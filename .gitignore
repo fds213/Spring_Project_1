@@ -1,0 +1,17 @@
+# Maven 빌드 결과
+target/
+
+# macOS
+.DS_Store
+._*
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# 에디터 개인 설정 (STS용 .project / .classpath / .settings 는 Import에 필요해서 올린다)
+.vscode/
+.idea/
+*.iml
+
+*.log
