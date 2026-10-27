@@ -9,6 +9,9 @@ target/
 Thumbs.db
 desktop.ini
 
+# 오피스 문서를 열어 둘 때 생기는 임시 파일
+~$*
+
 # 에디터 개인 설정 (STS용 .project / .classpath / .settings 는 Import에 필요해서 올린다)
 .vscode/
 .idea/
