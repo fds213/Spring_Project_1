@@ -16,9 +16,7 @@
         <org.slf4j-version>2.0.19</org.slf4j-version>
         <logback-version>1.6.3</logback-version>
         <junit-version>5.14.4</junit-version>
-        <!-- STS3 수업 기능 관리 | Security 시작: Spring Security 독립 버전 -->
         <spring-security.version>5.8.16</spring-security.version>
-        <!-- STS3 수업 기능 관리 | Security 끝: Spring Security 독립 버전 -->
     </properties>
     <dependencies>
         <dependency>
@@ -36,7 +34,6 @@
             <artifactId>aspectjrt</artifactId>
             <version>${org.aspectj-version}</version>
         </dependency>
-        <!-- Spring 5 uses spring-jcl; do not add jcl-over-slf4j. -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -53,7 +50,6 @@
             <artifactId>javax.inject</artifactId>
             <version>1</version>
         </dependency>
-        <!-- Keep javax APIs for Spring 5 / Tomcat 9. -->
         <dependency>
             <groupId>javax.servlet</groupId>
             <artifactId>javax.servlet-api</artifactId>
@@ -77,56 +73,42 @@
             <version>${org.springframework-version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- JUnit 5 is the Java 11 compatible major version. -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit-version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: mybatis 의존성 추가 -->
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis</artifactId>
             <version>3.5.19</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: mybatis 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: mybatis-spring 의존성 추가 -->
         <dependency>
             <groupId>org.mybatis</groupId>
             <artifactId>mybatis-spring</artifactId>
             <version>2.1.2</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: mybatis-spring 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: spring-jdbc 의존성 추가 -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-jdbc</artifactId>
             <version>5.3.39</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: spring-jdbc 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: spring-tx 의존성 추가 -->
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-tx</artifactId>
             <version>5.3.39</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: spring-tx 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: ojdbc11 의존성 추가 -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
             <artifactId>ojdbc11</artifactId>
             <version>21.23.0.0</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: ojdbc11 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: HikariCP 의존성 추가 -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>7.1.0</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: HikariCP 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | MyBatis XML 시작: log4jdbc-log4j2-jdbc4.1 의존성 추가 -->
         <dependency>
             <groupId>org.bgee.log4jdbc-log4j2</groupId>
             <artifactId>log4jdbc-log4j2-jdbc4.1</artifactId>
@@ -138,35 +120,26 @@
                 </exclusion>
             </exclusions>
         </dependency>
-        <!-- STS3 수업 기능 관리 | MyBatis XML 끝: log4jdbc-log4j2-jdbc4.1 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | Security 시작: spring-security-core 의존성 추가 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-core</artifactId>
             <version>${spring-security.version}</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | Security 끝: spring-security-core 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | Security 시작: spring-security-config 의존성 추가 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-config</artifactId>
             <version>${spring-security.version}</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | Security 끝: spring-security-config 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | Security 시작: spring-security-web 의존성 추가 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-web</artifactId>
             <version>${spring-security.version}</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | Security 끝: spring-security-web 의존성 추가 -->
-        <!-- STS3 수업 기능 관리 | Security 시작: spring-security-taglibs 의존성 추가 -->
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-taglibs</artifactId>
             <version>${spring-security.version}</version>
         </dependency>
-        <!-- STS3 수업 기능 관리 | Security 끝: spring-security-taglibs 의존성 추가 -->
         		<!-- Lombok -->
 		<dependency>
 		    <groupId>org.projectlombok</groupId>
