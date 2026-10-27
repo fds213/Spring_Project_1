@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE configuration PUBLIC "-//mybatis.org//DTD Config 3.0//EN" "https://mybatis.org/dtd/mybatis-3-config.dtd">
+<!-- STS3 수업 기능 관리 | MyBatis XML 기본 설정: 별칭과 추가 설정은 수업에서 작성하세요. -->
+<configuration></configuration>

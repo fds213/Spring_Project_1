@@ -1,8 +1,45 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <beans xmlns="http://www.springframework.org/schema/beans"
-	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
-	
-	<!-- Root Context: defines shared resources visible to all other web components -->
-		
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+                           http://www.springframework.org/schema/context https://www.springframework.org/schema/context/spring-context.xsd">
+
+    <!-- Root Context: defines shared resources visible to all other web components -->
+
+    <!-- STS3 수업 기능 관리 | MyBatis XML 시작: Oracle 연결 정보 및 HikariCP 설정 -->
+    <bean id="hikariConfig" class="com.zaxxer.hikari.HikariConfig">
+        <property name="driverClassName" value="net.sf.log4jdbc.sql.jdbcapi.DriverSpy" />
+        <property name="jdbcUrl" value="jdbc:log4jdbc:oracle:thin:@localhost:1521/XEPDB1" />
+        <property name="username" value="spring" />
+        <property name="password" value="java1234" />
+    </bean>
+    <!-- STS3 수업 기능 관리 | MyBatis XML 끝: Oracle 연결 정보 및 HikariCP 설정 -->
+
+    <!-- STS3 수업 기능 관리 | MyBatis XML 시작: DataSource 등록 -->
+    <bean id="dataSource" class="com.zaxxer.hikari.HikariDataSource" destroy-method="close">
+        <constructor-arg ref="hikariConfig" />
+    </bean>
+    <!-- STS3 수업 기능 관리 | MyBatis XML 끝: DataSource 등록 -->
+
+    <!-- STS3 수업 기능 관리 | MyBatis XML 시작: 공통 SqlSessionFactory 등록 -->
+    <bean id="sessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource" />
+        <property name="mapperLocations" value="classpath:mappers/*.xml" />
+        <property name="configLocation" value="classpath:config/mybatis-config.xml" />
+    </bean>
+    <!-- STS3 수업 기능 관리 | MyBatis XML 끝: 공통 SqlSessionFactory 등록 -->
+
+    <!-- STS3 수업 기능 관리 | MyBatis XML 시작: SqlSessionTemplate 등록 -->
+    <bean id="sqlSessionTemplate" class="org.mybatis.spring.SqlSessionTemplate">
+        <constructor-arg ref="sessionFactory" />
+    </bean>
+    <!-- STS3 수업 기능 관리 | MyBatis XML 끝: SqlSessionTemplate 등록 -->
+
+    <!-- DAO, Service 등 Controller를 제외한 클래스는 부모(root)에서 생성 -->
+    <context:component-scan base-package="com.ieum.gw">
+        <context:exclude-filter type="annotation"
+            expression="org.springframework.stereotype.Controller" />
+    </context:component-scan>
+
 </beans>
