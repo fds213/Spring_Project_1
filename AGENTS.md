@@ -6,7 +6,7 @@
 ## 프로젝트
 
 - 사내 그룹웨어(전자결재·근태·일정·게시판·채팅)와 IT Service Hub(티켓·자산·지점·회사 지도)를 하나로 합친 Spring MVC 웹 서비스다.
-- 기준 문서: `doc/사내_그룹웨어_IT_Service_Hub_통합_프로젝트_계획서.md`. 기능 범위·업무 흐름·권한·상태 전이 규칙은 이 문서를 따른다. 해당 기능을 만들기 전에 관련 장을 먼저 읽는다.
+- 기준 문서: `docs/사내_그룹웨어_IT_Service_Hub_통합_프로젝트_계획서.md`. 기능 범위·업무 흐름·권한·상태 전이 규칙은 이 문서를 따른다. 해당 기능을 만들기 전에 관련 장을 먼저 읽는다.
 - 문서에 없는 기능·테이블·컬럼·화면을 임의로 만들지 않는다. 요구가 불분명하거나 문서와 다르면 추측하지 말고 사람에게 묻는다.
 - 일정: 필수 기능 통합 11/6, 기능 추가 마감 11/9, 발표 11/13. 필수 기능이 끝나기 전에는 계획서 12장의 '추가 기능'을 작업하지 않는다.
 
@@ -28,9 +28,9 @@
 
 - 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 모듈 패키지는 그 아래에 둔다(예: `com.ieum.gw.approval.controller`).
 - 모듈 패키지: `employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `common`.
-- 모듈 안 구조: `controller`, `service`, `dao`, `dto`. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
-- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 `<모듈>.xml`(예: `approval.xml`)이고, 하나로 부족하면 `<모듈>-<기능>.xml`로 나눈다. namespace는 파일 이름과 같게 써서 다른 파일과 겹치지 않게 한다.
-- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalDTO`. URL: `/<모듈>/<기능>`(예: `/approval/list`), 관리 화면은 `/<모듈>/admin/<기능>`(예: `/employee/admin/list`).
+- 모듈 안 구조: `controller`, `service`, `dao`, `mapper`, `dto`. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.approval.mapper.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
+- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. URL: `/<모듈>/<기능>`(예: `/approval/list`), 관리 화면은 `/<모듈>/admin/<기능>`(예: `/employee/admin/list`).
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
 ## 수정 범위
@@ -40,7 +40,7 @@
 - 아래 공통 파일은 담당자만 수정한다. 에이전트는 수정하지 않고 필요한 변경 내용만 제안한다.
   - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 공통 레이아웃 JSP, `common` 패키지 → 담당 1
   - DDL·초기 데이터 스크립트 → DB 담당
-  - `AGENTS.md`, `doc/` 계획서 → 팀 합의
+  - `AGENTS.md`, `docs/` 계획서 → 팀 합의
 
 | 담당 | 모듈 | 이름 |
 |---|---|---|
@@ -62,6 +62,11 @@
 
 ## DB·MyBatis
 
+- MyBatis는 Mapper 인터페이스 방식으로 쓰고, 호출은 Service → DAO → Mapper 순서로 한다(수업 ToyProject와 같은 구조).
+  - Mapper(`mapper` 패키지)는 `@Mapper`를 붙인 인터페이스다. SQL 하나에 메서드 하나를 두고, 메서드 이름은 Mapper XML의 `id`와 같게 한다.
+  - DAO(`dao` 패키지)는 `@Repository` 클래스다. Mapper를 주입받아 감싸고, Service는 DAO만 호출한다. Service나 Controller가 Mapper를 직접 부르지 않는다.
+  - `SqlSessionTemplate`에 `"namespace.id"` 문자열을 넘기는 방식은 쓰지 않는다.
+  - 공통 설정(담당 1)은 `root-context.xml`에서 `@Mapper`가 붙은 인터페이스만 Mapper로 등록한다(`<mybatis-spring:scan base-package="com.ieum.gw" annotation="org.apache.ibatis.annotations.Mapper" />`). 그래서 `@Mapper`를 빼먹으면 Mapper가 등록되지 않는다.
 - 테이블·컬럼 추가·변경은 DB 담당을 거친다. 에이전트는 `CREATE`·`ALTER` 스크립트를 직접 고치지 않고, 필요한 SQL을 PR 설명이나 사람에게 제안한다.
 - MyBatis 파라미터는 `#{}`만 쓴다. `${}`는 정렬 컬럼처럼 서버에서 허용 목록으로 검증한 값에만 쓴다.
 - 검색·페이징은 동적 SQL(`<where>`, `<if>`)로 만든다.

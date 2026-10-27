@@ -191,7 +191,7 @@
 - WebSocket은 수업의 `@ServerEndpoint` 방식으로 한다. `SpringConfigurator`를 상속한 Configurator로 Service를 주입받고, 핸드셰이크 때 서버의 인증 정보에서 로그인 사용자를 넘긴다. `SpringConfigurator`는 root context의 bean을 찾으므로 Service·DAO는 `root-context.xml`에서 스캔한다.
 - 채팅 담당이 11장의 사전 구현에서 인증 사용자·Service 주입·DB 저장을 확인하고 공통 예제로 공유한다. 이 방식이 안 되면 Spring `WebSocketHandler`로 바꾼다. `spring-websocket` 의존성은 담당 1이 추가한다.
 - 필수 외부 연동은 카카오 지도다. 일정 UI는 FullCalendar를 검토하되 버전을 고정하고 JSP에서 조회·등록 동작을 먼저 확인한다. 차트·리치 에디터는 필수가 아니다.
-- 패키지는 `employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `common`으로 나누고 내부에 `controller/service/dao/dto`를 구분한다. Mapper XML은 `src/main/resources/mapper/<모듈>.xml`에 둔다.
+- 패키지는 `employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `common`으로 나누고 내부에 `controller/service/dao/mapper/dto`를 구분한다. MyBatis는 Mapper 인터페이스 방식으로 쓰고, DAO 클래스가 Mapper 인터페이스를 감싸 Service는 DAO만 호출한다. Mapper XML은 `src/main/resources/mapper/<Mapper 인터페이스 이름>.xml`에 둔다.
 - REST 비밀키·DB 비밀번호는 저장소에 올리지 않는다. 브라우저 지도 JavaScript 키는 클라이언트에 전달되는 키이므로 개발·발표 도메인 제한을 적용한다.
 
 ## 9. 7명 역할 분담안
