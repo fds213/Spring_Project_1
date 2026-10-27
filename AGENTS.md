@@ -28,13 +28,14 @@
 
 - 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 모듈 패키지는 그 아래에 둔다(예: `com.ieum.gw.approval.controller`).
 - 모듈 패키지: `employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `common`.
-- 모듈 안 구조: `controller`, `service`, `dao`, `dto`. Mapper XML은 `src/main/resources/mapper/<모듈>/`, JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- 모듈 안 구조: `controller`, `service`, `dao`, `dto`. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mappers/`에 바로 둔다. 파일 이름은 `<모듈>.xml`(예: `approval.xml`)이고, 하나로 부족하면 `<모듈>-<기능>.xml`로 나눈다. namespace는 파일 이름과 같게 써서 다른 파일과 겹치지 않게 한다.
 - 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalDTO`. URL: `/<모듈>/<기능>`(예: `/approval/list`), 관리 화면은 `/<모듈>/admin/<기능>`(예: `/employee/admin/list`).
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
 ## 수정 범위
 
-- 자기 담당 모듈의 패키지·Mapper·JSP 폴더 안에서만 수정한다.
+- 자기 담당 모듈의 패키지·JSP 폴더와 Mapper XML 파일 안에서만 수정한다.
 - 다른 모듈의 기능이 필요하면 그 모듈 Service의 공개 메서드를 호출한다. Controller끼리 호출하지 않는다. 필요한 메서드가 없으면 직접 만들지 말고, 담당자에게 요청할 메서드 이름·입력·반환값을 정리해 사람에게 알린다.
 - 아래 공통 파일은 담당자만 수정한다. 에이전트는 수정하지 않고 필요한 변경 내용만 제안한다.
   - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 공통 레이아웃 JSP, `common` 패키지 → 담당 1
