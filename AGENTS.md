@@ -5,7 +5,7 @@
 
 ## 프로젝트
 
-- 사내 그룹웨어(전자결재·근태·일정·게시판·채팅)와 IT Service Hub(티켓·자산·지점 지도)를 하나로 합친 Spring MVC 웹 서비스다.
+- 사내 그룹웨어(전자결재·근태·일정·게시판·채팅)와 IT Service Hub(티켓·자산·지점·회사 지도)를 하나로 합친 Spring MVC 웹 서비스다.
 - 기준 문서: `doc/사내_그룹웨어_IT_Service_Hub_통합_프로젝트_계획서.md`. 기능 범위·업무 흐름·권한·상태 전이 규칙은 이 문서를 따른다. 해당 기능을 만들기 전에 관련 장을 먼저 읽는다.
 - 문서에 없는 기능·테이블·컬럼·화면을 임의로 만들지 않는다. 요구가 불분명하거나 문서와 다르면 추측하지 말고 사람에게 묻는다.
 - 일정: 필수 기능 통합 11/6, 기능 추가 마감 11/9, 발표 11/13. 필수 기능이 끝나기 전에는 계획서 12장의 '추가 기능'을 작업하지 않는다.
@@ -16,7 +16,8 @@
 - 쓰지 않는다: Spring Boot, JPA·Hibernate, React·Vue, Gradle, Kotlin.
 - `pom.xml`의 의존성 추가·버전 변경은 하지 않는다. 필요하면 이유를 정리해 사람에게 요청한다.
 - Oracle은 XE 21c를 쓰고, PK는 SEQUENCE로 만든다(테이블마다 시퀀스 1개).
-- TODO(회의): 공용·개인 DB 방식, WebSocket 구현 방식(`@ServerEndpoint` 또는 Spring `WebSocketHandler`).
+- DB는 공용 Oracle 서버 한 대에 모두 접속한다. 테이블 변경은 DDL 스크립트로 Git에 올리고 DB 리드가 공용 DB에 반영한다. TODO(회의): 공용 DB를 둘 곳.
+- WebSocket은 `@ServerEndpoint` 방식이다. `SpringConfigurator`를 상속한 Configurator로 Service를 주입받고, 핸드셰이크 때 서버의 인증 정보에서 로그인 사용자를 넘긴다. 채팅 담당이 사전 구현에서 확인해 공유한 공통 예제를 따르고, 이 방식이 안 되면 Spring `WebSocketHandler`로 바꾼다. `spring-websocket` 의존성은 담당 1이 추가한다.
 
 ## 빌드·확인
 
@@ -28,7 +29,7 @@
 - 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 모듈 패키지는 그 아래에 둔다(예: `com.ieum.gw.approval.controller`).
 - 모듈 패키지: `employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `common`.
 - 모듈 안 구조: `controller`, `service`, `dao`, `dto`. Mapper XML은 `src/main/resources/mapper/<모듈>/`, JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
-- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalDTO`. URL: `/<모듈>/<기능>`(예: `/approval/list`).
+- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalDTO`. URL: `/<모듈>/<기능>`(예: `/approval/list`), 관리 화면은 `/<모듈>/admin/<기능>`(예: `/employee/admin/list`).
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
 ## 수정 범위
@@ -50,6 +51,14 @@
 | 6 | `schedule`, `board`, `notification`, 메인 | TODO(회의) |
 | 7 | `chat` | TODO(회의) |
 
+| 공통 역할 | 이름 |
+|---|---|
+| 팀장 | 최준원 |
+| DB 리드·DB 스크립트 취합 | 정상욱 |
+| 백엔드 리드 | 서장호 |
+| 프론트 리드·공통 레이아웃 | 홍동국 |
+| 보조 통합, 문서 취합, 발표자 | TODO(회의) |
+
 ## DB·MyBatis
 
 - 테이블·컬럼 추가·변경은 DB 담당을 거친다. 에이전트는 `CREATE`·`ALTER` 스크립트를 직접 고치지 않고, 필요한 SQL을 PR 설명이나 사람에게 제안한다.
@@ -70,6 +79,8 @@ DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코�
 
 - 로그인과 URL 접근은 Spring Security로 처리한다. 데이터별 권한(결재 문서 관계자, 티켓 요청자·담당자, 채팅방 참여자, 같은 부서)은 Service에서 검사한다. URL이나 파라미터의 ID만 바꿔서 남의 자료를 볼 수 없어야 한다.
 - 로그인 사용자 정보는 서버의 인증 정보에서만 가져온다. 요청 파라미터나 WebSocket 메시지에 담긴 사용자 ID·작성자 값을 믿지 않는다.
+- 관리 기능은 별도 사이트가 아니라 같은 사이트 안의 관리자 메뉴로 둔다. 관리 화면 URL(`/<모듈>/admin/**`)은 Spring Security에서 관리 역할만 통과시킨다.
+- 공개 회원가입은 없다. 첫 관리자 계정은 초기 데이터로 만들고, 사원 계정은 관리자가 만든다. 초기 비밀번호로 첫 로그인하면 비밀번호 변경 화면을 먼저 띄운다.
 - 비밀번호는 BCrypt로 해시해 저장한다. 평문으로 저장하거나 로그에 남기지 않는다.
 - JSP에서 사용자 입력을 출력할 때는 `<c:out>` 또는 `fn:escapeXml`로 이스케이프한다.
 - 파일 업로드·다운로드마다 소속 자료의 접근 권한을 검사하고, 확장자와 실제 파일 형식을 확인하며, 저장 파일명은 UUID로 만든다.
@@ -116,3 +127,4 @@ DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코�
 - 여러 모듈이나 공통 파일에 걸친 큰 변경은 하지 않는다. 필요하면 먼저 계획을 사람에게 보여 준다.
 - 작업이 끝나면 무엇을 왜 바꿨는지 짧게 요약한다. 담당자가 그 코드를 직접 설명할 수 있어야 한다(팀원별 AI 사용 기록·발표 질의 대비).
 - 답변·주석·문서는 한국어로 쓴다.
+- 개인 지침 파일(`CLAUDE.local.md` 등)은 각자 판단해 만든다.
