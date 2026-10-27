@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="sample">
-    <!-- STS3 수업 기능 관리 | MyBatis XML 시작: 기본 매퍼 -->
-    <!-- namespace를 수업에 맞게 변경하고 SQL을 작성하세요. -->
-    <!-- STS3 수업 기능 관리 | MyBatis XML 끝: 기본 매퍼 -->
-</mapper>

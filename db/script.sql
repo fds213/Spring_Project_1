@@ -41,3 +41,5 @@ INSERT INTO tblTestEmp (empnum, pw, name, role, status)
 VALUES ('20261023', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '코알라', 'ROLE_EMP', 'RETIRED');   -- 퇴사자 (로그인 차단 확인용)
 
 COMMIT;
+
+select * from TBLTESTEMP;
