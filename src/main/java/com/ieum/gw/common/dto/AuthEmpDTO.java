@@ -1,4 +1,4 @@
-package com.ieum.gw.auth.model;
+package com.ieum.gw.common.dto;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -7,16 +7,16 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class AuthEmpDto {
+public class AuthEmpDTO {
 
 	private String empnum;
-	
+
 	@ToString.Exclude
 	private String pw;
-	
+
 	private String name;
 	private String role;
 	private String status;
-	
+
 
 }

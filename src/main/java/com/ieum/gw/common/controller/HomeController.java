@@ -12,7 +12,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-import com.ieum.gw.auth.model.LoginUser;
+import com.ieum.gw.common.dto.LoginUser;
 
 /**
  * Handles requests for the application home page.

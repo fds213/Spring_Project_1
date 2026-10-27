@@ -11,12 +11,11 @@
 	<!-- 계정은 등록하지 않습니다. 수업에서 이 빈을 커스텀 UserDetailsService로 교체하세요. -->
 	<security:http use-expressions="true"
 		create-session="ifRequired">
-		<!-- 수업 시작 설정: 모든 URL 접근 허용. 구체적인 URL 권한 규칙은 이 규칙보다 위에 추가하세요. -->
-<security:intercept-url pattern="/resources/**" access="permitAll" />      
-<security:intercept-url pattern="/admin/**"     access="hasRole('ADMIN')" />
-<security:intercept-url pattern="/it/**"        access="hasAnyRole('IT', 'ADMIN')" />
-<security:intercept-url pattern="/hr/**"        access="hasAnyRole('HR', 'ADMIN')" />
-<security:intercept-url pattern="/**"           access="isAuthenticated()" />  
+		<!-- URL 권한 규칙은 위에서부터 먼저 맞는 것이 적용된다. 구체적인 규칙을 위에 둔다. -->
+		<!-- 관리 화면은 /<모듈>/admin/** (AGENTS.md 권한·보안). 인사(HR)·IT 담당자에게 열 모듈별 규칙은 요구분석서 확정 뒤 이 줄 위에 추가한다. -->
+		<security:intercept-url pattern="/resources/**" access="permitAll" />
+		<security:intercept-url pattern="/*/admin/**"   access="hasRole('ADMIN')" />
+		<security:intercept-url pattern="/**"           access="isAuthenticated()" />
 
 		<!-- 기본 GET /login 화면과 POST /login 인증 처리. 커스텀 JSP 작성 후 login-page를 지정하세요. -->
 		<security:form-login />

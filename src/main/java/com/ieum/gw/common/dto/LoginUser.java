@@ -1,4 +1,4 @@
-package com.ieum.gw.auth.model;
+package com.ieum.gw.common.dto;
 
 import java.util.Collection;
 import java.util.List;
@@ -9,9 +9,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 public class LoginUser implements UserDetails {
 
-	private final AuthEmpDto emp; // 포장할 사원 정보
+	private final AuthEmpDTO emp; // 포장할 사원 정보
 
-	public LoginUser(AuthEmpDto emp) {
+	public LoginUser(AuthEmpDTO emp) {
 		this.emp = emp;
 	}
 
