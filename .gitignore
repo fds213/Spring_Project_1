@@ -18,3 +18,6 @@ desktop.ini
 *.iml
 
 *.log
+
+# DB 접속 정보 (각자 PC에서 db.properties.example을 복사해서 사용)
+src/main/resources/config/db.properties
