@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IEUM</title>
+  <!-- 사이트 주소만 열면(예: http://localhost:8000/) 소개 페이지로 보낸다. 설치한 앱은 manifest의 start_url(index.html)로 열리고,
+       ?preview 로 그룹웨어를 보는 시안 확인도 그대로 둔다 -->
+  <script>
+    if (location.pathname.endsWith('/') && !new URLSearchParams(location.search).has('preview')) location.replace('site.html' + location.hash);
+  </script>
   <meta name="theme-color" content="#ffffff">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/favicon.png" type="image/png">

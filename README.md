@@ -34,9 +34,10 @@ python -m http.server 8000
 
 열 주소:
 
+- 소개 페이지: http://localhost:8000/ (주소만 열면 `site.html`로 이동한다)
 - 그룹웨어: http://localhost:8000/index.html?preview
 - 무료 체험 신청: http://localhost:8000/trial.html
-- 소개 페이지: http://localhost:8000/site.html
+- 도입 문의: http://localhost:8000/inquiry.html
 
 **VS Code Live Server**: 폴더를 열고 `index.html`을 우클릭한 뒤 Open with Live Server를 누른다. 주소의 포트만 5500으로 바뀐다(예: http://127.0.0.1:5500/index.html?preview).
 
