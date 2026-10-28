@@ -41,10 +41,10 @@
 	</context:component-scan>
 
 	<!-- WebSocket -->
-	<websocket:handlers>
-		<websocket:mapping path="/chat/ws" handler="chatWebSocketHandler"/>
-	</websocket:handlers>
+<!--	<websocket:handlers>-->
+<!--		<websocket:mapping path="/chat/ws" handler="chatWebSocketHandler"/>-->
+<!--	</websocket:handlers>-->
 
-	<beans:bean id="chatWebSocketHandler" class="com.ieum.gw.chat.handler.ChatWebSocketHandler"/>
+<!--	<beans:bean id="chatWebSocketHandler" class="com.ieum.gw.chat.handler.ChatWebSocketHandler"/>-->
 
 </beans:beans>

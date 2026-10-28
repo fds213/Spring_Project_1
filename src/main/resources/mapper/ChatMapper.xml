@@ -1,0 +1,15 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.chat.mapper.ChatMapper">
+    <select id="isMember" resultType="int">
+        SELECT count(*) FROM chat_member WHERE roomId = #{roomId} AND empnum = #{empnum} AND left_at IS NULL
+    </select>
+
+    <insert id="insertMessage" parameterType="com.ieum.gw.chat.dto.ChatMessageDTO">
+        <selectKey keyProperty="msgId" resultType="long" order="BEFORE">
+            SELECT seq_chat_message.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO chat_message (msgId, roomId, sender, msg_type, content)
+        VALUES (#{msgId}, #{roomId}, #{sender}, #{msg_type}, #{content})
+    </insert>
+</mapper>
