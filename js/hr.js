@@ -1,18 +1,19 @@
 // 인사 관리 > 사원 관리 and 가입 승인, plus the 계정 만들기 form on the login screen.
 //
 // How an employee gets an account (decided 2026-10-28, replaces the pre-registration of requirements v1.4 ACC-04):
-//   1. 승인 요청: on the login screen the employee opens 계정 만들기 and types the 업체 코드, 이름, 부서, 직급 and
-//      이메일. The 승인 요청 button next to the 업체 코드 is grey until a code is typed, then blue. Sending it makes
-//      a join request (status REQUESTED, no 사번 yet) and the screen says "승인 요청을 하였습니다".
+//   1. 승인 요청: on the login screen the employee opens 계정 만들기, confirms the 업체 코드 (확인 loads that
+//      company's 부서 and 직급 lists), picks 부서 and 직급, types 이름, and verifies the 이메일 with a mailed code.
+//      The 승인 요청 button is grey until the company is confirmed and the e-mail verified, then blue. Sending it
+//      makes a join request (status REQUESTED, no 사번 yet) and the screen says "승인 요청을 하였습니다".
 //   2. 승인·반려: the company admin (every request) or the head of that team (that team's requests) approves or
 //      rejects it on 가입 승인 within 1 hour of the request. After 1 hour it has expired ("요청 만료") and must be
 //      made again. Approving gives the next 사번 in order (<year> + the next number after the highest one used,
 //      numbers of people who left are never reused) and, from the company admin, roles (IT·인사; the 업체 관리자
 //      role is never given: one per company). Status APPROVED, "승인 완료 (계정 생성 전)".
 //   3. 계정 생성: the employee's screen turns into "승인 완료되었습니다": the 사번 appears in a locked field, and
-//      비밀번호, 비밀번호 확인 and 이메일 인증 fields appear; the bottom button becomes 계정 생성. With the password
-//      set and the e-mail verified, 계정 생성 makes the account (ACTIVE, or WAITING when it was approved past the
-//      headcount, see below). The same device picks the request up again if the screen was closed.
+//      비밀번호 and 비밀번호 확인 fields appear; the bottom button becomes 계정 생성. With the password set,
+//      계정 생성 makes the account (ACTIVE, or WAITING when it was approved past the headcount, see below).
+//      The same device picks the request up again if the screen was closed.
 // Seats (decided 2026-10-28), counted when a request is approved:
 //   - Trial: up to 10 accounts in use including the admin. The 11th approval is refused.
 //   - Paid: accounts in use up to the purchased headcount. Approvals may go 20% further (구매 인원 × 1.2, rounded
@@ -48,6 +49,15 @@ const DEMO_DEPTS = {
   ieum0002: ['경영지원팀', '영업팀', '물류팀', '품질관리팀', '구매팀'],
 };
 const deptsOf = code => loadStore(DEPT_KEY, {})[code] || DEMO_DEPTS[code] || DEPTS;
+// Ranks (직급) are per company too (user decided 2026-10-28), kept by the company's admin like departments and
+// sent with them by GET /join/company/{code}. Every list has 팀장, since the prototype's 부서장 is the team's 팀장.
+const RANKS = ['사원', '주임', '대리', '과장', '차장', '팀장', '부장'];
+const RANK_KEY = 'ieum-demo-ranks-v1';
+const DEMO_RANKS = {
+  ieum0001: ['사원', '대리', '과장', '팀장'],
+  ieum0002: ['사원', '주임', '대리', '과장', '차장', '팀장', '부장', '이사'],
+};
+const ranksOf = code => loadStore(RANK_KEY, {})[code] || DEMO_RANKS[code] || RANKS;
 // this device's own join request (계정 만들기), so closing the screen doesn't lose it
 const MY_JOIN_KEY = 'ieum-demo-join-mine';
 
@@ -416,7 +426,7 @@ function openApprove(reqId) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고, 직원이 계정 만들기 화면에서 비밀번호와 이메일 인증을 마치면 계정이 만들어집니다.`
+  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고, 직원이 계정 만들기 화면에서 비밀번호를 정하면 계정이 만들어집니다(이메일은 요청할 때 인증함).`
     + (slot === 'WAIT' ? ' 구매 인원이 모두 차서 자리 대기로 승인됩니다.' : '');
   // roles: the company admin only (who may give roles is still open, guide section 3); never 업체 관리자
   const roles = dialog.querySelector('.approve-roles');
@@ -577,15 +587,19 @@ const $j = id => document.getElementById(id);
 const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinCode'];
 let checkedCompany = ''; // the company code confirmed with 확인 ('' = not confirmed)
 
-// The department list shows the confirmed company's departments; before that it holds only the hint and is off
-function setDeptOptions(code) {
-  const sel = $j('joinDept');
+// The department and rank lists show the confirmed company's own; before that they hold only the hint and are off
+function fillSelect(id, list, pick, code) {
+  const sel = $j(id);
   const keep = sel.value;
-  const list = code ? deptsOf(code) : [];
-  sel.replaceChildren(new Option(code ? '부서를 고르세요' : '업체 코드를 먼저 확인하세요', ''), ...list.map(d => new Option(d, d)));
+  sel.replaceChildren(new Option(code ? pick : '업체 코드를 먼저 확인하세요', ''), ...list.map(d => new Option(d, d)));
   sel.value = list.includes(keep) ? keep : '';
   sel.dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
 }
+function setDeptOptions(code) {
+  fillSelect('joinDept', code ? deptsOf(code) : [], '부서를 고르세요', code);
+  fillSelect('joinRank', code ? ranksOf(code) : [], '직급을 고르세요', code);
+}
+const companyLoaded = code => `부서 ${deptsOf(code).length}개, 직급 ${ranksOf(code).length}개`;
 function setCompanyNote(text, ok) {
   const note = $j('joinCompanyNote');
   note.textContent = text;
@@ -608,9 +622,9 @@ function checkCompany() {
   const order = companyOrder(code);
   const why = !code ? '업체 코드를 입력해 주세요' : joinBlock(order);
   checkedCompany = why ? '' : code;
-  setCompanyNote(why || `${order.company} · 부서 ${deptsOf(code).length}개를 불러왔습니다`, !why);
+  setCompanyNote(why || `${order.company} · ${companyLoaded(code)}를 불러왔습니다`, !why);
   setDeptOptions(checkedCompany);
-  $j('joinDept').disabled = !checkedCompany;
+  $j('joinDept').disabled = $j('joinRank').disabled = !checkedCompany;
   syncRequestButton();
   // after select.js has turned the dropdown on (it redraws on the next tick)
   if (checkedCompany) setTimeout(() => $j('joinDeptBtn')?.focus());
@@ -625,12 +639,12 @@ function onCompanyInput() {
   checkedCompany = '';
   setCompanyNote('', false);
   setDeptOptions('');
-  $j('joinDept').disabled = true;
+  $j('joinDept').disabled = $j('joinRank').disabled = true;
   syncRequestButton();
 }
 $j('joinCompany').addEventListener('input', onCompanyInput);
 setDeptOptions('');
-$j('joinDept').disabled = true;
+$j('joinDept').disabled = $j('joinRank').disabled = true;
 
 const loadMyJoin = () => loadStore(MY_JOIN_KEY, null);
 const saveMyJoin = v => { try { if (v) localStorage.setItem(MY_JOIN_KEY, JSON.stringify(v)); else localStorage.removeItem(MY_JOIN_KEY); } catch { /* storage blocked */ } };
@@ -683,11 +697,12 @@ function renderJoinForm() {
     $j('joinName').value = e.name;
     // the request was made for this company, so it counts as confirmed and its departments are loaded
     checkedCompany = mine.company;
-    setCompanyNote(`${(companyOrder(mine.company) || {}).company || mine.company} · 부서 ${deptsOf(mine.company).length}개`, true);
+    setCompanyNote(`${(companyOrder(mine.company) || {}).company || mine.company} · ${companyLoaded(mine.company)}`, true);
     setDeptOptions(mine.company);
     $j('joinDept').value = e.dept;
     $j('joinDept').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
     $j('joinRank').value = e.rank;
+    $j('joinRank').dispatchEvent(new Event('change'));
     $j('joinEmail').value = e.email;
     joinCode = null;
     verifiedEmail = e.email.toLowerCase();
@@ -714,7 +729,7 @@ function renderJoinForm() {
     setJoinStatus('', '');
   }
   // the department list is on only for a confirmed company while the form can still be changed
-  $j('joinDept').disabled = waiting || approved || !checkedCompany;
+  $j('joinDept').disabled = $j('joinRank').disabled = waiting || approved || !checkedCompany;
   $j('btnJoinSend').disabled = waiting || approved || emailVerifiedNow();
   syncRequestButton();
   syncCreateButton();
@@ -801,16 +816,17 @@ $j('btnJoinRequest').addEventListener('click', () => {
   const company = $j('joinCompany').value.trim().toLowerCase();
   const name = $j('joinName').value.trim();
   const dept = $j('joinDept').value;
-  const rank = $j('joinRank').value.trim() || '사원';
+  const rank = $j('joinRank').value;
   const email = $j('joinEmail').value.trim();
   const error = $j('joinError');
-  error.textContent = !dept ? '부서를 골라 주세요' : !name ? '이름을 입력해 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요'
+  error.textContent = !dept ? '부서를 골라 주세요' : !rank ? '직급을 골라 주세요' : !name ? '이름을 입력해 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요'
     : !emailVerifiedNow() ? '이메일을 인증해 주세요' : '';
   if (error.textContent) return;
   const order = companyOrder(company);
   // checked again: the company may have changed since 확인, and the department must be one of its own
   error.textContent = company !== checkedCompany ? '업체 코드를 다시 확인해 주세요'
-    : joinBlock(order) || (deptsOf(company).includes(dept) ? '' : '부서를 다시 골라 주세요');
+    : joinBlock(order) || (!deptsOf(company).includes(dept) ? '부서를 다시 골라 주세요'
+      : ranksOf(company).includes(rank) ? '' : '직급을 다시 골라 주세요');
   if (error.textContent) return;
   const list = staffOf(company);
   const same = list.find(e => (e.email || '').toLowerCase() === email.toLowerCase()
