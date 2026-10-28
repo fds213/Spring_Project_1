@@ -45,8 +45,9 @@ if (!loadStore(SEEDED_KEY, false)) {
 
 // Built-in demo companies (added 2026-10-28 at the user's request): one admin of a company on its trial and one
 // of a paid company, so anyone opening the prototype can sign in without signing up first. Dates are counted
-// from today, so the trial never runs out. A company missing from this browser (first visit, or deleted) is put
-// back on every load; one already stored is left as it is, so payments or staff changes made in the demo stay.
+// from today. A company missing from this browser (first visit, or deleted), or whose trial or paid period has
+// run out, is put back on load; one still running is left as it is, so payments or staff changes made in the
+// demo stay until then (its staff are kept either way).
 // Their codes are kept out of the codes a signup can draw (trial.js RESERVED_CODES).
 const DEMO_PW = 'ieum1234';
 function demoCompanies() {
@@ -72,7 +73,8 @@ function demoCompanies() {
   ];
 }
 function ensureDemoCompanies() {
-  const orders = loadStore(ORDERS_KEY, []);
+  const stale = o => o.no.startsWith('T-DEMO-') && trialState(o).status === 'EXPIRED';
+  const orders = loadStore(ORDERS_KEY, []).filter(o => !stale(o));
   const missing = demoCompanies().filter(d => !orders.some(o => o.companyCode === d.companyCode));
   if (!missing.length) return;
   saveStore(ORDERS_KEY, [...orders, ...missing]);
@@ -142,7 +144,8 @@ function trialState(o) {
 // Paid plans (requirements v1.5 3.5·3.6, SUB-03·05). No automatic renewal or charge: the admin extends the
 // subscription directly, as many times as it likes, choosing monthly or annual each time.
 // - The first purchase, and a purchase after the paid period ended, start on the payment day.
-// - An extension before the end adds to the current expiry date (monthly → annual starts where the month ends).
+// - An extension before the end continues from the day after the current expiry date (monthly → annual starts
+//   where the month ends).
 // - Months are calendar months; a day the month doesn't have becomes its last day, and the run keeps its first
 //   day as the base, so 1.31 → 2.28 → 3.31 (anchor + total months, not chained from the adjusted date).
 // - The period runs through the expiry date itself; the day after it the company is read-only.
@@ -155,7 +158,12 @@ const PLANS = { MONTHLY: { label: '월간', months: 1 }, ANNUAL: { label: '연�
 function subscriptionOf(o) {
   if (o.status !== 'PAID' || !o.subAnchorAt) return null;
   const expire = addMonths(o.subAnchorAt, o.subMonths);
-  return { plan: o.plan, planLabel: PLANS[o.plan]?.label || '월간', from: o.subAnchorAt, expire, expireIso: expire.toISOString() };
+  // the plan of the paid period covering today (an extension bought on another plan starts later)
+  const now = Date.now();
+  const cur = (o.payments || []).filter(p => p.result === 'OK' && p.plan && p.from && p.to)
+    .find(p => dayStart(p.from).getTime() <= now && now <= endOfDay(p.to).getTime());
+  const plan = cur ? cur.plan : o.plan;
+  return { plan, planLabel: PLANS[plan]?.label || '월간', from: o.subAnchorAt, expire, expireIso: expire.toISOString() };
 }
 
 // The latest day an annual period paid so far ends (null if the company never bought annual)
@@ -186,7 +194,7 @@ function quoteOf(o, plan, users) {
   const n = users;
   const amount = Math.floor(n * PRICE_PER_USER * months * (100 - pct) / 100);
   const today = dayStart(Date.now());
-  const from = mode === 'EXTEND' ? sub.expire : today;
+  const from = mode === 'EXTEND' ? dayAfter(sub.expire) : today;
   const to = mode === 'EXTEND' ? addMonths(o.subAnchorAt, o.subMonths + months) : addMonths(today, months);
   return { mode, plan, months, users: n, pct, why, amount, from: from.toISOString(), to: to.toISOString(),
     formula: `${n}명 × ${won(PRICE_PER_USER)} × ${months}개월${pct ? ` × ${100 - pct}%` : ''}` };

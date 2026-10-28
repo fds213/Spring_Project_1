@@ -135,12 +135,12 @@ function monthWindow(now, monthOffset) {
   return [start, end];
 }
 
-// new paying seats = the headcount of first payments; every successful payment (first or monthly) counts toward
+// new paying seats = the headcount of first payments and of paying again after expiry; every successful payment counts toward
 // the payment count and the sales
 function sumWindow(pays, [start, end]) {
   const rows = pays.filter(p => { const t = new Date(p.at); return t >= start && t <= end; });
   return {
-    users: rows.filter(p => p.kind === 'FIRST').reduce((s, p) => s + p.users, 0),
+    users: rows.filter(p => p.kind === 'FIRST' || p.kind === 'RESTART').reduce((s, p) => s + p.users, 0),
     count: rows.length,
     sales: rows.reduce((s, p) => s + p.amount, 0),
   };
@@ -174,7 +174,7 @@ function renderStats() {
   put('dPaidCount', deltaText(cur.count, prev.count, cases));
   put('dSales', deltaText(cur.sales, prev.sales, won));
 
-  const salesRows = drawSales(orders.filter(o => o.status === 'PAID'));
+  const salesRows = drawSales(orders.filter(o => trialState(o).status === 'PAID')); // read-only (expired) companies don't pay now
   const days = drawDaily(orders, pays);
   drawTables(salesRows, days);
 }

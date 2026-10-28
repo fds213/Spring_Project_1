@@ -197,7 +197,7 @@ function renderBilling() {
     ['업체 코드', order.companyCode],
     ['이용 인원', change ? `${order.users}명 (${ymd(change.from)}부터 ${change.users}명)` : `${order.users}명`],
     ['1인 월 이용료', won(PRICE_PER_USER)],
-    ['결제 안내 이메일', order.email || '-'],
+    ['결제 안내 이메일', order.billEmail || order.email || '-'],
     ['체험 기간', `${ymd(order.at)} ~ ${st.trialEnd} (14일)`],
     ...(sub ? [
       ['요금제', sub.planLabel],
@@ -214,7 +214,7 @@ function renderBilling() {
   document.getElementById('billHint').textContent = {
     FIRST: st.status === 'EXPIRED' ? '체험이 끝나 읽기 전용입니다. 결제하면 오늘부터 바로 이어서 쓸 수 있습니다'
       : '체험 기간 중 언제든 결제할 수 있고, 결제한 날부터 유료 이용이 시작됩니다. 남은 체험 기간은 이어지지 않습니다',
-    EXTEND: `만료일(${st.end})부터 이어지도록 직접 연장합니다. 자동 결제는 없고, 해지·환불은 제공하지 않습니다`,
+    EXTEND: `만료일(${st.end}) 다음 날부터 이어지도록 직접 연장합니다. 자동 결제는 없고, 해지·환불은 제공하지 않습니다`,
     RESTART: '이용 기간이 끝나 읽기 전용입니다. 결제하면 오늘부터 다시 시작하고, 계정과 데이터는 그대로입니다',
   }[mode];
   renderBillSteps(order, mode);
@@ -233,7 +233,7 @@ function renderBillSteps(order, mode) {
     const users = document.getElementById('payUsers');
     if (users.dataset.for !== order.no) {
       users.value = plannedUsers(order);
-      document.getElementById('payEmail').value = order.email || '';
+      document.getElementById('payEmail').value = order.billEmail || order.email || '';
       users.dataset.for = order.no;
     }
     const min = `최소 ${activeStaff(session.company).length}명(지금 사용 중인 계정 수)`;
@@ -247,7 +247,7 @@ function renderBillSteps(order, mode) {
     fillDetail('billOrder', [
       ['구분', MODE_TEXT[q.mode]],
       ['요금제', `${PLANS[q.plan].label} (${q.months}개월)`],
-      ['이용 인원', q.mode === 'EXTEND' && q.users !== order.users ? `${q.users}명 (${ymd(dayAfter(q.from))}부터)` : `${q.users}명`],
+      ['이용 인원', q.mode === 'EXTEND' && q.users !== order.users ? `${q.users}명 (${ymd(q.from)}부터)` : `${q.users}명`],
       ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}`],
       ['결제 금액', `${won(q.amount)} (${q.formula})`],
       ['할인', q.pct ? `${q.pct}% · ${q.why}` : q.why],
@@ -271,7 +271,7 @@ function renderPayPreview(order) {
   const q = checkedPlan() === 'ANNUAL' ? year : month;
   fillDetail('payPreview', [
     ['결제 금액', ok ? `${won(q.amount)} (${q.formula})` : '-'],
-    ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}${q.mode === 'EXTEND' ? ' (지금 만료일부터 이어서)' : ' (오늘 결제하면)'}`],
+    ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}${q.mode === 'EXTEND' ? ' (지금 만료일 다음 날부터 이어서)' : ' (오늘 결제하면)'}`],
   ]);
 }
 document.getElementById('payUsers').addEventListener('input', () => {
@@ -307,6 +307,7 @@ document.getElementById('btnPayNext').addEventListener('click', () => {
   }
   billQuote = quote;
   billStep = 2;
+  document.getElementById('billAgree').checked = false; // agreed again for every payment
   renderBilling();
 });
 document.getElementById('btnPayBack').addEventListener('click', () => { billStep = 1; renderBilling(); });
@@ -358,7 +359,7 @@ function payBill(success) {
       if (q.mode === 'EXTEND') {
         order.subMonths += q.months;
         if (q.users !== plannedUsers(order)) {
-          order.seatChanges = [...(order.seatChanges || []), { from: dayAfter(q.from).toISOString(), users: q.users }];
+          order.seatChanges = [...(order.seatChanges || []), { from: q.from, users: q.users }];
         }
       } else {
         // first payment or after the paid period ended: a new run from today, with the headcount chosen at step 1
@@ -369,10 +370,11 @@ function payBill(success) {
         order.subMonths = q.months;
         order.users = q.users;
         order.total = q.users * PRICE_PER_USER;
-        order.email = q.email || order.email;
+        // the billing address is kept apart: order.email stays the verified signup address (password reset)
+        order.billEmail = q.email || order.billEmail;
         delete order.seatChanges;
       }
-      order.plan = q.plan;
+      if (q.mode !== 'EXTEND') order.plan = q.plan; // an extension's plan shows once its period starts
     }
     saveStore(ORDERS_KEY, orders);
     if (success) {
@@ -393,7 +395,7 @@ function showPayDone(order, q) {
     FIRST: `유료 이용 신청이 끝났습니다. ${ymd(q.from)}부터 ${ymd(q.to)}까지 ${PLANS[q.plan].label} 요금제로 이어서 쓰고, ` +
       `체험 중 ${TRIAL_SEATS}명이던 계정 한도도 풀렸습니다. 계정과 데이터는 그대로입니다.`,
     EXTEND: `연장이 끝났습니다. 만료일이 ${ymd(q.to)}로 늘었습니다.` +
-      (q.users !== order.users ? ` 이용 인원은 ${ymd(dayAfter(q.from))}부터 ${q.users}명입니다.` : ''),
+      (q.users !== order.users ? ` 이용 인원은 ${ymd(q.from)}부터 ${q.users}명입니다.` : ''),
     RESTART: `다시 결제했습니다. 오늘부터 ${ymd(q.to)}까지 쓸 수 있고, 계정과 데이터는 그대로입니다.`,
   }[q.mode] + ' 자동으로 결제되지 않으니 만료 전에 직접 연장해 주세요.';
   fillDetail('payDone', [
