@@ -260,6 +260,9 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .status-trial { background: var(--accent-bg); color: var(--accent); }
 .status-expired { background: #fff4e5; color: #8a4b08; }
 .status-active { background: #e5f4e4; color: #2b6a2f; }
+.status-read { background: #e5f4e4; color: #2b6a2f; }
+.status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
+.status-retired, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
 /* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
 .table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
 
@@ -279,20 +282,14 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .seat-bar.is-full p, .seat-bar.is-full strong { color: var(--danger); }
 .seat-bar.is-full .btn-primary { background: var(--danger); border-color: var(--danger); }
 
-.emp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding: 16px 18px 4px; }
-.emp-fields .form-error { margin-top: -2px; }
 /* 사번 is given automatically: shown like a field but not editable */
 .emp-no { display: flex; align-items: center; background: var(--bg-sub); color: var(--text-sub); font-variant-numeric: tabular-nums; }
-.emp-fields .emp-roles-hint { margin: -2px 0 10px; }
 .emp-roles { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; flex-direction: row; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
 .emp-roles legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
 .emp-roles label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; color: var(--text); }
 .emp-roles input { accent-color: var(--accent); }
 .emp-roles-hint { flex-basis: 100%; margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
-.emp-form .info-card-foot { margin-top: 8px; }
-.emp-form .bill-actions .btn { height: 40px; }
 @media (max-width: 600px) {
-  .emp-fields { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* trial strip under the header: days left and, for the company admin, the way to the billing page */
@@ -332,7 +329,6 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-step { display: flex; flex-direction: column; gap: 18px; }
 /* step 1: no gap held for an error that isn't there, so the fields sit evenly */
 .bill-step .form-error:empty { display: none; }
-.bill-intro { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 /* what the headcount costs, right under the headcount field: label left, amount right */
 .pay-summary {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 4px 0 0;
@@ -454,7 +450,6 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   border-radius: 8px; background: var(--bg-sub); color: var(--text-sub);
 }
 /* card footer with an action: pinned to the card's bottom, so it lines up even when cards stretch */
-.info-card-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--line); }
 .btn-block { width: 100%; height: 40px; justify-content: center; font-weight: 500; }
 /* inside a card the list loses its own frame and tint: label muted on the left, value in front */
 .info-card .detail { border: 0; border-radius: 0; grid-template-columns: 128px minmax(0, 1fr); }
@@ -505,11 +500,10 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .modal h2 { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
 .modal p { margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text-sub); }
 .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal form .field { margin-bottom: 12px; }
+.modal form .login-error:empty { display: none; }
+.modal form .login-error { margin: 0 0 12px; }
 /* 다운로드 안내창: 확인 순서가 있는 안내는 조금 넓게 */
-.modal.modal-wide { width: min(440px, calc(100% - 32px)); }
-.install-steps { margin: -8px 0 20px; padding-left: 20px; display: grid; gap: 10px; font-size: 14px; line-height: 1.6; color: var(--text-sub); }
-.install-steps strong { display: block; color: var(--text); font-weight: 600; }
-.install-steps span { overflow-wrap: anywhere; }
 .modal-actions .btn { height: 40px; padding: 0 16px; }
 
 /* toast: short notice at the bottom right, e.g. a new application arrived */

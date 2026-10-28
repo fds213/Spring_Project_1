@@ -246,7 +246,7 @@ const mailBody = (q, answer) => `${answer}\n\n----- 접수 원문 -----\n${q.bod
 // for reasons like a wrong address or a mail-server setting; here only the address is checked.
 function sendMail(message) {
   return new Promise(resolve => setTimeout(() => resolve(
-    /@[^@\s]+\.(com|net|org|kr)$/i.test(message.to) ? { ok: true } : { ok: false, reason: MAIL_FAIL }), 700));
+    /@[^@\s]+\.(?!con$)[a-z]{2,}$/i.test(message.to) ? { ok: true } : { ok: false, reason: MAIL_FAIL }), 700));
 }
 
 // Only one mail is in flight at a time; while it is, buttons are disabled so a double click can't send twice

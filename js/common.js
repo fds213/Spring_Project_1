@@ -35,7 +35,7 @@ function canSee(item) {
 let readOnly = false;
 
 function applyRoles() {
-  document.querySelectorAll('.nav-item[data-view]').forEach(a => { a.hidden = !canSee(a); });
+  document.querySelectorAll('.nav-item[data-view], [data-roles]').forEach(a => { a.hidden = !canSee(a); });
   // hide a group heading when none of its items are visible
   document.querySelectorAll('.nav-section').forEach(s => {
     s.hidden = ![...s.querySelectorAll('.nav-item')].some(a => !a.hidden);
@@ -48,10 +48,11 @@ function applyRoles() {
 // operators get the operator screens (ops.js). Prototype only: the accounts below live in this file and
 // the session in sessionStorage, so closing the tab signs out. The real project uses Spring Security form login.
 const DEMO_ACCOUNTS = [
-  // Only IEUM's own operator account is built in (sample companies removed 2026-10-28). Company accounts come
-  // from a trial signup or the built-in demo companies ieum0001/ieum0002 (findTrialAccount, ops.js demoCompanies)
-  // and from employees who joined through 계정 만들기 (hr.js).
-  { type: 'OPS', company: 'ieum', id: '20260001', pw: 'ieum1234',
+  // Only IEUM's own operator account is built in (sample companies removed 2026-10-28). IEUM is company
+  // ieum0000 (requirements v1.7 ACC-03). Company accounts come from a trial signup or the built-in demo
+  // companies ieum0001/ieum0002 (findTrialAccount, ops.js demoCompanies) and from employees who joined
+  // through 계정 생성 (hr.js).
+  { type: 'OPS', company: 'ieum0000', id: '20260001', pw: 'ieum1234',
     companyName: '이음 운영', name: '운영자', sub: '이음 운영팀', roles: 'EMPLOYEE' },
 ];
 
@@ -61,7 +62,7 @@ const DEMO_ACCOUNTS = [
 function findTrialAccount(company, id, pw) {
   const o = loadStore(ORDERS_KEY, []).find(x => x.companyCode === company && adminNo(x) === id && x.adminPw === pw);
   if (!o) return null;
-  return { type: 'EMPLOYEE', company, id, companyName: o.company, name: o.adminName, sub: '업체 관리자', roles: 'EMPLOYEE ADMIN' };
+  return { type: 'EMPLOYEE', company, id, companyName: o.company, name: o.adminName, sub: '업체 관리자', roles: 'EMPLOYEE ADMIN', deviceUserId: o.deviceUserId };
 }
 const MODES = {
   EMPLOYEE: { views: VIEWS, home: 'home' },
@@ -107,11 +108,20 @@ function enterApp() {
   // roles come with the account; the prototype's role picker starts from them
   userRoles = session.roles.split(' ');
   const picker = document.getElementById('demoRole');
-  picker.value = [...picker.options].some(opt => opt.value === session.roles) ? session.roles : 'EMPLOYEE';
+  // a combination the presets don't have (e.g. IT + 부서장) gets its own entry, so the picker shows the truth
+  let own = picker.querySelector('#demoRoleOwn');
+  if (!own) { own = new Option('', ''); own.id = 'demoRoleOwn'; picker.prepend(own); }
+  own.value = session.roles;
+  own.textContent = `계정 역할 (${session.roles.split(' ').filter(r => r !== 'EMPLOYEE').map(r => ({ IT: 'IT', HR: '인사', ADMIN: '관리자', HEAD: '부서장' })[r] || r).join('+') || '직원'})`;
+  const preset = [...picker.options].find(opt => opt !== own && opt.value === session.roles);
+  own.hidden = !!preset;
+  (preset || own).selected = true;
   refreshReadOnly();
   renderAttendance();
   renderTrialBar();
   refreshJoinBadge();
+  // operators are built-in demo accounts, so only company employees get 비밀번호 변경
+  document.getElementById('btnPwChange').hidden = session.type !== 'EMPLOYEE';
   document.getElementById('loginScreen').hidden = true;
   document.getElementById('appShell').hidden = false;
 }
@@ -162,8 +172,7 @@ function renderTrialBar() {
 let billStep = 1; // which step is showing; back to 1 whenever the page is opened
 let billQuote = null; // the quote made at step 1 → 2, so step 2 pays exactly what was shown
 
-const MODE_TEXT = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제' };
-const PAY_KIND = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
+const MODE_TEXT = PAY_KIND; // what the payment card is called in each mode (same words as the history)
 
 const fillDetail = (id, rows) => document.getElementById(id).replaceChildren(...rows.flatMap(([k, v]) => {
   const dt = document.createElement('dt'); dt.textContent = k;
@@ -491,7 +500,7 @@ document.getElementById('loginForm').addEventListener('submit', e => {
   }
   let acc = DEMO_ACCOUNTS.find(a => a.company === company && a.id === id && a.pw === pw) || findTrialAccount(company, id, pw);
   if (!acc) {
-    // an employee who joined through 계정 만들기 (hr.js): signs in once approved; otherwise says why not
+    // an employee who joined through 계정 생성 (hr.js): signs in once approved; otherwise says why not
     const staff = staffSignIn(company, id, pw);
     if (staff && staff.error) { error.textContent = staff.error; return; }
     acc = staff && staff.account;
@@ -620,8 +629,8 @@ function showView() {
 }
 
 // Today's attendance for the signed-in user, recorded by the fingerprint reader simulator under the
-// account's reader user number (deviceUserId; no built-in account has one since the sample companies were
-// removed on 2026-10-28). In the real JSP these values come from the server.
+// account's reader user number (deviceUserId: the demo admins have 0001~0003, see ops.js demoCompanies;
+// employees who joined through 계정 생성 have none yet). In the real JSP these values come from the server.
 const ATTEND_LABEL = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴' };
 
 function renderAttendance() {

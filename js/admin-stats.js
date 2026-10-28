@@ -1,5 +1,5 @@
 // Operator: 운영 데이터. Draws only from the applications 신청 현황 shows: the trial signups (o.at) and the
-// payments recorded on them (o.payments: the first payment and the monthly renewals).
+// payments recorded on them (o.payments: the first payment, extensions and paying again after expiry).
 // Load order: after ops.js and admin-inquiry.js (uses its h/span helpers); like admin-inquiry.js, nothing here
 // runs at the top level, so it only needs them once a screen is drawn.
 // Charts are plain HTML/CSS bars, no chart library: the page is a static PWA and two simple charts don't need one.
@@ -10,8 +10,7 @@ const DAILY_DAYS = 7;
 
 const localDayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
-// Every successful payment, with the company it belongs to. A renewal is recorded on the payment date it
-// stands for, which can be ahead of today in the prototype; the month windows below leave those out.
+// Every successful payment, with the company it belongs to, on the day it was made.
 const okPayments = orders => orders.flatMap(o => (o.payments || []).filter(p => p.result === 'OK')
   .map(p => ({ company: o.company, kind: p.kind || 'FIRST', users: p.users ?? o.users, amount: p.amount, at: p.at })));
 

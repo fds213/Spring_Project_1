@@ -72,32 +72,17 @@ function showInstallGuide(kind) {
     dialog.className = 'modal';
     const title = document.createElement('h2');
     const body = document.createElement('p');
-    const steps = document.createElement('ol');
-    steps.className = 'install-steps';
     const close = document.createElement('button');
     close.type = 'button';
     close.className = 'btn btn-primary btn-block';
     close.textContent = '확인';
     close.addEventListener('click', () => dialog.close());
-    dialog.append(title, body, steps, close);
+    dialog.append(title, body, close);
     document.body.append(dialog);
   }
   const guide = INSTALL_GUIDE[kind];
   dialog.querySelector('h2').textContent = guide.title;
   dialog.querySelector('p').textContent = guide.body;
-  // numbered steps (manual guide only): a bold lead and its explanation, written with textContent
-  const list = dialog.querySelector('.install-steps');
-  list.replaceChildren(...(guide.steps || []).map(([lead, text]) => {
-    const li = document.createElement('li');
-    const strong = document.createElement('strong');
-    strong.textContent = lead;
-    const span = document.createElement('span');
-    span.textContent = text;
-    li.append(strong, span);
-    return li;
-  }));
-  list.hidden = !guide.steps;
-  dialog.classList.toggle('modal-wide', !!guide.steps);
   if (!dialog.open) dialog.showModal();
 }
 

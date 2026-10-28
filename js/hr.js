@@ -1,7 +1,7 @@
-// 인사 관리 > 사원 관리 and 가입 승인, plus the 계정 만들기 form on the login screen.
+// 인사 관리 > 사원 관리 and 가입 승인, plus the 계정 생성 form on the login screen.
 //
 // How an employee gets an account (decided 2026-10-28, replaces the pre-registration of requirements v1.4 ACC-04):
-//   1. 승인 요청: on the login screen the employee opens 계정 만들기, confirms the 업체 코드 (확인 loads that
+//   1. 승인 요청: on the login screen the employee opens 계정 생성, confirms the 업체 코드 (확인 loads that
 //      company's 부서 and 직급 lists), picks 부서 and 직급, types 이름, and verifies the 이메일 with a mailed code.
 //      The 승인 요청 button is grey until the company is confirmed and the e-mail verified, then blue. Sending it
 //      makes a join request (status REQUESTED, no 사번 yet) and the screen says "승인 요청을 하였습니다".
@@ -13,7 +13,9 @@
 //   3. 계정 생성: the employee's screen turns into "승인 완료되었습니다": the 사번 appears in a locked field, and
 //      비밀번호 and 비밀번호 확인 fields appear; the bottom button becomes 계정 생성. With the password set,
 //      계정 생성 makes the account (ACTIVE, or WAITING when it was approved past the headcount, see below).
-//      The same device picks the request up again if the screen was closed.
+//      The account must be made within 1 hour of the approval (v1.7 ACC-05): after that the approval ends, the
+//      seat is free again and the 사번 stays used. The company admin may cancel an approved account that isn't
+//      created yet (CFG-02). The same device picks the request up again if the screen was closed.
 // Seats (decided 2026-10-28), counted when a request is approved:
 //   - Trial: up to 10 accounts in use including the admin. The 11th approval is refused.
 //   - Paid: accounts in use up to the purchased headcount. Approvals may go 20% further (구매 인원 × 1.2, rounded
@@ -23,7 +25,8 @@
 //   An approved account that hasn't been created yet already holds its seat (or its 자리 대기 place).
 // Deactivation: an employee who leaves is deactivated (status RETIRED as in the team repo's DB, can't sign in,
 // records stay) and frees the seat. The company admin can't be deactivated, nor yourself.
-// The prototype's 부서장 = rank 팀장 of that team; the real server reads the team's head from the DB.
+// 부서장 is a department setting, not a rank or a role (v1.7 3.7): the company admin marks one employee per
+// department in 사원 관리 (staff record head: true); the real server keeps it on the department.
 // Prototype only: requests and accounts live in localStorage per company code, the password is kept in plain
 // text so the account can sign in here, and the e-mail code is shown on screen instead of being mailed. The real
 // server stores a BCrypt hash, mails the code and checks every rule above again (the screen only explains why).
@@ -37,7 +40,9 @@ const ROLE_LABEL = { IT: 'IT 담당', HR: '인사 담당', ADMIN: '업체 관리
 const EMP_STATUS = {
   REQUESTED: '승인 대기', EXPIRED: '요청 만료', REJECTED: '반려', APPROVED: '계정 생성 전',
   ACTIVE: '사용 중', WAITING: '자리 대기', RETIRED: '비활성',
+  APPROVAL_EXPIRED: '승인 만료', CANCELED: '취소',
 };
+const APPROVAL_LIMIT_MS = 60 * 60 * 1000; // an approved account must be created within 1 hour (v1.7 ACC-05)
 // Departments are per company: the company's admin keeps them (부서 관리, not built in the prototype yet), and a
 // company without its own list uses DEPTS. The two built-in demo companies (ops.js demoCompanies) have different
 // lists so the join form visibly loads the company's own. The real server answers GET /join/company/{code} with
@@ -49,20 +54,20 @@ const DEMO_DEPTS = {
   ieum0002: ['경영지원팀', '영업팀', '물류팀', '품질관리팀', '구매팀'],
 };
 const deptsOf = code => loadStore(DEPT_KEY, {})[code] || DEMO_DEPTS[code] || DEPTS;
-// Ranks (직급) are per company too (user decided 2026-10-28), kept by the company's admin like departments and
-// sent with them by GET /join/company/{code}. Every list has 팀장, since the prototype's 부서장 is the team's 팀장.
-const RANKS = ['사원', '주임', '대리', '과장', '차장', '팀장', '부장'];
+// Ranks (직급): the master list is the one requirements v1.7 3.9 maps to years of service (연차 계산 uses it),
+// and each company uses a subset of it (user decided 2026-10-28), kept by the company's admin like departments
+// and sent with them by GET /join/company/{code}. 부서장 isn't a rank (see isHeadOf).
+const RANKS = ['사원', '주임', '대리', '과장', '차장', '부장'];
 const RANK_KEY = 'ieum-demo-ranks-v1';
 const DEMO_RANKS = {
-  ieum0001: ['사원', '대리', '과장', '팀장'],
-  ieum0002: ['사원', '주임', '대리', '과장', '차장', '팀장', '부장', '이사'],
+  ieum0001: ['사원', '대리', '과장', '부장'],
+  ieum0002: ['사원', '주임', '대리', '과장', '차장', '부장'],
 };
 const ranksOf = code => loadStore(RANK_KEY, {})[code] || DEMO_RANKS[code] || RANKS;
-// this device's own join request (계정 만들기), so closing the screen doesn't lose it
+// this device's own join request (계정 생성), so closing the screen doesn't lose it
 const MY_JOIN_KEY = 'ieum-demo-join-mine';
 
 // A company's accounts and join requests; the first look creates its first admin from the trial signup.
-// Older saved data (사전 등록 REGISTERED, PENDING) has no request behind it and is dropped.
 function staffOf(code) {
   const all = loadStore(EMP_KEY, {});
   if (!all[code]) {
@@ -70,9 +75,6 @@ function staffOf(code) {
     // nothing stored for a company that isn't there (yet): an empty list kept now would lose its admin later
     if (!order) return [];
     all[code] = [{ name: order.adminName, empNo: adminNo(order), dept: '경영지원팀', rank: '관리자', roles: ['ADMIN'], status: 'ACTIVE', at: order.at, email: order.email }];
-    saveStore(EMP_KEY, all);
-  } else if (all[code].some(e => ['REGISTERED', 'PENDING'].includes(e.status))) {
-    all[code] = all[code].filter(e => !['REGISTERED', 'PENDING'].includes(e.status));
     saveStore(EMP_KEY, all);
   }
   return all[code];
@@ -87,7 +89,10 @@ const employeesOf = code => staffOf(code).filter(e => e.empNo);
 
 // a request with no readable request time counts as expired (no "NaN분 남음")
 const requestExpired = e => e.status === 'REQUESTED' && !(Date.now() - new Date(e.requestAt).getTime() <= JOIN_LIMIT_MS);
-const statusOf = e => (requestExpired(e) ? 'EXPIRED' : e.status);
+// an approval not turned into an account within 1 hour is over: the seat is free, the 사번 stays used (ACC-05)
+const approvalExpired = e => e.status === 'APPROVED' && !(Date.now() - new Date(e.approvedAt).getTime() <= APPROVAL_LIMIT_MS);
+const approvalMinutesLeft = e => Math.max(0, Math.ceil((new Date(e.approvedAt).getTime() + APPROVAL_LIMIT_MS - Date.now()) / 60000));
+const statusOf = e => (requestExpired(e) ? 'EXPIRED' : approvalExpired(e) ? 'APPROVAL_EXPIRED' : e.status);
 const minutesLeft = e => Math.max(0, Math.ceil((new Date(e.requestAt).getTime() + JOIN_LIMIT_MS - Date.now()) / 60000));
 
 // Next 사번: this year + one past the highest number used this year, so a number is never handed out twice
@@ -108,14 +113,14 @@ function seatCaps(code) {
   return paid ? { paid, active: n, approve: Math.ceil(n * 1.2) } : { paid, active: TRIAL_SEATS, approve: TRIAL_SEATS };
 }
 // SEAT = uses a seat (signed in, or approved and about to be created); WAIT = holds a 자리 대기 place
-const seatOf = e => (e.status === 'ACTIVE' || (e.status === 'APPROVED' && !e.wait) ? 'SEAT'
-  : e.status === 'WAITING' || (e.status === 'APPROVED' && e.wait) ? 'WAIT' : '');
+const seatOf = e => (e.status === 'ACTIVE' || (e.status === 'APPROVED' && !approvalExpired(e) && !e.wait) ? 'SEAT'
+  : e.status === 'WAITING' || (e.status === 'APPROVED' && !approvalExpired(e) && e.wait) ? 'WAIT' : '');
 const activeStaff = code => staffOf(code).filter(e => seatOf(e) === 'SEAT');
 const waitingStaff = code => staffOf(code).filter(e => seatOf(e) === 'WAIT');
 const isFull = code => { const c = seatCaps(code); return !!c && activeStaff(code).length >= c.active; };
 // the employee's own team, for a 부서장: from the session or their staff record
 const myDept = () => session.dept || (employeesOf(session.company).find(e => e.empNo === session.id) || {}).dept;
-const isHeadOf = e => e.rank === '팀장';
+const isHeadOf = e => !!e.head;
 const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
 const cellOf = (label, ...parts) => {
@@ -149,6 +154,14 @@ const writeButton = (label, aria, onClick, primary) => {
   b.addEventListener('click', onClick);
   return b;
 };
+// a button that still works while the company is read-only: 비활성화 and 계정 생성 전 취소 only shrink the accounts
+// in use, so requirements v1.7 3.11 allows them (and a smaller re-purchase may need them)
+const allowedButton = (label, aria, onClick) => {
+  const b = writeButton(label, aria, onClick);
+  b.removeAttribute('data-write');
+  b.removeAttribute('aria-disabled');
+  return b;
+};
 const dash = () => { const s = document.createElement('span'); s.className = 'muted'; s.textContent = '-'; return s; };
 const whenAt = iso => { const d = new Date(iso); if (Number.isNaN(d.getTime())) return '-'; return `${ymd(iso)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
 
@@ -164,7 +177,7 @@ function renderEmployees() {
   const set = (id, v) => { document.getElementById(id).textContent = v; };
 
   set('empTotal', retired ? `${staff.length}명 (비활성 ${retired})` : `${staff.length}명`);
-  set('empActive', `${staff.filter(e => e.status === 'ACTIVE').length}명`);
+  set('empActive', `${staff.filter(e => seatOf(e) === 'SEAT').length}명`); // like 가입 승인: approved, not yet created counts
   set('empPending', `${staff.filter(e => e.status === 'APPROVED').length}명`);
   set('empLimit', !caps ? '-' : readOnly ? '읽기 전용' : caps.paid ? `${caps.active}명 (구매 인원)` : `${caps.active}명 (체험 중)`);
 
@@ -196,8 +209,8 @@ function renderEmployees() {
     tr.classList.toggle('is-inactive', e.status === 'RETIRED');
     tr.append(
       cellOf('이름', whoCell(e)),
-      cellOf('부서·직급', `${e.dept} · ${e.rank}`),
-      cellOf('역할', e.roles.length ? e.roles.map(r => ROLE_LABEL[r]).join(', ') : '직원'),
+      cellOf('부서·직급', `${e.dept}${e.head ? ' (부서장)' : ''} · ${e.rank}`),
+      cellOf('역할', (e.roles || []).length ? e.roles.map(r => ROLE_LABEL[r]).join(', ') : '직원'),
       cellOf('상태', statusChip(e)),
       cellOf('등록일', ymd(e.at)),
       cellOf('관리', stateButtons(e)),
@@ -208,20 +221,61 @@ function renderEmployees() {
 }
 
 // Buttons of a row in 사원 관리. None for the company admin (fixed seat) or for yourself.
+// 비활성화 and the cancel of a not-yet-created account work while read-only; the rest are write actions.
 function stateButtons(e) {
-  if (e.roles.includes('ADMIN') || e.empNo === session.id) return dash();
+  if ((e.roles || []).includes('ADMIN') || e.empNo === session.id) return dash();
   const box = document.createElement('div');
   box.className = 'row-actions';
-  if (seatOf(e) === 'WAIT') {
-    if (userRoles.includes('ADMIN')) box.append(writeButton('활성화', `${e.name} 활성화`, () => activateWaiting(e.empNo, renderEmployees), true));
-    box.append(writeButton('비활성화', `${e.name} 비활성화`, () => confirmState(e.empNo)));
-  } else if (['ACTIVE', 'APPROVED', 'RETIRED'].includes(e.status)) {
-    const label = e.status === 'RETIRED' ? '다시 사용' : '비활성화';
-    box.append(writeButton(label, `${e.name} ${label}`, () => confirmState(e.empNo)));
+  const admin = userRoles.includes('ADMIN');
+  if (e.status === 'APPROVED' && !approvalExpired(e)) {
+    // approved, not created yet: the admin may take the approval back (the seat frees, the 사번 stays used)
+    if (seatOf(e) === 'WAIT' && admin) box.append(writeButton('활성화', `${e.name} 활성화`, () => activateWaiting(e.empNo, renderEmployees), true));
+    if (admin) box.append(allowedButton('승인 취소', `${e.name} 승인 취소`, () => cancelApproved(e.empNo)));
+    else return dash();
+  } else if (seatOf(e) === 'WAIT') {
+    if (admin) box.append(writeButton('활성화', `${e.name} 활성화`, () => activateWaiting(e.empNo, renderEmployees), true));
+    box.append(allowedButton('비활성화', `${e.name} 비활성화`, () => confirmState(e.empNo)));
+  } else if (e.status === 'ACTIVE') {
+    box.append(allowedButton('비활성화', `${e.name} 비활성화`, () => confirmState(e.empNo)));
+    if (admin) box.append(writeButton(e.head ? '부서장 해제' : '부서장 지정', `${e.name} ${e.head ? '부서장 해제' : '부서장 지정'}`, () => setHead(e.empNo, !e.head)));
+  } else if (e.status === 'RETIRED') {
+    box.append(writeButton('다시 사용', `${e.name} 다시 사용`, () => confirmState(e.empNo)));
   } else {
     return dash();
   }
   return box;
+}
+
+// 부서장 지정: one per department (v1.7 3.7). The head approves that department's join requests (HEAD at sign-in).
+function setHead(no, on) {
+  const code = session.company;
+  const list = staffOf(code);
+  const e = list.find(x => x.empNo === no);
+  if (!e || e.status !== 'ACTIVE') return;
+  list.forEach(x => { if (x.dept === e.dept) delete x.head; });
+  if (on) e.head = true;
+  saveStaff(code, list);
+  showToast(on ? `${e.name}님을 ${e.dept} 부서장으로 지정했습니다. 그 부서의 가입 요청을 승인할 수 있습니다` : `${e.name}님의 부서장 지정을 해제했습니다`);
+  rerenderStaffViews();
+}
+
+// 승인 취소 (CFG-02): an approved account that was never created goes back to a free seat; its 사번 is not reused
+function cancelApproved(no) {
+  const e = employeesOf(session.company).find(x => x.empNo === no);
+  if (!e || e.status !== 'APPROVED') return;
+  askConfirm(`${e.name}님의 승인을 취소할까요?`,
+    `사번 ${e.empNo}. 취소하면 이 자리는 다시 비고, 직원은 계정을 만들 수 없어 다시 승인 요청을 해야 합니다. 배정했던 사번은 다시 쓰지 않습니다.`, '승인 취소', () => {
+      const code = session.company;
+      const list = staffOf(code);
+      const x = list.find(y => y.empNo === no);
+      if (!x || x.status !== 'APPROVED') return rerenderStaffViews();
+      x.status = 'CANCELED';
+      x.canceledAt = new Date().toISOString();
+      delete x.wait;
+      saveStaff(code, list);
+      showToast(`${x.name}님의 승인을 취소했습니다`);
+      rerenderStaffViews();
+    });
 }
 
 // A deactivated account comes back where it was: 계정 생성 전 if it was never created, otherwise 사용 중.
@@ -325,7 +379,7 @@ function renderJoin() {
   set('joinNote', !caps ? '' : (caps.paid
     ? `구매 인원 ${caps.active}명까지 사용 중으로 바뀌고, 잘못 승인한 경우를 대비해 ${caps.approve}명까지 승인할 수 있습니다. 구매 인원을 넘는 승인은 자리 대기가 되며, 업체 관리자가 자리가 날 때 직접 골라 활성화합니다.`
     : `체험 중에는 관리자를 포함해 ${caps.active}명까지 승인할 수 있습니다.`)
-    + ` 승인하면 다음 사번(지금은 ${nextEmpNo(code)})이 순서대로 붙고, 직원은 같은 화면에서 비밀번호와 이메일 인증을 마쳐 계정을 만듭니다. 요청 뒤 1시간이 지나면 만료되어 다시 요청해야 합니다.`);
+    + ` 승인하면 다음 사번(지금은 ${nextEmpNo(code)})이 순서대로 붙고, 직원은 같은 화면에서 비밀번호를 정해 계정을 만듭니다(이메일은 요청할 때 인증함). 요청 뒤 1시간이 지나면 만료되어 다시 요청해야 하고, 승인 뒤 1시간 안에 계정을 만들지 않으면 승인이 끝나 자리가 다시 빕니다.`);
 
   const rows = reqs.map(e => {
     const tr = document.createElement('tr');
@@ -372,7 +426,9 @@ function renderJoin() {
       actions.className = 'row-actions';
       actions.append(
         writeButton('활성화', `${e.name} 활성화`, () => activateWaiting(e.empNo, renderJoin), true),
-        writeButton('비활성화', `${e.name} 비활성화`, () => confirmState(e.empNo)),
+        e.status === 'APPROVED'
+          ? allowedButton('승인 취소', `${e.name} 승인 취소`, () => cancelApproved(e.empNo))
+          : allowedButton('비활성화', `${e.name} 비활성화`, () => confirmState(e.empNo)),
       );
       tr.append(
         cellOf('이름', whoCell(e)),
@@ -428,7 +484,7 @@ function openApprove(reqId) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고, 직원이 계정 만들기 화면에서 비밀번호를 정하면 계정이 만들어집니다(이메일은 요청할 때 인증함).`
+  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고, 직원이 계정 생성 화면에서 비밀번호를 정하면 계정이 만들어집니다(이메일은 요청할 때 인증함).`
     + (slot === 'WAIT' ? ' 구매 인원이 모두 차서 자리 대기로 승인됩니다.' : '');
   // roles: the company admin only (who may give roles is still open, guide section 3); never 업체 관리자
   const roles = dialog.querySelector('.approve-roles');
@@ -445,6 +501,10 @@ function approveJoin(reqId, roles) {
     showToast('이미 처리되었거나 만료된 요청입니다');
     return rerenderStaffViews();
   }
+  if (!userRoles.includes('ADMIN') && e.dept !== myDept()) {
+    showToast('내 부서의 가입 요청만 처리할 수 있습니다');
+    return rerenderStaffViews();
+  }
   // checked again: another tab may have used the last seat while the dialog was open
   const slot = approvalSlot(code);
   if (!slot) return showSeatDialog();
@@ -455,7 +515,7 @@ function approveJoin(reqId, roles) {
   });
   saveStaff(code, list);
   showToast(slot === 'SEAT'
-    ? `${e.name}님을 승인했습니다. 사번 ${e.empNo}. 직원이 비밀번호와 이메일 인증을 마치면 계정이 만들어집니다`
+    ? `${e.name}님을 승인했습니다. 사번 ${e.empNo}. 직원이 1시간 안에 비밀번호를 정하면 계정이 만들어집니다`
     : `${e.name}님을 승인했습니다(사번 ${e.empNo}). 구매 인원이 모두 차서 자리 대기로 두었습니다`);
   rerenderStaffViews();
 }
@@ -465,11 +525,12 @@ function rejectJoin(reqId) {
   const e = staffOf(session.company).find(x => x.reqId === reqId);
   if (!e) return;
   askConfirm(`${e.name}님의 가입 요청을 반려할까요?`,
-    `${e.dept} · ${e.email}. 반려하면 이 요청은 끝나고, 직원은 업체에 확인한 뒤 계정 만들기에서 다시 요청할 수 있습니다.`, '반려', () => {
+    `${e.dept} · ${e.email}. 반려하면 이 요청은 끝나고, 직원은 업체에 확인한 뒤 계정 생성에서 다시 요청할 수 있습니다.`, '반려', () => {
       const code = session.company;
       const list = staffOf(code);
       const x = list.find(y => y.reqId === reqId);
       if (!x || x.status !== 'REQUESTED') return rerenderStaffViews();
+      if (!userRoles.includes('ADMIN') && x.dept !== myDept()) { showToast('내 부서의 가입 요청만 처리할 수 있습니다'); return rerenderStaffViews(); }
       x.status = 'REJECTED';
       x.rejectedAt = new Date().toISOString();
       saveStaff(code, list);
@@ -561,10 +622,10 @@ function tickJoin() {
 setInterval(tickJoin, 30000);
 document.addEventListener('visibilitychange', tickJoin);
 
-// Sign-in of an employee who made an account through 계정 만들기 (called by common.js after the operator and
+// Sign-in of an employee who made an account through 계정 생성 (called by common.js after the operator and
 // trial-admin accounts). null = no such account with this password; { error } = it exists but can't sign in.
 function staffSignIn(company, id, pw) {
-  const order = company && company !== 'ieum' ? findCompanyOrder(company) : null;
+  const order = company && company !== 'ieum0000' ? findCompanyOrder(company) : null;
   const e = order ? employeesOf(company).find(x => x.empNo === id && x.pw && x.pw === pw) : null;
   if (!e) return null;
   if (e.status === 'WAITING') return { error: '계정은 만들어졌지만 사용할 자리가 없어 아직 쓸 수 없습니다. 업체 관리자에게 문의해 주세요.' };
@@ -573,12 +634,12 @@ function staffSignIn(company, id, pw) {
   return {
     account: {
       type: 'EMPLOYEE', company, id, companyName: order.company, name: e.name, sub: `${e.dept} · ${e.rank}`, dept: e.dept,
-      roles: ['EMPLOYEE', ...e.roles, ...(isHeadOf(e) ? ['HEAD'] : [])].join(' '),
+      roles: ['EMPLOYEE', ...(e.roles || []), ...(isHeadOf(e) ? ['HEAD'] : [])].join(' '),
     },
   };
 }
 
-// ---------- 로그인 화면: 계정 만들기 ----------
+// ---------- 로그인 화면: 계정 생성 ----------
 // One form, three states: request (confirm the company, fill in, verify the e-mail, press 승인 요청) → waiting
 // ("승인 요청을 하였습니다") → approved ("승인 완료되었습니다": 사번 locked, password, 계정 생성). The e-mail is
 // verified before the request (user decided 2026-10-28), so an approver only ever sees requests with a working
@@ -617,7 +678,7 @@ function joinBlock(order) {
   if (trialState(order).status === 'EXPIRED') return '이용 기간이 끝나 지금은 가입할 수 없습니다. 업체 관리자에게 문의해 주세요.';
   return '';
 }
-const companyOrder = code => (code && code !== 'ieum' ? findCompanyOrder(code) : null);
+const companyOrder = code => (code && code !== 'ieum0000' ? findCompanyOrder(code) : null);
 
 // 확인: find the company and load its departments
 function checkCompany() {
@@ -684,7 +745,7 @@ function renderJoinForm() {
   const e = myRequest();
   const mine = loadMyJoin();
   const waiting = !!e && e.status === 'REQUESTED' && !requestExpired(e);
-  const approved = !!e && e.status === 'APPROVED';
+  const approved = !!e && statusOf(e) === 'APPROVED';
   // the request fields are locked once sent (until it ends)
   JOIN_FIELDS.forEach(id => { $j(id).disabled = waiting || approved; });
   $j('btnJoinCheck').disabled = waiting || approved;
@@ -717,8 +778,14 @@ function renderJoinForm() {
   } else if (approved) {
     setJoinStatus(e.wait
       ? '승인 완료되었습니다. 구매 인원이 모두 차서, 계정을 만든 뒤 업체 관리자가 자리를 주면 로그인할 수 있습니다.'
-      : '승인 완료되었습니다. 비밀번호를 정한 뒤 계정 생성을 눌러 주세요.', 'ok');
+      : `승인 완료되었습니다. ${approvalMinutesLeft(e)}분 안에 비밀번호를 정하고 계정 생성을 눌러 주세요.`, 'ok');
     $j('joinId').textContent = e.empNo;
+  } else if (e && approvalExpired(e)) {
+    joinNotice = '승인 뒤 1시간 안에 계정을 만들지 않아 승인이 끝났습니다. 다시 승인 요청을 해 주세요.';
+    saveMyJoin(null);
+  } else if (e && e.status === 'CANCELED') {
+    joinNotice = '업체 관리자가 승인을 취소했습니다. 업체에 확인한 뒤 다시 승인 요청을 해 주세요.';
+    saveMyJoin(null);
   } else if (e && e.status === 'REJECTED') {
     joinNotice = '가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.';
     saveMyJoin(null);
@@ -741,7 +808,43 @@ function renderJoinForm() {
 // 이메일 인증 (before 승인 요청): 인증 메일 보내기 sends a 6-digit code to the typed address; typing the code
 // verifies that address. Changing the address afterwards needs a new code. The real server mails the code
 // (POST /join/email-code) and checks it (POST /join/email-verify); the prototype shows it on screen instead.
-let joinCode = null; // the code sent last, for joinCodeFor
+// Codes (v1.7 ACC-04, also used by 비밀번호 찾기): 6 digits, good for 10 minutes, dead after 5 wrong tries,
+// and a new one no more than once a minute. The real server enforces these (and 5 resends a day).
+const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_TRIES = 5;
+const RESEND_WAIT_S = 60;
+const newCode = () => ({ value: String(Math.floor(100000 + Math.random() * 900000)), at: Date.now(), tries: 0 });
+// null = right; otherwise why not (and whether a new code is needed now)
+function checkCode(code, typed) {
+  if (!code) return { why: '인증 메일을 먼저 받아 주세요.', dead: false };
+  if (Date.now() - code.at > CODE_TTL_MS) return { why: '인증 코드는 10분 동안만 쓸 수 있습니다. 인증 메일을 다시 받아 주세요.', dead: true };
+  if (typed === code.value) return null;
+  code.tries += 1;
+  if (code.tries >= CODE_TRIES) return { why: `인증 코드를 ${CODE_TRIES}번 틀려 이 코드는 쓸 수 없습니다. 인증 메일을 다시 받아 주세요.`, dead: true };
+  return { why: `인증 코드가 맞지 않습니다. (${CODE_TRIES - code.tries}번 더 틀리면 다시 받아야 합니다)`, dead: false };
+}
+// the send button rests for a minute after each mail, counting down on the button
+const resendTimers = new WeakMap();
+function restSendButton(btn, label) {
+  clearInterval(resendTimers.get(btn));
+  let left = RESEND_WAIT_S;
+  const tick = () => {
+    if (left <= 0) { clearInterval(resendTimers.get(btn)); resendTimers.delete(btn); btn.disabled = false; btn.textContent = label; return; }
+    btn.disabled = true;
+    btn.textContent = `${label} (${left}초)`;
+    left -= 1;
+  };
+  tick();
+  resendTimers.set(btn, setInterval(tick, 1000));
+}
+function freeSendButton(btn, label) {
+  clearInterval(resendTimers.get(btn));
+  resendTimers.delete(btn);
+  btn.disabled = false;
+  btn.textContent = label;
+}
+
+let joinCode = null; // the code sent last ({ value, at, tries }), for joinCodeFor
 let joinCodeFor = ''; // the address it was sent to
 let verifiedEmail = ''; // the address verified ('' = none)
 const typedEmail = () => $j('joinEmail').value.trim().toLowerCase();
@@ -757,33 +860,48 @@ function resetEmailCheck() {
   verifiedEmail = '';
   $j('joinCode').value = '';
   $j('joinCode').hidden = true;
-  $j('btnJoinSend').textContent = '인증 메일 보내기';
-  $j('btnJoinSend').disabled = false;
+  freeSendButton($j('btnJoinSend'), '인증 메일 보내기');
   setCodeNote('', false);
+}
+// why this e-mail can't get a code in this company ('' = it can): an open request or an account already uses it
+// (v1.7 ACC-04: refused before the code is sent)
+function emailTaken(company, email) {
+  if (!company) return '';
+  const same = staffOf(company).find(e => (e.email || '').toLowerCase() === email.toLowerCase()
+    && (['APPROVED', 'ACTIVE', 'WAITING'].includes(e.status) && !approvalExpired(e) || (e.status === 'REQUESTED' && !requestExpired(e))));
+  if (!same) return '';
+  return same.status === 'REQUESTED' ? '이 이메일로 승인을 기다리는 요청이 이미 있습니다.'
+    : '이 이메일로 이미 계정이 있습니다. 로그인하거나 업체 관리자에게 문의해 주세요.';
 }
 $j('btnJoinSend').addEventListener('click', () => {
   const email = $j('joinEmail').value.trim();
   if (!validEmail(email)) { setCodeNote('이메일 형식을 확인해 주세요.', false); return; }
-  joinCode = String(Math.floor(100000 + Math.random() * 900000));
+  const taken = emailTaken(checkedCompany, email);
+  if (taken) { setCodeNote(taken, false); return; }
+  joinCode = newCode();
   joinCodeFor = email.toLowerCase();
   verifiedEmail = '';
   $j('joinCode').value = '';
   $j('joinCode').hidden = false;
   $j('joinCode').focus();
-  setCodeNote(`${email}로 인증 코드를 보냈습니다. 받은 6자리를 넣어 주세요. (시연용 코드: ${joinCode})`, false);
-  $j('btnJoinSend').textContent = '다시 보내기';
+  setCodeNote(`${email}로 인증 코드를 보냈습니다. 받은 6자리를 10분 안에 넣어 주세요. (시연용 코드: ${joinCode.value})`, false);
+  restSendButton($j('btnJoinSend'), '다시 보내기');
   syncRequestButton();
 });
 $j('joinCode').addEventListener('input', () => {
   const v = $j('joinCode').value.trim();
-  if (joinCode && v === joinCode && typedEmail() === joinCodeFor) {
+  if (v.length !== 6) return;
+  const bad = typedEmail() === joinCodeFor ? checkCode(joinCode, v) : { why: '이메일이 바뀌었습니다. 인증 메일을 다시 받아 주세요.', dead: true };
+  if (!bad) {
     verifiedEmail = joinCodeFor;
     joinCode = null;
     $j('joinCode').hidden = true;
+    freeSendButton($j('btnJoinSend'), '다시 보내기');
     $j('btnJoinSend').disabled = true;
     setCodeNote('이메일 인증을 마쳤습니다.', true);
-  } else if (v.length === 6) {
-    setCodeNote('인증 코드가 맞지 않습니다. 다시 확인하거나 인증 메일을 다시 보내 주세요.', false);
+  } else {
+    setCodeNote(bad.why, false);
+    if (bad.dead) { joinCode = null; $j('joinCode').value = ''; freeSendButton($j('btnJoinSend'), '다시 보내기'); }
   }
   syncRequestButton();
 });
@@ -833,13 +951,8 @@ $j('btnJoinRequest').addEventListener('click', () => {
       : ranksOf(company).includes(rank) ? '' : '직급을 다시 골라 주세요');
   if (error.textContent) return;
   const list = staffOf(company);
-  const same = list.find(e => (e.email || '').toLowerCase() === email.toLowerCase()
-    && (['APPROVED', 'ACTIVE', 'WAITING'].includes(e.status) || (e.status === 'REQUESTED' && !requestExpired(e))));
-  if (same) {
-    error.textContent = same.status === 'REQUESTED' ? '이 이메일로 승인을 기다리는 요청이 이미 있습니다.'
-      : '이 이메일로 이미 계정이 있습니다. 로그인하거나 업체 관리자에게 문의해 주세요.';
-    return;
-  }
+  const taken = emailTaken(company, email); // checked again: another request may have come in since the code
+  if (taken) { error.textContent = taken; return; }
   const req = {
     reqId: `R${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
     name, dept, rank, email, emailVerified: true, roles: [], status: 'REQUESTED', requestAt: new Date().toISOString(), at: new Date().toISOString(),
@@ -862,7 +975,7 @@ joinForm.addEventListener('submit', ev => {
   ev.preventDefault();
   const mine = loadMyJoin();
   const e = myRequest();
-  if (!mine || !e || e.status !== 'APPROVED') return renderJoinForm();
+  if (!mine || !e || statusOf(e) !== 'APPROVED') return renderJoinForm();
   const pw = $j('joinPw').value;
   if (pw.length < 8 || pw !== $j('joinPw2').value) return syncCreateButton();
   const list = staffOf(mine.company);
@@ -897,28 +1010,27 @@ setInterval(() => { if (!joinForm.hidden && !document.hidden && loadMyJoin()) re
 // ---------- 로그인 화면: 비밀번호 찾기 ----------
 // 업체 코드 + 사번 → a 6-digit code to the e-mail the account was made with → with the right code, a new
 // password typed twice (8+ characters) replaces the old one. The current password is never shown: the real
-// server keeps only a BCrypt hash (user agreed 2026-10-28). Operators (ieum) aren't covered here.
-// Real server: POST /password/code { companyCode, empNo } answers the same way whether the account exists or
-// not (only the masked address when it does), POST /password/verify gives a short-lived reset token,
-// POST /password/reset { resetToken, password } stores the new hash and ends that account's other sessions.
+// server keeps only a BCrypt hash (user agreed 2026-10-28). Operators (ieum0000) aren't covered here.
+// The screen answers the same way whether or not the account exists (v1.7 ACC-07), and a code goes only to an
+// account in use (ACTIVE employee, or the admin of a verified company): with anything else nothing is sent and
+// no code can be right. Codes follow the join form's rules (10 minutes, 5 tries, a resend a minute).
+// Real server: POST /password/code { companyCode, empNo } → same reply either way, POST /password/verify →
+// short-lived reset token, POST /password/reset { resetToken, password } stores the new hash and ends that
+// account's other sessions.
 const pwForm = $j('pwForm');
 let pwTarget = null; // { company, id } the code was sent for
 let pwCode = null;
 let pwVerified = false;
 const maskEmail = v => { const [a, d] = String(v).split('@'); return `${a.slice(0, 1)}${'*'.repeat(Math.max(2, a.length - 1))}@${d}`; };
 
-// The account to reset: the company's first admin (password on the trial signup) or an employee who made an
-// account through 계정 생성. { error } when it exists but can't be reset here.
+// The account a code may go to: the company's first admin (password on the trial signup, company verified) or
+// an employee in use whose address was verified. null = nothing is sent (the screen doesn't say why).
 function resetTarget(company, id) {
-  const order = company && company !== 'ieum' ? findCompanyOrder(company) : null;
-  if (!order) return null;
-  if (order.emailVerified === false) return { error: '업체의 이메일 인증이 아직 끝나지 않았습니다. 신청 메일의 링크로 먼저 인증해 주세요.' };
+  const order = company && company !== 'ieum0000' ? findCompanyOrder(company) : null;
+  if (!order || order.emailVerified === false) return null;
   if (adminNo(order) === id) return { kind: 'ADMIN', email: order.email };
   const e = employeesOf(company).find(x => x.empNo === id && x.pw);
-  if (!e) return null;
-  if (e.status === 'RETIRED') return { error: '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요' };
-  // a code goes only to an address that was verified (accounts from the older flow may not have been)
-  if (!e.emailVerified) return { error: '이메일 인증을 하지 않은 계정이라 비밀번호를 찾을 수 없습니다. 업체 관리자에게 문의해 주세요.' };
+  if (!e || e.status !== 'ACTIVE' || !e.emailVerified) return null;
   return { kind: 'STAFF', email: e.email };
 }
 
@@ -931,8 +1043,7 @@ function resetPwForm() {
   $j('pwCode').hidden = true;
   $j('pwCodeNote').textContent = '';
   $j('pwCodeNote').classList.remove('is-ok');
-  $j('btnPwSend').textContent = '인증 메일 보내기';
-  $j('btnPwSend').disabled = false;
+  freeSendButton($j('btnPwSend'), '인증 메일 보내기');
   $j('pwNewBox').hidden = true;
   $j('btnPwReset').hidden = true;
   ['pwNew', 'pwNew2'].forEach(id => { $j(id).value = ''; });
@@ -964,26 +1075,28 @@ $j('btnPwSend').addEventListener('click', () => {
   const error = $j('pwError');
   error.textContent = !company || !id ? '업체 코드와 사번을 입력해 주세요' : '';
   if (error.textContent) return;
+  // the same words whether or not the account exists; a code only when it does (the prototype shows it here)
   const t = resetTarget(company, id);
-  if (!t) { error.textContent = '업체 코드와 사번을 확인해 주세요'; return; }
-  if (t.error) { error.textContent = t.error; return; }
-  // the real server mails the code; the prototype shows it here instead
   pwTarget = { company, id };
-  pwCode = String(Math.floor(100000 + Math.random() * 900000));
+  pwCode = t ? newCode() : null;
   pwVerified = false;
   $j('pwCode').value = '';
   $j('pwCode').hidden = false;
   $j('pwCode').focus();
   $j('pwCodeNote').classList.remove('is-ok');
-  $j('pwCodeNote').textContent = `가입할 때 쓴 ${maskEmail(t.email)}로 인증 코드를 보냈습니다. 받은 6자리를 넣어 주세요. (시연용 코드: ${pwCode})`;
-  $j('btnPwSend').textContent = '다시 보내기';
+  $j('pwCodeNote').textContent = '등록된 이메일로 인증 코드를 보냈습니다. 받은 6자리를 10분 안에 넣어 주세요.'
+    + (t ? ` (${maskEmail(t.email)} · 시연용 코드: ${pwCode.value})` : ' (시연용: 사용 중인 계정이 아니라 실제로는 보내지 않습니다)');
+  restSendButton($j('btnPwSend'), '다시 보내기');
 });
 $j('pwCode').addEventListener('input', () => {
   const v = $j('pwCode').value.trim();
-  if (pwCode && v === pwCode) {
+  if (v.length !== 6) return;
+  const bad = checkCode(pwCode, v);
+  if (!bad) {
     pwVerified = true;
     pwCode = null;
     $j('pwCode').hidden = true;
+    freeSendButton($j('btnPwSend'), '다시 보내기');
     $j('btnPwSend').disabled = true;
     ['pwCompany', 'pwId'].forEach(id => { $j(id).disabled = true; });
     $j('pwCodeNote').textContent = '이메일 인증을 마쳤습니다.';
@@ -991,8 +1104,9 @@ $j('pwCode').addEventListener('input', () => {
     $j('pwNewBox').hidden = false;
     $j('btnPwReset').hidden = false;
     $j('pwNew').focus();
-  } else if (v.length === 6) {
-    $j('pwCodeNote').textContent = '인증 코드가 맞지 않습니다. 다시 확인하거나 인증 메일을 다시 보내 주세요.';
+  } else {
+    $j('pwCodeNote').textContent = bad.why;
+    if (bad.dead) { pwCode = null; $j('pwCode').value = ''; freeSendButton($j('btnPwSend'), '다시 보내기'); }
   }
   syncPwReset();
 });
@@ -1011,7 +1125,7 @@ pwForm.addEventListener('submit', ev => {
   if (error.textContent || !pwVerified || !pwTarget) return;
   const { company, id } = pwTarget;
   const t = resetTarget(company, id);
-  if (!t || t.error) { error.textContent = (t && t.error) || '업체 코드와 사번을 확인해 주세요'; return; }
+  if (!t) { error.textContent = '지금은 비밀번호를 바꿀 수 없는 계정입니다. 업체 관리자에게 문의해 주세요.'; return; }
   if (t.kind === 'ADMIN') {
     const orders = loadStore(ORDERS_KEY, []);
     const o = orders.find(x => x.companyCode === company);
@@ -1030,4 +1144,40 @@ pwForm.addEventListener('submit', ev => {
   $j('loginError').textContent = '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
   $j('loginError').classList.add('is-ok');
   $j('loginPw').focus();
+});
+
+// ---------- 헤더: 비밀번호 변경 (로그인한 직원 본인) ----------
+// The current password must match; the new one is 8+ characters typed twice. Allowed while read-only (account
+// security, v1.7 3.11). Operators don't get the button (demo accounts). Real server: POST /password/change.
+const pwChangeDialog = $j('pwChangeDialog');
+function myPassword() {
+  const order = findCompanyOrder(session.company);
+  if (order && adminNo(order) === session.id) return { get: () => order.adminPw, set: v => { const os = loadStore(ORDERS_KEY, []); os.find(o => o.companyCode === session.company).adminPw = v; saveStore(ORDERS_KEY, os); } };
+  const e = employeesOf(session.company).find(x => x.empNo === session.id);
+  return e ? { get: () => e.pw, set: v => { const list = staffOf(session.company); list.find(x => x.empNo === session.id).pw = v; saveStaff(session.company, list); } } : null;
+}
+function syncPwChange() {
+  const n = $j('pwChgNew').value;
+  $j('btnPwChangeOk').disabled = !($j('pwCur').value && n.length >= 8 && n === $j('pwChgNew2').value);
+}
+$j('btnPwChange').addEventListener('click', () => {
+  ['pwCur', 'pwChgNew', 'pwChgNew2'].forEach(id => { $j(id).value = ''; });
+  $j('pwChgError').textContent = '';
+  syncPwChange();
+  if (!pwChangeDialog.open) pwChangeDialog.showModal();
+  $j('pwCur').focus();
+});
+['pwCur', 'pwChgNew', 'pwChgNew2'].forEach(id => $j(id).addEventListener('input', () => { $j('pwChgError').textContent = ''; syncPwChange(); }));
+pwChangeDialog.querySelector('[value="cancel"]').addEventListener('click', () => pwChangeDialog.close());
+$j('pwChangeForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const me = session && session.type === 'EMPLOYEE' ? myPassword() : null;
+  const error = $j('pwChgError');
+  const n = $j('pwChgNew').value;
+  error.textContent = !me ? '지금은 비밀번호를 바꿀 수 없습니다.' : $j('pwCur').value !== me.get() ? '현재 비밀번호가 맞지 않습니다.'
+    : n.length < 8 ? '새 비밀번호는 8자 이상으로 정해 주세요.' : n !== $j('pwChgNew2').value ? '새 비밀번호 확인이 맞지 않습니다.' : n === me.get() ? '지금 쓰는 비밀번호와 다르게 정해 주세요.' : '';
+  if (error.textContent) return;
+  me.set(n);
+  pwChangeDialog.close();
+  showToast('비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 쓰세요');
 });

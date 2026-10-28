@@ -2,11 +2,12 @@
 // user number registered on the device; fingerprint data never reaches IEUM. The real reader calls
 // POST /api/attendance/punch and the server applies these rules; here they run in the browser and results
 // go to localStorage so the groupware screen (index.html) can show them.
+// The people on the device are the built-in demo admins (ops.js demoCompanies gives their accounts the same
+// deviceUserId), so a punch here shows in the groupware header after signing in with the 시안용 계정 buttons.
 const PEOPLE = [
-  { deviceUserId: '0001', name: '김사원', dept: '개발팀' },
-  { deviceUserId: '0002', name: '박대리', dept: '영업팀' },
-  { deviceUserId: '0003', name: '이신입', dept: '개발팀' },
-  { deviceUserId: '0004', name: '최주임', dept: '인사팀' },
+  { deviceUserId: '0001', name: '김체험 (체험상사)', dept: '경영지원팀' },
+  { deviceUserId: '0002', name: '박유료 (유료물산)', dept: '경영지원팀' },
+  { deviceUserId: '0003', name: '정만료 (만료상사)', dept: '경영지원팀' },
   { deviceUserId: '0005', name: '정퇴사', dept: '영업팀', resigned: true },
   { name: '등록 안 된 사람', unregistered: true },
 ];

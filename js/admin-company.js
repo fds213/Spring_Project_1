@@ -51,7 +51,6 @@ function employeeCard(o) {
   return cardOf(`계정 · ${list.length}명`, body);
 }
 
-const PAY_KIND_LABEL = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
 const PLAN_LABEL = { MONTHLY: '월간', ANNUAL: '연간' };
 
 function firmDetail(o) {
@@ -66,7 +65,6 @@ function firmDetail(o) {
     ['이메일 인증', o.emailVerified === false ? '대기 (로그인 불가)' : '완료'],
     ['체험 신청', whenFull(o.at)],
     ['신청번호', o.no],
-    ['전용 로그인 주소', `/login?company=${o.companyCode}`],
   ]));
 
   // Deliberately NOT shown: the password typed at signup. It is sample data kept in plain text; a
@@ -77,11 +75,11 @@ function firmDetail(o) {
   ]));
 
   // the trial signup, then every payment try (first payment, extensions, paying again after expiry), newest first
-  // sorted newest first; two tries on the same date (a failed renewal, then the successful one) keep the order they were recorded in
+  // sorted newest first; two tries on the same date (a failed try, then the successful one) keep the order they were recorded in
   const history = [
     ...(o.payments || []).map((p, i) => [
       h('span', '', span(p.result === 'OK' ? '성공' : '실패', `status status-${p.result === 'OK' ? 'paid' : 'failed'}`),
-        ` ${PAY_KIND_LABEL[p.kind] || '첫 결제'}${p.plan ? ` ${PLAN_LABEL[p.plan]}` : ''} · ${won(p.amount)}`),
+        ` ${PAY_KIND[p.kind] || '첫 결제'}${p.plan ? ` ${PLAN_LABEL[p.plan]}` : ''} · ${won(p.amount)}`),
       `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}`, p.at, i + 1,
     ]),
     [h('span', '', span('체험 신청', 'status status-trial'), ' 14일 무료 체험'), `${whenFull(o.at)} · ${o.no}`, o.at, 0],

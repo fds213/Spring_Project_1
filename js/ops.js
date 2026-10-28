@@ -13,7 +13,7 @@ const OPS_VIEWS = {
 // Applications = free-trial signups from the intro site (trial.js saves them in localStorage). One row per
 // company: status TRIAL while the 14-day trial runs, PAID once the admin pays inside the groupware (any time
 // during the trial). A trial past its end date without payment is EXPIRED and the company turns read-only:
-// employees can't sign in, the admin can sign in only to pay (team decision 2026-10-27).
+// everyone still signs in and reads, nothing can be written until the admin pays (decided 2026-10-28).
 // In the real project the server keeps them and the badge comes from GET /badges every 15 seconds.
 const ORDERS_KEY = 'ieum-demo-orders';
 const READ_KEY = 'ieum-demo-orders-read';
@@ -39,6 +39,10 @@ if (!loadStore(SEEDED_KEY, false)) {
   if (stale) {
     saveStore(ORDERS_KEY, []);
     saveStore(READ_KEY, []);
+    // the staff, departments and ranks of those companies go too, or a re-used company code would inherit them
+    try {
+      Object.keys(localStorage).filter(k => /^ieum-demo-(employees|depts|ranks|join-mine)/.test(k)).forEach(k => localStorage.removeItem(k));
+    } catch { /* storage blocked */ }
   }
   saveStore(SEEDED_KEY, true);
 }
@@ -55,16 +59,20 @@ function demoCompanies() {
   const daysAgo = n => new Date(today.getTime() - n * DAY_MS);
   const trialEnd = start => { const d = new Date(start); d.setDate(d.getDate() + 13); d.setHours(23, 59, 59, 999); return d.toISOString(); };
   const trialAt = daysAgo(3);
+  const expiredAt = daysAgo(16); // its 14-day trial ended the day before yesterday: read-only until it pays
   const paidAt = daysAgo(30);
   const paidFrom = daysAgo(20); // paid a monthly plan on day 11 of its trial; it expires in about 10 days
   const paidTo = addMonths(paidFrom, 1);
   const base = { emailVerified: true, payments: [], adminPw: DEMO_PW };
   return [
     { ...base, no: 'T-DEMO-TRIAL', company: '체험상사', companyCode: 'ieum0001', users: 5, total: 5 * 4000,
-      email: 'trial-admin@example.com', adminName: '김체험', adminNo: empNo(trialAt.getFullYear(), 1),
+      email: 'trial-admin@example.com', adminName: '김체험', adminNo: empNo(trialAt.getFullYear(), 1), deviceUserId: '0001',
       status: 'TRIAL', at: trialAt.toISOString(), verifiedAt: trialAt.toISOString(), trialEnd: trialEnd(trialAt) },
+    { ...base, no: 'T-DEMO-EXPIRED', company: '만료상사', companyCode: 'ieum0003', users: 5, total: 5 * 4000,
+      email: 'expired-admin@example.com', adminName: '정만료', adminNo: empNo(expiredAt.getFullYear(), 1), deviceUserId: '0003',
+      status: 'TRIAL', at: expiredAt.toISOString(), verifiedAt: expiredAt.toISOString(), trialEnd: trialEnd(expiredAt) },
     { ...base, no: 'T-DEMO-PAID', company: '유료물산', companyCode: 'ieum0002', users: 20, total: 20 * 4000,
-      email: 'paid-admin@example.com', adminName: '박유료', adminNo: empNo(paidAt.getFullYear(), 1),
+      email: 'paid-admin@example.com', adminName: '박유료', adminNo: empNo(paidAt.getFullYear(), 1), deviceUserId: '0002',
       status: 'PAID', at: paidAt.toISOString(), verifiedAt: paidAt.toISOString(), trialEnd: trialEnd(paidAt),
       paidAt: paidFrom.toISOString(), serviceFrom: paidFrom.toISOString(),
       plan: 'MONTHLY', subAnchorAt: paidFrom.toISOString(), subMonths: 1,
@@ -73,10 +81,14 @@ function demoCompanies() {
   ];
 }
 function ensureDemoCompanies() {
-  const stale = o => o.no.startsWith('T-DEMO-') && trialState(o).status === 'EXPIRED';
+  // the trial and paid companies come back once their period ran out; the expired one is meant to be expired
+  const stale = o => o.no.startsWith('T-DEMO-') && o.no !== 'T-DEMO-EXPIRED' && trialState(o).status === 'EXPIRED';
   const orders = loadStore(ORDERS_KEY, []).filter(o => !stale(o));
+  // the 시안용 계정 buttons keep working after someone changed a demo password in 비밀번호 찾기
+  let changed = false;
+  orders.forEach(o => { if (o.no.startsWith('T-DEMO-') && o.adminPw !== DEMO_PW) { o.adminPw = DEMO_PW; changed = true; } });
   const missing = demoCompanies().filter(d => !orders.some(o => o.companyCode === d.companyCode));
-  if (!missing.length) return;
+  if (!missing.length) { if (changed) saveStore(ORDERS_KEY, orders); return; }
   saveStore(ORDERS_KEY, [...orders, ...missing]);
   // not "new applications" for the operator's badge
   saveStore(READ_KEY, [...new Set([...loadStore(READ_KEY, []), ...missing.map(appId)])]);
@@ -129,7 +141,7 @@ const endOfDay = t => { const d = new Date(t); d.setHours(23, 59, 59, 999); retu
 // Shared with the groupware's trial strip, reminder, billing page and the operator screens.
 function trialState(o) {
   const sub = subscriptionOf(o);
-  const last = sub ? sub.expire : new Date(o.trialEnd);
+  const last = sub ? sub.expire : new Date(o.trialEnd || o.at);
   const daysLeft = Math.max(0, Math.round((dayStart(last) - dayStart(Date.now())) / DAY_MS));
   const over = endOfDay(last) < new Date();
   const status = over ? 'EXPIRED' : sub ? 'PAID' : 'TRIAL';
@@ -154,6 +166,8 @@ function trialState(o) {
 // The real server works this out again from the order and checks the approved Toss amount against it.
 const PRICE_PER_USER = 4000;
 const PLANS = { MONTHLY: { label: '월간', months: 1 }, ANNUAL: { label: '연간', months: 12 } };
+// kind of a recorded payment. RENEW only in data saved by the auto-renewal version of 2026-10-28 morning
+const PAY_KIND = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
 
 function subscriptionOf(o) {
   if (o.status !== 'PAID' || !o.subAnchorAt) return null;
