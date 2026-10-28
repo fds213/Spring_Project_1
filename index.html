@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IEUM</title>
+  <meta name="theme-color" content="#ffffff">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/common.css">
+</head>
+<body>
+  <!-- 로그인: 앱을 열면 항상 여기서 시작한다. 업체 직원과 이음 운영자가 같은 칸으로 로그인한다.
+       이음도 업체 코드(ieum)를 가진 업체 하나로 보고, 로그인한 계정에 따라 같은 3단 틀 안에
+       그룹웨어 메뉴 또는 운영자 메뉴가 나온다 (가이드 2·3번 섹션) -->
+  <!-- 브라우저 탭에서 열면: 그룹웨어는 설치한 IEUM 앱에서만 쓴다. 다운로드 안내만 보여준다 -->
+  <section class="login-screen" id="appOnlyScreen" hidden>
+    <div class="login-box app-only">
+      <div class="login-brand">
+        <img src="img/logo-mark.png" alt="" class="brand-mark">
+        <img src="img/logo-wordmark.png" alt="IEUM" class="brand-word">
+      </div>
+      <h1>IEUM 그룹웨어는 앱에서 사용합니다</h1>
+      <p>앱을 설치하면 바탕화면이나 홈 화면의 IEUM 앱에서 바로 로그인할 수 있습니다.</p>
+      <button type="button" class="btn btn-primary btn-block" data-download>IEUM 앱 다운로드</button>
+    </div>
+  </section>
+
+  <section class="login-screen" id="loginScreen" hidden>
+    <div class="login-box">
+      <div class="login-brand">
+        <img src="img/logo-mark.png" alt="" class="brand-mark">
+        <img src="img/logo-wordmark.png" alt="IEUM" class="brand-word">
+      </div>
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="loginCompany">업체 코드</label>
+          <input class="input" id="loginCompany" autocomplete="organization" placeholder="예: ieum7431">
+        </div>
+        <div class="field">
+          <!-- 사번 = 등록 연도 + 4자리 번호 (예: 20260002). 업체 안에서 계정을 만든 순서대로 붙고 해마다 0001부터 다시 시작한다.
+               최초 관리자는 가입 연도 + 0001. 사번은 업체 안에서만 유일하므로 업체 코드와 함께 확인한다 -->
+          <label for="loginId">사번</label>
+          <input class="input" id="loginId" autocomplete="username" inputmode="numeric" placeholder="예: 20260002">
+        </div>
+        <div class="field">
+          <label for="loginPw">비밀번호</label>
+          <input class="input" id="loginPw" type="password" autocomplete="current-password">
+        </div>
+        <p class="login-error" id="loginError" role="alert"></p>
+        <button class="btn btn-primary btn-block" type="submit">로그인</button>
+        <!-- 직원 가입: 관리자가 사전 등록해 준 사번으로 가입을 요청하고, 관리자·부서장이 1시간 안에 승인한다 (hr.js) -->
+        <p class="login-help">처음이면 <button type="button" class="link-btn" id="btnJoin">계정 만들기</button> · 비밀번호를 잊었다면 관리자에게 초기화를 요청하세요.</p>
+      </form>
+      <!-- 계정 만들기: 신청자 정보 → 승인 요청 → (승인되면) 사번 자동 배정·비밀번호·이메일 인증 → 계정 생성 (hr.js).
+           승인 요청 버튼은 업체 코드를 넣기 전에는 회색으로 꺼져 있고, 넣으면 파란색으로 켜진다 -->
+      <form id="joinForm" novalidate hidden>
+        <h2 class="login-title">계정 만들기</h2>
+        <p class="login-lead">정보를 적고 승인을 요청하세요. 업체 관리자나 부서장이 1시간 안에 승인하면 이 화면에서 바로 계정을 만들 수 있습니다.</p>
+        <div class="field">
+          <label for="joinCompany">업체 코드</label>
+          <div class="input-action">
+            <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
+            <button type="button" class="btn btn-request" id="btnJoinRequest" disabled>승인 요청</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="joinName">이름</label>
+          <input class="input" id="joinName" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="joinDept">부서</label>
+          <select class="input" id="joinDept"><option value="">부서를 고르세요</option></select>
+        </div>
+        <div class="field">
+          <label for="joinRank">직급</label>
+          <input class="input" id="joinRank" autocomplete="off" placeholder="예: 사원">
+        </div>
+        <div class="field">
+          <label for="joinEmail">이메일</label>
+          <input class="input" id="joinEmail" type="email" autocomplete="email" placeholder="name@company.com">
+        </div>
+        <p class="join-status" id="joinStatus" role="status" hidden></p>
+        <!-- 승인된 뒤에만 보인다: 사번(잠김) · 비밀번호 · 비밀번호 확인 · 이메일 인증 -->
+        <div class="join-account" id="joinAccount" hidden>
+          <div class="field">
+            <label for="joinId">사번</label>
+            <output class="input emp-no" id="joinId"></output>
+            <p class="emp-roles-hint">승인 순서대로 자동으로 정해졌습니다</p>
+          </div>
+          <div class="field">
+            <label for="joinPw">비밀번호</label>
+            <input class="input" id="joinPw" type="password" autocomplete="new-password" placeholder="8자 이상">
+          </div>
+          <div class="field">
+            <label for="joinPw2">비밀번호 확인</label>
+            <input class="input" id="joinPw2" type="password" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label for="joinCode">이메일 인증</label>
+            <div class="input-action">
+              <input class="input" id="joinCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="인증 코드 6자리">
+              <button type="button" class="btn" id="btnJoinSend">인증 메일 보내기</button>
+            </div>
+            <p class="emp-roles-hint join-code-note" id="joinCodeNote"></p>
+          </div>
+        </div>
+        <p class="login-error" id="joinError" role="alert"></p>
+        <button class="btn btn-primary btn-block" type="submit" id="btnJoinCreate" hidden disabled>계정 생성</button>
+        <button class="btn btn-ghost btn-block" type="button" id="btnJoinCancel" hidden>요청 취소하고 다시 쓰기</button>
+        <button class="btn btn-ghost btn-block" type="button" id="btnJoinBack">로그인으로 돌아가기</button>
+      </form>
+      <!-- 시안 전용: 시연용 계정을 채워 넣는 버튼. 실제 JSP에는 넣지 않는다 -->
+      <div class="login-demo">
+        <p>시안용 계정</p>
+        <button type="button" class="btn" data-fill="ieum 20260001 ieum1234">이음 운영자 (업체 코드 ieum)</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="app-shell" id="appShell" hidden>
+    <header class="app-header">
+      <button class="icon-btn menu-btn" id="btnMenu" aria-label="메뉴 열기" aria-expanded="false" aria-controls="sidebar">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <a class="brand" id="brandLink" href="#home">
+        <img src="img/logo-mark.png" alt="" class="brand-mark">
+        <img src="img/logo-wordmark.png" alt="IEUM" class="brand-word">
+      </a>
+      <!-- 업체 직원: 업체명, 이음 운영자: "이음 운영" -->
+      <span class="company" id="companyName"></span>
+      <div class="header-right">
+        <!-- 출퇴근은 지문 단말기가 기록한다. 화면은 받은 기록을 보여주기만 한다 -->
+        <span class="attend-time" id="attendHeader" data-mode="EMPLOYEE" title="지문 단말기 기록">출근 기록 없음</span>
+        <button class="icon-btn" data-mode="EMPLOYEE" aria-label="알림">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
+          <span class="badge badge-dot">2</span>
+        </button>
+        <!-- 운영자 알림: 새 신청 수. 누르면 신청 현황으로 간다 -->
+        <a class="icon-btn" id="bell" data-mode="OPS" href="#ops-application-status" aria-label="새 신청 알림">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/><path d="M9 17v1a3 3 0 0 0 6 0v-1"/></svg>
+          <span class="badge badge-dot" id="bellCount" hidden></span>
+        </a>
+        <div class="user">
+          <span class="avatar" id="userAvatar"></span>
+          <span class="user-text"><strong id="userName"></strong><small id="userSub"></small></span>
+        </div>
+        <button class="btn" id="btnLogout">로그아웃</button>
+      </div>
+    </header>
+    <!-- 체험 중인 업체: 남은 기간과 결제 안내. 업체 관리자에게만 결제 버튼이 보인다 -->
+    <div class="trial-bar" id="trialBar" role="status" hidden>
+      <span id="trialText"></span>
+      <a class="btn btn-primary" id="trialPay" href="#admin-billing" hidden>결제하기</a>
+    </div>
+
+    <div class="app-body">
+      <nav class="sidebar" id="sidebar">
+        <!-- 업체 직원 메뉴. data-roles: 이 역할 중 하나라도 있으면 보임. 없으면 전체 직원에게 보임 (가이드 3번 섹션) -->
+        <div data-mode="EMPLOYEE">
+          <div class="nav-section">
+            <a href="#home" class="nav-item" data-view="home">홈</a>
+            <a href="#notice" class="nav-item" data-view="notice">공지사항</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">전자결재</p>
+            <!-- data-write: 새로 쓰거나 바꾸는 동작. 체험이 끝나 읽기 전용인 업체에서는 막는다 -->
+            <a href="#approval-write" class="nav-item" data-view="approval-write" data-write>기안 작성</a>
+            <a href="#approval-box" class="nav-item" data-view="approval-box">결재함 <span class="badge">3</span></a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">IT 서비스</p>
+            <a href="#ticket-new" class="nav-item" data-view="ticket-new" data-write>장애·문의 접수</a>
+            <a href="#ticket-mine" class="nav-item" data-view="ticket-mine">내 티켓</a>
+            <a href="#asset-mine" class="nav-item" data-view="asset-mine">내 장비</a>
+            <a href="#ticket-all" class="nav-item" data-view="ticket-all" data-roles="IT ADMIN">티켓 처리</a>
+            <a href="#asset-all" class="nav-item" data-view="asset-all" data-roles="IT">자산 관리</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">근무</p>
+            <a href="#attendance" class="nav-item" data-view="attendance">근태·연차</a>
+            <a href="#schedule" class="nav-item" data-view="schedule">일정</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">소통</p>
+            <a href="#chat" class="nav-item" data-view="chat">채팅 <span class="badge">5</span></a>
+            <a href="#board-dept" class="nav-item" data-view="board-dept">부서 게시판</a>
+            <a href="#location" class="nav-item" data-view="location">지도</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">회사</p>
+            <a href="#org" class="nav-item" data-view="org">조직도</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">인사 관리</p>
+            <a href="#hr-employee" class="nav-item" data-view="hr-employee" data-roles="HR ADMIN">사원 관리</a>
+            <a href="#hr-join" class="nav-item" data-view="hr-join" data-roles="ADMIN HEAD">가입 승인 <span class="badge" id="joinCount" hidden></span></a>
+            <a href="#hr-attendance" class="nav-item" data-view="hr-attendance" data-roles="HR">근태·연차 관리</a>
+            <a href="#hr-holiday" class="nav-item" data-view="hr-holiday" data-roles="HR">휴일 관리</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">업체 관리</p>
+            <a href="#admin-dept" class="nav-item" data-view="admin-dept" data-roles="ADMIN">부서 관리</a>
+            <a href="#admin-role" class="nav-item" data-view="admin-role" data-roles="ADMIN">역할 관리</a>
+            <a href="#admin-billing" class="nav-item" data-view="admin-billing" data-roles="ADMIN">이용 결제</a>
+          </div>
+
+          <!-- 시안 전용: 역할별 메뉴를 확인하는 선택 상자. 실제 JSP에는 넣지 않는다 -->
+          <div class="demo-role">
+            <label for="demoRole">시안: 역할 보기</label>
+            <select id="demoRole">
+              <option value="EMPLOYEE">직원</option>
+              <option value="EMPLOYEE IT">직원 + IT 담당자</option>
+              <option value="EMPLOYEE HR">직원 + 인사 담당자</option>
+              <option value="EMPLOYEE HEAD">직원 + 부서장</option>
+              <option value="EMPLOYEE ADMIN">직원 + 업체 관리자</option>
+              <option value="EMPLOYEE IT HR ADMIN">모든 역할</option>
+            </select>
+            <a class="demo-link" href="simulator.html" target="_blank" rel="noopener">지문 단말기 시뮬레이터 열기 ↗</a>
+          </div>
+        </div>
+
+        <!-- 이음 운영자 메뉴 -->
+        <div data-mode="OPS">
+          <div class="nav-section">
+            <p class="nav-group">업체</p>
+            <a href="#ops-company" class="nav-item" data-view="ops-company">업체 관리</a>
+            <a href="#ops-account-company" class="nav-item" data-view="ops-account-company">업체 계정</a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">신청</p>
+            <a href="#ops-application-status" class="nav-item" data-view="ops-application-status">신청 현황 <span class="badge" id="navCount" hidden></span></a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">장애/문의</p>
+            <a href="#ops-inquiry-guest" class="nav-item" data-view="ops-inquiry-guest">비회원 접수 <span class="badge" id="navGuestCount" hidden></span></a>
+            <a href="#ops-inquiry-company" class="nav-item" data-view="ops-inquiry-company">회원 접수 <span class="badge" id="navCompanyCount" hidden></span></a>
+          </div>
+          <div class="nav-section">
+            <p class="nav-group">운영</p>
+            <a href="#ops-stats" class="nav-item" data-view="ops-stats">운영 데이터</a>
+          </div>
+        </div>
+      </nav>
+      <div class="backdrop" id="backdrop"></div>
+
+      <main class="content">
+        <section class="view" id="view-home">
+          <p class="crumb"><span class="crumb-current">홈</span></p>
+          <div class="page-head"><h1 id="homeGreeting">안녕하세요</h1></div>
+          <div class="cards">
+            <div class="card"><small>결재 대기</small><strong>3건</strong></div>
+            <div class="card"><small>내 티켓</small><strong>1건 처리중</strong></div>
+            <div class="card"><small>오늘 근태 (단말기 기록)</small><strong id="attendCard">기록 없음</strong></div>
+            <div class="card"><small>남은 연차</small><strong>11.5일</strong></div>
+            <div class="card"><small>오늘 일정</small><strong>2개</strong></div>
+          </div>
+          <h2>공지사항</h2>
+          <ul class="list">
+            <li><span>[필독] 11월 보안 점검 안내</span><small>10.26</small></li>
+            <li><span>사내 Wi-Fi 비밀번호 변경</span><small>10.24</small></li>
+          </ul>
+        </section>
+
+        <section class="view" id="view-approval-box">
+          <p class="crumb">전자결재 &gt; <span class="crumb-current">결재함</span></p>
+          <div class="page-head"><h1>결재함</h1><a href="#approval-write" class="btn btn-primary" data-write>기안 작성</a></div>
+          <div class="tabs"><span class="on">대기 3</span><span>진행</span><span>완료</span><span>반려</span></div>
+          <ul class="list">
+            <li><span>IT 장비 신청서 · 노트북</span><small>이신입 · 10.26</small></li>
+            <li><span>휴가 신청서 · 11.3~11.4</span><small>박대리 · 10.25</small></li>
+            <li><span>지출 결의서 · 팀 회식</span><small>최주임 · 10.24</small></li>
+          </ul>
+        </section>
+
+        <!-- 이용 결제: 체험 중인 업체 관리자가 여기서 결제한다. 결제한 날부터 유료 이용 (남은 체험 기간은 이어지지 않음).
+             모의 결제라 카드 정보는 받지 않고 시연용으로 성공·실패만 고른다 (PAY-01·02) -->
+        <section class="view" id="view-admin-billing">
+          <p class="crumb">업체 관리 &gt; <span class="crumb-current">이용 결제</span></p>
+          <div class="page-head"><h1>이용 결제</h1></div>
+          <div class="cards">
+            <div class="card"><small>이용 상태</small><strong id="billStatus">-</strong></div>
+            <div class="card"><small id="billEndLabel">체험 만료일</small><strong id="billEnd">-</strong></div>
+            <div class="card"><small>월 이용료</small><strong id="billTotal">-</strong></div>
+            <div class="card"><small id="billFromLabel">유료 이용 시작일</small><strong id="billFrom">-</strong></div>
+          </div>
+          <div class="info-grid info-grid-2 table-gap">
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10"/><path d="M8 8h3M8 12h3M8 16h3M3 21h18"/></svg></span>
+                <h2>이용 정보</h2>
+              </header>
+              <dl class="detail" id="billInfo"></dl>
+            </section>
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+                <div><h2>결제</h2><p id="billHint"></p></div>
+              </header>
+              <!-- 결제 전(체험 중·읽기 전용): 1. 정보 변경 → 2. 결제 → 3. 신청 완료 -->
+              <div class="bill-pay" id="billPay">
+                <ol class="bill-steps" id="billSteps">
+                  <li data-step="1">1. 정보 변경</li>
+                  <li data-step="2">2. 결제</li>
+                  <li data-step="3">3. 신청 완료</li>
+                </ol>
+                <!-- 1. 정보 변경: 결제할 이용 인원과 결제 안내를 받을 이메일 -->
+                <div class="bill-step" id="billStep1">
+                  <p class="bill-intro">결제하기 전에 이용 인원과 결제 안내를 받을 이메일을 확인하고, 필요하면 바꿉니다.</p>
+                  <div class="bill-seats">
+                    <label for="payUsers">이용 인원</label>
+                    <div class="bill-seats-row"><input class="input" id="payUsers" type="number" min="1" max="500" inputmode="numeric" aria-describedby="payUsersHint"><span>명</span></div>
+                    <p class="bill-note" id="payUsersHint"></p>
+                    <p class="form-error" id="payUsersError" role="alert"></p>
+                    <!-- 인원으로 계산한 결제 금액: 인원 칸 바로 아래에 붙여 둔다 -->
+                    <dl class="pay-summary" id="payPreview"></dl>
+                  </div>
+                  <div class="bill-seats">
+                    <label for="payEmail">결제 안내 이메일</label>
+                    <input class="input" id="payEmail" type="email" autocomplete="email">
+                    <p class="form-error" id="payEmailError" role="alert"></p>
+                  </div>
+                  <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayNext">다음: 결제</button></div>
+                </div>
+                <!-- 2. 결제: 시연용 모의 결제 (PAY-02) -->
+                <div class="bill-step" id="billStep2" hidden>
+                  <p class="notice-warn">시연용 모의 결제입니다. 실제 결제가 이루어지지 않고, 카드 정보도 받지 않습니다.</p>
+                  <dl class="detail" id="billOrder"></dl>
+                  <label class="agree"><input type="checkbox" id="billAgree"> 시연용 서비스 이용 조건에 동의합니다.</label>
+                  <p class="form-error" id="billError" role="alert"></p>
+                  <div class="bill-actions">
+                    <button type="button" class="btn" id="btnPayBack">이전</button>
+                    <button type="button" class="btn" id="btnBillFail">결제 실패로 진행</button>
+                    <button type="button" class="btn btn-primary" id="btnBillOk">결제 성공으로 진행</button>
+                  </div>
+                  <p class="muted" id="billBusy" aria-live="polite"></p>
+                </div>
+                <!-- 3. 신청 완료: 유료 이용 신청이 끝났음을 알리고, 확인을 누르면 정기 결제 화면으로 -->
+                <div class="bill-step" id="billStep3" hidden>
+                  <p class="notice-ok" id="payDoneText"></p>
+                  <dl class="detail" id="payDone"></dl>
+                  <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayFinish">확인</button></div>
+                </div>
+              </div>
+              <!-- 결제 뒤: 매달 갱신(다음 결제일)과 이용 인원 변경. 해지·환불은 범위 밖 -->
+              <div class="bill-done" id="billDone" hidden>
+                <p class="notice-ok" id="billDoneText"></p>
+                <dl class="detail" id="billReceipt"></dl>
+                <div class="bill-seats">
+                  <label for="billUsers">이용 인원 변경</label>
+                  <div class="bill-seats-row">
+                    <input class="input" id="billUsers" type="number" min="1" max="500" inputmode="numeric" aria-describedby="billUsersHint">
+                    <span>명</span>
+                    <button type="button" class="btn" id="btnBillUsers">변경</button>
+                  </div>
+                  <p class="bill-note" id="billUsersHint"></p>
+                  <p class="form-error" id="billUsersError" role="alert"></p>
+                </div>
+                <!-- 시안 전용: 실제로는 다음 결제일에 서버가 저장된 결제 수단으로 결제한다 -->
+                <div class="bill-renew">
+                  <p class="notice-warn">시안: 다음 결제일이 된 것으로 보고 정기 결제를 진행해 봅니다.</p>
+                  <div class="bill-actions">
+                    <button type="button" class="btn" id="btnRenewFail">갱신 실패로 진행</button>
+                    <button type="button" class="btn btn-primary" id="btnRenewOk">갱신 성공으로 진행</button>
+                  </div>
+                  <p class="form-error" id="billRenewError" role="alert"></p>
+                  <p class="muted" id="billRenewBusy" aria-live="polite"></p>
+                </div>
+                <div>
+                  <h3 class="bill-sub">결제 이력</h3>
+                  <ul class="bill-history" id="billHistory"></ul>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 사원 관리: 업체 관리자(또는 인사 담당자)가 직원 계정을 만든다. 임시 비밀번호는 서버가 만들고 첫 로그인 때 바꾼다.
+             체험 중에는 관리자 포함 10명까지, 결제하면 제한 없음. 실제 제한은 서버가 계정 수를 세서 막는다 -->
+        <section class="view" id="view-hr-employee">
+          <p class="crumb">인사 관리 &gt; <span class="crumb-current">사원 관리</span></p>
+          <div class="page-head"><h1>사원 관리</h1><a href="#hr-join" class="btn">가입 승인으로</a></div>
+          <!-- 사원 등록은 없다: 직원은 로그인 화면의 계정 만들기로 승인을 요청하고, 승인되면 사번이 순서대로 붙는다 -->
+          <p class="muted join-scope">직원은 로그인 화면의 "계정 만들기"로 승인을 요청합니다. 가입 승인에서 승인하면 사번이 순서대로 붙고, 직원이 비밀번호와 이메일 인증을 마치면 계정이 만들어집니다.</p>
+          <div class="cards">
+            <div class="card"><small>전체 계정</small><strong id="empTotal">-</strong></div>
+            <div class="card"><small>사용 중</small><strong id="empActive">-</strong></div>
+            <div class="card"><small>계정 생성 전</small><strong id="empPending">-</strong></div>
+            <div class="card"><small>계정 한도</small><strong id="empLimit">-</strong></div>
+          </div>
+
+          <!-- 사용 중인 계정 수: 체험 중이면 10명 중, 결제 뒤에는 구매 인원 중 몇 명을 쓰는지 -->
+          <div class="seat-bar table-gap" id="seatBar" hidden>
+            <div class="seat-head">
+              <strong><span id="seatTitle">체험 중 계정</span> <span id="seatCount"></span></strong>
+              <a href="#admin-billing" class="btn btn-primary" id="seatPay">결제하고 제한 풀기</a>
+            </div>
+            <div class="seat-meter" id="seatMeter" role="meter" aria-label="체험 중 계정 사용" aria-valuemin="0"><span id="seatFill"></span></div>
+            <p id="seatText"></p>
+          </div>
+
+          <div class="table-wrap table-gap">
+            <table class="table">
+              <thead>
+                <tr><th>이름</th><th>부서·직급</th><th>역할</th><th>상태</th><th>등록일</th><th>관리</th></tr>
+              </thead>
+              <tbody id="empList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 가입 승인: 업체 관리자는 모든 요청, 부서장은 자기 부서 요청. 요청 뒤 1시간 안에 승인하거나 반려한다 (hr.js) -->
+        <section class="view" id="view-hr-join">
+          <p class="crumb">인사 관리 &gt; <span class="crumb-current">가입 승인</span></p>
+          <div class="page-head"><h1>가입 승인</h1></div>
+          <p class="muted join-scope" id="joinScope"></p>
+          <div class="cards">
+            <div class="card"><small>승인 대기</small><strong id="joinOpen">-</strong></div>
+            <div class="card"><small>사용 중</small><strong id="joinActive">-</strong></div>
+            <div class="card"><small>더 승인할 수 있음</small><strong id="joinRoom">-</strong></div>
+            <div class="card"><small>자리 대기</small><strong id="joinSeatWait">-</strong></div>
+          </div>
+          <p class="join-note table-gap" id="joinNote"></p>
+
+          <h2>가입 요청</h2>
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>이름</th><th>부서·직급</th><th>이메일</th><th>요청 시각</th><th>남은 시간</th><th>처리</th></tr>
+              </thead>
+              <tbody id="joinList"></tbody>
+            </table>
+          </div>
+          <p class="empty-note" id="joinEmpty" hidden>처리할 가입 요청이 없습니다.</p>
+
+          <!-- 결제한 업체의 관리자에게만: 구매 인원을 넘겨 승인된 계정. 자리가 나면 관리자가 골라 활성화한다 -->
+          <div id="seatWaitBox" hidden>
+            <h2>자리 대기</h2>
+            <p class="join-note" id="seatWaitNote"></p>
+            <div class="table-wrap table-gap">
+              <table class="table">
+                <thead>
+                  <tr><th>이름</th><th>부서·직급</th><th>승인 시각</th><th>처리</th></tr>
+                </thead>
+                <tbody id="seatWaitList"></tbody>
+              </table>
+            </div>
+            <p class="empty-note" id="seatWaitEmpty" hidden>자리 대기 중인 계정이 없습니다.</p>
+          </div>
+        </section>
+
+        <section class="view" id="view-ops-application-status">
+          <p class="crumb">신청 &gt; <span class="crumb-current">신청 현황</span></p>
+          <div class="page-head"><h1>신청 현황</h1></div>
+          <!-- 카드를 누르면 아래 표가 그 조건으로 걸러진다 -->
+          <div class="cards" id="appFilters">
+            <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 신청</small><strong id="cntAll">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="new" aria-pressed="false"><small>새 신청</small><strong id="cntNew">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="TRIAL" aria-pressed="false"><small>체험 중</small><strong id="cntTrial">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="PAID" aria-pressed="false"><small>결제 완료</small><strong id="cntPaid">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="EXPIRED" aria-pressed="false"><small>읽기 전용</small><strong id="cntExpired">0건</strong></button>
+          </div>
+          <div class="table-wrap table-gap">
+            <table class="table table-fixed">
+              <!-- 열 너비 고정: 걸러진 행이 없어도 제목 줄 위치가 그대로다 -->
+              <colgroup><col style="width: 14%"><col style="width: 26%"><col style="width: 10%"><col style="width: 14%"><col style="width: 18%"><col style="width: 18%"></colgroup>
+              <thead>
+                <tr><th>신청 시각</th><th>업체</th><th class="num">인원</th><th class="num">월 이용료</th><th>관리자</th><th>상태</th></tr>
+              </thead>
+              <tbody id="appList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 신청 상세: 신청 현황 표에서 행을 누르면 그 행 바로 아래에 펼쳐진다.
+             구매 페이지 입력 순서대로 카드 3개(업체 정보 → 최초 관리자 계정 → 결제 정보), 1200px 이하에서는 한 줄로 쌓인다 -->
+        <template id="appDetailTpl">
+          <div class="info-grid">
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16"/><path d="M15 10h4a1 1 0 0 1 1 1v10"/><path d="M8 8h3M8 12h3M8 16h3M3 21h18"/></svg></span>
+                <h2>업체 정보</h2>
+              </header>
+              <dl class="detail" data-part="company"></dl>
+            </section>
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>
+                <div>
+                  <h2>최초 관리자 계정</h2>
+                  <p>신청할 때 바로 만들어진 계정입니다 (운영자 발급 없음, 요구분석서 v1.4)</p>
+                </div>
+              </header>
+              <dl class="detail" data-part="admin"></dl>
+            </section>
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+                <h2>결제 정보</h2>
+              </header>
+              <dl class="detail" data-part="pay"></dl>
+            </section>
+          </div>
+        </template>
+
+        <!-- 비회원 접수: 답변은 메일로 나간다. 발송 성공 뒤에만 "답변 완료". 장애 접수 / 문의 접수 두 탭으로 나눠 본다 -->
+        <section class="view" id="view-ops-inquiry-guest">
+          <p class="crumb">장애/문의 &gt; <span class="crumb-current">비회원 접수</span></p>
+          <div class="page-head"><h1>비회원 접수</h1></div>
+          <div class="type-tabs" id="guestTabs" role="tablist" aria-label="비회원 접수 유형">
+            <button type="button" role="tab" class="type-tab" data-type="INCIDENT" aria-selected="true">장애 접수 <span class="badge" id="guestTabINCIDENT" hidden></span></button>
+            <button type="button" role="tab" class="type-tab" data-type="INQUIRY" aria-selected="false" tabindex="-1">문의 접수 <span class="badge" id="guestTabINQUIRY" hidden></span></button>
+          </div>
+          <div class="cards" id="guestFilters">
+            <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 (스팸 제외)</small><strong id="gCntAll">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="WAIT" aria-pressed="false"><small>답변 대기</small><strong id="gCntWait">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="FAILED" aria-pressed="false"><small>발송 실패</small><strong id="gCntFailed">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="DONE" aria-pressed="false"><small>답변 완료</small><strong id="gCntDone">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="SPAM" aria-pressed="false"><small>스팸 숨김</small><strong id="gCntSpam">0건</strong></button>
+          </div>
+          <div class="search-row">
+            <input type="search" class="search-input" id="guestSearch" placeholder="이름·이메일·제목·내용·접수번호로 검색" aria-label="비회원 접수 검색" autocomplete="off">
+            <select class="filter-select" id="guestPeriod" aria-label="접수 기간">
+              <option value="all">전체 기간</option><option value="1">오늘</option><option value="7">최근 7일</option><option value="30">최근 30일</option>
+            </select>
+            <label class="inq-check"><input type="checkbox" id="guestStale"> 24시간 넘게 답변 없음</label>
+            <span class="inq-hint" id="guestSearchInfo" role="status"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-fixed">
+              <colgroup><col style="width: 14%"><col style="width: 26%"><col style="width: 40%"><col style="width: 20%"></colgroup>
+              <thead><tr><th>접수 시각</th><th>보낸 사람</th><th>제목</th><th>상태</th></tr></thead>
+              <tbody id="guestList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 회원 접수: 답변을 저장하면 업체 관리자에게 알림이 생긴다 (메일 발송 없음). 장애 접수 / 문의 접수 두 탭 -->
+        <section class="view" id="view-ops-inquiry-company">
+          <p class="crumb">장애/문의 &gt; <span class="crumb-current">회원 접수</span></p>
+          <div class="page-head"><h1>회원 접수</h1></div>
+          <div class="type-tabs" id="companyTabs" role="tablist" aria-label="회원 접수 유형">
+            <button type="button" role="tab" class="type-tab" data-type="INCIDENT" aria-selected="true">장애 접수 <span class="badge" id="companyTabINCIDENT" hidden></span></button>
+            <button type="button" role="tab" class="type-tab" data-type="INQUIRY" aria-selected="false" tabindex="-1">문의 접수 <span class="badge" id="companyTabINQUIRY" hidden></span></button>
+          </div>
+          <div class="cards" id="companyFilters">
+            <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 접수</small><strong id="cCntAll">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="WAIT" aria-pressed="false"><small>답변 대기</small><strong id="cCntWait">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="DONE" aria-pressed="false"><small>답변 완료</small><strong id="cCntDone">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="UNREAD" aria-pressed="false"><small>알림 안 읽음</small><strong id="cCntUnread">0건</strong></button>
+          </div>
+          <div class="search-row">
+            <input type="search" class="search-input" id="companySearch" placeholder="업체·접수자·제목·내용·접수번호로 검색" aria-label="회원 접수 검색" autocomplete="off">
+            <select class="filter-select" id="companyPeriod" aria-label="접수 기간">
+              <option value="all">전체 기간</option><option value="1">오늘</option><option value="7">최근 7일</option><option value="30">최근 30일</option>
+            </select>
+            <label class="inq-check"><input type="checkbox" id="companyStale"> 24시간 넘게 답변 없음</label>
+            <span class="inq-hint" id="companySearchInfo" role="status"></span>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-fixed">
+              <colgroup><col style="width: 14%"><col style="width: 24%"><col style="width: 30%"><col style="width: 16%"><col style="width: 16%"></colgroup>
+              <thead><tr><th>접수 시각</th><th>업체 · 접수자</th><th>제목</th><th>답변</th><th>업체 관리자 읽음</th></tr></thead>
+              <tbody id="companyList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 운영 데이터: 신청 현황의 체험 신청과 결제 데이터만으로 그린다. 숫자 3개 + 그래프 2개 + 표 -->
+        <section class="view" id="view-ops-stats">
+          <p class="crumb">운영 &gt; <span class="crumb-current">운영 데이터</span></p>
+          <div class="page-head"><h1>운영 데이터</h1></div>
+          <p class="muted" id="statsMonth"></p>
+          <div class="cards">
+            <div class="card"><small>신규 유료 이용자</small><strong id="stUsers">0명</strong><span class="delta" id="dUsers"></span></div>
+            <div class="card"><small>결제 완료</small><strong id="stPaidCount">0건</strong><span class="delta" id="dPaidCount"></span></div>
+            <div class="card"><small>매출</small><strong id="stSales">0원</strong><span class="delta" id="dSales"></span></div>
+          </div>
+          <div class="chart-grid table-gap">
+            <section class="chart-card">
+              <h2>업체별 월 이용료</h2>
+              <p class="inq-hint">결제한 업체의 지금 월 이용료</p>
+              <div id="chSales"></div>
+            </section>
+            <section class="chart-card">
+              <h2>일별 체험 신청·결제</h2>
+              <p class="inq-hint">최근 7일</p>
+              <div class="chart-legend" id="chDailyLegend"></div>
+              <div id="chDaily"></div>
+            </section>
+          </div>
+          <details class="chart-table">
+            <summary>표로 보기</summary>
+            <div id="chTables"></div>
+          </details>
+          <p class="inq-hint table-gap">위 숫자와 그래프는 신청 현황의 체험 신청과 결제 데이터에서 계산합니다. 신규 유료 이용자는 첫 결제의 이용 인원, 결제 완료와 매출은 첫 결제와 정기 결제를 모두 셉니다. 이번 달 1일부터 오늘까지의 값이고, 증감은 지난달 같은 기간과 비교합니다.</p>
+          <div class="chart-tip" id="chartTip" role="tooltip" hidden></div>
+        </section>
+
+        <!-- 업체 관리: 체험 중인 업체를 포함한 모든 업체. 누르면 그 업체의 모든 정보(기본 정보, 관리자 계정, 계정 목록, 신청·결제 이력, 장애·문의 접수)가 아래로 펼쳐진다 -->
+        <section class="view" id="view-ops-company">
+          <p class="crumb">업체 &gt; <span class="crumb-current">업체 관리</span></p>
+          <div class="page-head"><h1>업체 관리</h1></div>
+          <p class="inq-hint">업체를 누르면 상세 정보가 펼쳐집니다.</p>
+          <div class="table-wrap table-gap">
+            <table class="table table-fixed">
+              <colgroup><col style="width: 24%"><col style="width: 18%"><col style="width: 12%"><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"></colgroup>
+              <thead><tr><th>업체</th><th>관리자</th><th class="num">이용 인원</th><th class="num">월 이용료</th><th>상태</th><th>가입일</th></tr></thead>
+              <tbody id="firmList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="view-placeholder">
+          <p class="crumb" id="placeholderCrumb"></p>
+          <div class="page-head"><h1 id="placeholderTitle"></h1></div>
+          <p class="muted">시안에서는 이 화면을 아직 만들지 않았어요. 실제 화면은 각 담당자가 JSP로 채웁니다.</p>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <!-- 사원 관리: 체험 중 11번째 계정을 만들려고 할 때 -->
+  <!-- 사원 관리: 직원 계정 비활성화·다시 사용 확인 (hr.js가 제목·본문·버튼 글자를 채운다) -->
+  <dialog class="modal" id="empStateDialog">
+    <h2></h2>
+    <p></p>
+    <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="button" class="btn btn-primary" value="ok"></button></div>
+  </dialog>
+
+  <dialog class="modal" id="seatDialog">
+    <h2>계정을 더 만들 수 없습니다</h2>
+    <p></p>
+    <div class="modal-actions"><button type="button" class="btn" value="close">닫기</button><button type="button" class="btn btn-primary" value="pay">결제하러 가기</button></div>
+  </dialog>
+
+  <script src="js/install.js"></script>
+  <script src="js/password-toggle.js"></script>
+  <script src="js/ops.js"></script>
+  <script src="js/admin-inquiry.js"></script>
+  <script src="js/admin-stats.js"></script>
+  <script src="js/admin-company.js"></script>
+  <script src="js/hr.js"></script>
+  <script src="js/common.js"></script>
+</body>
+</html>
