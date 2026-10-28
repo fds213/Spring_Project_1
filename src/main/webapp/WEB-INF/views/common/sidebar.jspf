@@ -1,0 +1,91 @@
+<%-- tag 파일(layout.tag, site.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
+<%@ tag pageEncoding="UTF-8" %>
+<%--
+  사이드 메뉴. layout.tag 가 include 한다. 역할로 보일지 정하는 것은 sec:authorize (실제 접근은 Security URL 규칙과 Service가 막는다).
+  주소는 /<모듈>/<기능>, 관리 화면은 /<모듈>/admin/<기능> (AGENTS.md, 팀 저장소 PR #1). feature/authTest 의 Security 는
+  /*/admin/** 를 ADMIN 만 통과시키므로, 인사 담당(HR)·IT 담당이 여는 관리 화면은 담당 1이 그 위에 규칙을 더해야 한다.
+  역할은 저장소 DB 값 ROLE_EMP / ROLE_IT / ROLE_HR / ROLE_ADMIN 이고 한 사람에 하나다. 이음 운영자 ROLE_OPS 는 제안(저장소에 아직 없음).
+  이용 결제는 저장소에 맞는 모듈이 없어 /company/admin/billing 으로 임시로 둔다(모듈은 팀이 정한다).
+  배지 숫자는 data-badge 칸을 common.js 가 GET /badges 로 15초마다 채운다.
+--%>
+<nav class="sidebar" id="sidebar">
+  <c:choose>
+    <c:when test="${isOps}">
+      <%-- 이음 운영자 메뉴 (주소 /ops/...) --%>
+      <div class="nav-section">
+        <p class="nav-group">업체</p>
+        <ui:nav key="ops-company" path="/ops/company" current="${menu}">업체 관리</ui:nav>
+        <ui:nav key="ops-account-company" path="/ops/account-company" current="${menu}">업체 계정</ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">신청</p>
+        <ui:nav key="ops-application-status" path="/ops/application-status" current="${menu}">신청 현황 <span class="badge" data-badge="application" hidden></span></ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">장애/문의</p>
+        <ui:nav key="ops-inquiry-guest" path="/ops/inquiry-guest" current="${menu}">비회원 접수 <span class="badge" data-badge="inquiryGuest" hidden></span></ui:nav>
+        <ui:nav key="ops-inquiry-company" path="/ops/inquiry-company" current="${menu}">회원 접수 <span class="badge" data-badge="inquiryCompany" hidden></span></ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">운영</p>
+        <ui:nav key="ops-stats" path="/ops/stats" current="${menu}">운영 데이터</ui:nav>
+      </div>
+    </c:when>
+
+    <c:otherwise>
+      <%-- 업체 직원 메뉴 --%>
+      <div class="nav-section">
+        <ui:nav key="home" path="/home" current="${menu}">홈</ui:nav>
+        <ui:nav key="notice" path="/board/notice" current="${menu}">공지사항</ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">전자결재</p>
+        <ui:nav key="approval-write" path="/approval/write" current="${menu}" write="true">기안 작성</ui:nav>
+        <ui:nav key="approval-box" path="/approval/list" current="${menu}">결재함 <span class="badge" data-badge="approval" hidden></span></ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">IT 서비스</p>
+        <ui:nav key="ticket-new" path="/ticket/new" current="${menu}" write="true">장애·문의 접수</ui:nav>
+        <ui:nav key="ticket-mine" path="/ticket/mine" current="${menu}">내 티켓</ui:nav>
+        <ui:nav key="asset-mine" path="/asset/mine" current="${menu}">내 장비</ui:nav>
+        <sec:authorize access="hasAnyRole('IT','ADMIN')"><ui:nav key="ticket-all" path="/ticket/admin/list" current="${menu}">티켓 처리</ui:nav></sec:authorize>
+        <sec:authorize access="hasRole('IT')"><ui:nav key="asset-all" path="/asset/admin/list" current="${menu}">자산 관리</ui:nav></sec:authorize>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">근무</p>
+        <ui:nav key="attendance" path="/attendance/my" current="${menu}">근태·연차</ui:nav>
+        <ui:nav key="schedule" path="/schedule/calendar" current="${menu}">일정</ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">소통</p>
+        <ui:nav key="chat" path="/chat/rooms" current="${menu}">채팅 <span class="badge" data-badge="chat" hidden></span></ui:nav>
+        <ui:nav key="board-dept" path="/board/dept" current="${menu}">부서 게시판</ui:nav>
+        <ui:nav key="location" path="/location/map" current="${menu}">지도</ui:nav>
+      </div>
+      <div class="nav-section">
+        <p class="nav-group">회사</p>
+        <ui:nav key="org" path="/employee/org" current="${menu}">조직도</ui:nav>
+      </div>
+      <%-- 묶음 제목은 그 안의 메뉴가 하나라도 보일 때만 --%>
+      <sec:authorize access="hasAnyRole('HR','ADMIN')">
+        <div class="nav-section">
+          <p class="nav-group">인사 관리</p>
+          <ui:nav key="hr-employee" path="/employee/admin/list" current="${menu}">사원 관리</ui:nav>
+          <sec:authorize access="hasRole('HR')">
+            <ui:nav key="hr-attendance" path="/attendance/admin/list" current="${menu}">근태·연차 관리</ui:nav>
+            <ui:nav key="hr-holiday" path="/attendance/admin/holiday" current="${menu}">휴일 관리</ui:nav>
+          </sec:authorize>
+        </div>
+      </sec:authorize>
+      <sec:authorize access="hasRole('ADMIN')">
+        <%-- 업체 관리: 부서·역할은 employee 모듈의 관리 화면, 이용 결제는 모듈 미정(임시 company) --%>
+        <div class="nav-section">
+          <p class="nav-group">업체 관리</p>
+          <ui:nav key="admin-dept" path="/employee/admin/dept" current="${menu}">부서 관리</ui:nav>
+          <ui:nav key="admin-role" path="/employee/admin/role" current="${menu}">역할 관리</ui:nav>
+          <ui:nav key="admin-billing" path="/company/admin/billing" current="${menu}">이용 결제</ui:nav>
+        </div>
+      </sec:authorize>
+    </c:otherwise>
+  </c:choose>
+</nav>

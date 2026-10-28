@@ -1,0 +1,10 @@
+<%-- tag 파일(layout.tag, site.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
+<%@ tag pageEncoding="UTF-8" %>
+<%-- 홈페이지형 푸터. site.tag 가 include 한다 --%>
+<footer class="site-footer">
+  <div class="wrap">
+    <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word"></a>
+    <nav><a href="${ctx}/#features">기능</a><a href="${ctx}/#pricing">가격</a><a href="${ctx}/inquiry">문의</a></nav>
+    <span>© IEUM · 부트캠프 팀 프로젝트 시연용 서비스입니다. 실제 결제는 이루어지지 않습니다.</span>
+  </div>
+</footer>
