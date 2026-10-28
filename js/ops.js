@@ -55,7 +55,8 @@ function demoCompanies() {
   const trialEnd = start => { const d = new Date(start); d.setDate(d.getDate() + 13); d.setHours(23, 59, 59, 999); return d.toISOString(); };
   const trialAt = daysAgo(3);
   const paidAt = daysAgo(30);
-  const paidFrom = daysAgo(20); // paid on day 11 of its trial; the next monthly payment is about 10 days away
+  const paidFrom = daysAgo(20); // paid a monthly plan on day 11 of its trial; it expires in about 10 days
+  const paidTo = addMonths(paidFrom, 1);
   const base = { emailVerified: true, payments: [], adminPw: DEMO_PW };
   return [
     { ...base, no: 'T-DEMO-TRIAL', company: '체험상사', companyCode: 'ieum0001', users: 5, total: 5 * 4000,
@@ -64,8 +65,10 @@ function demoCompanies() {
     { ...base, no: 'T-DEMO-PAID', company: '유료물산', companyCode: 'ieum0002', users: 20, total: 20 * 4000,
       email: 'paid-admin@example.com', adminName: '박유료', adminNo: empNo(paidAt.getFullYear(), 1),
       status: 'PAID', at: paidAt.toISOString(), verifiedAt: paidAt.toISOString(), trialEnd: trialEnd(paidAt),
-      serviceFrom: paidFrom.toISOString(), nextPayAt: addMonths(paidFrom, 1).toISOString(),
-      payments: [{ at: paidFrom.toISOString(), kind: 'FIRST', result: 'OK', amount: 20 * 4000, users: 20 }] },
+      paidAt: paidFrom.toISOString(), serviceFrom: paidFrom.toISOString(),
+      plan: 'MONTHLY', subAnchorAt: paidFrom.toISOString(), subMonths: 1,
+      payments: [{ at: paidFrom.toISOString(), kind: 'FIRST', plan: 'MONTHLY', months: 1, pct: 0, result: 'OK',
+        amount: 20 * 4000, users: 20, from: paidFrom.toISOString(), to: paidTo.toISOString() }] },
   ];
 }
 function ensureDemoCompanies() {
@@ -75,6 +78,23 @@ function ensureDemoCompanies() {
   saveStore(ORDERS_KEY, [...orders, ...missing]);
   // not "new applications" for the operator's badge
   saveStore(READ_KEY, [...new Set([...loadStore(READ_KEY, []), ...missing.map(appId)])]);
+}
+
+// Paid companies stored by the older monthly auto-renewal version (nextPayAt) become a monthly subscription
+// that started on its first paid day and covers one month per successful payment.
+function upgradeStoredOrders() {
+  const orders = loadStore(ORDERS_KEY, []);
+  const old = orders.filter(o => o.status === 'PAID' && !o.subAnchorAt);
+  if (!old.length) return;
+  old.forEach(o => {
+    o.plan = 'MONTHLY';
+    o.subAnchorAt = dayStart(o.serviceFrom || o.paidAt || o.at).toISOString();
+    o.subMonths = Math.max(1, (o.payments || []).filter(p => p.result === 'OK').length);
+    o.paidAt = o.paidAt || (o.payments || []).find(p => p.result === 'OK')?.at || o.serviceFrom;
+    delete o.nextPayAt;
+    delete o.nextUsers;
+  });
+  saveStore(ORDERS_KEY, orders);
 }
 
 // 사번 = 등록 연도 + 4자리 번호 (20260001), given in the order accounts are created within the company;
@@ -93,28 +113,85 @@ const pad2 = n => String(n).padStart(2, '0');
 const ymd = iso => { const d = new Date(iso); return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`; };
 const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d; };
 
-// Days before a payment reminder: the admin gets one on these days of the trial (D-day = the last day)
+// Days before a payment reminder: the admin gets one on these days before the trial or the paid period ends
+// (D-day = the last day)
 const REMIND_DAYS = [7, 3, 1, 0];
+const endOfDay = t => { const d = new Date(t); d.setHours(23, 59, 59, 999); return d; };
 
-// Trial state of an application, computed from today. daysLeft counts calendar days to the last trial day
-// (0 = the last day itself, "D-day"). Paid service starts the day the company pays, during the trial or after
-// it ended (requirements v1.3 PAY-02, adopted 2026-10-28): the days left in the trial are not added on.
-// Until it pays, serviceFrom is today (= the start date if it paid now).
-// Shared with the groupware's trial strip, reminder and billing page.
+// State of a company, computed from today: its trial, or its paid subscription once it has paid.
+// status TRIAL / PAID / EXPIRED (trial or paid period over → read-only for everyone, requirements v1.5
+// DEM-03·SUB-04); paid tells which period `end` and daysLeft are about. daysLeft counts calendar days to
+// the last day (0 = the last day itself, "D-day"). Paid service starts the day the company pays, during the
+// trial or after it ended (PAY-02): the days left in the trial are not added on. serviceFrom is the first day
+// of the current paid run, or today before paying (= the start date if it paid now).
+// Shared with the groupware's trial strip, reminder, billing page and the operator screens.
 function trialState(o) {
-  const end = new Date(o.trialEnd);
-  const daysLeft = Math.max(0, Math.round((dayStart(end) - dayStart(Date.now())) / DAY_MS));
-  const status = o.status === 'PAID' ? 'PAID' : (end < new Date() ? 'EXPIRED' : 'TRIAL');
-  const serviceFrom = o.status === 'PAID' && o.serviceFrom ? new Date(o.serviceFrom) : dayStart(Date.now());
+  const sub = subscriptionOf(o);
+  const last = sub ? sub.expire : new Date(o.trialEnd);
+  const daysLeft = Math.max(0, Math.round((dayStart(last) - dayStart(Date.now())) / DAY_MS));
+  const over = endOfDay(last) < new Date();
+  const status = over ? 'EXPIRED' : sub ? 'PAID' : 'TRIAL';
+  const serviceFrom = sub ? new Date(sub.from) : dayStart(Date.now());
   return {
-    status, label: STATUS_LABEL[status], daysLeft, end: ymd(o.trialEnd), serviceFrom: ymd(serviceFrom), serviceFromIso: serviceFrom.toISOString(),
-    dday: daysLeft === 0 ? 'D-day' : `D-${daysLeft}`, urgent: status === 'TRIAL' && daysLeft <= 3,
+    status, paid: !!sub, label: STATUS_LABEL[status], daysLeft, end: ymd(last), trialEnd: ymd(o.trialEnd),
+    serviceFrom: ymd(serviceFrom), serviceFromIso: serviceFrom.toISOString(),
+    dday: daysLeft === 0 ? 'D-day' : `D-${daysLeft}`, urgent: status !== 'EXPIRED' && daysLeft <= 3,
   };
 }
-// After the first payment (team decision 2026-10-27): the company pays every month, and the admin may change
-// the headcount. No cancellation or refund. Each payment covers one month; the next one is due the day after
-// the paid month ends. A headcount change waits for the next payment (no day-by-day proration).
-// In the real project the server charges the saved payment method on that day; the prototype has a button.
+
+// Paid plans (requirements v1.5 3.5·3.6, SUB-03·05). No automatic renewal or charge: the admin extends the
+// subscription directly, as many times as it likes, choosing monthly or annual each time.
+// - The first purchase, and a purchase after the paid period ended, start on the payment day.
+// - An extension before the end adds to the current expiry date (monthly → annual starts where the month ends).
+// - Months are calendar months; a day the month doesn't have becomes its last day, and the run keeps its first
+//   day as the base, so 1.31 → 2.28 → 3.31 (anchor + total months, not chained from the adjusted date).
+// - The period runs through the expiry date itself; the day after it the company is read-only.
+// - Annual is 10% off the first time and 20% off for an annual extension or a new annual purchase until
+//   3 months after the last annual period ended; later than that it is 10% again. Monthly has no discount.
+// The real server works this out again from the order and checks the approved Toss amount against it.
+const PRICE_PER_USER = 4000;
+const PLANS = { MONTHLY: { label: '월간', months: 1 }, ANNUAL: { label: '연간', months: 12 } };
+
+function subscriptionOf(o) {
+  if (o.status !== 'PAID' || !o.subAnchorAt) return null;
+  const expire = addMonths(o.subAnchorAt, o.subMonths);
+  return { plan: o.plan, planLabel: PLANS[o.plan]?.label || '월간', from: o.subAnchorAt, expire, expireIso: expire.toISOString() };
+}
+
+// The latest day an annual period paid so far ends (null if the company never bought annual)
+function lastAnnualEnd(o) {
+  const ends = (o.payments || []).filter(p => p.result === 'OK' && p.plan === 'ANNUAL' && p.to).map(p => new Date(p.to).getTime());
+  return ends.length ? new Date(Math.max(...ends)) : null;
+}
+
+// What paying for `plan` today would buy: FIRST (trial, or read-only after it), EXTEND (paid period running)
+// or RESTART (paid period ended), the discount, the amount and the period it covers
+function quoteOf(o, plan, users) {
+  const sub = subscriptionOf(o);
+  const st = trialState(o);
+  const mode = !sub ? 'FIRST' : st.status === 'EXPIRED' ? 'RESTART' : 'EXTEND';
+  const months = PLANS[plan].months;
+  let pct = 0;
+  let why = '할인 없음';
+  if (plan === 'ANNUAL') {
+    const last = lastAnnualEnd(o);
+    if (last && new Date() <= endOfDay(addMonths(last, 3))) {
+      pct = 20;
+      why = mode === 'EXTEND' && endOfDay(last) >= new Date() ? '연간 연장 할인' : '연간 만료 후 3개월 안 재구매 할인';
+    } else {
+      pct = 10;
+      why = last ? '연간 만료 3개월이 지나 기본 연간 할인' : '첫 연간 할인';
+    }
+  }
+  const n = mode === 'EXTEND' ? o.users : users;
+  const amount = Math.floor(n * PRICE_PER_USER * months * (100 - pct) / 100);
+  const today = dayStart(Date.now());
+  const from = mode === 'EXTEND' ? sub.expire : today;
+  const to = mode === 'EXTEND' ? addMonths(o.subAnchorAt, o.subMonths + months) : addMonths(today, months);
+  return { mode, plan, months, users: n, pct, why, amount, from: from.toISOString(), to: to.toISOString(),
+    formula: `${n}명 × ${won(PRICE_PER_USER)} × ${months}개월${pct ? ` × ${100 - pct}%` : ''}` };
+}
+
 function addMonths(t, n) {
   const d = new Date(t);
   const day = d.getDate();
@@ -124,18 +201,10 @@ function addMonths(t, n) {
   d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
   return d;
 }
-function billingState(o) {
-  const nextPay = o.nextPayAt ? new Date(o.nextPayAt) : addMonths(o.serviceFrom, 1);
-  const nextUsers = o.nextUsers ?? o.users;
-  return {
-    nextPay: ymd(nextPay), nextPayIso: nextPay.toISOString(),
-    period: `${ymd(addMonths(nextPay, -1))} ~ ${ymd(nextPay.getTime() - DAY_MS)}`,
-    nextUsers, nextAmount: nextUsers * 4000, changing: nextUsers !== o.users,
-  };
-}
-
 const findCompanyOrder = code => loadStore(ORDERS_KEY, []).find(o => o.companyCode === code);
-ensureDemoCompanies(); // here, once empNo, appId, dayStart and addMonths are defined
+// here, once empNo, appId, dayStart and addMonths are defined
+upgradeStoredOrders();
+ensureDemoCompanies();
 const when = iso => {
   const d = new Date(iso);
   const p = n => String(n).padStart(2, '0');
@@ -177,7 +246,7 @@ function buildDetail(o) {
 
   fill('company', [
     ['업체명', o.company],
-    ['이용 인원', o.nextUsers && o.nextUsers !== o.users ? `${o.users}명 (다음 결제부터 ${o.nextUsers}명)` : `${o.users}명`],
+    ['이용 인원', `${o.users}명`],
     ['이메일', o.email],
     // v1.4: the account exists from the signup; until the e-mail is verified the company can't sign in
     ['이메일 인증', o.emailVerified === false ? `대기 (인증 메일 ${whenFull(o.verifySentAt || o.at)} 발송, 인증 전 로그인 불가)` : o.verifiedAt ? `완료 (${whenFull(o.verifiedAt)})` : '완료'],
@@ -203,15 +272,18 @@ function buildDetail(o) {
 
   const st = trialState(o);
   const failed = (o.payments || []).filter(p => p.result === 'FAILED').length;
-  const payText = st.status === 'PAID' ? `결제 완료 (${ymd(o.paidAt)})` : failed ? `미결제 · 실패 ${failed}회` : '미결제';
+  const sub = subscriptionOf(o);
+  const payText = sub ? `결제 완료 (첫 결제 ${ymd(o.paidAt)})` : failed ? `미결제 · 실패 ${failed}회` : '미결제';
   fill('pay', [
     ['신청번호', o.no],
     ['신청 시각', whenFull(o.at)],
-    ['체험 기간', `${ymd(o.at)} ~ ${st.end}`],
-    ['월 이용료', won(o.total)],
+    ['체험 기간', `${ymd(o.at)} ~ ${st.trialEnd}`],
+    ['월 기준 이용료', won(o.total)],
     ['결제 상태', payText],
-    ['유료 이용 시작', st.status === 'PAID' ? st.serviceFrom : '결제한 날부터'],
-    ...(st.status === 'PAID' ? [['다음 결제일', `${billingState(o).nextPay} · ${won(billingState(o).nextAmount)}`]] : []),
+    ...(sub ? [
+      ['요금제', sub.planLabel],
+      ['이용 기간', `${st.serviceFrom} ~ ${st.end}${st.status === 'EXPIRED' ? ' (만료, 읽기 전용)' : ''}`],
+    ] : [['유료 이용 시작', '결제한 날부터']]),
     ['업체 코드', o.companyCode],
   ]);
   return box;
@@ -327,7 +399,8 @@ function renderStatus() {
     company.push(el('small', o.no, 'cell-sub'));
 
     const st = states.get(o.no);
-    const statusSub = st.status === 'TRIAL' ? `${st.dday} · ${st.end} 만료` : st.status === 'PAID' ? `다음 결제 ${billingState(o).nextPay}` : `${st.end} 체험 만료`;
+    const statusSub = st.status === 'EXPIRED' ? `${st.end} ${st.paid ? '이용' : '체험'} 만료`
+      : st.paid ? `${subscriptionOf(o).planLabel} · ${st.end} 만료` : `${st.dday} · ${st.end} 만료`;
     tr.append(
       cell('신청 시각', '', el('span', when(o.at))),
       cell('업체', '', ...company),

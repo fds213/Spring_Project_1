@@ -59,16 +59,13 @@
         <p class="login-help">처음이면 <button type="button" class="link-btn" id="btnJoin">계정 만들기</button> · 비밀번호를 잊었다면 관리자에게 초기화를 요청하세요.</p>
       </form>
       <!-- 계정 만들기: 신청자 정보 → 승인 요청 → (승인되면) 사번 자동 배정·비밀번호·이메일 인증 → 계정 생성 (hr.js).
-           승인 요청 버튼은 업체 코드를 넣기 전에는 회색으로 꺼져 있고, 넣으면 파란색으로 켜진다 -->
+           승인 요청 버튼(아래쪽, 로그인으로 돌아가기 위)은 업체 코드를 넣기 전에는 회색으로 꺼져 있고, 넣으면 파란색으로 켜진다 -->
       <form id="joinForm" novalidate hidden>
         <h2 class="login-title">계정 만들기</h2>
         <p class="login-lead">정보를 적고 승인을 요청하세요. 업체 관리자나 부서장이 1시간 안에 승인하면 이 화면에서 바로 계정을 만들 수 있습니다.</p>
         <div class="field">
           <label for="joinCompany">업체 코드</label>
-          <div class="input-action">
-            <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
-            <button type="button" class="btn btn-request" id="btnJoinRequest" disabled>승인 요청</button>
-          </div>
+          <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
         </div>
         <div class="field">
           <label for="joinName">이름</label>
@@ -112,6 +109,7 @@
           </div>
         </div>
         <p class="login-error" id="joinError" role="alert"></p>
+        <button type="button" class="btn btn-request btn-block" id="btnJoinRequest" disabled>승인 요청</button>
         <button class="btn btn-primary btn-block" type="submit" id="btnJoinCreate" hidden disabled>계정 생성</button>
         <button class="btn btn-ghost btn-block" type="button" id="btnJoinCancel" hidden>요청 취소하고 다시 쓰기</button>
         <button class="btn btn-ghost btn-block" type="button" id="btnJoinBack">로그인으로 돌아가기</button>
@@ -288,9 +286,9 @@
           <div class="page-head"><h1>이용 결제</h1></div>
           <div class="cards">
             <div class="card"><small>이용 상태</small><strong id="billStatus">-</strong></div>
+            <div class="card"><small>요금제</small><strong id="billPlan">-</strong></div>
             <div class="card"><small id="billEndLabel">체험 만료일</small><strong id="billEnd">-</strong></div>
-            <div class="card"><small>월 이용료</small><strong id="billTotal">-</strong></div>
-            <div class="card"><small id="billFromLabel">유료 이용 시작일</small><strong id="billFrom">-</strong></div>
+            <div class="card"><small>이용 인원</small><strong id="billUsersNow">-</strong></div>
           </div>
           <div class="info-grid info-grid-2 table-gap">
             <section class="info-card">
@@ -299,40 +297,60 @@
                 <h2>이용 정보</h2>
               </header>
               <dl class="detail" id="billInfo"></dl>
+              <div class="bill-history-box" id="billHistoryBox" hidden>
+                <h3 class="bill-sub">결제 이력</h3>
+                <ul class="bill-history" id="billHistory"></ul>
+              </div>
             </section>
             <section class="info-card">
               <header class="info-card-head">
                 <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
-                <div><h2>결제</h2><p id="billHint"></p></div>
+                <div><h2 id="billPayTitle">결제</h2><p id="billHint"></p></div>
               </header>
-              <!-- 결제 전(체험 중·읽기 전용): 1. 정보 변경 → 2. 결제 → 3. 신청 완료 -->
+              <!-- 요구분석서 v1.5 SUB-03: 자동 갱신·자동 결제 없이 관리자가 직접 결제·연장한다. 매번 월간·연간을 고른다.
+                   체험 중·체험 만료: 첫 결제 / 유료 이용 중: 연장(기존 만료일부터) / 유료 만료: 다시 결제(결제한 날부터)
+                   1. 요금제 선택 → 2. 결제(토스 테스트 결제 자리, 시안은 모의) → 3. 완료 -->
               <div class="bill-pay" id="billPay">
                 <ol class="bill-steps" id="billSteps">
-                  <li data-step="1">1. 정보 변경</li>
+                  <li data-step="1">1. 요금제 선택</li>
                   <li data-step="2">2. 결제</li>
-                  <li data-step="3">3. 신청 완료</li>
+                  <li data-step="3">3. 완료</li>
                 </ol>
-                <!-- 1. 정보 변경: 결제할 이용 인원과 결제 안내를 받을 이메일 -->
+                <!-- 1. 요금제 선택: 월간·연간과 (첫 결제·다시 결제일 때) 인원·결제 안내 이메일 -->
                 <div class="bill-step" id="billStep1">
-                  <p class="bill-intro">결제하기 전에 이용 인원과 결제 안내를 받을 이메일을 확인하고, 필요하면 바꿉니다.</p>
-                  <div class="bill-seats">
+                  <fieldset class="plan-pick">
+                    <legend>요금제</legend>
+                    <label class="plan-opt">
+                      <input type="radio" name="payPlan" value="MONTHLY" checked>
+                      <span class="plan-opt-name">월간</span>
+                      <span class="plan-opt-price" id="planPriceMONTHLY"></span>
+                      <span class="plan-opt-note">1개월 · 할인 없음</span>
+                    </label>
+                    <label class="plan-opt">
+                      <input type="radio" name="payPlan" value="ANNUAL">
+                      <span class="plan-opt-name">연간</span>
+                      <span class="plan-opt-price" id="planPriceANNUAL"></span>
+                      <span class="plan-opt-note" id="planNoteANNUAL"></span>
+                    </label>
+                  </fieldset>
+                  <div class="bill-seats" id="payUsersBox">
                     <label for="payUsers">이용 인원</label>
                     <div class="bill-seats-row"><input class="input" id="payUsers" type="number" min="1" max="500" inputmode="numeric" aria-describedby="payUsersHint"><span>명</span></div>
                     <p class="bill-note" id="payUsersHint"></p>
                     <p class="form-error" id="payUsersError" role="alert"></p>
-                    <!-- 인원으로 계산한 결제 금액: 인원 칸 바로 아래에 붙여 둔다 -->
-                    <dl class="pay-summary" id="payPreview"></dl>
                   </div>
-                  <div class="bill-seats">
+                  <div class="bill-seats" id="payEmailBox">
                     <label for="payEmail">결제 안내 이메일</label>
                     <input class="input" id="payEmail" type="email" autocomplete="email">
                     <p class="form-error" id="payEmailError" role="alert"></p>
                   </div>
+                  <!-- 고른 요금제로 계산한 금액과 이용 기간 -->
+                  <dl class="pay-summary" id="payPreview"></dl>
                   <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayNext">다음: 결제</button></div>
                 </div>
-                <!-- 2. 결제: 시연용 모의 결제 (PAY-02) -->
+                <!-- 2. 결제: 실제로는 토스페이먼츠 테스트 결제창을 열고, 서버가 승인 결과와 금액을 확인한 뒤에만 반영한다 (PAY-01·02) -->
                 <div class="bill-step" id="billStep2" hidden>
-                  <p class="notice-warn">시연용 모의 결제입니다. 실제 결제가 이루어지지 않고, 카드 정보도 받지 않습니다.</p>
+                  <p class="notice-warn">시안: 토스 테스트 결제 자리입니다. 실제 결제창은 열리지 않고, 카드 정보도 받지 않습니다.</p>
                   <dl class="detail" id="billOrder"></dl>
                   <label class="agree"><input type="checkbox" id="billAgree"> 시연용 서비스 이용 조건에 동의합니다.</label>
                   <p class="form-error" id="billError" role="alert"></p>
@@ -343,40 +361,11 @@
                   </div>
                   <p class="muted" id="billBusy" aria-live="polite"></p>
                 </div>
-                <!-- 3. 신청 완료: 유료 이용 신청이 끝났음을 알리고, 확인을 누르면 정기 결제 화면으로 -->
+                <!-- 3. 완료: 확인을 누르면 1단계(다음 연장)로 돌아간다 -->
                 <div class="bill-step" id="billStep3" hidden>
                   <p class="notice-ok" id="payDoneText"></p>
                   <dl class="detail" id="payDone"></dl>
                   <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayFinish">확인</button></div>
-                </div>
-              </div>
-              <!-- 결제 뒤: 매달 갱신(다음 결제일)과 이용 인원 변경. 해지·환불은 범위 밖 -->
-              <div class="bill-done" id="billDone" hidden>
-                <p class="notice-ok" id="billDoneText"></p>
-                <dl class="detail" id="billReceipt"></dl>
-                <div class="bill-seats">
-                  <label for="billUsers">이용 인원 변경</label>
-                  <div class="bill-seats-row">
-                    <input class="input" id="billUsers" type="number" min="1" max="500" inputmode="numeric" aria-describedby="billUsersHint">
-                    <span>명</span>
-                    <button type="button" class="btn" id="btnBillUsers">변경</button>
-                  </div>
-                  <p class="bill-note" id="billUsersHint"></p>
-                  <p class="form-error" id="billUsersError" role="alert"></p>
-                </div>
-                <!-- 시안 전용: 실제로는 다음 결제일에 서버가 저장된 결제 수단으로 결제한다 -->
-                <div class="bill-renew">
-                  <p class="notice-warn">시안: 다음 결제일이 된 것으로 보고 정기 결제를 진행해 봅니다.</p>
-                  <div class="bill-actions">
-                    <button type="button" class="btn" id="btnRenewFail">갱신 실패로 진행</button>
-                    <button type="button" class="btn btn-primary" id="btnRenewOk">갱신 성공으로 진행</button>
-                  </div>
-                  <p class="form-error" id="billRenewError" role="alert"></p>
-                  <p class="muted" id="billRenewBusy" aria-live="polite"></p>
-                </div>
-                <div>
-                  <h3 class="bill-sub">결제 이력</h3>
-                  <ul class="bill-history" id="billHistory"></ul>
                 </div>
               </div>
             </section>

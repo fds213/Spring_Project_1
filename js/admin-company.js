@@ -51,7 +51,8 @@ function employeeCard(o) {
   return cardOf(`계정 · ${list.length}명`, body);
 }
 
-const PAY_KIND_LABEL = { FIRST: '첫 결제', RENEW: '정기 결제' };
+const PAY_KIND_LABEL = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
+const PLAN_LABEL = { MONTHLY: '월간', ANNUAL: '연간' };
 
 function firmDetail(o) {
   const st = trialState(o);
@@ -75,12 +76,12 @@ function firmDetail(o) {
     ['사번', adminNo(o)],
   ]));
 
-  // the trial signup, then every payment try (first payment and monthly renewals), newest first
+  // the trial signup, then every payment try (first payment, extensions, paying again after expiry), newest first
   // sorted newest first; two tries on the same date (a failed renewal, then the successful one) keep the order they were recorded in
   const history = [
     ...(o.payments || []).map((p, i) => [
       h('span', '', span(p.result === 'OK' ? '성공' : '실패', `status status-${p.result === 'OK' ? 'paid' : 'failed'}`),
-        ` ${PAY_KIND_LABEL[p.kind] || '첫 결제'} · ${won(p.amount)}`),
+        ` ${PAY_KIND_LABEL[p.kind] || '첫 결제'}${p.plan ? ` ${PLAN_LABEL[p.plan]}` : ''} · ${won(p.amount)}`),
       `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}`, p.at, i + 1,
     ]),
     [h('span', '', span('체험 신청', 'status status-trial'), ' 14일 무료 체험'), `${whenFull(o.at)} · ${o.no}`, o.at, 0],

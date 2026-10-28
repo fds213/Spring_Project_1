@@ -65,7 +65,7 @@ a { color: inherit; text-decoration: none; }
 .link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
 #joinForm { display: flex; flex-direction: column; gap: 14px; }
 .join-account { display: flex; flex-direction: column; gap: 14px; }
-/* 입력칸 오른쪽에 붙는 버튼 (승인 요청, 인증 메일 보내기) */
+/* 입력칸 오른쪽에 붙는 버튼 (인증 메일 보내기) */
 .input-action { display: flex; gap: 8px; }
 .input-action .input { flex: 1; min-width: 0; }
 .input-action .btn { flex-shrink: 0; height: auto; }
@@ -276,9 +276,9 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* billing page: notices, agreement, buttons inside the payment card */
-.bill-pay, .bill-done { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
-.bill-pay .detail, .bill-done .detail { border: 1px solid var(--line); border-radius: var(--radius); }
-.bill-pay .detail dt, .bill-done .detail dt { padding-left: 14px; }
+.bill-pay { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bill-pay .detail { border: 1px solid var(--line); border-radius: var(--radius); }
+.bill-pay .detail dt { padding-left: 14px; }
 .notice-warn { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #fff4e5; color: #8a4b08; font-size: 13px; border: 1px solid #fde2c1; }
 .notice-ok { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #e5f4e4; color: #2b6a2f; font-size: 13px; line-height: 1.6; }
 .agree { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-sub); }
@@ -308,7 +308,20 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-seats-row .input { width: 110px; }
 .bill-seats-row .btn { height: 42px; }
 .bill-note { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-.bill-renew { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* step 1: monthly / annual side by side, stacked when the card is too narrow for both */
+.plan-pick { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.plan-pick legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.plan-opt {
+  position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 12px 38px;
+  border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer;
+}
+.plan-opt input { position: absolute; left: 14px; top: 15px; margin: 0; accent-color: var(--accent); }
+.plan-opt:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plan-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plan-opt-name { font-weight: 600; }
+.plan-opt-price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-opt-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.bill-history-box { padding: 4px 18px 14px; border-top: 1px solid var(--line); }
 .bill-sub { margin: 4px 0 6px; font-size: 14px; font-weight: 600; }
 .bill-history { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .bill-history li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }

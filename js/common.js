@@ -116,111 +116,118 @@ function enterApp() {
   document.getElementById('appShell').hidden = false;
 }
 
-// Trial strip under the header. Shown to a company still in its trial (or past it without paying);
-// the pay button only for roles that can reach 업체 관리 > 이용 결제.
+// Strip under the header: a company in its trial, a paid company in the last 7 days of its period (there is no
+// automatic renewal, so someone has to extend it), or a company whose period is over (read-only).
+// The pay button only for roles that can reach 업체 관리 > 이용 결제.
 function renderTrialBar() {
   const bar = document.getElementById('trialBar');
   const order = session && session.type === 'EMPLOYEE' ? findCompanyOrder(session.company) : null;
   const st = order ? trialState(order) : null;
-  if (!st || st.status === 'PAID') { bar.hidden = true; return; }
+  if (!st || (st.status === 'PAID' && st.daysLeft > 7)) { bar.hidden = true; return; }
   const text = document.getElementById('trialText');
   text.replaceChildren();
   const strong = document.createElement('strong');
   const more = document.createElement('span'); // the longer tail; phones show only the bold part
   more.className = 'trial-more';
+  const admin = userRoles.includes('ADMIN');
   if (st.status === 'TRIAL') {
     strong.textContent = st.daysLeft === 0 ? `오늘 무료 체험이 끝납니다 (${st.end})` : `무료 체험 중 · ${st.dday} (${st.end} 만료)`;
     more.textContent = st.urgent ? ' · 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀝니다'
       : ' · 결제하면 그날부터 유료로 이어서 씁니다';
+  } else if (st.status === 'PAID') {
+    strong.textContent = st.daysLeft === 0 ? `오늘 유료 이용 기간이 끝납니다 (${st.end})` : `유료 이용 만료 ${st.dday} (${st.end})`;
+    more.textContent = ' · 자동으로 결제되지 않습니다. 연장하지 않으면 만료 다음 날부터 읽기 전용입니다';
   } else {
-    strong.textContent = `체험이 끝나 읽기 전용입니다 (${st.end} 만료)`;
-    more.textContent = userRoles.includes('ADMIN') ? ' · 결제하면 바로 이어서 쓸 수 있습니다' : ' · 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다';
+    strong.textContent = `${st.paid ? '이용 기간' : '체험'}이 끝나 읽기 전용입니다 (${st.end} 만료)`;
+    more.textContent = admin ? ' · 결제하면 바로 이어서 쓸 수 있습니다' : ' · 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다';
   }
   text.append(strong, more);
   bar.classList.toggle('is-urgent', st.urgent);
   bar.classList.toggle('is-expired', st.status === 'EXPIRED');
-  document.getElementById('trialPay').hidden = !userRoles.includes('ADMIN');
+  const pay = document.getElementById('trialPay');
+  pay.textContent = st.status === 'PAID' ? '연장하기' : '결제하기';
+  pay.hidden = !admin;
   bar.hidden = false;
 }
 
-// 업체 관리 > 이용 결제: the company's trial and the mock payment. Before the first payment it runs in three
-// steps: 1. 정보 변경 (headcount and billing e-mail) → 2. 결제 → 3. 신청 완료. Paid service starts the day
-// after the trial ends, whenever during the trial the admin pays. After that the company pays monthly on the
-// next payment date and the admin may change the headcount for the next payment (billingState in ops.js).
-// In the real project the server recalculates the amount from the headcount and records each payment once
-// (PAY-01·02).
-let billStep = 1; // which step of the first payment is showing; back to 1 whenever the page is opened
+// 업체 관리 > 이용 결제 (requirements v1.5 PAY-01·02, SUB-01·03·05). No automatic renewal: the admin pays
+// directly, choosing monthly or annual each time (quoteOf in ops.js has the rules and the price).
+// - trial, or read-only after it: 첫 결제 with headcount and billing e-mail, starts today
+// - paid and running: 연장, adds to the current expiry date, same headcount (more seats = 증설, not built yet)
+// - paid period over (read-only): 다시 결제, starts today, headcount and e-mail can change
+// Steps: 1. 요금제 선택 → 2. 결제 (Toss test payment in the real project, mock here) → 3. 완료.
+// In the real project the server rebuilds the quote from the order, checks the approved Toss amount against it
+// and applies a payment only once even when the confirm request repeats.
+let billStep = 1; // which step is showing; back to 1 whenever the page is opened
+let billQuote = null; // the quote made at step 1 → 2, so step 2 pays exactly what was shown
+
+const MODE_TEXT = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제' };
+const PAY_KIND = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
 
 const fillDetail = (id, rows) => document.getElementById(id).replaceChildren(...rows.flatMap(([k, v]) => {
   const dt = document.createElement('dt'); dt.textContent = k;
   const dd = document.createElement('dd'); dd.textContent = v;
   return [dt, dd];
 }));
+const checkedPlan = () => document.querySelector('input[name="payPlan"]:checked').value;
 
 function renderBilling() {
   const order = findCompanyOrder(session.company);
-  const fill = fillDetail;
   const card = (id, v) => { document.getElementById(id).textContent = v; };
-  const paidCards = !!order && trialState(order).status === 'PAID';
-  card('billEndLabel', paidCards ? '이용 인원' : '체험 만료일');
-  card('billFromLabel', paidCards ? '다음 결제일' : '유료 이용 시작일');
   if (!order) {
-    ['billStatus', 'billEnd', 'billTotal', 'billFrom'].forEach(id => card(id, '-'));
-    fill('billInfo', [['안내', '이 업체의 신청 정보가 없습니다']]);
+    ['billStatus', 'billPlan', 'billEnd', 'billUsersNow'].forEach(id => card(id, '-'));
+    fillDetail('billInfo', [['안내', '이 업체의 신청 정보가 없습니다']]);
     document.getElementById('billPay').hidden = true;
-    document.getElementById('billDone').hidden = true;
+    document.getElementById('billHistoryBox').hidden = true;
     return;
   }
   const st = trialState(order);
-  const paid = st.status === 'PAID';
-  const bill = paid ? billingState(order) : null;
-  card('billStatus', paid ? '이용 중' : st.label);
-  card('billEnd', paid ? `${order.users}명` : st.end);
-  card('billTotal', won(order.total));
-  card('billFrom', paid ? bill.nextPay : '결제한 날');
-  fill('billInfo', [
+  const sub = subscriptionOf(order);
+  card('billStatus', st.status === 'PAID' ? '이용 중' : st.label);
+  card('billPlan', sub ? sub.planLabel : '무료 체험');
+  // the D-day sits in the label so the date fits on one line in the card
+  card('billEndLabel', `${sub ? '만료일' : '체험 만료일'} · ${st.status === 'EXPIRED' ? '만료됨' : st.dday}`);
+  card('billEnd', st.end);
+  card('billUsersNow', `${order.users}명`);
+  fillDetail('billInfo', [
     ['업체명', order.company],
     ['업체 코드', order.companyCode],
     ['이용 인원', `${order.users}명`],
-    ['1인 월 이용료', won(4000)],
-    ['월 이용료', won(order.total)],
+    ['1인 월 이용료', won(PRICE_PER_USER)],
     ['결제 안내 이메일', order.email || '-'],
-    ['체험 기간', `${ymd(order.at)} ~ ${st.end} (14일)`],
-    ...(paid ? [['유료 이용 시작일', st.serviceFrom], ['이번 이용 기간', bill.period]] : []),
-    ['계정 한도', paid ? '제한 없음' : `관리자 포함 ${TRIAL_SEATS}명 (결제하면 해제)`],
+    ['체험 기간', `${ymd(order.at)} ~ ${st.trialEnd} (14일)`],
+    ...(sub ? [
+      ['요금제', sub.planLabel],
+      ['이용 기간', `${st.serviceFrom} ~ ${st.end}`],
+      ['결제 방식', '자동 결제 없음 · 만료 전에 직접 연장'],
+    ] : []),
+    ['계정 한도', sub ? `사용 중 ${order.users}명 (구매 인원)` : `관리자 포함 ${TRIAL_SEATS}명 (결제하면 해제)`],
   ]);
-  // the completion step stays on screen after paying until the admin presses 확인
-  if (!paid && billStep === 3) billStep = 1;
-  const steps = !paid || billStep === 3;
-  document.getElementById('billPay').hidden = !steps;
-  document.getElementById('billDone').hidden = steps;
-  document.getElementById('billHint').textContent = paid ? '매달 다음 결제일에 결제됩니다. 해지·환불은 제공하지 않습니다' : st.status === 'EXPIRED'
-    ? '체험이 끝나 읽기 전용입니다. 결제하면 오늘부터 바로 이어서 쓸 수 있습니다' : '체험 기간 중 언제든 결제할 수 있고, 결제한 날부터 유료 이용이 시작됩니다. 남은 체험 기간은 이어지지 않습니다';
-  if (!steps) {
-    fill('billReceipt', [
-      ['다음 결제일', bill.nextPay],
-      ['다음 결제 금액', `${won(bill.nextAmount)} (${bill.nextUsers}명 × ${won(4000)})`],
-      ['지금 이용 인원', bill.changing ? `${order.users}명 → 다음 결제부터 ${bill.nextUsers}명` : `${order.users}명`],
-    ]);
-    document.getElementById('billDoneText').textContent = `${bill.nextPay}에 ${won(bill.nextAmount)}이 결제되고, 그 뒤로도 매달 같은 날 결제됩니다. ` +
-      '실제로는 저장한 결제 수단으로 자동 결제되며, 결제 수단은 확정 전입니다.';
-    const users = document.getElementById('billUsers');
-    if (document.activeElement !== users) users.value = bill.nextUsers;
-    document.getElementById('billUsersHint').textContent =
-      `다음 결제일(${bill.nextPay})부터 적용 · 최소 ${activeStaff(session.company).length}명(지금 사용 중인 계정 수)`;
-    renderPayHistory(order);
-    return;
-  }
-  renderBillSteps(order, st);
+  renderPayHistory(order);
+
+  const mode = quoteOf(order, 'MONTHLY', order.users).mode;
+  document.getElementById('billPay').hidden = false;
+  document.getElementById('billPayTitle').textContent = MODE_TEXT[mode];
+  document.getElementById('billHint').textContent = {
+    FIRST: st.status === 'EXPIRED' ? '체험이 끝나 읽기 전용입니다. 결제하면 오늘부터 바로 이어서 쓸 수 있습니다'
+      : '체험 기간 중 언제든 결제할 수 있고, 결제한 날부터 유료 이용이 시작됩니다. 남은 체험 기간은 이어지지 않습니다',
+    EXTEND: `만료일(${st.end})부터 이어지도록 직접 연장합니다. 자동 결제는 없고, 해지·환불은 제공하지 않습니다`,
+    RESTART: '이용 기간이 끝나 읽기 전용입니다. 결제하면 오늘부터 다시 시작하고, 계정과 데이터는 그대로입니다',
+  }[mode];
+  renderBillSteps(order, mode);
 }
 
-function renderBillSteps(order, st) {
+function renderBillSteps(order, mode) {
   document.querySelectorAll('#billSteps li').forEach(li => {
     const k = Number(li.dataset.step);
     li.className = k === billStep ? 'on' : k < billStep ? 'done-step' : '';
   });
   [1, 2, 3].forEach(n => { document.getElementById(`billStep${n}`).hidden = n !== billStep; });
   if (billStep === 1) {
+    // headcount and e-mail only when a new period starts today; an extension keeps the purchased headcount
+    const fresh = mode !== 'EXTEND';
+    document.getElementById('payUsersBox').hidden = !fresh;
+    document.getElementById('payEmailBox').hidden = !fresh;
     // filled once per visit, so a re-render (e.g. a change from another tab) doesn't wipe what is being typed
     const users = document.getElementById('payUsers');
     if (users.dataset.for !== order.no) {
@@ -228,73 +235,76 @@ function renderBillSteps(order, st) {
       document.getElementById('payEmail').value = order.email || '';
       users.dataset.for = order.no;
     }
-    document.getElementById('payUsersHint').textContent =
-      `최소 ${activeStaff(session.company).length}명(지금 사용 중인 계정 수) · 결제하면 체험 중 10명 제한이 풀립니다`;
-    renderPayPreview(st);
+    document.getElementById('payUsersHint').textContent = `최소 ${activeStaff(session.company).length}명(지금 사용 중인 계정 수)` +
+      (mode === 'FIRST' ? ' · 결제하면 체험 중 10명 제한이 풀립니다' : '');
+    renderPayPreview(order);
   } else if (billStep === 2) {
+    const q = billQuote;
     const failed = (order.payments || []).filter(p => p.result === 'FAILED').length;
     fillDetail('billOrder', [
-      ['신청번호', order.no],
-      ['이용 인원', `${order.users}명`],
-      ['결제 금액', `${won(order.total)} (첫 달)`],
-      ['유료 이용 시작일', `${st.serviceFrom} (결제한 날)`],
-      ['결제 이력', failed ? `실패 ${failed}회` : '없음'],
+      ['구분', MODE_TEXT[q.mode]],
+      ['요금제', `${PLANS[q.plan].label} (${q.months}개월)`],
+      ['이용 인원', `${q.users}명`],
+      ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}`],
+      ['결제 금액', `${won(q.amount)} (${q.formula})`],
+      ['할인', q.pct ? `${q.pct}% · ${q.why}` : q.why],
+      ['결제 실패 이력', failed ? `${failed}회` : '없음'],
     ]);
     document.getElementById('billError').textContent = '';
     document.getElementById('billBusy').textContent = '';
-  } else {
-    const bill = billingState(order);
-    document.getElementById('payDoneText').textContent = `유료 이용 신청이 끝났습니다. ${st.serviceFrom}부터 월 ${won(order.total)}으로 ` +
-      `이어서 쓰고, 체험 중 ${TRIAL_SEATS}명이던 계정 한도도 풀렸습니다. 계정과 데이터는 그대로입니다.`;
-    fillDetail('payDone', [
-      ['신청번호', order.no],
-      ['결제일', ymd(order.paidAt)],
-      ['결제 금액', `${won(order.total)} (${order.users}명)`],
-      ['유료 이용 시작일', st.serviceFrom],
-      ['다음 결제일', bill.nextPay],
-    ]);
   }
 }
 
-// step 1: what the first payment will be, updated while the headcount is typed
-function renderPayPreview(st) {
+// step 1: both plans' prices and the chosen plan's amount and period, updated while the headcount is typed
+function renderPayPreview(order) {
   const n = Number(document.getElementById('payUsers').value);
   const ok = Number.isInteger(n) && n >= 1 && n <= 500;
+  const users = ok ? n : order.users;
+  const month = quoteOf(order, 'MONTHLY', users);
+  const year = quoteOf(order, 'ANNUAL', users);
+  document.getElementById('planPriceMONTHLY').textContent = `${won(month.amount)} / 월`;
+  document.getElementById('planPriceANNUAL').textContent = `${won(year.amount)} / 년`;
+  document.getElementById('planNoteANNUAL').textContent = `12개월 · ${year.pct}% 할인 (${year.why})`;
+  const q = checkedPlan() === 'ANNUAL' ? year : month;
   fillDetail('payPreview', [
-    ['월 이용료', ok ? `${won(n * 4000)} (${n}명 × ${won(4000)})` : '-'],
-    ['유료 이용 시작일', `결제한 날 (오늘 결제하면 ${st.serviceFrom})`],
+    ['결제 금액', ok || q.mode === 'EXTEND' ? `${won(q.amount)} (${q.formula})` : '-'],
+    ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}${q.mode === 'EXTEND' ? ' (지금 만료일부터 이어서)' : ' (오늘 결제하면)'}`],
   ]);
 }
 document.getElementById('payUsers').addEventListener('input', () => {
   document.getElementById('payUsersError').textContent = '';
   const order = findCompanyOrder(session.company);
-  if (order) renderPayPreview(trialState(order));
+  if (order) renderPayPreview(order);
 });
+document.querySelectorAll('input[name="payPlan"]').forEach(r => r.addEventListener('change', () => {
+  const order = findCompanyOrder(session.company);
+  if (order) renderPayPreview(order);
+}));
 document.getElementById('payEmail').addEventListener('input', () => { document.getElementById('payEmailError').textContent = ''; });
 
-// step 1 → 2: save the headcount and e-mail on the application, so the payment uses them
+// step 1 → 2: check the headcount and e-mail (first payment / pay again) and fix the quote to pay
 document.getElementById('btnPayNext').addEventListener('click', () => {
-  const usersEl = document.getElementById('payUsers');
-  const emailEl = document.getElementById('payEmail');
-  const n = Number(usersEl.value);
-  const email = emailEl.value.trim();
-  const accounts = activeStaff(session.company).length;
-  const usersError = !Number.isInteger(n) || n < 1 || n > 500 ? '이용 인원은 1~500명으로 입력해 주세요'
-    : n < accounts ? `지금 계정이 ${accounts}명이라 ${accounts}명보다 적게 정할 수 없습니다` : '';
-  const emailError = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : '이메일 형식을 확인해 주세요';
-  document.getElementById('payUsersError').textContent = usersError;
-  document.getElementById('payEmailError').textContent = emailError;
-  if (usersError) return usersEl.focus();
-  if (emailError) return emailEl.focus();
-  const orders = loadStore(ORDERS_KEY, []);
-  const order = orders.find(o => o.companyCode === session.company);
-  if (order && order.status !== 'PAID') {
-    order.users = n;
-    order.total = n * 4000;
-    order.email = email;
-    saveStore(ORDERS_KEY, orders);
-    billStep = 2;
+  const order = findCompanyOrder(session.company);
+  if (!order) return;
+  const plan = checkedPlan();
+  let quote = quoteOf(order, plan, order.users);
+  if (quote.mode !== 'EXTEND') {
+    const usersEl = document.getElementById('payUsers');
+    const emailEl = document.getElementById('payEmail');
+    const n = Number(usersEl.value);
+    const email = emailEl.value.trim();
+    const accounts = activeStaff(session.company).length;
+    const usersError = !Number.isInteger(n) || n < 1 || n > 500 ? '이용 인원은 1~500명으로 입력해 주세요'
+      : n < accounts ? `지금 계정이 ${accounts}명이라 ${accounts}명보다 적게 정할 수 없습니다` : '';
+    const emailError = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ? '' : '이메일 형식을 확인해 주세요';
+    document.getElementById('payUsersError').textContent = usersError;
+    document.getElementById('payEmailError').textContent = emailError;
+    if (usersError) return usersEl.focus();
+    if (emailError) return emailEl.focus();
+    quote = { ...quoteOf(order, plan, n), email };
   }
+  billQuote = quote;
+  billStep = 2;
   renderBilling();
 });
 document.getElementById('btnPayBack').addEventListener('click', () => { billStep = 1; renderBilling(); });
@@ -303,9 +313,10 @@ document.getElementById('btnPayFinish').addEventListener('click', () => {
   renderBilling();
   document.querySelector('.content').scrollTop = 0;
 });
-// opening the page (or another page) starts the first payment again from step 1 with fresh values
+// opening the page (or another page) starts again from step 1 with fresh values
 window.addEventListener('hashchange', () => {
   billStep = 1;
+  billQuote = null;
   delete document.getElementById('payUsers').dataset.for;
 });
 
@@ -327,41 +338,76 @@ function payBill(success) {
     document.getElementById('billBusy').textContent = '';
     const orders = loadStore(ORDERS_KEY, []);
     const order = orders.find(o => o.companyCode === session.company);
-    if (!order) return;
-    order.payments = order.payments || [];
-    const now = new Date().toISOString();
-    if (order.status === 'PAID') { // already paid in another tab: record nothing, just show the receipt
+    if (!order || !billQuote) return;
+    // the state changed in another tab since step 1 (e.g. it paid there): quote again instead of paying
+    const now = quoteOf(order, billQuote.plan, billQuote.users);
+    if (now.mode !== billQuote.mode || now.from !== billQuote.from || now.amount !== billQuote.amount) {
+      billStep = 1;
       renderBilling();
-      renderTrialBar();
+      showToast('결제 상태가 바뀌어 금액을 다시 계산했습니다. 확인하고 다시 진행해 주세요');
       return;
     }
+    const q = billQuote;
+    const at = new Date().toISOString();
+    order.payments = order.payments || [];
+    order.payments.push({ at, kind: q.mode, plan: q.plan, months: q.months, pct: q.pct, users: q.users, amount: q.amount,
+      from: q.from, to: q.to, result: success ? 'OK' : 'FAILED' });
     if (success) {
-      // during the trial: from the day after it ends; already read-only: from today
-      order.serviceFrom = trialState(order).serviceFromIso;
-      order.status = 'PAID';
-      order.paidAt = now;
-      order.nextPayAt = addMonths(order.serviceFrom, 1).toISOString();
-      billStep = 3; // show the completion step
+      if (q.mode === 'EXTEND') {
+        order.subMonths += q.months;
+      } else {
+        // first payment or after the paid period ended: a new run from today, with the headcount chosen at step 1
+        order.status = 'PAID';
+        order.paidAt = order.paidAt || at;
+        order.serviceFrom = q.from;
+        order.subAnchorAt = q.from;
+        order.subMonths = q.months;
+        order.users = q.users;
+        order.total = q.users * PRICE_PER_USER;
+        order.email = q.email || order.email;
+      }
+      order.plan = q.plan;
     }
-    order.payments.push({ at: now, kind: 'FIRST', result: success ? 'OK' : 'FAILED', amount: order.total, users: order.users });
     saveStore(ORDERS_KEY, orders);
+    if (success) {
+      billStep = 3;
+      showPayDone(order, q);
+    }
     refreshReadOnly(); // paying ends read-only mode: everything can be used again
     renderBilling();
     renderTrialBar();
-    if (!success) error.textContent = '모의 결제에 실패했습니다. 다시 시도해 주세요.';
+    if (!success) error.textContent = '모의 결제에 실패했습니다. 결제는 반영되지 않았고, 다시 시도할 수 있습니다.';
   }, 800);
 }
 document.getElementById('btnBillOk').addEventListener('click', () => payBill(true));
 document.getElementById('btnBillFail').addEventListener('click', () => payBill(false));
 
-// Payment history, newest first: the first payment, then one monthly payment per month
-const PAY_KIND = { FIRST: '첫 결제', RENEW: '정기 결제' };
+function showPayDone(order, q) {
+  document.getElementById('payDoneText').textContent = {
+    FIRST: `유료 이용 신청이 끝났습니다. ${ymd(q.from)}부터 ${ymd(q.to)}까지 ${PLANS[q.plan].label} 요금제로 이어서 쓰고, ` +
+      `체험 중 ${TRIAL_SEATS}명이던 계정 한도도 풀렸습니다. 계정과 데이터는 그대로입니다.`,
+    EXTEND: `연장이 끝났습니다. 만료일이 ${ymd(q.to)}로 늘었습니다.`,
+    RESTART: `다시 결제했습니다. 오늘부터 ${ymd(q.to)}까지 쓸 수 있고, 계정과 데이터는 그대로입니다.`,
+  }[q.mode] + ' 자동으로 결제되지 않으니 만료 전에 직접 연장해 주세요.';
+  fillDetail('payDone', [
+    ['구분', MODE_TEXT[q.mode]],
+    ['요금제', PLANS[q.plan].label],
+    ['결제 금액', `${won(q.amount)} (${q.formula})`],
+    ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}`],
+    ['만료일', ymd(addMonths(order.subAnchorAt, order.subMonths))],
+  ]);
+}
+
+// Payment history, newest first
 function renderPayHistory(order) {
-  const list = document.getElementById('billHistory');
-  list.replaceChildren(...(order.payments || []).slice().reverse().map(p => {
+  const pays = order.payments || [];
+  document.getElementById('billHistoryBox').hidden = !pays.length;
+  document.getElementById('billHistory').replaceChildren(...pays.slice().reverse().map(p => {
     const li = document.createElement('li');
     const what = document.createElement('span');
-    what.textContent = `${ymd(p.at)} · ${PAY_KIND[p.kind] || '첫 결제'} · ${won(p.amount)}${p.users ? ` (${p.users}명)` : ''}`;
+    const plan = p.plan ? ` ${PLANS[p.plan].label}` : '';
+    what.textContent = `${ymd(p.at)} · ${PAY_KIND[p.kind] || '첫 결제'}${plan} · ${won(p.amount)}${p.users ? ` (${p.users}명)` : ''}` +
+      (p.result === 'OK' && p.from && p.to ? ` · ${ymd(p.from)} ~ ${ymd(p.to)}` : '');
     const result = document.createElement('span');
     result.className = `status status-${p.result === 'OK' ? 'paid' : 'failed'}`;
     result.textContent = p.result === 'OK' ? '성공' : '실패';
@@ -369,63 +415,6 @@ function renderPayHistory(order) {
     return li;
   }));
 }
-
-// The order of the signed-in company, read fresh so a change from another tab isn't overwritten
-function withOrder(change) {
-  const orders = loadStore(ORDERS_KEY, []);
-  const order = orders.find(o => o.companyCode === session.company);
-  if (!order || order.status !== 'PAID') return null;
-  change(order);
-  saveStore(ORDERS_KEY, orders);
-  return order;
-}
-
-// Headcount change: takes effect from the next payment, never below the accounts the company already has
-document.getElementById('btnBillUsers').addEventListener('click', () => {
-  const v = Number(document.getElementById('billUsers').value);
-  const accounts = activeStaff(session.company).length;
-  const error = document.getElementById('billUsersError');
-  error.textContent = !Number.isInteger(v) || v < 1 || v > 500 ? '이용 인원은 1~500명으로 입력해 주세요'
-    : v < accounts ? `지금 계정이 ${accounts}명이라 ${accounts}명보다 적게 줄일 수 없습니다` : '';
-  if (error.textContent) return;
-  const order = withOrder(o => { if (v === o.users) delete o.nextUsers; else o.nextUsers = v; });
-  if (!order) return;
-  renderBilling();
-  showToast(v === order.users ? '이용 인원 변경을 취소했습니다' : `다음 결제일부터 ${v}명, 월 ${won(v * 4000)}으로 바뀝니다`);
-});
-
-// Monthly renewal (prototype: pretend the next payment date has come). Success moves the next payment
-// date one month on and applies a pending headcount change; failure is only recorded, since what happens
-// after a failed renewal is still to be decided. Buttons lock while "processing" like the first payment.
-function renewBill(success) {
-  const ok = document.getElementById('btnRenewOk');
-  const fail = document.getElementById('btnRenewFail');
-  if (ok.disabled) return;
-  const error = document.getElementById('billRenewError');
-  const busy = document.getElementById('billRenewBusy');
-  error.textContent = '';
-  ok.disabled = fail.disabled = true;
-  busy.textContent = '정기 결제를 처리하고 있습니다…';
-  setTimeout(() => {
-    ok.disabled = fail.disabled = false;
-    busy.textContent = '';
-    withOrder(o => {
-      const bill = billingState(o);
-      o.payments = o.payments || [];
-      // recorded on the payment date it stands for, so the history reads like the real one
-      o.payments.push({ at: bill.nextPayIso, kind: 'RENEW', result: success ? 'OK' : 'FAILED', amount: bill.nextAmount, users: bill.nextUsers });
-      if (!success) return;
-      o.users = bill.nextUsers;
-      o.total = o.users * 4000;
-      delete o.nextUsers;
-      o.nextPayAt = addMonths(bill.nextPayIso, 1).toISOString();
-    });
-    renderBilling();
-    if (!success) error.textContent = '정기 결제에 실패했습니다. 실패한 뒤 어떻게 할지(재시도, 읽기 전용 전환 등)는 확정 전입니다.';
-  }, 800);
-}
-document.getElementById('btnRenewOk').addEventListener('click', () => renewBill(true));
-document.getElementById('btnRenewFail').addEventListener('click', () => renewBill(false));
 
 // data-fill="업체코드 사번 비밀번호"
 document.querySelectorAll('[data-fill]').forEach(b => b.addEventListener('click', () => {
@@ -436,9 +425,9 @@ document.querySelectorAll('[data-fill]').forEach(b => b.addEventListener('click'
   document.getElementById('loginError').textContent = '';
 }));
 
-// A company whose trial ended unpaid is read-only: everyone still signs in and sees everything there is,
-// but nothing can be added or changed until the admin pays; paying lets them carry on with the same
-// accounts and data. Screens mark the actions that write with data-write. In the real project the server
+// A company whose trial ended unpaid, or whose paid period ended without an extension, is read-only
+// (requirements v1.5 DEM-03·SUB-04): everyone still signs in and sees everything there is, but nothing can be
+// added or changed until the admin pays; paying lets them carry on with the same accounts and data. Screens mark the actions that write with data-write. In the real project the server
 // refuses every write from such a company (POST/PUT/DELETE, chat messages) except the payment itself;
 // the screen only greys the buttons out and says why.
 function isReadOnly(company) {
@@ -457,8 +446,8 @@ function refreshReadOnly() {
 }
 
 const readOnlyMessage = () => userRoles.includes('ADMIN')
-  ? '체험이 끝나 읽기 전용입니다. 이용 결제에서 결제하면 바로 이어서 쓸 수 있습니다.'
-  : '체험이 끝나 읽기 전용입니다. 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.';
+  ? '이용 기간이 끝나 읽기 전용입니다. 이용 결제에서 결제하면 바로 이어서 쓸 수 있습니다.'
+  : '이용 기간이 끝나 읽기 전용입니다. 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.';
 
 // Any write action while read-only: stop it before its own handler runs and say why
 document.addEventListener('click', e => {
@@ -528,16 +517,17 @@ document.getElementById('loginForm').addEventListener('submit', e => {
   showPaymentReminder();
 });
 
-// Payment reminder: an admin of a company still in its trial gets a pop-up on D-7, D-3, D-1 and the last
-// day, once per day. Once the trial ended unpaid (read-only) everyone gets one a day (decided 2026-10-28):
-// the admin with a way to pay, employees with "ask your admin" and only a 확인 button. Once per person per
-// day. The real server also sends the trial ones as notifications (bell) and e-mail on the same days.
+// Payment reminder: the admin gets a pop-up on D-7, D-3, D-1 and the last day of the trial, and of a paid
+// period too (no automatic renewal, so it has to extend by hand), once per day. Once the trial or the paid
+// period is over (read-only) everyone gets one a day (decided 2026-10-28): the admin with a way to pay,
+// employees with "ask your admin" and only a 확인 button. Once per person per day. The real server also
+// sends the reminders as notifications (bell) and e-mail on the same days.
 function showPaymentReminder() {
   if (!session || session.type !== 'EMPLOYEE') return;
   const admin = userRoles.includes('ADMIN');
   const order = findCompanyOrder(session.company);
   const st = order && trialState(order);
-  if (!st || st.status === 'PAID' || (st.status === 'TRIAL' && (!admin || !REMIND_DAYS.includes(st.daysLeft)))) return;
+  if (!st || (st.status !== 'EXPIRED' && (!admin || !REMIND_DAYS.includes(st.daysLeft)))) return;
   const key = `ieum-demo-reminded-${session.company}-${session.id}`;
   const today = ymd(Date.now());
   if (loadStore(key, '') === today) return;
@@ -558,11 +548,17 @@ function showPaymentReminder() {
   // employees can't pay: one 확인 button instead of 나중에 / 결제하러 가기
   dialog.querySelector('[value="later"]').textContent = admin ? '나중에' : '확인';
   dialog.querySelector('[value="pay"]').hidden = !admin;
+  dialog.querySelector('[value="pay"]').textContent = st.status === 'PAID' ? '연장하러 가기' : '결제하러 가기';
   if (st.status === 'EXPIRED') {
-    dialog.querySelector('h2').textContent = '체험이 끝나 읽기 전용입니다';
-    dialog.querySelector('p').textContent = `무료 체험이 ${st.end}에 끝나, 지금은 지난 내용을 보기만 할 수 있습니다. ` + (admin
+    const what = st.paid ? '유료 이용 기간' : '무료 체험';
+    dialog.querySelector('h2').textContent = `${st.paid ? '이용 기간' : '체험'}이 끝나 읽기 전용입니다`;
+    dialog.querySelector('p').textContent = `${what}이 ${st.end}에 끝나, 지금은 지난 내용을 보기만 할 수 있습니다. ` + (admin
       ? '결제하면 오늘부터 바로 이어서 쓸 수 있고, 계정과 데이터는 그대로입니다.'
       : '업체 관리자에게 결제를 요청해 주세요. 결제하면 계정과 데이터 그대로 바로 이어서 쓸 수 있습니다.');
+  } else if (st.status === 'PAID') {
+    dialog.querySelector('h2').textContent = st.daysLeft === 0 ? '오늘 유료 이용 기간이 끝납니다' : `유료 이용 기간이 ${st.daysLeft}일 남았습니다`;
+    dialog.querySelector('p').textContent = `이용 기간은 ${st.end}까지이고, 자동으로 결제되지 않습니다. 그 전에 연장하지 않으면 ` +
+      '다음 날부터 읽기 전용으로 바뀝니다. 연장하면 지금 만료일부터 이어집니다.';
   } else {
     dialog.querySelector('h2').textContent = st.daysLeft === 0 ? '오늘 무료 체험이 끝납니다' : `무료 체험이 ${st.daysLeft}일 남았습니다`;
     dialog.querySelector('p').textContent = `체험은 ${st.end}에 끝나고, 그때까지 결제하지 않으면 읽기 전용으로 바뀌어 새로 쓰거나 바꿀 수 없습니다. ` +

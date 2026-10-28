@@ -81,7 +81,7 @@ function nextEmpNo(code) {
 function seatCaps(code) {
   const order = findCompanyOrder(code);
   if (!order) return null;
-  const paid = trialState(order).status === 'PAID';
+  const paid = order.status === 'PAID'; // also after the paid period ended (read-only)
   return paid ? { paid, active: order.users, approve: Math.ceil(order.users * 1.2) } : { paid, active: TRIAL_SEATS, approve: TRIAL_SEATS };
 }
 // SEAT = uses a seat (signed in, or approved and about to be created); WAIT = holds a 자리 대기 place
