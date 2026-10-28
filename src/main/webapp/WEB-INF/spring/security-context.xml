@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<beans
+	xmlns:security="http://www.springframework.org/schema/security"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/security https://www.springframework.org/schema/security/spring-security.xsd"
+	xmlns="http://www.springframework.org/schema/beans">
+	<!-- STS3 수업 기능 관리 | Security 시작: 세션 기반 기본 설정 -->
+	<bean id="bCryptPasswordEncoder"
+		class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+	<!-- 계정은 등록하지 않습니다. 수업에서 이 빈을 커스텀 UserDetailsService로 교체하세요. -->
+	<security:http use-expressions="true"
+		create-session="ifRequired">
+		<!-- URL 권한 규칙은 위에서부터 먼저 맞는 것이 적용된다. 구체적인 규칙을 위에 둔다. -->
+		<!-- 관리 화면은 /<모듈>/admin/** (AGENTS.md 권한·보안). 인사(HR)·IT 담당자에게 열 모듈별 규칙은 요구분석서 확정 뒤 이 줄 위에 추가한다. -->
+		<security:intercept-url pattern="/resources/**" access="permitAll" />
+		<security:intercept-url pattern="/*/admin/**"   access="hasRole('ADMIN')" />
+		<security:intercept-url pattern="/**"           access="isAuthenticated()" />
+
+		<!-- 기본 GET /login 화면과 POST /login 인증 처리. 커스텀 JSP 작성 후 login-page를 지정하세요. -->
+		<security:form-login />
+		<security:logout logout-url="/logout"
+			logout-success-url="/login?logout" invalidate-session="true" />
+		<security:csrf />
+		<!-- 커스텀 클래스 작성 후 form-login의 authentication-success-handler-ref 및 access-denied-handler를 
+			연결하세요. -->
+	</security:http>
+	<security:authentication-manager>
+		<security:authentication-provider
+			user-service-ref="customUserDetailsService">
+			<security:password-encoder
+				ref="bCryptPasswordEncoder" />
+		</security:authentication-provider>
+	</security:authentication-manager>
+	<!-- STS3 수업 기능 관리 | Security 끝: 세션 기반 기본 설정 -->
+</beans>

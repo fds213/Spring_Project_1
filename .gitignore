@@ -17,4 +17,12 @@ desktop.ini
 .idea/
 *.iml
 
+# STS 수업 플러그인 기록 파일과 주석 처리기가 만드는 소스 폴더
+.sts3-class-manager-*.xml
+.apt_generated/
+.apt_generated_tests/
+
 *.log
+
+# DB 접속 정보 (각자 PC에서 db.properties.example을 복사해서 사용)
+src/main/resources/config/db.properties
