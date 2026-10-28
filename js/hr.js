@@ -37,7 +37,17 @@ const EMP_STATUS = {
   REQUESTED: '승인 대기', EXPIRED: '요청 만료', REJECTED: '반려', APPROVED: '계정 생성 전',
   ACTIVE: '사용 중', WAITING: '자리 대기', RETIRED: '비활성',
 };
+// Departments are per company: the company's admin keeps them (부서 관리, not built in the prototype yet), and a
+// company without its own list uses DEPTS. The two built-in demo companies (ops.js demoCompanies) have different
+// lists so the join form visibly loads the company's own. The real server answers GET /join/company/{code} with
+// the company name and its departments (permitAll, like /join).
 const DEPTS = ['경영지원팀', '개발팀', '영업팀', '물류팀'];
+const DEPT_KEY = 'ieum-demo-depts-v1';
+const DEMO_DEPTS = {
+  ieum0001: ['경영지원팀', '개발팀', '영업팀'],
+  ieum0002: ['경영지원팀', '영업팀', '물류팀', '품질관리팀', '구매팀'],
+};
+const deptsOf = code => loadStore(DEPT_KEY, {})[code] || DEMO_DEPTS[code] || DEPTS;
 // this device's own join request (계정 만들기), so closing the screen doesn't lose it
 const MY_JOIN_KEY = 'ieum-demo-join-mine';
 
@@ -562,7 +572,62 @@ const loginForm = document.getElementById('loginForm');
 const joinForm = document.getElementById('joinForm');
 const $j = id => document.getElementById(id);
 const JOIN_FIELDS = ['joinCompany', 'joinName', 'joinDept', 'joinRank', 'joinEmail'];
-$j('joinDept').append(...DEPTS.map(d => new Option(d, d)));
+let checkedCompany = ''; // the company code confirmed with 확인 ('' = not confirmed)
+
+// The department list shows the confirmed company's departments; before that it holds only the hint and is off
+function setDeptOptions(code) {
+  const sel = $j('joinDept');
+  const keep = sel.value;
+  const list = code ? deptsOf(code) : [];
+  sel.replaceChildren(new Option(code ? '부서를 고르세요' : '업체 코드를 먼저 확인하세요', ''), ...list.map(d => new Option(d, d)));
+  sel.value = list.includes(keep) ? keep : '';
+  sel.dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
+}
+function setCompanyNote(text, ok) {
+  const note = $j('joinCompanyNote');
+  note.textContent = text;
+  note.hidden = !text;
+  note.classList.toggle('is-ok', !!text && ok);
+  note.classList.toggle('is-bad', !!text && !ok);
+}
+// why a company can't take a join request now ('' = it can); checked at 확인 and again at 승인 요청
+function joinBlock(order) {
+  if (!order) return '업체 코드를 확인해 주세요';
+  if (order.emailVerified === false) return '업체의 이메일 인증이 아직 끝나지 않아 가입할 수 없습니다. 업체 관리자에게 문의해 주세요.';
+  if (trialState(order).status === 'EXPIRED') return '이용 기간이 끝나 지금은 가입할 수 없습니다. 업체 관리자에게 문의해 주세요.';
+  return '';
+}
+const companyOrder = code => (code && code !== 'ieum' ? findCompanyOrder(code) : null);
+
+// 확인: find the company and load its departments
+function checkCompany() {
+  const code = $j('joinCompany').value.trim().toLowerCase();
+  const order = companyOrder(code);
+  const why = !code ? '업체 코드를 입력해 주세요' : joinBlock(order);
+  checkedCompany = why ? '' : code;
+  setCompanyNote(why || `${order.company} · 부서 ${deptsOf(code).length}개를 불러왔습니다`, !why);
+  setDeptOptions(checkedCompany);
+  $j('joinDept').disabled = !checkedCompany;
+  syncRequestButton();
+  // after select.js has turned the dropdown on (it redraws on the next tick)
+  if (checkedCompany) setTimeout(() => $j('joinDeptBtn')?.focus());
+}
+$j('btnJoinCheck').addEventListener('click', checkCompany);
+$j('joinCompany').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); checkCompany(); }
+});
+// a changed code needs 확인 again: the departments of the old one are cleared
+function onCompanyInput() {
+  if (checkedCompany && $j('joinCompany').value.trim().toLowerCase() === checkedCompany) return;
+  checkedCompany = '';
+  setCompanyNote('', false);
+  setDeptOptions('');
+  $j('joinDept').disabled = true;
+  syncRequestButton();
+}
+$j('joinCompany').addEventListener('input', onCompanyInput);
+setDeptOptions('');
+$j('joinDept').disabled = true;
 
 const loadMyJoin = () => loadStore(MY_JOIN_KEY, null);
 const saveMyJoin = v => { try { if (v) localStorage.setItem(MY_JOIN_KEY, JSON.stringify(v)); else localStorage.removeItem(MY_JOIN_KEY); } catch { /* storage blocked */ } };
@@ -572,14 +637,13 @@ function myRequest() {
   return mine ? staffOf(mine.company).find(e => e.reqId === mine.reqId) || null : null;
 }
 
-// 승인 요청 button: grey and off until a company code is typed, then blue
+// 승인 요청 button: grey and off until the company code is confirmed with 확인, then blue
 function syncRequestButton() {
   const b = $j('btnJoinRequest');
-  const on = !b.dataset.locked && $j('joinCompany').value.trim() !== '';
+  const on = !b.dataset.locked && !!checkedCompany && $j('joinCompany').value.trim().toLowerCase() === checkedCompany;
   b.disabled = !on;
   b.classList.toggle('btn-primary', on);
 }
-$j('joinCompany').addEventListener('input', syncRequestButton);
 
 function setJoinStatus(text, kind) {
   const s = $j('joinStatus');
@@ -596,6 +660,7 @@ function renderJoinForm() {
   const approved = !!e && e.status === 'APPROVED';
   // the request fields are locked once sent (until it ends)
   JOIN_FIELDS.forEach(id => { $j(id).disabled = waiting || approved; });
+  $j('btnJoinCheck').disabled = waiting || approved;
   $j('btnJoinRequest').dataset.locked = waiting || approved ? '1' : '';
   $j('btnJoinRequest').hidden = approved;
   $j('btnJoinCancel').hidden = !waiting;
@@ -606,6 +671,10 @@ function renderJoinForm() {
     // fill from the stored request when the screen was opened again
     $j('joinCompany').value = mine.company;
     $j('joinName').value = e.name;
+    // the request was made for this company, so it counts as confirmed and its departments are loaded
+    checkedCompany = mine.company;
+    setCompanyNote(`${(companyOrder(mine.company) || {}).company || mine.company} · 부서 ${deptsOf(mine.company).length}개`, true);
+    setDeptOptions(mine.company);
     $j('joinDept').value = e.dept;
     $j('joinDept').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
     $j('joinRank').value = e.rank;
@@ -630,6 +699,8 @@ function renderJoinForm() {
   } else {
     setJoinStatus('', '');
   }
+  // the department list is on only for a confirmed company while the form can still be changed
+  $j('joinDept').disabled = waiting || approved || !checkedCompany;
   syncRequestButton();
   syncCreateButton();
 }
@@ -664,7 +735,7 @@ function showJoin(open) {
   loginForm.hidden = open;
   joinForm.hidden = !open;
   if (open) {
-    if (!loadMyJoin()) $j('joinCompany').value = $j('loginCompany').value;
+    if (!loadMyJoin()) { $j('joinCompany').value = $j('loginCompany').value; onCompanyInput(); }
     renderJoinForm();
     $j('joinCompany').focus();
   }
@@ -682,10 +753,11 @@ $j('btnJoinRequest').addEventListener('click', () => {
   const error = $j('joinError');
   error.textContent = !name ? '이름을 입력해 주세요' : !dept ? '부서를 골라 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요' : '';
   if (error.textContent) return;
-  const order = company !== 'ieum' ? findCompanyOrder(company) : null;
-  if (!order) { error.textContent = '업체 코드를 확인해 주세요'; return; }
-  if (order.emailVerified === false) { error.textContent = '업체의 이메일 인증이 아직 끝나지 않아 가입할 수 없습니다. 업체 관리자에게 문의해 주세요.'; return; }
-  if (trialState(order).status === 'EXPIRED') { error.textContent = '이용 기간이 끝나 지금은 가입할 수 없습니다. 업체 관리자에게 문의해 주세요.'; return; }
+  const order = companyOrder(company);
+  // checked again: the company may have changed since 확인, and the department must be one of its own
+  error.textContent = company !== checkedCompany ? '업체 코드를 다시 확인해 주세요'
+    : joinBlock(order) || (deptsOf(company).includes(dept) ? '' : '부서를 다시 골라 주세요');
+  if (error.textContent) return;
   const list = staffOf(company);
   const same = list.find(e => (e.email || '').toLowerCase() === email.toLowerCase()
     && (['APPROVED', 'ACTIVE', 'WAITING'].includes(e.status) || (e.status === 'REQUESTED' && !requestExpired(e))));

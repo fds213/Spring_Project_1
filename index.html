@@ -59,13 +59,18 @@
         <p class="login-help">처음이면 <button type="button" class="link-btn" id="btnJoin">계정 만들기</button> · 비밀번호를 잊었다면 관리자에게 초기화를 요청하세요.</p>
       </form>
       <!-- 계정 만들기: 신청자 정보 → 승인 요청 → (승인되면) 사번 자동 배정·비밀번호·이메일 인증 → 계정 생성 (hr.js).
-           승인 요청 버튼(아래쪽, 로그인으로 돌아가기 위)은 업체 코드를 넣기 전에는 회색으로 꺼져 있고, 넣으면 파란색으로 켜진다 -->
+           승인 요청 버튼(아래쪽, 로그인으로 돌아가기 위)은 업체 코드를 확인하기 전에는 회색으로 꺼져 있고, 확인하면 파란색으로 켜진다 -->
       <form id="joinForm" novalidate hidden>
         <h2 class="login-title">계정 만들기</h2>
         <p class="login-lead">정보를 적고 승인을 요청하세요. 업체 관리자나 부서장이 1시간 안에 승인하면 이 화면에서 바로 계정을 만들 수 있습니다.</p>
         <div class="field">
           <label for="joinCompany">업체 코드</label>
-          <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
+          <!-- 확인: 업체를 찾아 그 업체의 부서를 부서 목록에 불러온다. 확인 전에는 부서와 승인 요청이 꺼져 있다 -->
+          <div class="input-action">
+            <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
+            <button type="button" class="btn" id="btnJoinCheck">확인</button>
+          </div>
+          <p class="emp-roles-hint join-code-note" id="joinCompanyNote" role="status" hidden></p>
         </div>
         <div class="field">
           <label for="joinName">이름</label>
