@@ -802,6 +802,7 @@ function syncCreateButton() {
 function showJoin(open) {
   loginForm.hidden = open;
   joinForm.hidden = !open;
+  $j('pwForm').hidden = true;
   if (open) {
     if (!loadMyJoin()) { $j('joinCompany').value = $j('loginCompany').value; onCompanyInput(); }
     renderJoinForm();
@@ -885,3 +886,139 @@ $j('loginForm').addEventListener('input', () => $j('loginError').classList.remov
 // event; the real screen asks the server every few seconds (GET /join/status)
 window.addEventListener('storage', ev => { if (ev.key === EMP_KEY && !joinForm.hidden) renderJoinForm(); });
 setInterval(() => { if (!joinForm.hidden && !document.hidden && loadMyJoin()) renderJoinForm(); }, 5000);
+
+// ---------- 로그인 화면: 비밀번호 찾기 ----------
+// 업체 코드 + 사번 → a 6-digit code to the e-mail the account was made with → with the right code, a new
+// password typed twice (8+ characters) replaces the old one. The current password is never shown: the real
+// server keeps only a BCrypt hash (user agreed 2026-10-28). Operators (ieum) aren't covered here.
+// Real server: POST /password/code { companyCode, empNo } answers the same way whether the account exists or
+// not (only the masked address when it does), POST /password/verify gives a short-lived reset token,
+// POST /password/reset { resetToken, password } stores the new hash and ends that account's other sessions.
+const pwForm = $j('pwForm');
+let pwTarget = null; // { company, id } the code was sent for
+let pwCode = null;
+let pwVerified = false;
+const maskEmail = v => { const [a, d] = String(v).split('@'); return `${a.slice(0, 1)}${'*'.repeat(Math.max(2, a.length - 1))}@${d}`; };
+
+// The account to reset: the company's first admin (password on the trial signup) or an employee who made an
+// account through 계정 생성. { error } when it exists but can't be reset here.
+function resetTarget(company, id) {
+  const order = company && company !== 'ieum' ? findCompanyOrder(company) : null;
+  if (!order) return null;
+  if (order.emailVerified === false) return { error: '업체의 이메일 인증이 아직 끝나지 않았습니다. 신청 메일의 링크로 먼저 인증해 주세요.' };
+  if (adminNo(order) === id) return { kind: 'ADMIN', email: order.email };
+  const e = employeesOf(company).find(x => x.empNo === id && x.pw);
+  if (!e) return null;
+  if (e.status === 'RETIRED') return { error: '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요' };
+  return { kind: 'STAFF', email: e.email };
+}
+
+function resetPwForm() {
+  pwTarget = null;
+  pwCode = null;
+  pwVerified = false;
+  ['pwCompany', 'pwId'].forEach(id => { $j(id).disabled = false; });
+  $j('pwCode').value = '';
+  $j('pwCode').hidden = true;
+  $j('pwCodeNote').textContent = '';
+  $j('pwCodeNote').classList.remove('is-ok');
+  $j('btnPwSend').textContent = '인증 메일 보내기';
+  $j('btnPwSend').disabled = false;
+  $j('pwNewBox').hidden = true;
+  $j('btnPwReset').hidden = true;
+  ['pwNew', 'pwNew2'].forEach(id => { $j(id).value = ''; });
+  $j('pwError').textContent = '';
+  syncPwReset();
+}
+function syncPwReset() {
+  const pw = $j('pwNew').value;
+  $j('btnPwReset').disabled = !(pwVerified && pw.length >= 8 && pw === $j('pwNew2').value);
+}
+
+function showPwFind(open) {
+  loginForm.hidden = open;
+  joinForm.hidden = true;
+  pwForm.hidden = !open;
+  if (open) {
+    resetPwForm();
+    $j('pwCompany').value = $j('loginCompany').value;
+    $j('pwId').value = $j('loginId').value;
+    ($j('pwCompany').value ? $j('pwId') : $j('pwCompany')).focus();
+  }
+}
+$j('btnPwFind').addEventListener('click', () => showPwFind(true));
+$j('btnPwBack').addEventListener('click', () => showPwFind(false));
+
+$j('btnPwSend').addEventListener('click', () => {
+  const company = $j('pwCompany').value.trim().toLowerCase();
+  const id = $j('pwId').value.trim();
+  const error = $j('pwError');
+  error.textContent = !company || !id ? '업체 코드와 사번을 입력해 주세요' : '';
+  if (error.textContent) return;
+  const t = resetTarget(company, id);
+  if (!t) { error.textContent = '업체 코드와 사번을 확인해 주세요'; return; }
+  if (t.error) { error.textContent = t.error; return; }
+  // the real server mails the code; the prototype shows it here instead
+  pwTarget = { company, id };
+  pwCode = String(Math.floor(100000 + Math.random() * 900000));
+  pwVerified = false;
+  $j('pwCode').value = '';
+  $j('pwCode').hidden = false;
+  $j('pwCode').focus();
+  $j('pwCodeNote').classList.remove('is-ok');
+  $j('pwCodeNote').textContent = `가입할 때 쓴 ${maskEmail(t.email)}로 인증 코드를 보냈습니다. 받은 6자리를 넣어 주세요. (시연용 코드: ${pwCode})`;
+  $j('btnPwSend').textContent = '다시 보내기';
+});
+$j('pwCode').addEventListener('input', () => {
+  const v = $j('pwCode').value.trim();
+  if (pwCode && v === pwCode) {
+    pwVerified = true;
+    pwCode = null;
+    $j('pwCode').hidden = true;
+    $j('btnPwSend').disabled = true;
+    ['pwCompany', 'pwId'].forEach(id => { $j(id).disabled = true; });
+    $j('pwCodeNote').textContent = '이메일 인증을 마쳤습니다.';
+    $j('pwCodeNote').classList.add('is-ok');
+    $j('pwNewBox').hidden = false;
+    $j('btnPwReset').hidden = false;
+    $j('pwNew').focus();
+  } else if (v.length === 6) {
+    $j('pwCodeNote').textContent = '인증 코드가 맞지 않습니다. 다시 확인하거나 인증 메일을 다시 보내 주세요.';
+  }
+  syncPwReset();
+});
+// another company or 사번 needs its own code
+['pwCompany', 'pwId'].forEach(id => $j(id).addEventListener('input', () => { if (pwTarget) resetPwForm(); }));
+['pwNew', 'pwNew2'].forEach(id => $j(id).addEventListener('input', () => {
+  $j('pwError').textContent = '';
+  syncPwReset();
+}));
+
+pwForm.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const pw = $j('pwNew').value;
+  const error = $j('pwError');
+  error.textContent = pw.length < 8 ? '비밀번호는 8자 이상으로 정해 주세요' : pw !== $j('pwNew2').value ? '비밀번호 확인이 맞지 않습니다' : '';
+  if (error.textContent || !pwVerified || !pwTarget) return;
+  const { company, id } = pwTarget;
+  const t = resetTarget(company, id);
+  if (!t || t.error) { error.textContent = (t && t.error) || '업체 코드와 사번을 확인해 주세요'; return; }
+  if (t.kind === 'ADMIN') {
+    const orders = loadStore(ORDERS_KEY, []);
+    const o = orders.find(x => x.companyCode === company);
+    o.adminPw = pw;
+    saveStore(ORDERS_KEY, orders);
+  } else {
+    const list = staffOf(company);
+    list.find(x => x.empNo === id && x.pw).pw = pw;
+    saveStaff(company, list);
+  }
+  ['pwCompany', 'pwId'].forEach(x => { $j(x).disabled = false; });
+  showPwFind(false);
+  $j('loginCompany').value = company;
+  $j('loginId').value = id;
+  $j('loginPw').value = '';
+  $j('loginError').textContent = '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
+  $j('loginError').classList.add('is-ok');
+  $j('loginPw').focus();
+});
