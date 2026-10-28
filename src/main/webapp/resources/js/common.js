@@ -73,15 +73,15 @@
   });
   if (document.querySelector('[data-badge]')) startBadges();
 
-  // ---------- 5) read-only company (trial over, unpaid): stop write actions and say why ----------
+  // ---------- 5) read-only company (trial or paid period over, unpaid): stop write actions and say why ----------
   // 화면은 data-write 가 붙은 버튼·링크를 흐리게 두고 누르면 안내만 한다. 실제로 막는 것은 서버(쓰기 요청 거절)다.
   document.addEventListener('click', e => {
     if (!document.body.classList.contains('is-readonly') || !e.target.closest('[data-write]')) return;
     e.preventDefault();
     e.stopImmediatePropagation();
     toast(document.body.dataset.admin === 'true'
-      ? '체험이 끝나 읽기 전용입니다. 이용 결제에서 결제하면 바로 이어서 쓸 수 있습니다.'
-      : '체험이 끝나 읽기 전용입니다. 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.');
+      ? '이용 기간이 끝나 읽기 전용입니다. 이용 결제에서 결제하면 바로 이어서 쓸 수 있습니다.'
+      : '이용 기간이 끝나 읽기 전용입니다. 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.');
   }, true);
 
   // what screen scripts use

@@ -18,11 +18,13 @@
 
   이 틀이 쓰는 서버 값 (백엔드와 확정, 가이드 9장):
   - loginUser: Spring Security principal (저장소 com.ieum.gw.common.dto.LoginUser). 저장소에 있는 name, empnum 만 읽는다
-  - loginInfo (request 속성, 없어도 됨): companyName, deptName, rankName. 담당 1이 @ControllerAdvice 등으로 넣으면 헤더에 보인다.
-    없으면 업체명은 비우고 부서·직급 자리에 사번을 보여준다 (LoginUser 에 없는 값을 읽으면 화면이 500 오류로 깨지므로 따로 받는다)
-  - 역할: 저장소 DB 값 ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN (한 사람에 하나). 이음 운영자 ROLE_OPS 는 제안
-    (hasRole 은 ROLE_ 접두사를 붙여 찾는다)
-  - companyBilling (request 속성, 업체 직원만): status(TRIAL / PAID / EXPIRED), endDate("2026.11.08"), daysLeft(0 = 마지막 날)
+  - loginInfo (request 속성, 없어도 됨): companyName, deptName, rankName, deptHead(부서장이면 true, 가입 승인 메뉴).
+    담당 1이 @ControllerAdvice 등으로 넣으면 헤더에 보인다. 없으면 업체명은 비우고 부서·직급 자리에 사번을 보여준다
+    (LoginUser 에 없는 값을 읽으면 화면이 500 오류로 깨지므로 따로 받는다)
+  - 역할: 저장소 DB 값 ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN (한 사람에 하나). 이음 운영자는 ieum0000 소속 + ROLE_OPS
+    (요구분석서 v1.6. hasRole 은 ROLE_ 접두사를 붙여 찾는다)
+  - companyBilling (request 속성, 업체 직원만. 요청마다 DB에서 읽는다): status(TRIAL / PAID / TRIAL_EXPIRED / PAID_EXPIRED,
+    v1.6 3.12 제안 이름), endDate("2026.11.08", 체험 만료일 또는 유료 만료일), daysLeft(0 = 마지막 날)
   - todayPunch (request 속성, 업체 직원만): inTime("08:52"), outTime(없으면 비움)
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -30,7 +32,8 @@
 <sec:authentication property="principal" var="loginUser" scope="request" />
 <sec:authorize access="hasRole('OPS')" var="isOps" />
 <sec:authorize access="hasRole('ADMIN')" var="isAdmin" />
-<c:set var="readOnly" value="${not isOps and companyBilling.status eq 'EXPIRED'}" />
+<%-- 체험이나 유료 이용 기간이 끝난 업체(TRIAL_EXPIRED, PAID_EXPIRED)는 읽기 전용 --%>
+<c:set var="readOnly" value="${not isOps and fn:endsWith(companyBilling.status, '_EXPIRED')}" />
 <!doctype html>
 <html lang="ko">
 <head>
@@ -47,7 +50,7 @@
   <link rel="apple-touch-icon" href="${ctx}/resources/icons/apple-touch-icon.png">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
 </head>
-<%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 체험이 끝나 결제하지 않은 업체(쓰기 동작을 흐리게) --%>
+<%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 이용 기간이 끝나 결제하지 않은 업체(쓰기 동작을 흐리게) --%>
 <body data-ctx="${ctx}" data-mode="${isOps ? 'OPS' : 'EMPLOYEE'}" data-admin="${isAdmin}"${readOnly ? ' class="is-readonly"' : ''}>
   <div class="app-shell">
     <%@ include file="/WEB-INF/views/common/header.jspf" %>

@@ -53,15 +53,21 @@
   </div>
 </header>
 
-<%-- 체험 중이거나 체험이 끝난(읽기 전용) 업체만. 결제 버튼은 업체 관리자에게만 --%>
-<c:if test="${not isOps and not empty companyBilling and companyBilling.status ne 'PAID'}">
-  <c:set var="trialUrgent" value="${companyBilling.status eq 'TRIAL' and companyBilling.daysLeft le 3}" />
+<%-- 체험 중, 유료 이용 마지막 7일(자동 결제가 없어 직접 연장해야 한다), 이용 기간이 끝난(읽기 전용) 업체만.
+     결제·연장 버튼은 업체 관리자에게만 (구독 권한 위임이 생기면 그 사람에게도). 이용 결제는 subscription 모듈(v1.6) --%>
+<c:set var="paidStrip" value="${companyBilling.status eq 'PAID' and companyBilling.daysLeft le 7}" />
+<c:if test="${not isOps and not empty companyBilling and (companyBilling.status ne 'PAID' or paidStrip)}">
+  <c:set var="trialUrgent" value="${not readOnly and companyBilling.daysLeft le 3}" />
   <div class="trial-bar${trialUrgent ? ' is-urgent' : ''}${readOnly ? ' is-expired' : ''}" role="status">
     <span>
       <c:choose>
         <c:when test="${readOnly}">
-          <strong>체험이 끝나 읽기 전용입니다 (<c:out value="${companyBilling.endDate}" /> 만료)</strong>
+          <strong>${companyBilling.status eq 'PAID_EXPIRED' ? '이용 기간' : '체험'}이 끝나 읽기 전용입니다 (<c:out value="${companyBilling.endDate}" /> 만료)</strong>
           <span class="trial-more">${isAdmin ? ' · 결제하면 바로 이어서 쓸 수 있습니다' : ' · 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다'}</span>
+        </c:when>
+        <c:when test="${paidStrip}">
+          <strong><c:choose><c:when test="${companyBilling.daysLeft eq 0}">오늘 유료 이용 기간이 끝납니다</c:when><c:otherwise>유료 이용 만료 D-${companyBilling.daysLeft}</c:otherwise></c:choose> (<c:out value="${companyBilling.endDate}" />)</strong>
+          <span class="trial-more"> · 자동으로 결제되지 않습니다. 연장하지 않으면 만료 다음 날부터 읽기 전용입니다</span>
         </c:when>
         <c:when test="${companyBilling.daysLeft eq 0}">
           <strong>오늘 무료 체험이 끝납니다 (<c:out value="${companyBilling.endDate}" />)</strong>
@@ -74,7 +80,7 @@
       </c:choose>
     </span>
     <c:if test="${isAdmin}">
-      <a class="btn btn-primary" href="${ctx}/company/admin/billing">결제하기</a>
+      <a class="btn btn-primary" href="${ctx}/subscription/billing">${paidStrip ? '연장하기' : '결제하기'}</a>
     </c:if>
   </div>
 </c:if>

@@ -38,12 +38,18 @@ if (btnSiteMenu) {
 const calcUsers = document.getElementById('calcUsers');
 const calcRange = document.getElementById('calcRange');
 if (calcUsers) {
-  const render = n => {
-    const total = document.getElementById('calcTotal');
-    total.replaceChildren(document.createTextNode(won(n * PRICE_PER_USER)));
+  const show = (id, amount, per) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.replaceChildren(document.createTextNode(won(amount)));
     const unit = document.createElement('small');
-    unit.textContent = '/ 월';
-    total.append(unit);
+    unit.textContent = per;
+    el.append(unit);
+  };
+  // monthly, and the first annual purchase (12 months, 10% off)
+  const render = n => {
+    show('calcTotal', n * PRICE_PER_USER, '/ 월');
+    show('calcAnnual', Math.floor(n * PRICE_PER_USER * 12 * 90 / 100), '/ 년');
   };
   const fromBox = () => {
     const n = Math.max(0, Math.floor(Number(calcUsers.value) || 0));

@@ -4,8 +4,10 @@
   사이드 메뉴. layout.tag 가 include 한다. 역할로 보일지 정하는 것은 sec:authorize (실제 접근은 Security URL 규칙과 Service가 막는다).
   주소는 /<모듈>/<기능>, 관리 화면은 /<모듈>/admin/<기능> (AGENTS.md, 팀 저장소 PR #1). feature/authTest 의 Security 는
   /*/admin/** 를 ADMIN 만 통과시키므로, 인사 담당(HR)·IT 담당이 여는 관리 화면은 담당 1이 그 위에 규칙을 더해야 한다.
-  역할은 저장소 DB 값 ROLE_EMP / ROLE_IT / ROLE_HR / ROLE_ADMIN 이고 한 사람에 하나다. 이음 운영자 ROLE_OPS 는 제안(저장소에 아직 없음).
-  이용 결제는 저장소에 맞는 모듈이 없어 /company/admin/billing 으로 임시로 둔다(모듈은 팀이 정한다).
+  역할은 저장소 DB 값 ROLE_EMP / ROLE_IT / ROLE_HR / ROLE_ADMIN 이고 한 사람에 하나다. 이음 운영자는 ieum0000 소속 + ROLE_OPS(v1.6).
+  가입 승인(업체 관리자 또는 그 부서 부서장)과 이용 결제(업체 관리자, 나중에 구독 권한을 받은 사람)는 역할만으로 정해지지 않아
+  /admin/ 주소 밖에 두고, 서버가 요청마다 그 사람이 맞는지 확인한다(요구분석서 v1.6 3.12). 이용 결제는 subscription 모듈이다.
+  부서장 여부는 loginInfo.deptHead 로 받는다(화면 공통 값).
   배지 숫자는 data-badge 칸을 common.js 가 GET /badges 로 15초마다 채운다.
 --%>
 <nav class="sidebar" id="sidebar">
@@ -66,24 +68,32 @@
         <p class="nav-group">회사</p>
         <ui:nav key="org" path="/employee/org" current="${menu}">조직도</ui:nav>
       </div>
-      <%-- 묶음 제목은 그 안의 메뉴가 하나라도 보일 때만 --%>
-      <sec:authorize access="hasAnyRole('HR','ADMIN')">
+      <%-- 묶음 제목은 그 안의 메뉴가 하나라도 보일 때만. 부서장은 역할이 아니라 부서 설정이라 loginInfo.deptHead 로 본다 --%>
+      <sec:authorize access="hasAnyRole('HR','ADMIN')" var="hrMenu" />
+      <c:set var="joinMenu" value="${isAdmin or loginInfo.deptHead}" />
+      <c:if test="${hrMenu or joinMenu}">
         <div class="nav-section">
           <p class="nav-group">인사 관리</p>
-          <ui:nav key="hr-employee" path="/employee/admin/list" current="${menu}">사원 관리</ui:nav>
+          <c:if test="${hrMenu}">
+            <ui:nav key="hr-employee" path="/employee/admin/list" current="${menu}">사원 관리</ui:nav>
+          </c:if>
+          <%-- 가입 승인: 업체 관리자는 모든 요청, 부서장은 자기 부서 요청만 (/employee/join, 관리 주소 밖) --%>
+          <c:if test="${joinMenu}">
+            <ui:nav key="hr-join" path="/employee/join" current="${menu}">가입 승인 <span class="badge" data-badge="join" hidden></span></ui:nav>
+          </c:if>
           <sec:authorize access="hasRole('HR')">
             <ui:nav key="hr-attendance" path="/attendance/admin/list" current="${menu}">근태·연차 관리</ui:nav>
             <ui:nav key="hr-holiday" path="/attendance/admin/holiday" current="${menu}">휴일 관리</ui:nav>
           </sec:authorize>
         </div>
-      </sec:authorize>
+      </c:if>
       <sec:authorize access="hasRole('ADMIN')">
-        <%-- 업체 관리: 부서·역할은 employee 모듈의 관리 화면, 이용 결제는 모듈 미정(임시 company) --%>
+        <%-- 업체 관리: 부서·역할은 employee 모듈의 관리 화면, 이용 결제는 subscription 모듈(관리 주소 밖) --%>
         <div class="nav-section">
           <p class="nav-group">업체 관리</p>
           <ui:nav key="admin-dept" path="/employee/admin/dept" current="${menu}">부서 관리</ui:nav>
           <ui:nav key="admin-role" path="/employee/admin/role" current="${menu}">역할 관리</ui:nav>
-          <ui:nav key="admin-billing" path="/company/admin/billing" current="${menu}">이용 결제</ui:nav>
+          <ui:nav key="admin-billing" path="/subscription/billing" current="${menu}">이용 결제</ui:nav>
         </div>
       </sec:authorize>
     </c:otherwise>

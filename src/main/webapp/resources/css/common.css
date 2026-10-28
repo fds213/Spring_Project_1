@@ -61,6 +61,66 @@ a { color: inherit; text-decoration: none; }
 #loginForm { display: flex; flex-direction: column; gap: 14px; }
 .login-error { margin: 0; min-height: 18px; font-size: 13px; color: var(--danger); }
 .login-help { margin: 0; text-align: center; font-size: 12px; color: var(--text-muted); }
+/* 계정 만들기 (가입 요청) */
+.link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+#joinForm { display: flex; flex-direction: column; gap: 14px; }
+.join-account { display: flex; flex-direction: column; gap: 14px; }
+/* 입력칸 오른쪽에 붙는 버튼 (업체 코드 확인, 인증 메일 보내기) */
+.input-action { display: flex; gap: 8px; }
+.input-action .input { flex: 1; min-width: 0; }
+.input-action .btn { flex-shrink: 0; height: auto; }
+/* 승인 요청: 업체 코드를 넣기 전에는 회색으로 꺼져 있다 */
+.btn-request[disabled] { opacity: 1; background: var(--bg-sub); border-color: var(--line); color: var(--text-muted); }
+.join-status { margin: 0; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; background: var(--accent-bg); color: var(--accent); }
+.join-status.is-ok { background: #e5f4e4; color: #2b6a2f; }
+.join-status.is-bad { background: var(--danger-bg); color: var(--danger); }
+.join-code-input { margin-top: 8px; }
+.join-code-note:empty { display: none; }
+.join-request-hint { margin: 0; text-align: center; }
+.join-code-note.is-ok { color: #2b6a2f; }
+.join-code-note.is-bad { color: var(--danger); }
+.login-error.is-ok { color: #2b6a2f; }
+#joinForm select:disabled, #joinForm input:disabled, #joinForm .select-trigger:disabled { background: var(--bg-sub); color: var(--text-sub); }
+
+/* custom dropdown (js/select.js): the native select stays hidden as the value; this button + list show it.
+   Opening slides the list down and turns the arrow up */
+.select { position: relative; }
+.select-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
+.select-trigger .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-trigger.is-placeholder .select-value { color: var(--text-muted); }
+.select-trigger:disabled { cursor: default; }
+.select-arrow { flex: none; color: var(--text-sub); transition: transform 0.22s ease, color 0.22s ease; }
+.select.open .select-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.select.open .select-arrow { transform: rotate(180deg); color: var(--accent); }
+.select-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+  margin: 0; padding: 6px; list-style: none; max-height: 240px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+  opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top center;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
+}
+.select.open .select-list { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s ease, transform 0.18s ease; }
+.select-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 10px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer;
+}
+.select.open .select-option { animation: select-option-in 0.2s ease both; animation-delay: calc(var(--i) * 25ms); }
+.select-option.is-active { background: var(--bg-sub); }
+.select-option[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.select-check { flex: none; opacity: 0; transform: scale(0.6); transition: opacity 0.15s ease, transform 0.15s ease; }
+.select-option[aria-selected="true"] .select-check { opacity: 1; transform: none; }
+@keyframes select-option-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .select-arrow, .select-list, .select.open .select-list, .select-check { transition: none; }
+  .select.open .select-option { animation: none; }
+}
+/* 가입 승인 대화상자의 역할 선택 */
+.approve-roles { margin: 0 0 20px; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
+.approve-roles legend { margin-bottom: 6px; font-size: 13px; color: var(--text-sub); }
+.login-title { margin: 0; font-size: 18px; font-weight: 600; }
+.login-lead { margin: -6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 .login-demo { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--line); display: flex; flex-direction: column; gap: 8px; }
 .login-demo p { margin: 0; font-size: 12px; color: var(--text-muted); }
 .login-demo .btn { justify-content: center; }
@@ -174,6 +234,16 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .card-filter[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); }
 .card-filter[aria-pressed="true"] small, .card-filter[aria-pressed="true"] strong { color: var(--accent); }
 .table-gap { margin-top: 20px; }
+/* 가입 승인 */
+.join-scope { margin: -10px 0 16px; font-size: 13px; }
+.join-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+.join-left { font-variant-numeric: tabular-nums; }
+.join-left.is-late { color: #8a4b08; font-weight: 600; }
+.empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.status-requested { background: var(--accent-bg); color: var(--accent); }
+.status-approved { background: var(--accent-bg); color: var(--accent); }
+.status-waiting { background: #fff4e5; color: #8a4b08; }
 
 .tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-sub); }
 .tabs span { padding-bottom: 9px; cursor: pointer; }
@@ -190,6 +260,8 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .status-trial { background: var(--accent-bg); color: var(--accent); }
 .status-expired { background: #fff4e5; color: #8a4b08; }
 .status-active { background: #e5f4e4; color: #2b6a2f; }
+/* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
+.table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
 
 /* 사원 관리: trial seat usage (10 incl. the admin). Orange with 2 or fewer left, red when full */
 .seat-bar { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 10px; }
@@ -243,9 +315,9 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 }
 
 /* billing page: notices, agreement, buttons inside the payment card */
-.bill-pay, .bill-done { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
-.bill-pay .detail, .bill-done .detail { border: 1px solid var(--line); border-radius: var(--radius); }
-.bill-pay .detail dt, .bill-done .detail dt { padding-left: 14px; }
+.bill-pay { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bill-pay .detail { border: 1px solid var(--line); border-radius: var(--radius); }
+.bill-pay .detail dt { padding-left: 14px; }
 .notice-warn { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #fff4e5; color: #8a4b08; font-size: 13px; border: 1px solid #fde2c1; }
 .notice-ok { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #e5f4e4; color: #2b6a2f; font-size: 13px; line-height: 1.6; }
 .agree { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-sub); }
@@ -275,7 +347,20 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-seats-row .input { width: 110px; }
 .bill-seats-row .btn { height: 42px; }
 .bill-note { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-.bill-renew { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px dashed var(--line); }
+/* step 1: monthly / annual side by side, stacked when the card is too narrow for both */
+.plan-pick { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.plan-pick legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.plan-opt {
+  position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 12px 38px;
+  border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer;
+}
+.plan-opt input { position: absolute; left: 14px; top: 15px; margin: 0; accent-color: var(--accent); }
+.plan-opt:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plan-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plan-opt-name { font-weight: 600; }
+.plan-opt-price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-opt-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.bill-history-box { padding: 4px 18px 14px; border-top: 1px solid var(--line); }
 .bill-sub { margin: 4px 0 6px; font-size: 14px; font-weight: 600; }
 .bill-history { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .bill-history li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
