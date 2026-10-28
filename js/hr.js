@@ -607,6 +607,7 @@ function renderJoinForm() {
     $j('joinCompany').value = mine.company;
     $j('joinName').value = e.name;
     $j('joinDept').value = e.dept;
+    $j('joinDept').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
     $j('joinRank').value = e.rank;
     $j('joinEmail').value = e.email;
   }

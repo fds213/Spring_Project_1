@@ -76,7 +76,42 @@ a { color: inherit; text-decoration: none; }
 .join-status.is-bad { background: var(--danger-bg); color: var(--danger); }
 .join-code-note.is-ok { color: #2b6a2f; }
 .login-error.is-ok { color: #2b6a2f; }
-#joinForm select:disabled, #joinForm input:disabled { background: var(--bg-sub); color: var(--text-sub); }
+#joinForm select:disabled, #joinForm input:disabled, #joinForm .select-trigger:disabled { background: var(--bg-sub); color: var(--text-sub); }
+
+/* custom dropdown (js/select.js): the native select stays hidden as the value; this button + list show it.
+   Opening slides the list down and turns the arrow up */
+.select { position: relative; }
+.select-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
+.select-trigger .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-trigger.is-placeholder .select-value { color: var(--text-muted); }
+.select-trigger:disabled { cursor: default; }
+.select-arrow { flex: none; color: var(--text-sub); transition: transform 0.22s ease, color 0.22s ease; }
+.select.open .select-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.select.open .select-arrow { transform: rotate(180deg); color: var(--accent); }
+.select-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+  margin: 0; padding: 6px; list-style: none; max-height: 240px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+  opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top center;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
+}
+.select.open .select-list { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s ease, transform 0.18s ease; }
+.select-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 10px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer;
+}
+.select.open .select-option { animation: select-option-in 0.2s ease both; animation-delay: calc(var(--i) * 25ms); }
+.select-option.is-active { background: var(--bg-sub); }
+.select-option[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.select-check { flex: none; opacity: 0; transform: scale(0.6); transition: opacity 0.15s ease, transform 0.15s ease; }
+.select-option[aria-selected="true"] .select-check { opacity: 1; transform: none; }
+@keyframes select-option-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .select-arrow, .select-list, .select.open .select-list, .select-check { transition: none; }
+  .select.open .select-option { animation: none; }
+}
 /* 가입 승인 대화상자의 역할 선택 */
 .approve-roles { margin: 0 0 20px; padding: 0; border: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 14px; }
 .approve-roles legend { margin-bottom: 6px; font-size: 13px; color: var(--text-sub); }

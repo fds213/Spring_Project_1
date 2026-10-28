@@ -183,13 +183,36 @@ function quoteOf(o, plan, users) {
       why = last ? '연간 만료 3개월이 지나 기본 연간 할인' : '첫 연간 할인';
     }
   }
-  const n = mode === 'EXTEND' ? o.users : users;
+  const n = users;
   const amount = Math.floor(n * PRICE_PER_USER * months * (100 - pct) / 100);
   const today = dayStart(Date.now());
   const from = mode === 'EXTEND' ? sub.expire : today;
   const to = mode === 'EXTEND' ? addMonths(o.subAnchorAt, o.subMonths + months) : addMonths(today, months);
   return { mode, plan, months, users: n, pct, why, amount, from: from.toISOString(), to: to.toISOString(),
     formula: `${n}명 × ${won(PRICE_PER_USER)} × ${months}개월${pct ? ` × ${100 - pct}%` : ''}` };
+}
+
+// Headcount at an extension (user decided 2026-10-28): the admin may change it when extending, never below
+// the accounts in use now. The new headcount is charged for the added period and starts the day after the
+// current period ends (o.seatChanges, one entry per extension that changed it); until then o.users stays.
+const dayAfter = t => new Date(dayStart(t).getTime() + DAY_MS);
+const plannedUsers = o => (o.seatChanges?.length ? o.seatChanges[o.seatChanges.length - 1].users : o.users);
+const nextSeatChange = o => (o.seatChanges?.length ? o.seatChanges[0] : null);
+// Moves every change whose day has come into o.users (on load and before the billing page draws)
+function applyDueSeats() {
+  const orders = loadStore(ORDERS_KEY, []);
+  const now = Date.now();
+  let changed = false;
+  orders.forEach(o => {
+    const due = (o.seatChanges || []).filter(c => new Date(c.from).getTime() <= now);
+    if (!due.length) return;
+    o.users = due[due.length - 1].users;
+    o.total = o.users * PRICE_PER_USER;
+    o.seatChanges = o.seatChanges.filter(c => new Date(c.from).getTime() > now);
+    if (!o.seatChanges.length) delete o.seatChanges;
+    changed = true;
+  });
+  if (changed) saveStore(ORDERS_KEY, orders);
 }
 
 function addMonths(t, n) {
@@ -204,6 +227,7 @@ function addMonths(t, n) {
 const findCompanyOrder = code => loadStore(ORDERS_KEY, []).find(o => o.companyCode === code);
 // here, once empNo, appId, dayStart and addMonths are defined
 upgradeStoredOrders();
+applyDueSeats();
 ensureDemoCompanies();
 const when = iso => {
   const d = new Date(iso);
@@ -246,7 +270,7 @@ function buildDetail(o) {
 
   fill('company', [
     ['업체명', o.company],
-    ['이용 인원', `${o.users}명`],
+    ['이용 인원', nextSeatChange(o) ? `${o.users}명 (${ymd(nextSeatChange(o).from)}부터 ${plannedUsers(o)}명)` : `${o.users}명`],
     ['이메일', o.email],
     // v1.4: the account exists from the signup; until the e-mail is verified the company can't sign in
     ['이메일 인증', o.emailVerified === false ? `대기 (인증 메일 ${whenFull(o.verifySentAt || o.at)} 발송, 인증 전 로그인 불가)` : o.verifiedAt ? `완료 (${whenFull(o.verifiedAt)})` : '완료'],
