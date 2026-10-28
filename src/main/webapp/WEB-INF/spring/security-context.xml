@@ -12,13 +12,27 @@
 	<security:http use-expressions="true"
 		create-session="ifRequired">
 		<!-- URL 권한 규칙은 위에서부터 먼저 맞는 것이 적용된다. 구체적인 규칙을 위에 둔다. -->
-		<!-- 관리 화면은 /<모듈>/admin/** (AGENTS.md 권한·보안). 인사(HR)·IT 담당자에게 열 모듈별 규칙은 요구분석서 확정 뒤 이 줄 위에 추가한다. -->
-		<security:intercept-url pattern="/resources/**" access="permitAll" />
-		<security:intercept-url pattern="/*/admin/**"   access="hasRole('ADMIN')" />
-		<security:intercept-url pattern="/**"           access="isAuthenticated()" />
+		<!-- 관리 화면은 /<모듈>/admin/** (AGENTS.md 권한·보안). 인사(HR)·IT 담당자에게 열 모듈별 규칙은 
+			요구분석서 확정 뒤 이 줄 위에 추가한다. -->
+		<security:intercept-url
+			pattern="/service-worker.js" access="permitAll" />
+		<security:intercept-url pattern="/resources/**"
+			access="permitAll" />
+		<security:intercept-url pattern="/login"
+			access="permitAll" />
+		<security:intercept-url
+			pattern="/manifest.json" access="permitAll" />
+		<security:intercept-url pattern="/*/admin/**"
+			access="hasRole('ADMIN')" />
+		<security:intercept-url pattern="/**"
+			access="isAuthenticated()" />
+
 
 		<!-- 기본 GET /login 화면과 POST /login 인증 처리. 커스텀 JSP 작성 후 login-page를 지정하세요. -->
-		<security:form-login />
+		<security:form-login login-page="/login"
+			login-processing-url="/login" username-parameter="username"
+			password-parameter="password"
+			authentication-failure-url="/login?error" default-target-url="/home" />
 		<security:logout logout-url="/logout"
 			logout-success-url="/login?logout" invalidate-session="true" />
 		<security:csrf />
