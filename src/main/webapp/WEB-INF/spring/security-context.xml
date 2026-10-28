@@ -32,7 +32,8 @@
 		<security:form-login login-page="/login"
 			login-processing-url="/login" username-parameter="username"
 			password-parameter="password"
-			authentication-failure-url="/login?error" default-target-url="/home" />
+			authentication-failure-url="/login?error" default-target-url="/home"
+			always-use-default-target="true" />
 		<security:logout logout-url="/logout"
 			logout-success-url="/login?logout" invalidate-session="true" />
 		<security:csrf />

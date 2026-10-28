@@ -22,6 +22,10 @@ public class LoginUser implements UserDetails {
 	public String getName() {
 		return emp.getName();
 	}
+	
+	public String getCompcode() {
+		return emp.getCompcode();
+	}
 
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {

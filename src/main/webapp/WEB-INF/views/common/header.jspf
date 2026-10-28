@@ -1,4 +1,4 @@
-<%-- tag 파일(layout.tag, site.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
+ <%-- tag 파일(layout.tag, site.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
 <%@ tag pageEncoding="UTF-8" %>
 <%-- 그룹웨어·운영자 헤더. layout.tag 가 include 한다 (ctx, loginUser, isOps, isAdmin, readOnly 는 layout.tag 에서 정한 값,
      loginInfo 는 서버가 넣는 선택 값) --%>

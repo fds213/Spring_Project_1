@@ -2,9 +2,10 @@
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.common.mapper.AuthMapper">
 
-    <select id="getInfo" parameterType="String" resultType="com.ieum.gw.common.dto.AuthEmpDTO">
-    SELECT empnum, pw, name, role, status
-    FROM tblTestEmp
-    WHERE empnum = #{empnum}
-</select>
+	<select id="getInfo"
+		resultType="com.ieum.gw.common.dto.AuthEmpDTO">
+		SELECT compcode, empnum, pw, name, role, status
+		FROM test_emp
+		WHERE compcode = #{compcode} AND empnum = #{empnum}
+	</select>
 </mapper>
