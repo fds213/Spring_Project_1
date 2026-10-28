@@ -27,9 +27,9 @@ function saveStore(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* storage blocked: the demo still runs for this page */ }
 }
 
-// No sample companies (removed 2026-10-28 at the user's request): only IEUM's operator account is built in, and
-// every company comes from a trial signup. Opening this version once clears the companies an earlier version
-// stored in this browser (samples and test signups alike), so everyone starts from the same empty state.
+// The old sample companies were removed 2026-10-28 at the user's request. Companies now come from a trial signup,
+// plus the two built-in demo companies below (demoCompanies). Opening this version once clears the companies an earlier version
+// stored in this browser (samples and test signups alike), so everyone starts from the same state.
 // Only a browser that ran an older version (an older seeded-v* mark) has stale companies to clear. A fresh
 // browser may already hold a company signed up on trial.html, which doesn't load this file: clearing then
 // would delete the signup the person is about to sign in with, so it is kept.
@@ -41,6 +41,40 @@ if (!loadStore(SEEDED_KEY, false)) {
     saveStore(READ_KEY, []);
   }
   saveStore(SEEDED_KEY, true);
+}
+
+// Built-in demo companies (added 2026-10-28 at the user's request): one admin of a company on its trial and one
+// of a paid company, so anyone opening the prototype can sign in without signing up first. Dates are counted
+// from today, so the trial never runs out. A company missing from this browser (first visit, or deleted) is put
+// back on every load; one already stored is left as it is, so payments or staff changes made in the demo stay.
+// Their codes are kept out of the codes a signup can draw (trial.js RESERVED_CODES).
+const DEMO_PW = 'ieum1234';
+function demoCompanies() {
+  const today = dayStart(Date.now());
+  const daysAgo = n => new Date(today.getTime() - n * DAY_MS);
+  const trialEnd = start => { const d = new Date(start); d.setDate(d.getDate() + 13); d.setHours(23, 59, 59, 999); return d.toISOString(); };
+  const trialAt = daysAgo(3);
+  const paidAt = daysAgo(30);
+  const paidFrom = daysAgo(20); // paid on day 11 of its trial; the next monthly payment is about 10 days away
+  const base = { emailVerified: true, payments: [], adminPw: DEMO_PW };
+  return [
+    { ...base, no: 'T-DEMO-TRIAL', company: '체험상사', companyCode: 'ieum0001', users: 5, total: 5 * 4000,
+      email: 'trial-admin@example.com', adminName: '김체험', adminNo: empNo(trialAt.getFullYear(), 1),
+      status: 'TRIAL', at: trialAt.toISOString(), verifiedAt: trialAt.toISOString(), trialEnd: trialEnd(trialAt) },
+    { ...base, no: 'T-DEMO-PAID', company: '유료물산', companyCode: 'ieum0002', users: 20, total: 20 * 4000,
+      email: 'paid-admin@example.com', adminName: '박유료', adminNo: empNo(paidAt.getFullYear(), 1),
+      status: 'PAID', at: paidAt.toISOString(), verifiedAt: paidAt.toISOString(), trialEnd: trialEnd(paidAt),
+      serviceFrom: paidFrom.toISOString(), nextPayAt: addMonths(paidFrom, 1).toISOString(),
+      payments: [{ at: paidFrom.toISOString(), kind: 'FIRST', result: 'OK', amount: 20 * 4000, users: 20 }] },
+  ];
+}
+function ensureDemoCompanies() {
+  const orders = loadStore(ORDERS_KEY, []);
+  const missing = demoCompanies().filter(d => !orders.some(o => o.companyCode === d.companyCode));
+  if (!missing.length) return;
+  saveStore(ORDERS_KEY, [...orders, ...missing]);
+  // not "new applications" for the operator's badge
+  saveStore(READ_KEY, [...new Set([...loadStore(READ_KEY, []), ...missing.map(appId)])]);
 }
 
 // 사번 = 등록 연도 + 4자리 번호 (20260001), given in the order accounts are created within the company;
@@ -101,6 +135,7 @@ function billingState(o) {
 }
 
 const findCompanyOrder = code => loadStore(ORDERS_KEY, []).find(o => o.companyCode === code);
+ensureDemoCompanies(); // here, once empNo, appId, dayStart and addMonths are defined
 const when = iso => {
   const d = new Date(iso);
   const p = n => String(n).padStart(2, '0');

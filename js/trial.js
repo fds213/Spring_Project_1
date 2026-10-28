@@ -47,7 +47,9 @@ document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', 
 // The real server draws it inside the transaction that creates the company (unique key in the DB).
 // ('ieum' alone is IEUM's own company, the operators, and isn't in the range.)
 const CODE_COUNT = 10000;
-const takenCodes = () => new Set(loadStore('ieum-demo-orders', []).map(o => o.companyCode));
+// the built-in demo companies (ops.js demoCompanies) may not be stored yet when this page opens first
+const RESERVED_CODES = ['ieum0001', 'ieum0002'];
+const takenCodes = () => new Set([...RESERVED_CODES, ...loadStore('ieum-demo-orders', []).map(o => o.companyCode)]);
 const codeOf = n => `ieum${String(n).padStart(4, '0')}`;
 function drawCode() {
   const taken = takenCodes();

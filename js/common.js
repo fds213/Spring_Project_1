@@ -49,7 +49,8 @@ function applyRoles() {
 // the session in sessionStorage, so closing the tab signs out. The real project uses Spring Security form login.
 const DEMO_ACCOUNTS = [
   // Only IEUM's own operator account is built in (sample companies removed 2026-10-28). Company accounts come
-  // from a trial signup (findTrialAccount) and from employees who joined through 계정 만들기 (hr.js).
+  // from a trial signup or the built-in demo companies ieum0001/ieum0002 (findTrialAccount, ops.js demoCompanies)
+  // and from employees who joined through 계정 만들기 (hr.js).
   { type: 'OPS', company: 'ieum', id: '20260001', pw: 'ieum1234',
     companyName: '이음 운영', name: '운영자', sub: '이음 운영팀', roles: 'EMPLOYEE' },
 ];
