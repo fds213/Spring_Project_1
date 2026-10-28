@@ -57,8 +57,9 @@ function staffOf(code) {
   const all = loadStore(EMP_KEY, {});
   if (!all[code]) {
     const order = findCompanyOrder(code);
-    const at = order ? order.at : new Date().toISOString();
-    all[code] = order ? [{ name: order.adminName, empNo: adminNo(order), dept: '경영지원팀', rank: '관리자', roles: ['ADMIN'], status: 'ACTIVE', at, email: order.email }] : [];
+    // nothing stored for a company that isn't there (yet): an empty list kept now would lose its admin later
+    if (!order) return [];
+    all[code] = [{ name: order.adminName, empNo: adminNo(order), dept: '경영지원팀', rank: '관리자', roles: ['ADMIN'], status: 'ACTIVE', at: order.at, email: order.email }];
     saveStore(EMP_KEY, all);
   } else if (all[code].some(e => ['REGISTERED', 'PENDING'].includes(e.status))) {
     all[code] = all[code].filter(e => !['REGISTERED', 'PENDING'].includes(e.status));
@@ -566,12 +567,14 @@ function staffSignIn(company, id, pw) {
 }
 
 // ---------- 로그인 화면: 계정 만들기 ----------
-// One form, three states: request (fill in and press 승인 요청) → waiting ("승인 요청을 하였습니다") → approved
-// ("승인 완료되었습니다": 사번 locked, password, e-mail code, 계정 생성). This device remembers its request.
+// One form, three states: request (confirm the company, fill in, verify the e-mail, press 승인 요청) → waiting
+// ("승인 요청을 하였습니다") → approved ("승인 완료되었습니다": 사번 locked, password, 계정 생성). The e-mail is
+// verified before the request (user decided 2026-10-28), so an approver only ever sees requests with a working
+// address. This device remembers its request.
 const loginForm = document.getElementById('loginForm');
 const joinForm = document.getElementById('joinForm');
 const $j = id => document.getElementById(id);
-const JOIN_FIELDS = ['joinCompany', 'joinName', 'joinDept', 'joinRank', 'joinEmail'];
+const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinCode'];
 let checkedCompany = ''; // the company code confirmed with 확인 ('' = not confirmed)
 
 // The department list shows the confirmed company's departments; before that it holds only the hint and is off
@@ -637,12 +640,19 @@ function myRequest() {
   return mine ? staffOf(mine.company).find(e => e.reqId === mine.reqId) || null : null;
 }
 
-// 승인 요청 button: grey and off until the company code is confirmed with 확인, then blue
+// 승인 요청 button: grey and off until the company code is confirmed with 확인 and the e-mail typed now is
+// verified, then blue. The line above it says what is still missing.
 function syncRequestButton() {
   const b = $j('btnJoinRequest');
-  const on = !b.dataset.locked && !!checkedCompany && $j('joinCompany').value.trim().toLowerCase() === checkedCompany;
+  const company = !!checkedCompany && $j('joinCompany').value.trim().toLowerCase() === checkedCompany;
+  const email = emailVerifiedNow();
+  const on = !b.dataset.locked && company && email;
   b.disabled = !on;
   b.classList.toggle('btn-primary', on);
+  const hint = $j('joinRequestHint');
+  hint.hidden = !!b.dataset.locked || on;
+  hint.textContent = !company && !email ? '업체 코드 확인과 이메일 인증을 마치면 승인 요청을 할 수 있습니다'
+    : !company ? '업체 코드를 확인하면 승인 요청을 할 수 있습니다' : '이메일을 인증하면 승인 요청을 할 수 있습니다';
 }
 
 function setJoinStatus(text, kind) {
@@ -679,13 +689,17 @@ function renderJoinForm() {
     $j('joinDept').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
     $j('joinRank').value = e.rank;
     $j('joinEmail').value = e.email;
+    joinCode = null;
+    verifiedEmail = e.email.toLowerCase();
+    $j('joinCode').hidden = true;
+    setCodeNote('이메일 인증을 마쳤습니다.', true);
   }
   if (waiting) {
     setJoinStatus(`승인 요청을 하였습니다. 업체 관리자나 부서장이 승인하면 이 화면에서 바로 계정을 만들 수 있습니다. (${minutesLeft(e)}분 안에 승인되지 않으면 다시 요청해야 합니다)`, 'wait');
   } else if (approved) {
     setJoinStatus(e.wait
       ? '승인 완료되었습니다. 구매 인원이 모두 차서, 계정을 만든 뒤 업체 관리자가 자리를 주면 로그인할 수 있습니다.'
-      : '승인 완료되었습니다. 비밀번호를 정하고 이메일을 인증한 뒤 계정 생성을 눌러 주세요.', 'ok');
+      : '승인 완료되었습니다. 비밀번호를 정한 뒤 계정 생성을 눌러 주세요.', 'ok');
     $j('joinId').textContent = e.empNo;
   } else if (e && e.status === 'REJECTED') {
     setJoinStatus('가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.', 'bad');
@@ -701,35 +715,74 @@ function renderJoinForm() {
   }
   // the department list is on only for a confirmed company while the form can still be changed
   $j('joinDept').disabled = waiting || approved || !checkedCompany;
+  $j('btnJoinSend').disabled = waiting || approved || emailVerifiedNow();
   syncRequestButton();
   syncCreateButton();
 }
 
-// 계정 생성: on only with a password of 8+ characters typed twice the same and the e-mail verified
-let joinCode = null;
-let joinVerified = false;
-function syncCreateButton() {
-  const pw = $j('joinPw').value;
-  $j('btnJoinCreate').disabled = !(pw.length >= 8 && pw === $j('joinPw2').value && joinVerified);
+// 이메일 인증 (before 승인 요청): 인증 메일 보내기 sends a 6-digit code to the typed address; typing the code
+// verifies that address. Changing the address afterwards needs a new code. The real server mails the code
+// (POST /join/email-code) and checks it (POST /join/email-verify); the prototype shows it on screen instead.
+let joinCode = null; // the code sent last, for joinCodeFor
+let joinCodeFor = ''; // the address it was sent to
+let verifiedEmail = ''; // the address verified ('' = none)
+const typedEmail = () => $j('joinEmail').value.trim().toLowerCase();
+const emailVerifiedNow = () => !!verifiedEmail && typedEmail() === verifiedEmail;
+function setCodeNote(text, ok) {
+  const note = $j('joinCodeNote');
+  note.textContent = text;
+  note.classList.toggle('is-ok', !!ok);
 }
-['joinPw', 'joinPw2'].forEach(id => $j(id).addEventListener('input', syncCreateButton));
-$j('btnJoinSend').addEventListener('click', () => {
-  // the real server mails a 6-digit code to the request's e-mail; the prototype shows it here instead
-  joinCode = String(Math.floor(100000 + Math.random() * 900000));
-  joinVerified = false;
+function resetEmailCheck() {
+  joinCode = null;
+  joinCodeFor = '';
+  verifiedEmail = '';
   $j('joinCode').value = '';
-  $j('joinCodeNote').textContent = `${$j('joinEmail').value}로 인증 코드를 보냈습니다. (시연용 코드: ${joinCode})`;
+  $j('joinCode').hidden = true;
+  $j('btnJoinSend').textContent = '인증 메일 보내기';
+  $j('btnJoinSend').disabled = false;
+  setCodeNote('', false);
+}
+$j('btnJoinSend').addEventListener('click', () => {
+  const email = $j('joinEmail').value.trim();
+  if (!validEmail(email)) { setCodeNote('이메일 형식을 확인해 주세요.', false); return; }
+  joinCode = String(Math.floor(100000 + Math.random() * 900000));
+  joinCodeFor = email.toLowerCase();
+  verifiedEmail = '';
+  $j('joinCode').value = '';
+  $j('joinCode').hidden = false;
+  $j('joinCode').focus();
+  setCodeNote(`${email}로 인증 코드를 보냈습니다. 받은 6자리를 넣어 주세요. (시연용 코드: ${joinCode})`, false);
   $j('btnJoinSend').textContent = '다시 보내기';
-  syncCreateButton();
+  syncRequestButton();
 });
 $j('joinCode').addEventListener('input', () => {
   const v = $j('joinCode').value.trim();
-  joinVerified = !!joinCode && v === joinCode;
-  $j('joinCodeNote').textContent = joinVerified ? '이메일 인증이 끝났습니다.'
-    : v.length === 6 ? '인증 코드가 맞지 않습니다.' : $j('joinCodeNote').textContent;
-  $j('joinCodeNote').classList.toggle('is-ok', joinVerified);
-  syncCreateButton();
+  if (joinCode && v === joinCode && typedEmail() === joinCodeFor) {
+    verifiedEmail = joinCodeFor;
+    joinCode = null;
+    $j('joinCode').hidden = true;
+    $j('btnJoinSend').disabled = true;
+    setCodeNote('이메일 인증을 마쳤습니다.', true);
+  } else if (v.length === 6) {
+    setCodeNote('인증 코드가 맞지 않습니다. 다시 확인하거나 인증 메일을 다시 보내 주세요.', false);
+  }
+  syncRequestButton();
 });
+// a different address needs its own code
+$j('joinEmail').addEventListener('input', () => {
+  if (verifiedEmail || joinCodeFor) {
+    if (typedEmail() !== (verifiedEmail || joinCodeFor)) resetEmailCheck();
+  }
+  syncRequestButton();
+});
+
+// 계정 생성: on only with a password of 8+ characters typed twice the same
+function syncCreateButton() {
+  const pw = $j('joinPw').value;
+  $j('btnJoinCreate').disabled = !(pw.length >= 8 && pw === $j('joinPw2').value);
+}
+['joinPw', 'joinPw2'].forEach(id => $j(id).addEventListener('input', syncCreateButton));
 
 function showJoin(open) {
   loginForm.hidden = open;
@@ -751,7 +804,8 @@ $j('btnJoinRequest').addEventListener('click', () => {
   const rank = $j('joinRank').value.trim() || '사원';
   const email = $j('joinEmail').value.trim();
   const error = $j('joinError');
-  error.textContent = !name ? '이름을 입력해 주세요' : !dept ? '부서를 골라 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요' : '';
+  error.textContent = !dept ? '부서를 골라 주세요' : !name ? '이름을 입력해 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요'
+    : !emailVerifiedNow() ? '이메일을 인증해 주세요' : '';
   if (error.textContent) return;
   const order = companyOrder(company);
   // checked again: the company may have changed since 확인, and the department must be one of its own
@@ -768,12 +822,10 @@ $j('btnJoinRequest').addEventListener('click', () => {
   }
   const req = {
     reqId: `R${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    name, dept, rank, email, roles: [], status: 'REQUESTED', requestAt: new Date().toISOString(), at: new Date().toISOString(),
+    name, dept, rank, email, emailVerified: true, roles: [], status: 'REQUESTED', requestAt: new Date().toISOString(), at: new Date().toISOString(),
   };
   saveStaff(company, [...list, req]);
   saveMyJoin({ company, reqId: req.reqId });
-  joinCode = null;
-  joinVerified = false;
   renderJoinForm();
 });
 
@@ -792,18 +844,15 @@ joinForm.addEventListener('submit', ev => {
   const e = myRequest();
   if (!mine || !e || e.status !== 'APPROVED') return renderJoinForm();
   const pw = $j('joinPw').value;
-  if (pw.length < 8 || pw !== $j('joinPw2').value || !joinVerified) return syncCreateButton();
+  if (pw.length < 8 || pw !== $j('joinPw2').value) return syncCreateButton();
   const list = staffOf(mine.company);
   const x = list.find(y => y.reqId === mine.reqId);
   Object.assign(x, { status: x.wait ? 'WAITING' : 'ACTIVE', pw, emailVerified: true, createdAt: new Date().toISOString() });
   delete x.wait;
   saveStaff(mine.company, list);
   saveMyJoin(null);
-  joinCode = null;
-  joinVerified = false;
-  ['joinPw', 'joinPw2', 'joinCode'].forEach(id => { $j(id).value = ''; });
-  $j('joinCodeNote').textContent = '';
-  $j('btnJoinSend').textContent = '인증 메일 보내기';
+  ['joinPw', 'joinPw2'].forEach(id => { $j(id).value = ''; });
+  resetEmailCheck();
   // back to the login form with the company code and the new 사번 filled in
   showJoin(false);
   $j('loginCompany').value = mine.company;

@@ -74,6 +74,9 @@ a { color: inherit; text-decoration: none; }
 .join-status { margin: 0; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; background: var(--accent-bg); color: var(--accent); }
 .join-status.is-ok { background: #e5f4e4; color: #2b6a2f; }
 .join-status.is-bad { background: var(--danger-bg); color: var(--danger); }
+.join-code-input { margin-top: 8px; }
+.join-code-note:empty { display: none; }
+.join-request-hint { margin: 0; text-align: center; }
 .join-code-note.is-ok { color: #2b6a2f; }
 .join-code-note.is-bad { color: var(--danger); }
 .login-error.is-ok { color: #2b6a2f; }

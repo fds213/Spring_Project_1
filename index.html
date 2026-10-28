@@ -58,8 +58,8 @@
         <!-- 직원 가입: 관리자가 사전 등록해 준 사번으로 가입을 요청하고, 관리자·부서장이 1시간 안에 승인한다 (hr.js) -->
         <p class="login-help">처음이면 <button type="button" class="link-btn" id="btnJoin">계정 만들기</button> · 비밀번호를 잊었다면 관리자에게 초기화를 요청하세요.</p>
       </form>
-      <!-- 계정 만들기: 신청자 정보 → 승인 요청 → (승인되면) 사번 자동 배정·비밀번호·이메일 인증 → 계정 생성 (hr.js).
-           승인 요청 버튼(아래쪽, 로그인으로 돌아가기 위)은 업체 코드를 확인하기 전에는 회색으로 꺼져 있고, 확인하면 파란색으로 켜진다 -->
+      <!-- 계정 만들기: 업체 코드 확인 → 부서·직급·이름 → 이메일 인증 → 승인 요청 → (승인되면) 사번 자동 배정·비밀번호 → 계정 생성 (hr.js).
+           승인 요청 버튼(아래쪽, 로그인으로 돌아가기 위)은 업체 코드 확인과 이메일 인증을 모두 마치기 전에는 회색으로 꺼져 있고, 마치면 파란색으로 켜진다 -->
       <form id="joinForm" novalidate hidden>
         <h2 class="login-title">계정 만들기</h2>
         <p class="login-lead">정보를 적고 승인을 요청하세요. 업체 관리자나 부서장이 1시간 안에 승인하면 이 화면에서 바로 계정을 만들 수 있습니다.</p>
@@ -73,10 +73,6 @@
           <p class="emp-roles-hint join-code-note" id="joinCompanyNote" role="status" hidden></p>
         </div>
         <div class="field">
-          <label for="joinName">이름</label>
-          <input class="input" id="joinName" autocomplete="name">
-        </div>
-        <div class="field">
           <label for="joinDept">부서</label>
           <select class="input" id="joinDept" data-ui="select"><option value="">부서를 고르세요</option></select>
         </div>
@@ -85,11 +81,21 @@
           <input class="input" id="joinRank" autocomplete="off" placeholder="예: 사원">
         </div>
         <div class="field">
+          <label for="joinName">이름</label>
+          <input class="input" id="joinName" autocomplete="name">
+        </div>
+        <!-- 이메일 인증: 인증 메일을 보내고 받은 6자리 코드를 넣어야 승인 요청을 할 수 있다. 이메일을 바꾸면 다시 인증한다 -->
+        <div class="field">
           <label for="joinEmail">이메일</label>
-          <input class="input" id="joinEmail" type="email" autocomplete="email" placeholder="name@company.com">
+          <div class="input-action">
+            <input class="input" id="joinEmail" type="email" autocomplete="email" placeholder="name@company.com">
+            <button type="button" class="btn" id="btnJoinSend">인증 메일 보내기</button>
+          </div>
+          <input class="input join-code-input" id="joinCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="인증 코드 6자리" aria-label="이메일 인증 코드" hidden>
+          <p class="emp-roles-hint join-code-note" id="joinCodeNote" role="status"></p>
         </div>
         <p class="join-status" id="joinStatus" role="status" hidden></p>
-        <!-- 승인된 뒤에만 보인다: 사번(잠김) · 비밀번호 · 비밀번호 확인 · 이메일 인증 -->
+        <!-- 승인된 뒤에만 보인다: 사번(잠김) · 비밀번호 · 비밀번호 확인 -->
         <div class="join-account" id="joinAccount" hidden>
           <div class="field">
             <label for="joinId">사번</label>
@@ -104,16 +110,9 @@
             <label for="joinPw2">비밀번호 확인</label>
             <input class="input" id="joinPw2" type="password" autocomplete="new-password">
           </div>
-          <div class="field">
-            <label for="joinCode">이메일 인증</label>
-            <div class="input-action">
-              <input class="input" id="joinCode" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="인증 코드 6자리">
-              <button type="button" class="btn" id="btnJoinSend">인증 메일 보내기</button>
-            </div>
-            <p class="emp-roles-hint join-code-note" id="joinCodeNote"></p>
-          </div>
         </div>
         <p class="login-error" id="joinError" role="alert"></p>
+        <p class="emp-roles-hint join-request-hint" id="joinRequestHint">업체 코드 확인과 이메일 인증을 마치면 승인 요청을 할 수 있습니다</p>
         <button type="button" class="btn btn-request btn-block" id="btnJoinRequest" disabled>승인 요청</button>
         <button class="btn btn-primary btn-block" type="submit" id="btnJoinCreate" hidden disabled>계정 생성</button>
         <button class="btn btn-ghost btn-block" type="button" id="btnJoinCancel" hidden>요청 취소하고 다시 쓰기</button>
