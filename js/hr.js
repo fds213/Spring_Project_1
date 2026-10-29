@@ -140,8 +140,13 @@ function seatCaps(code) {
   if (!order) return null;
   const paid = order.status === 'PAID'; // also after the paid period ended (read-only)
   // a smaller headcount bought at an extension limits approvals from now on, so the accounts in use never pass it
-  const n = Math.min(order.users, plannedUsers(order));
-  return paid ? { paid, active: n, approve: Math.ceil(n * 1.2) } : { paid, active: TRIAL_SEATS, approve: TRIAL_SEATS };
+  // A payment waiting for the operator's approval (ops.js) limits approvals the same way from now on: approving it
+  // must never leave more accounts in use than the headcount paid for
+  const pending = pendingOf(order);
+  const cap = k => (pending ? Math.min(k, pending.users) : k);
+  const n = cap(Math.min(order.users, plannedUsers(order)));
+  return paid ? { paid, pending: !!pending, active: n, approve: Math.ceil(n * 1.2) }
+    : { paid, pending: !!pending, active: cap(TRIAL_SEATS), approve: cap(TRIAL_SEATS) };
 }
 // SEAT = uses a seat (signed in, or approved and about to be created); WAIT = holds a 자리 대기 place
 const seatOf = e => (e.status === 'ACTIVE' || (e.status === 'APPROVED' && !approvalExpired(e) && !e.wait) ? 'SEAT'
@@ -233,6 +238,8 @@ function renderEmployees() {
         ? '체험 중 쓸 수 있는 자리를 모두 썼습니다. 쓰지 않는 직원을 비활성화하면 그만큼 다른 직원을 승인할 수 있고, 결제가 승인되면 구매한 인원만큼 쓸 수 있습니다.'
         : `체험 중에는 관리자를 포함해 ${caps.active}명까지 쓸 수 있습니다. ${caps.active - n}명 더 승인할 수 있습니다.`));
     document.getElementById('seatPay').hidden = caps.paid || !userRoles.includes('ADMIN');
+    // already paid and waiting for the operator: the button only shows that request
+    document.getElementById('seatPay').textContent = caps.pending ? '결제 신청 보기' : '결제하고 제한 풀기';
   }
 
   const rows = staff.map(e => {

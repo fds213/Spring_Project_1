@@ -11,9 +11,10 @@ const OPS_VIEWS = {
 };
 
 // Applications = free-trial signups from the intro site (trial.js saves them in localStorage). One row per
-// company: status TRIAL while the 14-day trial runs, PAID once the admin pays inside the groupware (any time
-// during the trial). A trial past its end date without payment is EXPIRED and the company turns read-only:
-// everyone still signs in and reads, nothing can be written until the admin pays (decided 2026-10-28).
+// company: status TRIAL while the 14-day trial runs, PAID once an operator approves the admin's payment
+// (paid any time during the trial; approval below, decidePayment). A trial past its end date without an approved
+// payment is EXPIRED and the company turns read-only: everyone still signs in and reads, nothing can be written
+// until a payment is approved (decided 2026-10-28, approval 2026-10-29).
 // In the real project the server keeps them and the badge comes from GET /badges every 15 seconds.
 const ORDERS_KEY = 'ieum-demo-orders';
 const READ_KEY = 'ieum-demo-orders-read';
@@ -81,8 +82,10 @@ function demoCompanies() {
   ];
 }
 function ensureDemoCompanies() {
-  // the trial and paid companies come back once their period ran out; the expired one is meant to be expired
-  const stale = o => o.no.startsWith('T-DEMO-') && o.no !== 'T-DEMO-EXPIRED' && trialState(o).status === 'EXPIRED';
+  // the trial and paid companies come back once their period ran out; the expired one is meant to be expired.
+  // One with a payment waiting for approval stays (read-only until the operator decides), or the payment would vanish
+  const stale = o => o.no.startsWith('T-DEMO-') && o.no !== 'T-DEMO-EXPIRED' && trialState(o).status === 'EXPIRED'
+    && !pendingOf(o);
   const orders = loadStore(ORDERS_KEY, []).filter(o => !stale(o));
   // the 시안용 계정 buttons keep working after someone changed a demo password in 비밀번호 찾기
   let changed = false;
@@ -135,9 +138,9 @@ const endOfDay = t => { const d = new Date(t); d.setHours(23, 59, 59, 999); retu
 // State of a company, computed from today: its trial, or its paid subscription once it has paid.
 // status TRIAL / PAID / EXPIRED (trial or paid period over → read-only for everyone, requirements v1.5
 // DEM-03·SUB-04); paid tells which period `end` and daysLeft are about. daysLeft counts calendar days to
-// the last day (0 = the last day itself, "D-day"). Paid service starts the day the company pays, during the
-// trial or after it ended (PAY-02): the days left in the trial are not added on. serviceFrom is the first day
-// of the current paid run, or today before paying (= the start date if it paid now).
+// the last day (0 = the last day itself, "D-day"). Paid service starts the day an operator approves the payment,
+// during the trial or after it ended (PAY-02, approval 2026-10-29): the days left in the trial are not added on.
+// serviceFrom is the first day of the current paid run, or today before paying (= the start date if approved now).
 // Shared with the groupware's trial strip, reminder, billing page and the operator screens.
 function trialState(o) {
   const sub = subscriptionOf(o);
@@ -267,7 +270,8 @@ const PAY_RESULT = {
   FAILED: { label: '결제 실패', cls: 'failed' },
 };
 const pendingOf = o => (o.payments || []).find(p => p.result === 'PENDING') || null;
-const lastPayment = o => (o.payments || []).length ? o.payments[o.payments.length - 1] : null;
+// the latest request (a failed mock payment never became one, so it doesn't hide a rejection notice)
+const lastPayment = o => (o.payments || []).slice().reverse().find(p => p.result !== 'FAILED') || null;
 // one id per payment request, for the operator's "new" marks (the application itself is appId)
 const reqId = (o, p) => `${o.no}@${p.at}`;
 
@@ -282,13 +286,14 @@ function approvalPeriod(o, p) {
   return { extend: false, from: today, to: addMonths(today, p.months) };
 }
 
-// Approve or reject the company's waiting request. Returns the decided payment, or null when nothing waits
-// (decided already, e.g. in another tab).
-function decidePayment(no, approve, reason) {
+// Approve or reject the company's waiting request. `expect` is the request the operator was looking at (reqId);
+// returns the decided payment, or null when that request no longer waits (decided in another tab, or the
+// admin paid again since, which is a different request).
+function decidePayment(no, approve, reason, expect) {
   const orders = loadStore(ORDERS_KEY, []);
   const o = orders.find(x => x.no === no);
   const p = o && pendingOf(o);
-  if (!p) return null;
+  if (!p || (expect && reqId(o, p) !== expect)) return null;
   const at = new Date().toISOString();
   p.decidedAt = at;
   if (!approve) {
@@ -305,7 +310,9 @@ function decidePayment(no, approve, reason) {
     o.subMonths += p.months;
     if (p.users !== plannedUsers(o)) o.seatChanges = [...(o.seatChanges || []), { from: p.from, users: p.users }];
   } else {
-    // a new paid run from the approval day, with the headcount chosen when paying
+    // a new paid run from the approval day, with the headcount chosen when paying. An extension whose period
+    // ran out while it waited is recorded as paying again, which is what it turned into
+    if (p.kind === 'EXTEND') p.kind = 'RESTART';
     o.status = 'PAID';
     o.paidAt = o.paidAt || at;
     o.serviceFrom = p.from;
@@ -413,7 +420,7 @@ function buildDetail(o) {
     ...(sub ? [
       ['요금제', sub.planLabel],
       ['이용 기간', `${st.serviceFrom} ~ ${st.end}${st.status === 'EXPIRED' ? ' (만료, 읽기 전용)' : ''}`],
-    ] : [['유료 이용 시작', '결제한 날부터']]),
+    ] : [['유료 이용 시작', '결제를 승인한 날부터']]),
     ['업체 코드', o.companyCode],
   ]);
   if (pending) box.prepend(requestCard(o, pending));
@@ -455,16 +462,26 @@ function requestCard(o, p) {
   reject.type = 'button';
   reject.className = 'btn';
   reject.textContent = '반려';
-  reject.addEventListener('click', () => openRejectDialog(o));
+  // both buttons act on this request only (the one on screen), never on one that came in after it
+  const id = reqId(o, p);
+  reject.addEventListener('click', () => openRejectDialog(o, id));
   const approve = document.createElement('button');
   approve.type = 'button';
   approve.className = 'btn btn-primary';
   approve.textContent = '승인';
   approve.addEventListener('click', () => {
-    const done = decidePayment(o.no, true);
+    // the headcount paid for can't be below the accounts in use (checked when paying, and seatCaps in hr.js keeps
+    // approvals under it while the request waits); data from before that rule could still break it
+    const accounts = activeStaff(o.companyCode).length;
+    if (p.users < accounts) {
+      showToast(`지금 계정이 ${accounts}명이라 결제 인원 ${p.users}명으로는 승인할 수 없습니다. 반려하고 인원을 고쳐 다시 결제하도록 안내해 주세요`);
+      return;
+    }
+    const done = decidePayment(o.no, true, '', id);
     showToast(done ? `${o.company}: ${PAY_KIND[done.kind]} 신청을 승인했습니다 (${ymd(done.from)} ~ ${ymd(done.to)})`
-      : '이미 처리된 신청입니다');
+      : '이미 처리되었거나 바뀐 신청입니다. 목록을 다시 확인해 주세요');
     renderStatus();
+    renderBadges();
   });
   actions.append(reject, approve);
   card.append(head, dl, actions);
@@ -473,8 +490,10 @@ function requestCard(o, p) {
 
 // 반려: a reason is required (the admin sees it on its billing page)
 let rejectFor = null;
-function openRejectDialog(o) {
+let rejectId = null; // the request the dialog was opened for (reqId)
+function openRejectDialog(o, id) {
   rejectFor = o;
+  rejectId = id;
   const dialog = document.getElementById('payRejectDialog');
   dialog.querySelector('h2').textContent = `${o.company}의 ${PAY_KIND[pendingOf(o)?.kind] || '결제'} 신청을 반려할까요?`;
   document.getElementById('rejectReason').value = '';
@@ -493,10 +512,11 @@ document.getElementById('payRejectForm').addEventListener('submit', e => {
     return;
   }
   document.getElementById('payRejectDialog').close();
-  const done = rejectFor && decidePayment(rejectFor.no, false, reason);
-  showToast(done ? `${rejectFor.company}: 결제 신청을 반려했습니다` : '이미 처리된 신청입니다');
-  rejectFor = null;
+  const done = rejectFor && decidePayment(rejectFor.no, false, reason, rejectId);
+  showToast(done ? `${rejectFor.company}: 결제 신청을 반려했습니다` : '이미 처리되었거나 바뀐 신청입니다. 목록을 다시 확인해 주세요');
+  rejectFor = rejectId = null;
   renderStatus();
+  renderBadges();
 });
 
 // The application whose detail is open under its row (one at a time); kept across re-renders

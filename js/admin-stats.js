@@ -10,9 +10,11 @@ const DAILY_DAYS = 7;
 
 const localDayKey = d => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
-// Every successful payment, with the company it belongs to, on the day it was made.
+// Every approved payment, with the company it belongs to, on the day it was approved (it counts from then;
+// payments from before approvals existed have no decidedAt and keep the day they were made). Waiting,
+// rejected and failed ones don't count.
 const okPayments = orders => orders.flatMap(o => (o.payments || []).filter(p => p.result === 'OK')
-  .map(p => ({ company: o.company, kind: p.kind || 'FIRST', users: p.users ?? o.users, amount: p.amount, at: p.at })));
+  .map(p => ({ company: o.company, kind: p.kind || 'FIRST', users: p.users ?? o.users, amount: p.amount, at: p.decidedAt || p.at })));
 
 // --- one shared tooltip for every mark; contents are set with textContent only ---
 function bindTip(el, rows) {

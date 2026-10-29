@@ -374,8 +374,13 @@ function payBill(success) {
     if (!order || !billQuote) return;
     // the state changed in another tab since step 1 (e.g. it paid there, or a request is already waiting):
     // quote again instead of paying
+    if (pendingOf(order)) {
+      renderBilling(); // shows the request that is already waiting (step 3)
+      showToast('이미 운영자 승인을 기다리는 결제가 있어 결제하지 않았습니다');
+      return;
+    }
     const now = quoteOf(order, billQuote.plan, billQuote.users);
-    if (pendingOf(order) || now.mode !== billQuote.mode || now.from !== billQuote.from || now.amount !== billQuote.amount) {
+    if (now.mode !== billQuote.mode || now.from !== billQuote.from || now.amount !== billQuote.amount) {
       billStep = 1;
       renderBilling();
       showToast('결제 상태가 바뀌어 금액을 다시 계산했습니다. 확인하고 다시 진행해 주세요');
