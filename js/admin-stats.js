@@ -142,7 +142,7 @@ function sumWindow(pays, [start, end]) {
   const rows = pays.filter(p => { const t = new Date(p.at); return t >= start && t <= end; });
   return {
     users: rows.filter(p => p.kind === 'FIRST' || p.kind === 'RESTART').reduce((s, p) => s + p.users, 0),
-    count: rows.length,
+    count: rows.filter(p => p.kind !== 'REFUND').length,
     sales: rows.reduce((s, p) => s + p.amount, 0),
   };
 }
