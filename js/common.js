@@ -596,6 +596,9 @@ function showView() {
   const { views } = MODES[session.type];
   const home = MODES[session.type].home;
   let key = location.hash.slice(1);
+  // 공지사항·부서 게시판은 주소 뒤에 /view/3 같은 하위 화면이 붙는다: 메뉴·권한은 앞부분으로 보고, 화면은 notice.js가 연다
+  const full = key;
+  if (/^(notice|board-dept)\//.test(key)) key = key.split('/')[0];
   const link = document.querySelector(`.nav-item[data-view="${key}"]`);
   // not a screen of this account type, or no access with the current roles: back to its first screen
   // a write page opened by its address while read-only: back home with the reason
@@ -609,7 +612,9 @@ function showView() {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
 
   const built = document.getElementById('view-' + key);
-  if (built) {
+  if ((key === 'notice' || key === 'board-dept') && typeof routeNoticeBoard === 'function') {
+    routeNoticeBoard(full);
+  } else if (built) {
     built.classList.add('on');
   } else {
     const current = document.createElement('span');
@@ -620,6 +625,7 @@ function showView() {
     document.getElementById('view-placeholder').classList.add('on');
   }
   if (session.type === 'OPS') opsViewShown(key);
+  if (key === 'home' && typeof renderHomeNotices === 'function') renderHomeNotices();
   if (key === 'admin-billing') renderBilling();
   if (key === 'hr-employee') renderEmployees();
   if (key === 'hr-join') renderJoin();
