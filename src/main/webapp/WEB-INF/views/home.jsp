@@ -10,6 +10,7 @@
 	Hello world!  
 </h1>
 
-<p>The time on the server is ${serverTime}.</p>
+<p>${loginName} 님 (${loginEmpnum}) 환영합니다.</p>
 </body>
 </html>
+ 

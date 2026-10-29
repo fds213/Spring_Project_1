@@ -26,9 +26,8 @@
 			연결하세요. -->
 	</security:http>
 	<security:authentication-manager>
-		<!-- 임시: 계정 0개(로그인 불가). 인증 코드 병합 시 user-service-ref="customUserDetailsService"로 교체 -->
-		<security:authentication-provider>
-			<security:user-service />
+		<security:authentication-provider
+			user-service-ref="customUserDetailsService">
 			<security:password-encoder
 				ref="bCryptPasswordEncoder" />
 		</security:authentication-provider>
