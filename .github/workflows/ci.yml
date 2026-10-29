@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+    # edited: 쌓인 PR의 base를 develop으로 바꿀 때도 다시 돈다(제목·본문 수정에도 돈다)
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+      - name: 빌드와 단위 테스트
+        run: mvn -B -ntp clean verify
