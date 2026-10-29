@@ -9,6 +9,7 @@ import lombok.ToString;
 @ToString
 public class AuthEmpDTO {
 
+	private String compcode;
 	private String empnum;
 
 	@ToString.Exclude
@@ -17,6 +18,7 @@ public class AuthEmpDTO {
 	private String name;
 	private String role;
 	private String status;
+	private boolean locked;
 
 
 }

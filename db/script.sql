@@ -1,44 +1,38 @@
 -- =====================================================================
 -- 로그인 테스트용 임시 테이블 (정식 EMP 테이블 확정 후 교체 예정)
+-- 실행 위치: 팀 DB (192.168.10.41:1521/XEPDB1, ieum 계정) - 이미 생성됨, 다시 실행하지 말 것
 -- 테스트 계정 비밀번호: 모두 1234
---
--- 실행 순서
---   ① system 계정으로 접속 (SID xe 아님! 서비스 이름 XEPDB1)
---   ② spring 계정으로 접속 (서비스 이름 XEPDB1)
+-- PK (compcode, empnum): 사번은 업체 안에서만 유일 (요구분석서 v1.7 3.11)
 -- =====================================================================
 
--- ---------------------------------------------------------------------
--- ① system 계정(XEPDB1)에서 1번만 실행
---    안 하면 INSERT 때 ORA-01950 (테이블스페이스 권한 없음) 발생
--- ---------------------------------------------------------------------
--- ALTER USER spring QUOTA UNLIMITED ON USERS;
-
-
--- ---------------------------------------------------------------------
--- ② spring 계정(XEPDB1)에서 실행
--- ---------------------------------------------------------------------
-CREATE TABLE tblTestEmp (
-    empnum varchar2(100) PRIMARY KEY,
-    pw     varchar2(100) NOT NULL,
-    name   varchar2(50)  NOT NULL,
-    role   varchar2(50)  NOT NULL CHECK (role IN ('ROLE_EMP', 'ROLE_IT', 'ROLE_HR', 'ROLE_ADMIN')),
-    status varchar2(50)  NOT NULL CHECK (status IN ('ACTIVE', 'RETIRED'))
+CREATE TABLE test_emp (
+    compcode varchar2(20)  NOT NULL,
+    empnum   varchar2(20)  NOT NULL,
+    pw       varchar2(100) NOT NULL,
+    name     varchar2(50)  NOT NULL,
+    role     varchar2(20)  NOT NULL CHECK (role IN ('ROLE_EMP','ROLE_IT','ROLE_HR','ROLE_ADMIN','ROLE_OPS')),
+    status   varchar2(20)  NOT NULL CHECK (status IN ('REQUESTED','REJECTED','APPROVED','ACTIVE','WAITING','RETIRED')),
+    CONSTRAINT pk_test_emp PRIMARY KEY (compcode, empnum)
 );
 
-INSERT INTO tblTestEmp (empnum, pw, name, role, status)
-VALUES ('20261027', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '홍길동', 'ROLE_EMP', 'ACTIVE');
+INSERT INTO test_emp VALUES ('ieum0001','20261027','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','홍길동','ROLE_EMP','ACTIVE');
+INSERT INTO test_emp VALUES ('ieum0001','20261026','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','아무개','ROLE_IT','ACTIVE');
+INSERT INTO test_emp VALUES ('ieum0001','20261025','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','고양이','ROLE_HR','ACTIVE');
+INSERT INTO test_emp VALUES ('ieum0001','20261024','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','강아지','ROLE_ADMIN','ACTIVE');
+INSERT INTO test_emp VALUES ('ieum0001','20261023','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','코알라','ROLE_EMP','RETIRED');   -- 퇴사 (로그인 차단 확인)
+INSERT INTO test_emp VALUES ('ieum0002','20261027','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','다른회사홍길동','ROLE_EMP','ACTIVE');  -- 같은 사번, 다른 업체
+INSERT INTO test_emp VALUES ('ieum0000','20260001','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','이음운영자','ROLE_OPS','ACTIVE');    -- 운영자
 
-INSERT INTO tblTestEmp (empnum, pw, name, role, status)
-VALUES ('20261026', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '아무개', 'ROLE_IT', 'ACTIVE');
+ALTER TABLE test_emp ADD fail_count NUMBER DEFAULT 0 NOT NULL; -- 로그인 실패 횟수
+ALTER TABLE test_emp ADD lock_until DATE; -- 실패시 언제까지 계정 lock ?
 
-INSERT INTO tblTestEmp (empnum, pw, name, role, status)
-VALUES ('20261025', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '고양이', 'ROLE_HR', 'ACTIVE');
+SELECT compcode, empnum, name, fail_count, lock_until FROM test_emp;
 
-INSERT INTO tblTestEmp (empnum, pw, name, role, status)
-VALUES ('20261024', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '강아지', 'ROLE_ADMIN', 'ACTIVE');
+-- 로그인 테스트후 db 조회용 sql문 입니다. 로그인 실패시 count잘 올라가는지? 5번틀리면 lock잘 걸리는지 ?
+--SELECT compcode, empnum, name, status, fail_count, lock_until FROM test_emp WHERE compcode = 'ieum0001';
 
-INSERT INTO tblTestEmp (empnum, pw, name, role, status)
-VALUES ('20261023', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', '코알라', 'ROLE_EMP', 'RETIRED');   -- 퇴사자 (로그인 차단 확인용)
+-- 테스트후 count와 lock시간 초기화 sql문 입니다.
+--UPDATE test_emp SET fail_count = 0, lock_until = NULL WHERE compcode = 'ieum0001';
 
 COMMIT;
 

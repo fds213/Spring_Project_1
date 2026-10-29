@@ -22,7 +22,7 @@ public class HomeController {
 	
 	private static final Logger logger = LoggerFactory.getLogger(HomeController.class);
 
-	@RequestMapping(value = "/", method = RequestMethod.GET)
+	@RequestMapping(value = "/home", method = RequestMethod.GET)
 	public String home(Locale locale, Model model, @AuthenticationPrincipal LoginUser loginUser) {
 		logger.info("Welcome home! The client locale is {}.", locale);
 
@@ -37,7 +37,7 @@ public class HomeController {
 		model.addAttribute("loginName", loginUser.getName());
 		model.addAttribute("loginEmpnum", loginUser.getEmpnum());
 
-		return "home";
+		return "common/layout-sample";
 	}
 	
 }
