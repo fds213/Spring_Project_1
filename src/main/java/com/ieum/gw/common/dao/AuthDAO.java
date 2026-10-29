@@ -13,7 +13,7 @@ public class AuthDAO {
 
 	private final AuthMapper mapper;
 
-	public AuthEmpDTO getInfo(String compnum, String empnum) {
-	    return mapper.getInfo(compnum, empnum);
+	public AuthEmpDTO getInfo(String compcode, String empnum) {
+	    return mapper.getInfo(compcode, empnum);
 	}
 }
