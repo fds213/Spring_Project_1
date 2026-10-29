@@ -50,15 +50,14 @@ public class LoginUser implements UserDetails {
 		// TODO Auto-generated method stub
 		return "ACTIVE".equals(emp.getStatus());
 	}
-
+	
 	@Override
-	public boolean isAccountNonExpired() {
-		// TODO Auto-generated method stub
-		return true;
+	public boolean isAccountNonLocked() {
+		return !emp.isLocked();
 	}
 
 	@Override
-	public boolean isAccountNonLocked() {
+	public boolean isAccountNonExpired() {
 		// TODO Auto-generated method stub
 		return true;
 	}

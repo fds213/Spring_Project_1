@@ -9,4 +9,6 @@ import com.ieum.gw.common.dto.AuthEmpDTO;
 public interface AuthMapper {
 
 	AuthEmpDTO getInfo(@Param("compcode") String compcode, @Param("empnum") String empnum);
+	int recordFail(@Param("compcode") String compcode, @Param("empnum") String empnum);
+	int resetFail(@Param("compcode") String compcode, @Param("empnum") String empnum);
 }

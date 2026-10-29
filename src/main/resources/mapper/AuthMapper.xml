@@ -4,8 +4,27 @@
 
 	<select id="getInfo"
 		resultType="com.ieum.gw.common.dto.AuthEmpDTO">
-		SELECT compcode, empnum, pw, name, role, status
+		SELECT compcode, empnum, pw, name, role, status,
+		CASE
+		WHEN lock_until > SYSDATE
+		THEN 1
+		ELSE 0
+		END AS locked
 		FROM test_emp
-		WHERE compcode = #{compcode} AND empnum = #{empnum}
+		WHERE compcode = #{compcode} AND empnum =
+		#{empnum}
 	</select>
+	<update id="recordFail">
+		UPDATE test_emp
+		SET lock_until = CASE WHEN fail_count + 1 >= 5 THEN SYSDATE + 10/1440
+		ELSE lock_until END,
+		fail_count = CASE WHEN fail_count + 1 >= 5 THEN 0 ELSE fail_count + 1 END
+		WHERE compcode = #{compcode} AND empnum = #{empnum}
+	</update>
+
+	<update id="resetFail">
+		UPDATE test_emp
+		SET fail_count = 0, lock_until = null
+		WHERE compcode = #{compcode} AND empnum = #{empnum}
+	</update>
 </mapper>
