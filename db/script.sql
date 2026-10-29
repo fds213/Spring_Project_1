@@ -22,4 +22,11 @@ INSERT INTO test_emp VALUES ('ieum0001','20261024','$2a$10$/EgOc8YI8ovfzFdRPnYzo
 INSERT INTO test_emp VALUES ('ieum0001','20261023','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','코알라','ROLE_EMP','RETIRED');   -- 퇴사 (로그인 차단 확인)
 INSERT INTO test_emp VALUES ('ieum0002','20261027','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','다른회사홍길동','ROLE_EMP','ACTIVE');  -- 같은 사번, 다른 업체
 INSERT INTO test_emp VALUES ('ieum0000','20260001','$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2','이음운영자','ROLE_OPS','ACTIVE');    -- 운영자
+
+ALTER TABLE test_emp ADD fail_count NUMBER DEFAULT 0 NOT NULL; -- 로그인 실패 횟수
+ALTER TABLE test_emp ADD lock_until DATE; -- 실패시 언제까지 계정 lock ?
+
+SELECT compcode, empnum, name, fail_count, lock_until FROM test_emp;
+
+
 COMMIT;
