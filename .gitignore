@@ -26,3 +26,7 @@ desktop.ini
 
 # DB 접속 정보 (각자 PC에서 db.properties.example을 복사해서 사용)
 src/main/resources/config/db.properties
+
+# STS가 자동으로 만드는 IDE 설정 (Lombok 어노테이션 처리)
+.factorypath
+.settings/org.eclipse.jdt.apt.core.prefs

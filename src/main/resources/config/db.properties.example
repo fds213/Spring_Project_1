@@ -1,6 +1,6 @@
-# 이 파일을 복사해서 db.properties로 이름을 바꾸고 본인 Oracle 계정으로 채우세요.
+# 이 파일을 복사해서 db.properties로 이름을 바꾸고 password만 채우세요. (팀 DB, 비밀번호는 팀 공지 참고)
 # db.properties는 .gitignore에 등록되어 저장소에 올라가지 않습니다.
 db.driver=net.sf.log4jdbc.sql.jdbcapi.DriverSpy
-db.url=jdbc:log4jdbc:oracle:thin:@localhost:1521/XEPDB1
-db.username=
+db.url=jdbc:log4jdbc:oracle:thin:@192.168.10.41:1521/XEPDB1
+db.username=ieum
 db.password=
