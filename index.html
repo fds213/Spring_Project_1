@@ -283,6 +283,7 @@
           <div class="nav-section">
             <p class="nav-group">신청</p>
             <a href="#ops-application-status" class="nav-item" data-view="ops-application-status">신청 현황 <span class="badge" id="navCount" hidden></span></a>
+            <a href="#ops-seat-request" class="nav-item" data-view="ops-seat-request">증설 승인 <span class="badge" id="navSeatCount" hidden></span></a>
           </div>
           <div class="nav-section">
             <p class="nav-group">장애/문의</p>
@@ -414,6 +415,51 @@
                   <p class="notice-ok" id="payDoneText"></p>
                   <dl class="detail" id="payDone"></dl>
                 </div>
+              </div>
+              <!-- 인원 증설: 유료로 이용 중일 때만. 증설 요청 → 결제 → 운영자 승인 → 증설 완료. 오늘부터 만료일까지의 이용료만 결제한다 (seat.js) -->
+              <div class="seat-box" id="seatBox" hidden>
+                <div class="bill-actions"><button type="button" class="btn" id="btnSeatAdd">인원 증설</button></div>
+                  <div class="seat-add" id="seatAdd" hidden>
+                    <h3 class="bill-sub">인원 증설</h3>
+                    <ol class="bill-steps" id="seatSteps">
+                      <li data-step="1">1. 증설 요청</li>
+                      <li data-step="2">2. 결제</li>
+                      <li data-step="3">3. 운영자 승인</li>
+                      <li data-step="4">4. 증설 완료</li>
+                    </ol>
+                    <div class="bill-step" id="seatStep1">
+                      <p class="bill-intro">늘릴 인원을 정하면 오늘부터 이번 이용 기간 끝까지의 이용료만 추가로 결제합니다. 운영자가 승인하면 바로 쓸 수 있습니다.</p>
+                      <div class="bill-seats">
+                        <label for="seatAddCount">늘릴 인원</label>
+                        <div class="bill-seats-row"><input class="input" id="seatAddCount" type="number" min="1" max="500" value="1" inputmode="numeric"><span>명</span></div>
+                        <p class="form-error" id="seatError" role="alert"></p>
+                        <dl class="pay-summary" id="seatQuote"></dl>
+                      </div>
+                      <div class="bill-actions">
+                        <button type="button" class="btn" id="btnSeatCancel">취소</button>
+                        <button type="button" class="btn btn-primary" id="btnSeatRequest">증설 요청</button>
+                      </div>
+                    </div>
+                    <div class="bill-step" id="seatStep2" hidden>
+                      <p class="notice-warn">시연용 모의 결제입니다. 실제 결제가 이루어지지 않고, 카드 정보도 받지 않습니다.</p>
+                      <dl class="detail" id="seatOrder"></dl>
+                      <p class="form-error" id="seatPayError" role="alert"></p>
+                      <div class="bill-actions">
+                        <button type="button" class="btn" id="btnSeatPayCancel">증설 요청 취소</button>
+                        <button type="button" class="btn" id="btnSeatPayFail">결제 실패로 진행</button>
+                        <button type="button" class="btn btn-primary" id="btnSeatPayOk">결제 성공으로 진행</button>
+                      </div>
+                      <p class="muted" id="seatBusy" aria-live="polite"></p>
+                    </div>
+                    <div class="bill-step" id="seatStep3" hidden>
+                      <p class="notice-ok" id="seatWaitText"></p>
+                      <dl class="detail" id="seatWait"></dl>
+                    </div>
+                    <div class="bill-step" id="seatStep4" hidden>
+                      <p id="seatResultText"></p>
+                      <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnSeatDone">확인</button></div>
+                    </div>
+                  </div>
               </div>
             </section>
           </div>
@@ -710,6 +756,27 @@
                 <tr><th>신청 시각</th><th>업체</th><th class="num">인원</th><th class="num">월 이용료</th><th>관리자</th><th>상태</th></tr>
               </thead>
               <tbody id="appList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="view" id="view-ops-seat-request">
+          <p class="crumb">신청 &gt; <span class="crumb-current">증설 승인</span></p>
+          <div class="page-head"><h1>증설 승인</h1></div>
+          <div class="cards" id="seatFilters">
+            <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 요청</small><strong id="cntSeatAll">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="PAID" aria-pressed="false"><small>승인 대기</small><strong id="cntSeatPaid">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="REQUESTED" aria-pressed="false"><small>결제 대기</small><strong id="cntSeatWait">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="APPROVED" aria-pressed="false"><small>증설 완료</small><strong id="cntSeatDone">0건</strong></button>
+            <button type="button" class="card card-filter" data-filter="REJECTED" aria-pressed="false"><small>반려</small><strong id="cntSeatRejected">0건</strong></button>
+          </div>
+          <div class="table-wrap table-gap">
+            <table class="table table-fixed">
+              <colgroup><col style="width: 14%"><col style="width: 22%"><col style="width: 14%"><col style="width: 18%"><col style="width: 14%"><col style="width: 18%"></colgroup>
+              <thead>
+                <tr><th>요청 시각</th><th>업체</th><th>증설</th><th>결제 금액</th><th>상태</th><th>처리</th></tr>
+              </thead>
+              <tbody id="seatList"></tbody>
             </table>
           </div>
         </section>
@@ -1138,6 +1205,7 @@
   <script src="js/attendance.js"></script>
   <script src="js/schedule.js"></script>
   <script src="js/approval.js"></script>
+  <script src="js/seat.js"></script>
   <script src="js/common.js"></script>
 </body>
 </html>

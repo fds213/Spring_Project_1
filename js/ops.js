@@ -5,6 +5,7 @@ const OPS_VIEWS = {
   'ops-company': { crumb: '업체', title: '업체 관리' },
   'ops-account-company': { crumb: '업체', title: '업체 계정' },
   'ops-application-status': { crumb: '신청', title: '신청 현황' },
+  'ops-seat-request': { crumb: '신청', title: '증설 승인' },
   'ops-inquiry-guest': { crumb: '장애/문의', title: '비회원 접수' },
   'ops-inquiry-company': { crumb: '장애/문의', title: '회원 접수' },
   'ops-stats': { crumb: '운영', title: '운영 데이터' },
@@ -103,7 +104,7 @@ function upgradeStoredOrders() {
   old.forEach(o => {
     o.plan = 'MONTHLY';
     o.subAnchorAt = dayStart(o.serviceFrom || o.paidAt || o.at).toISOString();
-    o.subMonths = Math.max(1, (o.payments || []).filter(p => p.result === 'OK').length);
+    o.subMonths = Math.max(1, (o.payments || []).filter(p => p.result === 'OK' && p.kind !== 'ADD' && p.kind !== 'REFUND').length);
     o.paidAt = o.paidAt || (o.payments || []).find(p => p.result === 'OK')?.at || o.serviceFrom;
     delete o.nextPayAt;
     delete o.nextUsers;
@@ -167,7 +168,7 @@ function trialState(o) {
 const PRICE_PER_USER = 4000;
 const PLANS = { MONTHLY: { label: '월간', months: 1 }, ANNUAL: { label: '연간', months: 12 } };
 // kind of a recorded payment. RENEW only in data saved by the auto-renewal version of 2026-10-28 morning
-const PAY_KIND = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제' };
+const PAY_KIND = { FIRST: '첫 결제', EXTEND: '연장', RESTART: '다시 결제', RENEW: '정기 결제', ADD: '증설 결제', REFUND: '증설 환불' };
 
 function subscriptionOf(o) {
   if (o.status !== 'PAID' || !o.subAnchorAt) return null;
@@ -665,6 +666,7 @@ function opsViewShown(key) {
   if (key === 'ops-inquiry-company') openInquiryView('company');
   if (key === 'ops-stats') renderStats();
   if (key === 'ops-company') openFirmView();
+  if (key === 'ops-seat-request') renderSeatOps();
   if (key !== 'ops-application-status') return;
   seenNew = new Set(unreadIds());
   appFilter = 'all';
@@ -701,6 +703,7 @@ window.addEventListener('storage', e => {
   // redraw the open screen in place, keeping its filters and open row
   const key = location.hash.slice(1);
   if (key === 'ops-application-status') renderStatus();
+  if (key === 'ops-seat-request') renderSeatOps(); else refreshSeatBadge();
   if (key === 'ops-company') renderFirms();
   if (key === 'ops-stats') renderStats();
 });

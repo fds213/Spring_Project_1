@@ -122,6 +122,7 @@ function enterApp() {
   renderTrialBar();
   refreshJoinBadge();
   refreshApprovalBadge();
+  refreshSeatBadge();
   // operators are built-in demo accounts, so only company employees get 비밀번호 변경
   document.getElementById('btnPwChange').hidden = session.type !== 'EMPLOYEE';
   document.getElementById('loginScreen').hidden = true;
@@ -251,6 +252,7 @@ function renderBilling() {
       `사유: ${last.reason} · 결제한 금액은 취소됩니다. 내용을 고쳐 다시 결제할 수 있습니다.`;
   }
   renderBillSteps(order, mode);
+  renderSeatAdd(order);
 }
 
 function renderBillSteps(order, mode) {

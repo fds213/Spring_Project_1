@@ -752,3 +752,11 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .type-pill.type-incident { background: #fdf0dc; color: #8a4b00; }
 /* phones: the cell's value is right-aligned, so keep the label in front of the title and push the pair to the right */
 @media (max-width: 600px) { .title-line { justify-content: flex-end; } }
+/* 인원 증설: 연장 카드 아래에 점선으로 구분해 붙이고, 4단계라 단계 표시를 4칸으로 나눈다 */
+.seat-box { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--line); }
+.seat-box[hidden], .seat-add[hidden] { display: none; }
+.seat-add { display: flex; flex-direction: column; gap: 12px; }
+.seat-add .bill-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.seat-add .bill-step { display: flex; flex-direction: column; gap: 12px; }
+.seat-add .bill-step[hidden] { display: none; }
+.seat-add .detail { border: 1px solid var(--line); border-radius: var(--radius); }
