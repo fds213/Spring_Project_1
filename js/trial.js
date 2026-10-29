@@ -39,23 +39,26 @@ function goStep(n) {
 
 document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => goStep(Number(b.dataset.go))));
 
-// 업체 코드 is not chosen by the applicant: companies are numbered in signup order from ieum0001 (requirements
-// v1.7 ACC-03; ieum0000 is IEUM's own company, the operators). Shown when the page opens in a locked field like
-// the 사번. If another signup takes it first (another tab), start() takes the next one and the result screen
-// shows the code actually given. After ieum9999 no code can be issued and the signup stops with a notice.
-// The real server takes the next number inside the transaction that creates the company (unique key in the DB).
+// 업체 코드 is not chosen by the applicant: ieum + 4 digits drawn at random, not in signup order, so a customer
+// can't tell how many came before it or guess another company's code (requirements v1.8; ieum0000 is IEUM's
+// own company, the operators). Shown when the page opens in a locked field like the 사번. A code already used
+// is drawn again, at most 10 times; if all 10 are taken the signup stops with a notice. If another signup takes
+// the shown code first (another tab), start() draws a new one and the result screen shows the code actually
+// given. The real server draws inside the transaction that creates the company (unique key on the code) and
+// sorts companies by their internal number and signup date, never by the code.
 const CODE_COUNT = 10000;
+const CODE_TRIES = 10;
 // the built-in demo companies (ops.js demoCompanies) may not be stored yet when this page opens first
-const RESERVED_CODES = ['ieum0001', 'ieum0002', 'ieum0003'];
+const RESERVED_CODES = ['ieum0000', 'ieum0001', 'ieum0002', 'ieum0003'];
 const takenCodes = () => new Set([...RESERVED_CODES, ...loadStore('ieum-demo-orders', []).map(o => o.companyCode)]);
 const codeOf = n => `ieum${String(n).padStart(4, '0')}`;
 function drawCode() {
-  let next = 1;
-  for (const c of takenCodes()) {
-    const n = /^ieum\d{4}$/.test(c) ? Number(c.slice(4)) : 0;
-    if (n >= next) next = n + 1;
+  const taken = takenCodes();
+  for (let i = 0; i < CODE_TRIES; i++) {
+    const code = codeOf(1 + Math.floor(Math.random() * (CODE_COUNT - 1))); // ieum0001 ~ ieum9999
+    if (!taken.has(code)) return code;
   }
-  return next < CODE_COUNT ? codeOf(next) : null;
+  return null;
 }
 const NO_CODE = '지금은 발급할 수 있는 업체 코드가 없습니다. 도입 문의로 연락해 주세요.';
 let previewCode = drawCode();
