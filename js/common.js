@@ -7,6 +7,7 @@ const VIEWS = {
   'ticket-new': { crumb: 'IT 서비스', title: '장애·문의 접수' },
   'ticket-mine': { crumb: 'IT 서비스', title: '내 티켓' },
   'asset-mine': { crumb: 'IT 서비스', title: '내 장비' },
+  'ieum-inquiry': { crumb: 'IT 서비스', title: '이음 장애 문의' },
   'ticket-all': { crumb: 'IT 서비스', title: '티켓 처리' },
   'asset-all': { crumb: 'IT 서비스', title: '자산 관리' },
   'attendance': { crumb: '근무', title: '근태·연차' },
@@ -27,7 +28,7 @@ const VIEWS = {
 };
 
 // Role-based menu: an item shows when the user has any role in its data-roles.
-// In the real JSP the server decides this with sec:authorize; the select below only simulates it.
+// In the real JSP the server decides this with sec:authorize. Roles come with the account and only the company admin grants them.
 let userRoles = ['EMPLOYEE'];
 
 function canSee(item) {
@@ -115,6 +116,7 @@ function enterApp() {
   refreshJoinBadge();
   refreshApprovalBadge();
   refreshSeatBadge();
+  eaRefreshBadge();
   // operators are built-in demo accounts, so only company employees get 비밀번호 변경
   document.getElementById('btnPwChange').hidden = session.type !== 'EMPLOYEE';
   document.getElementById('loginScreen').hidden = true;
@@ -641,6 +643,12 @@ function showView() {
   if (key === 'attendance') openAttendanceView();
   if (key === 'schedule') openScheduleView();
   if (key === 'work-approval') openApprovalView();
+  if (key === 'approval-write') openApprovalWriteView();
+  if (key === 'approval-box') openApprovalBoxView();
+  if (key === 'ticket-new') openTicketNewView();
+  if (key === 'ticket-mine') openTicketMineView();
+  if (key === 'asset-mine') openAssetMineView();
+  if (key === 'ieum-inquiry') openIeumInquiryView();
   if (key === 'hr-employee') renderEmployees();
   if (key === 'hr-join') renderJoin();
   if (key === 'admin-dept') openOrgAdmin('dept');
