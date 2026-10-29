@@ -1,8 +1,9 @@
 // 인사 관리 > 사원 관리 and 가입 승인, plus the 계정 생성 form on the login screen.
 //
 // How an employee gets an account (user decided 2026-10-29; replaces the 가입 키 of requirements v1.8):
-//   0. 가입 활성화: on 가입 승인 a 부서장 opens joining for their own department, the company admin for the whole
-//      company, for a time picked next to the button (10분 ~ 하루). It turns itself off when the time is up.
+//   0. 가입 활성화: on 가입 승인 a 부서장 opens joining for their own department; the company admin presses the
+//      button, a list of the departments unfolds, and the ones ticked are opened. Each stays open for the time
+//      picked next to the button (10분 ~ 하루) and turns itself off when the time is up.
 //      While nothing is open, the company code does nothing on the join form, so a leaked code is of little use.
 //   1. 승인 요청: on the login screen the employee opens 계정 생성 and confirms the 업체 코드. Only while joining
 //      is open does 확인 load the open departments and the ranks; otherwise nothing happens (the same as a code that
@@ -64,7 +65,8 @@ const DEMO_RANKS = {
 };
 const ranksOf = code => loadStore(RANK_KEY, {})[code] || DEMO_RANKS[code] || RANKS;
 
-// 가입 활성화 per company: [{ scope, until, by, byName }], scope = a department or JOIN_OPEN_ALL (the company admin).
+// 가입 활성화 per company: [{ scope, until, by, byName }], scope = a department (JOIN_OPEN_ALL = every department,
+// from the first version where the company admin opened the whole company; still read, no longer written).
 // Entries whose time is up are dropped when read. The real server keeps them on the company (or department) with
 // the end time and answers the join form only for an open department.
 const JOIN_OPEN_KEY = 'ieum-demo-join-open-v1';
@@ -379,6 +381,7 @@ document.querySelectorAll('#seatDialog button').forEach(b => b.addEventListener(
 function resetEmployeePage() {
   const d = document.getElementById('approveDialog');
   if (d && d.open) d.close();
+  joinPickOpen = false; // the admin's department list starts folded next time
 }
 
 // ---------- 가입 승인 ----------
@@ -390,53 +393,145 @@ function visibleRequests() {
   return all.filter(e => e.dept === dept);
 }
 
-// 가입 활성화 box: this person's own scope (부서장 = their department, 업체 관리자 = the whole company), its end
-// time, and the other open scopes (the admin sees and can turn off all of them; a 부서장 sees the company-wide one)
-const myJoinScope = () => (userRoles.includes('ADMIN') ? JOIN_OPEN_ALL : myDept());
+// 가입 활성화 box. A 부서장 opens or closes their own department with the one button. The company admin presses it
+// and a list of the departments unfolds below: the ticked ones are opened (an open one ticked again gets the new
+// time). Every open department is listed with its end time and its own 끄기 for the admin; a 부서장 sees their own.
+let joinPickOpen = false; // the admin's department list is unfolded
 function renderJoinOpen() {
   const code = session.company;
   const admin = userRoles.includes('ADMIN');
-  const scope = myJoinScope();
   const list = joinOpenings(code);
-  const mine = list.find(x => x.scope === scope);
-  const what = admin ? '업체의 모든 부서' : `${scope || '내'} 부서`;
-  $j('joinOpenBox').classList.toggle('is-on', !!mine);
-  $j('joinOpenNote').textContent = mine
-    ? `켜져 있습니다 · ${hhmm(mine.until)}까지 (${minsUntil(mine.until)}분 남음). 이 동안 직원이 계정 생성에서 업체 코드를 확인하면 ${what}로 가입을 요청할 수 있습니다.`
-    : `꺼져 있습니다. 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있고, 꺼져 있으면 업체 코드를 넣어도 아무 반응이 없습니다. 켜면 ${what}가 열리고, 고른 시간이 지나면 저절로 꺼집니다.`;
   const btn = $j('btnJoinOpen');
-  btn.textContent = mine ? '끄기' : '가입 활성화';
-  btn.classList.toggle('btn-primary', !mine);
-  btn.setAttribute('aria-label', mine ? `${scopeLabel(scope)} 가입 활성화 끄기` : `${scopeLabel(scope)} 가입 활성화`);
   if (readOnly) btn.setAttribute('aria-disabled', 'true'); else btn.removeAttribute('aria-disabled');
-  $j('joinOpenTime').disabled = !!mine;
+  if (admin) {
+    const names = list.map(x => scopeLabel(x.scope));
+    $j('joinOpenBox').classList.toggle('is-on', list.length > 0);
+    $j('joinOpenNote').textContent = list.length
+      ? `열린 부서 ${list.length}개: ${names.join(', ')}. 이 동안 직원이 계정 생성에서 업체 코드를 확인하면 열린 부서로만 가입을 요청할 수 있고, 부서마다 고른 시간이 지나면 저절로 꺼집니다.`
+      : '꺼져 있습니다. 가입 활성화를 누르면 부서 목록이 펼쳐지고, 고른 부서만 정한 시간 동안 열립니다. 꺼져 있으면 업체 코드를 넣어도 아무 반응이 없습니다.';
+    btn.textContent = joinPickOpen ? '접기' : '가입 활성화';
+    btn.classList.toggle('btn-primary', !joinPickOpen);
+    btn.setAttribute('aria-expanded', joinPickOpen);
+    btn.setAttribute('aria-controls', 'joinOpenPick');
+    btn.setAttribute('aria-label', joinPickOpen ? '부서 목록 접기' : '가입 활성화: 열 부서 고르기');
+    $j('joinOpenTime').disabled = false;
+    $j('joinOpenPick').hidden = !joinPickOpen;
+    if (joinPickOpen) renderJoinPick(list);
+  } else {
+    const dept = myDept();
+    const mine = list.find(x => x.scope === dept || x.scope === JOIN_OPEN_ALL);
+    $j('joinOpenBox').classList.toggle('is-on', !!mine);
+    $j('joinOpenNote').textContent = mine
+      ? `켜져 있습니다 · ${hhmm(mine.until)}까지 (${minsUntil(mine.until)}분 남음)${mine.by !== session.id ? `, ${mine.byName || mine.by} 님이 켬` : ''}. 이 동안 직원이 계정 생성에서 업체 코드를 확인하면 ${dept || '내'} 부서로 가입을 요청할 수 있습니다.`
+      : `꺼져 있습니다. 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있고, 꺼져 있으면 업체 코드를 넣어도 아무 반응이 없습니다. 켜면 ${dept || '내'} 부서가 열리고, 고른 시간이 지나면 저절로 꺼집니다.`;
+    btn.textContent = mine ? '끄기' : '가입 활성화';
+    btn.classList.toggle('btn-primary', !mine);
+    btn.removeAttribute('aria-expanded');
+    btn.removeAttribute('aria-controls');
+    btn.setAttribute('aria-label', mine ? `${dept} 가입 활성화 끄기` : `${dept} 가입 활성화`);
+    $j('joinOpenTime').disabled = !!mine;
+    $j('joinOpenPick').hidden = true;
+  }
   $j('joinOpenTime').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
-  const others = list.filter(x => x.scope !== scope && (admin || x.scope === JOIN_OPEN_ALL));
+  // the admin manages every open department here; a 부서장 only sees the line above
   const ul = $j('joinOpenList');
-  ul.hidden = !others.length;
-  ul.replaceChildren(...others.map(x => {
+  const rows = admin ? list : [];
+  ul.hidden = !rows.length;
+  ul.replaceChildren(...rows.map(x => {
     const li = document.createElement('li');
     const text = document.createElement('span');
-    text.textContent = `${scopeLabel(x.scope)} · ${x.byName || x.by} 님이 켬 · ${hhmm(x.until)}까지 (${minsUntil(x.until)}분 남음)`;
-    li.append(text);
-    if (admin) li.append(writeButton('끄기', `${scopeLabel(x.scope)} 가입 활성화 끄기`, () => turnJoinOff(x.scope)));
+    text.textContent = `${scopeLabel(x.scope)} · ${hhmm(x.until)}까지 (${minsUntil(x.until)}분 남음) · ${x.byName || x.by} 님이 켬`;
+    li.append(text, writeButton('끄기', `${scopeLabel(x.scope)} 가입 활성화 끄기`, () => turnJoinOff([x.scope])));
     return li;
   }));
+  if (rows.length > 1) {
+    const li = document.createElement('li');
+    li.className = 'join-open-all-off';
+    li.append(writeButton('모두 끄기', '열린 부서 가입 활성화 모두 끄기', () => turnJoinOff(rows.map(x => x.scope))));
+    ul.append(li);
+  }
 }
-function turnJoinOff(scope) {
-  setJoinOpening(session.company, scope, 0);
-  showToast(`${scopeLabel(scope)} 가입 활성화를 껐습니다`);
+
+// The admin's unfolded list: one box per department, an open one marked with its end time. Keeps what is ticked
+// across the 30 s redraw.
+function renderJoinPick(list) {
+  const box = $j('joinOpenChecks');
+  const ticked = new Set([...box.querySelectorAll('input:checked')].map(c => c.value));
+  box.replaceChildren(...deptsOf(session.company).map(d => {
+    const label = document.createElement('label');
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.value = d;
+    c.checked = ticked.has(d);
+    const name = document.createElement('span');
+    name.textContent = d;
+    label.append(c, name);
+    const open = list.find(x => x.scope === d || x.scope === JOIN_OPEN_ALL);
+    if (open) {
+      const s = document.createElement('small');
+      s.textContent = `열림 · ${hhmm(open.until)}까지`;
+      label.append(s);
+    }
+    return label;
+  }));
+  syncJoinPick();
+}
+function syncJoinPick() {
+  const boxes = [...$j('joinOpenChecks').querySelectorAll('input')];
+  const n = boxes.filter(c => c.checked).length;
+  $j('btnJoinPickOk').disabled = n === 0;
+  $j('btnJoinPickOk').textContent = n ? `선택한 부서 ${n}개 열기` : '선택한 부서 열기';
+  $j('btnJoinPickAll').textContent = boxes.length && n === boxes.length ? '전체 해제' : '전체 선택';
+}
+document.getElementById('joinOpenChecks').addEventListener('change', syncJoinPick);
+document.getElementById('btnJoinPickAll').addEventListener('click', () => {
+  const boxes = [...$j('joinOpenChecks').querySelectorAll('input')];
+  const all = boxes.every(c => c.checked);
+  boxes.forEach(c => { c.checked = !all; });
+  syncJoinPick();
+});
+document.getElementById('btnJoinPickCancel').addEventListener('click', () => {
+  joinPickOpen = false;
+  $j('joinOpenChecks').replaceChildren();
+  renderJoinOpen();
+  $j('btnJoinOpen').focus();
+});
+document.getElementById('btnJoinPickOk').addEventListener('click', () => {
+  const depts = [...$j('joinOpenChecks').querySelectorAll('input:checked')].map(c => c.value);
+  if (!depts.length) return;
+  const minutes = Number($j('joinOpenTime').value) || 60;
+  // a company-wide opening from the earlier version is replaced by the departments picked now
+  if (joinOpenings(session.company).some(x => x.scope === JOIN_OPEN_ALL)) setJoinOpening(session.company, JOIN_OPEN_ALL, 0);
+  depts.forEach(d => setJoinOpening(session.company, d, minutes));
+  const until = joinOpenings(session.company).find(x => x.scope === depts[0]).until;
+  joinPickOpen = false;
+  $j('joinOpenChecks').replaceChildren();
+  showToast(`${depts.join(', ')} 가입을 ${hhmm(until)}까지 열었습니다. 직원에게 업체 코드를 알려 주세요`);
+  renderJoin();
+});
+
+function turnJoinOff(scopes) {
+  scopes.forEach(s => setJoinOpening(session.company, s, 0));
+  showToast(scopes.length > 1 ? `열린 부서 ${scopes.length}개의 가입 활성화를 모두 껐습니다` : `${scopeLabel(scopes[0])} 가입 활성화를 껐습니다`);
   renderJoin();
 }
 document.getElementById('btnJoinOpen').addEventListener('click', () => {
-  const scope = myJoinScope();
-  if (!scope) return showToast('부서가 정해지지 않아 가입을 열 수 없습니다');
-  const on = joinOpenings(session.company).some(x => x.scope === scope);
-  if (on) return turnJoinOff(scope);
+  if (userRoles.includes('ADMIN')) {
+    // the admin unfolds (or folds) the department list; opening happens with 선택한 부서 열기
+    joinPickOpen = !joinPickOpen;
+    if (!joinPickOpen) $j('joinOpenChecks').replaceChildren();
+    renderJoinOpen();
+    if (joinPickOpen) $j('joinOpenChecks').querySelector('input')?.focus();
+    return;
+  }
+  const dept = myDept();
+  if (!dept) return showToast('부서가 정해지지 않아 가입을 열 수 없습니다');
+  const own = joinOpenings(session.company).find(x => x.scope === dept);
+  if (own) return turnJoinOff([dept]);
   const minutes = Number($j('joinOpenTime').value) || 60;
-  setJoinOpening(session.company, scope, minutes);
-  const until = joinOpenings(session.company).find(x => x.scope === scope).until;
-  showToast(`${scopeLabel(scope)} 가입을 ${hhmm(until)}까지 열었습니다. 직원에게 업체 코드를 알려 주세요`);
+  setJoinOpening(session.company, dept, minutes);
+  const until = joinOpenings(session.company).find(x => x.scope === dept).until;
+  showToast(`${dept} 가입을 ${hhmm(until)}까지 열었습니다. 직원에게 업체 코드를 알려 주세요`);
   renderJoin();
 });
 

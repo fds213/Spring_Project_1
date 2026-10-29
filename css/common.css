@@ -86,6 +86,17 @@ a { color: inherit; text-decoration: none; }
 .join-open-actions { display: flex; gap: 8px; align-items: center; }
 .join-open-actions .select, .join-open-actions select { min-width: 110px; }
 .join-open-actions .btn { height: 42px; white-space: nowrap; }
+.join-open-pick { margin-top: 14px; padding: 14px; border-radius: var(--radius); background: var(--bg-sub); }
+.join-open-pick-title { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text-sub); }
+.join-open-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.join-open-checks label { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 14px; cursor: pointer; }
+.join-open-checks label:has(input:checked) { border-color: var(--accent); }
+.join-open-checks input { margin: 0; accent-color: var(--accent); }
+.join-open-checks label span { white-space: nowrap; }
+/* an open department's end time goes on its own line under the name */
+.join-open-checks small { flex-basis: 100%; padding-left: 21px; font-size: 11px; color: var(--accent); white-space: nowrap; }
+.join-open-pick-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.join-open-pick-actions .btn { height: 40px; }
 .join-open-list { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
 .join-open-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
 @media (max-width: 560px) { .join-open-actions { width: 100%; } .join-open-actions > * { flex: 1; } }

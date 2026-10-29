@@ -455,8 +455,9 @@
           <p class="crumb">인사 관리 &gt; <span class="crumb-current">가입 승인</span></p>
           <div class="page-head"><h1>가입 승인</h1></div>
           <p class="muted join-scope" id="joinScope"></p>
-          <!-- 가입 활성화 (10/29 결정): 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있다. 부서장은 자기 부서만,
-               업체 관리자는 업체 전체를 연다. 고른 시간이 지나면 저절로 꺼지고, 꺼져 있으면 업체 코드를 넣어도 아무 반응이 없다 -->
+          <!-- 가입 활성화 (10/29 결정): 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있다. 부서장은 자기 부서를 바로 열고,
+               업체 관리자는 버튼을 누르면 아래에 부서 목록이 펼쳐져 고른 부서만 연다. 고른 시간이 지나면 저절로 꺼지고,
+               꺼져 있으면 업체 코드를 넣어도 아무 반응이 없다 -->
           <section class="join-open" id="joinOpenBox">
             <div class="join-open-head">
               <div>
@@ -472,6 +473,16 @@
                   <option value="1440">하루</option>
                 </select>
                 <button type="button" class="btn btn-primary" id="btnJoinOpen" data-write>가입 활성화</button>
+              </div>
+            </div>
+            <!-- 업체 관리자만: 가입 활성화를 누르면 펼쳐지는 부서 목록 -->
+            <div class="join-open-pick" id="joinOpenPick" hidden>
+              <p class="join-open-pick-title">열 부서를 고르세요</p>
+              <div class="join-open-checks" id="joinOpenChecks"></div>
+              <div class="join-open-pick-actions">
+                <button type="button" class="btn" id="btnJoinPickAll">전체 선택</button>
+                <button type="button" class="btn" id="btnJoinPickCancel">취소</button>
+                <button type="button" class="btn btn-primary" id="btnJoinPickOk" data-write disabled>선택한 부서 열기</button>
               </div>
             </div>
             <ul class="join-open-list" id="joinOpenList" hidden></ul>
