@@ -550,7 +550,7 @@ function renderJoin() {
   set('joinActive', caps ? `${n} / ${caps.active}명` : `${n}명`);
   set('joinRoom', caps ? `${Math.max(0, caps.approve - n - w)}명` : '-');
   set('joinSeatWait', caps && caps.paid ? `${w}명` : '-');
-  set('joinScope', admin ? '업체의 모든 가입 요청을 처리합니다.' : `${myDept() || '내'} 부서의 가입 요청만 처리합니다.`);
+  set('joinScope', admin ? '직원의 가입 요청을 처리합니다.' : `${myDept() || '내 부서'} 직원의 가입 요청만 처리합니다.`);
   set('joinNote', !caps ? '' : (caps.paid
     ? `구매 인원 ${caps.active}명까지 사용 중으로 바뀌고, 잘못 승인한 경우를 대비해 ${caps.approve}명까지 승인할 수 있습니다. 구매 인원을 넘는 승인은 자리 대기가 되며, 업체 관리자가 자리가 날 때 직접 골라 활성화합니다.`
     : `체험 중에는 관리자를 포함해 ${caps.active}명까지 승인할 수 있습니다.`)
