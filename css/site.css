@@ -168,11 +168,15 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
 .flow li:nth-child(3) { --ring-delay: 1.29s; }
 .flow li:nth-child(4) { --ring-delay: 1.94s; }
 .flow li:nth-child(5) { --ring-delay: 2.58s; }
+/* the sweep takes 4% of the cycle (0.16s at 4s): about as long as the streak's tip needs to cross the 52px circle
+   at a 1120px-wide page, so the two halves meet on the right just as the streak carries on */
 @keyframes ring-run {
   0% { opacity: 1; --ring-sweep: 0deg; }
-  7% { opacity: 1; --ring-sweep: 180deg; }
-  20%, 100% { opacity: 0; --ring-sweep: 180deg; }
+  4% { opacity: 1; --ring-sweep: 180deg; }
+  15%, 100% { opacity: 0; --ring-sweep: 180deg; }
 }
+/* off screen (site.js): no need to draw it */
+.flow.is-paused::after, .flow.is-paused li::after { animation-play-state: paused; }
 .flow li { position: relative; counter-increment: step; text-align: center; padding-top: 0; }
 .flow li::before {
   content: counter(step); position: relative; z-index: 1; display: grid; place-items: center;

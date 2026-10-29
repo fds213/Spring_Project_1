@@ -21,8 +21,8 @@ const WORK_END_HM = '18:00';
 const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴' };
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
-// 시연용 직급별 이전 경력 (요구분석서 3.9). 목록에 없는 직급(관리자·팀장 등)은 0년으로 본다
-const PREV_CAREER = { 사원: 0, 주임: 2, 대리: 4, 과장: 7, 차장: 10, 부장: 13 };
+// 시연용 직급별 이전 경력 (요구분석서 3.9)은 hr.js 의 RANK_CAREER / rankCareerOf 에 있다: 업체가 직급 관리에서
+// 직급 이름을 바꾸거나 새로 만들어도 경력 값이 따라가게 업체별로 저장한다. 목록에 없는 직급(관리자 등)은 0년으로 본다
 
 // 시연용 기본 휴일. 실제로는 인사 담당자가 휴일 관리에서 등록한다 (이 시안에는 그 화면이 없어서 업체별 저장값이 있으면 그것을 쓴다)
 const DEFAULT_HOLIDAYS = {
@@ -69,7 +69,7 @@ function leaveCycle(rec) {
   const at = n => new Date(hire.getFullYear() + n, hire.getMonth(), hire.getDate());
   let n = Math.max(0, now.getFullYear() - hire.getFullYear());
   while (n > 0 && at(n) > now) n--;
-  const prev = PREV_CAREER[rec.rank] ?? 0;
+  const prev = rankCareerOf(session.company, rec.rank);
   const career = prev + n;
   return { hire, start: at(n), end: at(n + 1), years: n, prev, career, grant: 15 + Math.floor(career / 3) };
 }

@@ -327,6 +327,8 @@ document.getElementById('payEmail').addEventListener('input', () => { document.g
 document.getElementById('btnPayNext').addEventListener('click', () => {
   const order = findCompanyOrder(session.company);
   if (!order) return;
+  // an 인원 증설 request in progress (seat.js) changes the headcount this quote is for: one thing at a time
+  if (typeof seatActive === 'function' && seatActive(order)) return showToast('진행 중인 인원 증설이 끝난 뒤에 결제할 수 있습니다');
   const usersEl = document.getElementById('payUsers');
   const emailEl = document.getElementById('payEmail');
   const n = Number(usersEl.value);

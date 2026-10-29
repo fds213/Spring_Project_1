@@ -69,6 +69,21 @@ const DEMO_RANKS = {
   ieum0002: ['사원', '주임', '대리', '과장', '차장', '부장'],
 };
 const ranksOf = code => loadStore(RANK_KEY, {})[code] || DEMO_RANKS[code] || RANKS;
+// Years of prior career counted per rank for 연차 (attendance.js leaveCycle, requirements 3.9; demo values).
+// Kept per company by rank name, so 직급 관리 can carry a value over when a rank is renamed; a rank the
+// company never had a value for (a new one, or '관리자') counts 0 years.
+const RANK_CAREER = { 사원: 0, 주임: 2, 대리: 4, 과장: 7, 차장: 10, 부장: 13 };
+const RANK_CAREER_KEY = 'ieum-demo-rank-career-v1';
+const rankCareerOf = (code, rank) => {
+  const mine = loadStore(RANK_CAREER_KEY, {})[code] || {};
+  return mine[rank] ?? RANK_CAREER[rank] ?? 0;
+};
+function setRankCareer(code, rank, years) {
+  const all = loadStore(RANK_CAREER_KEY, {});
+  all[code] = all[code] || {};
+  if (years == null) delete all[code][rank]; else all[code][rank] = years;
+  saveStore(RANK_CAREER_KEY, all);
+}
 
 // 가입 활성화 per company: [{ scope, until, by, byName }], scope = a department (JOIN_OPEN_ALL = every department,
 // from the first version where the company admin opened the whole company; still read, no longer written).
@@ -104,8 +119,22 @@ const minsUntil = iso => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.n
 const MY_JOIN_KEY = 'ieum-demo-join-mine';
 
 // A company's accounts and join requests; the first look creates its first admin from the trial signup.
+// Join requests that ended (반려·취소·만료) are of no use after a while and this list is read by nearly every
+// screen, so they are dropped once per page load when older than 7 days. The applicant's device has long shown
+// the reason by then (renderJoinForm clears its own record on the first look). Accounts (with a 사번) stay.
+const PRUNE_AFTER_MS = 7 * 86400000;
+const prunedCodes = new Set();
+function pruneStaff(code, list) {
+  if (prunedCodes.has(code)) return list;
+  prunedCodes.add(code);
+  const old = e => Date.now() - new Date(e.decidedAt || e.canceledAt || e.requestAt || e.at || 0).getTime() > PRUNE_AFTER_MS;
+  const kept = list.filter(e => e.empNo || !old(e) || !['REJECTED', 'CANCELED', 'EXPIRED'].includes(statusOf(e)));
+  if (kept.length !== list.length) saveStaff(code, kept);
+  return kept;
+}
 function staffOf(code) {
   const all = loadStore(EMP_KEY, {});
+  if (all[code]) return pruneStaff(code, all[code]);
   if (!all[code]) {
     const order = findCompanyOrder(code);
     // nothing stored for a company that isn't there (yet): an empty list kept now would lose its admin later
@@ -343,9 +372,30 @@ function deleteRetired(no) {
       const x = list[i];
       list[i] = { empNo: x.empNo, name: x.name, dept: x.dept, rank: x.rank, at: x.at, status: 'DELETED', deletedAt: new Date().toISOString() };
       saveStaff(code, list);
+      // the fingerprint-reader number it had linked goes free for the next employee (attendance.js LINK_KEY)
+      const links = loadStore(LINK_KEY, {});
+      if (links[`${code}:${no}`]) { delete links[`${code}:${no}`]; saveStore(LINK_KEY, links); }
+      releaseApproverLeaves(code, no, '결재자 계정이 삭제되어 자동 반려되었습니다. 결재선을 바꿔 다시 신청해 주세요');
       showToast(`${x.name} 계정을 삭제했습니다`);
       rerenderStaffViews();
     }, true);
+}
+
+// Leave requests waiting on this person as their current approver would wait forever once the account is
+// deactivated or deleted (approval.js decideLeave needs that person to sign in): they are rejected with a reason
+// the requester sees in 근태·연차, so they can re-apply with another approver. Real server: the same, in one
+// transaction with the account change.
+function releaseApproverLeaves(code, empNo, why) {
+  const all = loadStore(LEAVE_KEY, {});
+  const stuck = (all[code] || []).filter(l => l.status === 'REQUESTED' && l.line && l.line[l.step] === empNo);
+  if (!stuck.length) return 0;
+  const at = new Date().toISOString();
+  stuck.forEach(l => {
+    l.history = [...(l.history || []), { step: l.step, by: 'SYSTEM', name: '시스템', action: 'REJECT', at, comment: why }];
+    l.status = 'REJECTED';
+  });
+  saveStore(LEAVE_KEY, all);
+  return stuck.length;
 }
 
 // A deactivated account comes back where it was: 계정 생성 전 if it was never created, otherwise 사용 중.
@@ -389,9 +439,10 @@ document.querySelectorAll('#empStateDialog button').forEach(b => b.addEventListe
     e.before = e.status;
     e.status = 'RETIRED';
     const waiting = list.filter(x => seatOf(x) === 'WAIT').length;
+    const released = releaseApproverLeaves(code, no, '결재자 계정이 비활성화되어 자동 반려되었습니다. 결재선을 바꿔 다시 신청해 주세요');
     showToast(freedSeat && waiting
       ? `${e.name} 계정을 비활성화했습니다. 자리 대기 ${waiting}명이 있으니 가입 승인에서 골라 활성화하세요`
-      : `${e.name} 계정을 비활성화했습니다`);
+      : `${e.name} 계정을 비활성화했습니다` + (released ? ` · 이 사람이 결재할 차례였던 휴가 ${released}건은 자동 반려했습니다` : ''));
   }
   saveStaff(code, list);
   rerenderStaffViews();
@@ -1041,7 +1092,7 @@ function renderJoinForm() {
     // made by the earlier flow (approval first, account later): asked again in the new flow
     joinNotice = '이전 방식으로 처리된 요청입니다. 다시 승인 요청을 해 주세요.';
     saveMyJoin(null);
-  } else if (e && e.status === 'RETIRED') {
+  } else if (e && (e.status === 'RETIRED' || e.status === 'DELETED')) {
     joinNotice = '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요.';
     saveMyJoin(null);
   } else if (e && e.status === 'REJECTED') {
@@ -1052,6 +1103,10 @@ function renderJoinForm() {
     saveMyJoin(null);
   } else if (mine && !e) {
     joinNotice = '요청을 찾을 수 없습니다. 다시 승인 요청을 해 주세요.';
+    saveMyJoin(null);
+  } else if (mine && e && !waiting && !approved) {
+    // any state this form has no branch for (a status added later): never keep the device bound to it
+    joinNotice = '이 요청은 더 진행할 수 없습니다. 다시 승인 요청을 해 주세요.';
     saveMyJoin(null);
   }
   // an ended request's reason stays on screen until the form is changed (a later refresh has no request to show)

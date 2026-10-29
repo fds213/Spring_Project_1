@@ -86,11 +86,14 @@ function renderSeatAdd(order) {
   const active = seatActive(order);
   const unseen = active ? null : seatUnseen(order);
   const shown = active || unseen;
-  // 체험 중에는 정식 전환 결제로, 이용이 끝난 뒤에는 다시 결제로 인원을 정한다. 증설은 유료 이용 중에만 한다
-  const canAdd = trialState(order).status === 'PAID';
+  // 체험 중에는 정식 전환 결제로, 이용이 끝난 뒤에는 다시 결제로 인원을 정한다. 증설은 유료 이용 중에만 한다.
+  // 운영자 승인을 기다리는 결제(연장 등)가 있으면 그것이 끝난 뒤에: 두 흐름이 겹치면 승인 순서에 따라 인원이 뒤바뀐다
+  const planPending = !!pendingOf(order);
+  const canAdd = trialState(order).status === 'PAID' && !planPending;
   wrap.hidden = !(canAdd || shown);
   box.hidden = !(shown || (seatOpen && canAdd));
   seatEl('btnSeatAdd').disabled = !!active || !canAdd;
+  seatEl('btnSeatAdd').title = planPending ? '승인을 기다리는 결제가 끝난 뒤에 증설할 수 있습니다' : '';
   if (box.hidden) return;
 
   const step = shown ? SEAT_STEP[shown.status] : 1;
@@ -144,7 +147,8 @@ function renderSeatQuote(order) {
 function withSeatOrder(change) {
   const orders = loadStore(ORDERS_KEY, []);
   const order = orders.find(o => o.companyCode === session.company);
-  if (!order || order.status !== 'PAID') return null;
+  // PAID and still running: once the period is over (read-only) nothing about 증설 can be started or paid
+  if (!order || trialState(order).status !== 'PAID') return null;
   change(order);
   saveStore(ORDERS_KEY, orders);
   return order;
@@ -169,7 +173,7 @@ seatEl('btnSeatRequest').addEventListener('click', () => {
   const n = readSeatCount();
   let made = null;
   withSeatOrder(o => {
-    if (seatActive(o) || seatCountError(o, n)) return;
+    if (seatActive(o) || pendingOf(o) || seatCountError(o, n)) return;
     const q = seatQuote(o, n);
     if (q.days < 1) return;
     o.seatRequests = o.seatRequests || [];
@@ -186,6 +190,7 @@ function paySeat(success) {
   const fail = seatEl('btnSeatPayFail');
   const cancel = seatEl('btnSeatPayCancel');
   if (ok.disabled) return;
+  if (readOnly) return showToast(readOnlyMessage()); // the period ended while this page was open
   seatEl('seatPayError').textContent = '';
   ok.disabled = fail.disabled = cancel.disabled = true;
   seatEl('seatBusy').textContent = '결제를 처리하고 있습니다…';
@@ -240,6 +245,8 @@ function decideSeat(id, approve) {
   const hit = orders.map(o => ({ o, r: (o.seatRequests || []).find(x => x.id === id) })).find(x => x.r);
   if (!hit || hit.r.status !== 'PAID') return; // 이미 다른 탭에서 처리함
   const { o, r } = hit;
+  // 기간이 끝난 업체(읽기 전용)의 증설은 승인해도 쓸 날이 없다: 반려(환불)만 할 수 있다
+  if (approve && trialState(o).status !== 'PAID') return showToast(`${o.company}: 이용 기간이 끝나 증설을 승인할 수 없습니다. 반려(환불)해 주세요`);
   r.decidedAt = new Date().toISOString();
   r.ack = false; // 업체 관리자가 결과를 한 번 확인하게 한다
   if (approve) {
@@ -247,6 +254,9 @@ function decideSeat(id, approve) {
     o.users += r.add;
     o.total = o.users * SEAT_PRICE;
     (o.seatChanges || []).forEach(c => { c.users += r.add; }); // 늘린 인원은 다음 연장에도 포함된다
+    // 승인을 기다리는 연장 결제가 있으면 그 인원에도 더한다 (승인될 때 인원을 도로 줄이지 않게)
+    const plan = pendingOf(o);
+    if (plan) plan.users += r.add;
   } else {
     // 반려하면 낸 돈을 돌려준다. 이용 중 해지·환불은 없지만(팀 결정 2026-10-27) 서비스를 못 받은 결제는 예외다
     r.status = 'REJECTED';

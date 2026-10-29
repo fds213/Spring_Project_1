@@ -34,10 +34,19 @@
   }
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
 
-  // Who is in a department or rank: accounts and open join requests, by state
+  // Every change here is a write: refused while the company is read-only (the buttons are greyed out by
+  // data-write, but Enter in an input reaches these functions without a click)
+  function blockedWrite() {
+    if (!readOnly) return false;
+    showToast(readOnlyMessage());
+    return true;
+  }
+
+  // Who is in a department or rank: accounts and open join requests, by state. `staff` is passed in when the
+  // caller already has the list (the table reads it once, not once per row)
   const LIVE = ['ACTIVE', 'WAITING', 'APPROVED', 'RETIRED', 'REQUESTED'];
-  function membersOf(kind, name) {
-    const people = staffOf(session.company).filter(e => e[kind] === name && LIVE.includes(statusOf(e)));
+  function membersOf(kind, name, staff = staffOf(session.company)) {
+    const people = staff.filter(e => e[kind] === name && LIVE.includes(statusOf(e)));
     const count = st => people.filter(e => st.includes(statusOf(e))).length;
     return { all: people.length, inUse: count(['ACTIVE', 'WAITING', 'APPROVED']), retired: count(['RETIRED']), requests: count(['REQUESTED']) };
   }
@@ -77,6 +86,12 @@
         notices.list.forEach(n => { if (n.writerDept === from) n.writerDept = to; });
         saveStore(`ieum-notice-demo-v3:${code}`, notices);
       }
+      // notice.js keeps both stores in memory: drop that copy, or its next save would write the old names back
+      if (typeof resetNoticeCaches === 'function') resetNoticeCaches();
+    } else {
+      // the years of career counted for 연차 follow the rank to its new name (hr.js rankCareerOf)
+      setRankCareer(code, to, rankCareerOf(code, from));
+      setRankCareer(code, from, null);
     }
     // the signed-in admin's own session in this tab: its department and the header line ("부서 · 직급").
     // Other tabs and people pick the new name up from the staff records (notice.js and hr.js read those first)
@@ -92,6 +107,7 @@
 
   // ---------- actions ----------
   function add(kind) {
+    if (blockedWrite()) return;
     const input = $o(`${ORG[kind].prefix}NewName`);
     const list = listOf(kind);
     const error = list.length >= ORG[kind].max ? `${ORG[kind].topic} ${ORG[kind].max}개까지 만들 수 있습니다` : nameError(kind, input.value);
@@ -105,6 +121,7 @@
   }
 
   function move(kind, i, dir) {
+    if (blockedWrite()) return;
     const list = listOf(kind);
     const j = i + dir;
     if (j < 0 || j >= list.length) return;
@@ -114,6 +131,7 @@
   }
 
   function saveRename(kind, from, input) {
+    if (blockedWrite()) return;
     const to = input.value.trim();
     const errorEl = $o(`${ORG[kind].prefix}Error`);
     if (to === from) { editing[kind] = null; errorEl.textContent = ''; return render(kind); }
@@ -132,6 +150,7 @@
   }
 
   function remove(kind, name) {
+    if (blockedWrite()) return;
     const word = ORG[kind].word;
     if (listOf(kind).length <= 1) return showToast(`${ORG[kind].topic} 하나 이상 있어야 합니다`);
     const m = membersOf(kind, name);
@@ -148,6 +167,8 @@
         if (kind === 'dept') {
           const open = loadStore(JOIN_OPEN_KEY, {});
           if (open[session.company]) { open[session.company] = open[session.company].filter(x => x.scope !== name); saveStore(JOIN_OPEN_KEY, open); }
+        } else {
+          setRankCareer(session.company, name, null);
         }
         showToast(`${word} '${name}'을(를) 삭제했습니다`);
         render(kind);
@@ -166,7 +187,8 @@
     const word = ORG[kind].word;
     if (editing[kind] && !list.includes(editing[kind])) editing[kind] = null;
     $o(`${ORG[kind].prefix}Count`).textContent = `${list.length}개 / 최대 ${ORG[kind].max}개`;
-    const heads = kind === 'dept' ? staffOf(session.company).filter(e => e.head && statusOf(e) === 'ACTIVE') : [];
+    const staff = staffOf(session.company); // read once for the whole table
+    const heads = kind === 'dept' ? staff.filter(e => e.head && statusOf(e) === 'ACTIVE') : [];
     $o(`${ORG[kind].prefix}List`).replaceChildren(...list.map((name, i) => {
       const tr = document.createElement('tr');
       const order = document.createElement('div');
@@ -205,10 +227,18 @@
           btn('삭제', `${name} 삭제`, () => remove(kind, name)),
         );
       }
-      const m = membersOf(kind, name);
+      const m = membersOf(kind, name, staff);
       const people = document.createElement('span');
       people.textContent = [`${m.inUse}명`, m.retired && `비활성 ${m.retired}`, m.requests && `요청 ${m.requests}`].filter(Boolean).join(' · ');
       tr.append(cellOf('순서', order), cellOf(word, nameCell), cellOf('인원', people));
+      if (kind === 'rank') {
+        // what 연차 counts as prior career for this rank (demo values; a new rank counts 0)
+        const years = rankCareerOf(session.company, name);
+        const c = document.createElement('span');
+        c.textContent = `${years}년`;
+        if (!years) c.className = 'muted';
+        tr.append(cellOf('연차 경력', c));
+      }
       if (kind === 'dept') {
         const head = heads.find(e => e.dept === name);
         const h = document.createElement('span');

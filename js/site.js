@@ -165,6 +165,10 @@ function syncFlowRings() {
 }
 syncFlowRings();
 window.addEventListener('resize', syncFlowRings);
+// the light only runs while the section is on screen (five conic gradients re-drawn every frame otherwise)
+if (flowList && 'IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => flowList.classList.toggle('is-paused', !entry.isIntersecting)).observe(flowList);
+}
 
 // floating 도입 문의 button: hide it while the footer is on screen so it never covers the footer
 const fab = document.getElementById('fabInquiry');

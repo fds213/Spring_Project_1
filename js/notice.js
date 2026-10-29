@@ -857,6 +857,18 @@ $('bBtnCancel').addEventListener('click', async () => {
 });
 
 // ---------- 그룹웨어에 내놓는 것 ----------
+// The stores are cached in memory per company. Drop the cache when the saved copy changed under us: a department
+// renamed in 부서 관리 (org-admin.js rewrites posts and notices and calls this), or another tab writing the same
+// company's notices or board. Without it the next save here would write the old data back over the change.
+function resetNoticeCaches() { storeOf = ''; boardOf = ''; }
+window.resetNoticeCaches = resetNoticeCaches;
+window.addEventListener('storage', e => {
+  if (!session || !e.key || (e.key !== storeKey() && e.key !== boardKey())) return;
+  resetNoticeCaches();
+  const v = location.hash.slice(1);
+  if (/^(notice|board-dept)(\/|$)/.test(v)) route(v);
+  else if (v === 'home' && typeof renderHomeNotices === 'function') renderHomeNotices();
+});
 window.routeNoticeBoard = route;
 window.renderHomeNotices = () => { syncMe(); ensureStore(); renderHome(); };
 })();
