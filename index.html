@@ -232,6 +232,7 @@
             <p class="nav-group">근무</p>
             <a href="#attendance" class="nav-item" data-view="attendance">근태·연차</a>
             <a href="#schedule" class="nav-item" data-view="schedule">일정</a>
+            <a href="#work-approval" class="nav-item" data-view="work-approval" data-roles="HEAD HR ADMIN">승인 <span class="badge" id="approvalCount" hidden></span></a>
           </div>
           <div class="nav-section">
             <p class="nav-group">소통</p>
@@ -412,6 +413,170 @@
                   <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayFinish">확인</button></div>
                 </div>
               </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- 근태·연차: 로그인한 본인의 출퇴근 기록과 연차만 보여 준다. 다른 직원의 근태와 승인은 없다 (attendance.js) -->
+        <section class="view" id="view-attendance">
+          <p class="crumb">근무 &gt; <span class="crumb-current">근태·연차</span></p>
+          <div class="page-head"><h1>근태·연차</h1></div>
+          <div class="cards">
+            <div class="card"><small>오늘 근태</small><strong id="attToday">-</strong></div>
+            <div class="card"><small>이번 달 지각</small><strong id="attLate">-</strong></div>
+            <div class="card"><small>이번 달 조퇴</small><strong id="attEarly">-</strong></div>
+            <div class="card"><small>남은 연차</small><strong id="attLeft">-</strong></div>
+          </div>
+          <div class="att-link table-gap" id="attLink"></div>
+          <div class="info-grid info-grid-2 table-gap">
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+                <div><h2>월별 근태 기록</h2><p>지문 단말기에서 받은 출퇴근 기록입니다 (기본 근무 09:00~18:00)</p></div>
+              </header>
+              <div class="att-month">
+                <button type="button" class="btn" id="attPrev" aria-label="이전 달">&lt;</button>
+                <strong id="attMonthLabel"></strong>
+                <button type="button" class="btn" id="attNext" aria-label="다음 달">&gt;</button>
+              </div>
+              <div class="table-wrap att-table">
+                <table class="table">
+                  <thead><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>상태</th><th>비고</th></tr></thead>
+                  <tbody id="attList"></tbody>
+                </table>
+              </div>
+            </section>
+            <section class="info-card">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+                <div><h2>연차·휴가</h2><p>15일 + 총 경력 3년마다 1일. 반차는 0.5일입니다</p></div>
+              </header>
+              <dl class="detail" id="leaveInfo"></dl>
+              <form class="leave-form" id="leaveForm" novalidate>
+                <h3 class="bill-sub">연차·휴가 신청</h3>
+                <div class="leave-row">
+                  <label for="leaveKind">구분</label>
+                  <select class="filter-select" id="leaveKind">
+                    <option value="FULL">연차 (종일)</option><option value="AM">오전 반차</option><option value="PM">오후 반차</option>
+                  </select>
+                </div>
+                <div class="leave-row">
+                  <label for="leaveFrom">시작일</label>
+                  <input class="input" id="leaveFrom" type="date">
+                </div>
+                <div class="leave-row">
+                  <label for="leaveTo">종료일</label>
+                  <input class="input" id="leaveTo" type="date">
+                </div>
+                <div class="leave-row">
+                  <label for="leaveReason">사유</label>
+                  <input class="input" id="leaveReason" maxlength="100" autocomplete="off" placeholder="선택">
+                </div>
+                <div class="leave-row">
+                  <label for="leaveAppr1">1단계 결재</label>
+                  <select class="filter-select" id="leaveAppr1"></select>
+                </div>
+                <div class="leave-row">
+                  <label for="leaveAppr2">2단계 결재</label>
+                  <select class="filter-select" id="leaveAppr2"></select>
+                </div>
+                <p class="form-error" id="leaveError" role="alert"></p>
+                <div class="bill-actions"><button type="submit" class="btn btn-primary">승인 요청</button></div>
+                <p class="bill-note">주말과 등록 휴일은 세지 않습니다. 결재선은 최대 2단계이고 순서대로 승인합니다. 마지막 결재자가 승인하면 연차에 반영됩니다.</p>
+              </form>
+              <h3 class="bill-sub">이번 연차 기간 사용 내역</h3>
+              <ul class="bill-history" id="leaveHistory"></ul>
+            </section>
+          </div>
+        </section>
+
+        <!-- 근무 > 승인: 부서장·인사 담당·업체 관리자가 (1) 내 순번인 휴가 신청을 승인·반려하고 (2) 볼 수 있는 직원의 근태를 확인한다 (approval.js) -->
+        <section class="view" id="view-work-approval">
+          <p class="crumb">근무 &gt; <span class="crumb-current">승인</span></p>
+          <div class="page-head"><h1>승인</h1></div>
+          <div class="cards">
+            <div class="card"><small>내 순번 승인 대기</small><strong id="apprCntWait">-</strong></div>
+            <div class="card"><small>선택한 날 확인 대상</small><strong id="apprCntPeople">-</strong></div>
+            <div class="card"><small>선택한 날 지각·조퇴</small><strong id="apprCntIssue">-</strong></div>
+            <div class="card"><small>내가 처리한 건</small><strong id="apprCntDone">-</strong></div>
+          </div>
+          <section class="info-card table-gap">
+            <header class="info-card-head">
+              <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>
+              <div><h2>휴가 승인 대기</h2><p>내 순번이 된 신청만 보입니다. 반려할 때는 사유를 적어야 합니다</p></div>
+            </header>
+            <div class="table-wrap appr-table">
+              <table class="table">
+                <thead><tr><th>신청자</th><th>구분·기간</th><th>일수</th><th>사유</th><th>결재선</th><th>처리</th></tr></thead>
+                <tbody id="apprList"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="info-card table-gap">
+            <header class="info-card-head">
+              <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+              <div><h2>직원 근태 현황</h2><p id="apprScope"></p></div>
+            </header>
+            <div class="att-month">
+              <button type="button" class="btn" id="apprPrev" aria-label="전날">&lt;</button>
+              <input class="input appr-date" id="apprDate" type="date" aria-label="날짜">
+              <button type="button" class="btn" id="apprNext" aria-label="다음 날">&gt;</button>
+              <button type="button" class="btn" id="apprToday">오늘</button>
+            </div>
+            <div class="table-wrap att-table">
+              <table class="table">
+                <thead><tr><th>직원</th><th>출근</th><th>퇴근</th><th>상태</th><th>비고</th><th>이번 달 지각·조퇴</th></tr></thead>
+                <tbody id="apprAtt"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="info-card table-gap">
+            <header class="info-card-head">
+              <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></span>
+              <h2>내가 처리한 내역</h2>
+            </header>
+            <ul class="bill-history appr-history" id="apprHistory"></ul>
+          </section>
+        </section>
+
+        <!-- 일정: 개인·부서·전사 일정과 휴일, 본인의 연차를 달력으로 본다 (schedule.js) -->
+        <section class="view" id="view-schedule">
+          <p class="crumb">근무 &gt; <span class="crumb-current">일정</span></p>
+          <div class="page-head"><h1>일정</h1></div>
+          <div class="sch-layout">
+            <section class="info-card">
+              <div class="sch-toolbar">
+                <div class="att-month">
+                  <button type="button" class="btn" id="schPrev" aria-label="이전 달">&lt;</button>
+                  <strong id="schMonthLabel"></strong>
+                  <button type="button" class="btn" id="schNext" aria-label="다음 달">&gt;</button>
+                  <button type="button" class="btn" id="schToday">오늘</button>
+                </div>
+                <div class="sch-filters" id="schFilters">
+                  <label><input type="checkbox" data-scope="PERSONAL" checked> <span class="sch-chip chip-personal">개인</span></label>
+                  <label><input type="checkbox" data-scope="DEPT" checked> <span class="sch-chip chip-dept">부서</span></label>
+                  <label><input type="checkbox" data-scope="COMPANY" checked> <span class="sch-chip chip-company">전사</span></label>
+                  <label><input type="checkbox" data-scope="LEAVE" checked> <span class="sch-chip chip-leave">내 연차</span></label>
+                </div>
+              </div>
+              <div class="sch-week" aria-hidden="true"><span class="is-red">일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span class="is-blue">토</span></div>
+              <div class="sch-grid" id="schGrid"></div>
+            </section>
+            <section class="info-card sch-side">
+              <header class="info-card-head">
+                <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
+                <h2 id="schDayTitle">-</h2>
+              </header>
+              <ul class="sch-day-list" id="schDayList"></ul>
+              <form class="leave-form" id="schForm" novalidate>
+                <h3 class="bill-sub">일정 추가</h3>
+                <div class="leave-row"><label for="schScope">구분</label><select class="filter-select" id="schScope"></select></div>
+                <div class="leave-row"><label for="schDate">날짜</label><input class="input" id="schDate" type="date"></div>
+                <div class="leave-row"><label for="schTitle">제목</label><input class="input" id="schTitle" maxlength="40" autocomplete="off"></div>
+                <div class="leave-row"><label for="schMemo">메모</label><input class="input" id="schMemo" maxlength="200" autocomplete="off" placeholder="선택"></div>
+                <p class="form-error" id="schError" role="alert"></p>
+                <div class="bill-actions"><button type="submit" class="btn btn-primary">추가</button></div>
+              </form>
             </section>
           </div>
         </section>
@@ -952,6 +1117,9 @@
   <script src="js/admin-company.js"></script>
   <script src="js/hr.js"></script>
   <script src="js/notice.js"></script>
+  <script src="js/attendance.js"></script>
+  <script src="js/schedule.js"></script>
+  <script src="js/approval.js"></script>
   <script src="js/common.js"></script>
 </body>
 </html>

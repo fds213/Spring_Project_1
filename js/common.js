@@ -11,6 +11,7 @@ const VIEWS = {
   'asset-all': { crumb: 'IT 서비스', title: '자산 관리' },
   'attendance': { crumb: '근무', title: '근태·연차' },
   'schedule': { crumb: '근무', title: '일정' },
+  'work-approval': { crumb: '근무', title: '승인' },
   'chat': { crumb: '소통', title: '채팅' },
   'board-dept': { crumb: '소통', title: '부서 게시판' },
   'location': { crumb: '소통', title: '지도' },
@@ -120,6 +121,7 @@ function enterApp() {
   renderAttendance();
   renderTrialBar();
   refreshJoinBadge();
+  refreshApprovalBadge();
   // operators are built-in demo accounts, so only company employees get 비밀번호 변경
   document.getElementById('btnPwChange').hidden = session.type !== 'EMPLOYEE';
   document.getElementById('loginScreen').hidden = true;
@@ -627,6 +629,9 @@ function showView() {
   if (session.type === 'OPS') opsViewShown(key);
   if (key === 'home' && typeof renderHomeNotices === 'function') renderHomeNotices();
   if (key === 'admin-billing') renderBilling();
+  if (key === 'attendance') openAttendanceView();
+  if (key === 'schedule') openScheduleView();
+  if (key === 'work-approval') openApprovalView();
   if (key === 'hr-employee') renderEmployees();
   if (key === 'hr-join') renderJoin();
   document.querySelector('.content').scrollTop = 0;
@@ -644,7 +649,7 @@ function renderAttendance() {
   try {
     const d = new Date();
     const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    const mine = session && session.deviceUserId;
+    const mine = session && session.type === 'EMPLOYEE' ? deviceIdOf() : '';
     rec = mine ? (JSON.parse(localStorage.getItem('ieum-demo-punches')) || {})[day]?.[mine] || null : null;
   } catch { /* storage blocked: show "no record" */ }
 
@@ -664,6 +669,8 @@ function renderAttendance() {
 // new signup in another tab changes the trial strip too
 window.addEventListener('storage', e => {
   if (e.key === 'ieum-demo-punches') renderAttendance();
+  // 다른 탭의 출퇴근 체크·단말기 연결·연차·일정 변경: 열려 있는 근태·연차·일정 화면도 그 자리에서 다시 그린다
+  if ([PUNCH_KEY, LINK_KEY, LEAVE_KEY, SCHEDULE_KEY].includes(e.key) && session && session.type === 'EMPLOYEE') { renderAttendance(); refreshWorkViews(); }
   if (e.key === EMP_KEY && session && session.type === 'EMPLOYEE') rerenderStaffViews();
   // company accounts only (ops.js refreshes the operator screens). Redraw what depends on the order in place;
   // re-enter the page only when read-only mode flipped, which may have to move the user off a write page

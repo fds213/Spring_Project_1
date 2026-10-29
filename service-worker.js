@@ -1,6 +1,6 @@
 // Caches the app shell so the installed app opens even when the server is briefly unreachable.
 // Bump CACHE when shell files change, or users keep seeing the old version.
-const CACHE = 'ieum-shell-v122';
+const CACHE = 'ieum-shell-v123';
 const SHELL = [
   './',
   'index.html',
@@ -25,6 +25,9 @@ const SHELL = [
   'js/admin-company.js',
   'js/hr.js',
   'js/notice.js',
+  'js/attendance.js',
+  'js/schedule.js',
+  'js/approval.js',
   'img/hero-app.png',
   'img/logo-mark.png',
   'img/logo-wordmark.png',
