@@ -21,7 +21,8 @@ let readonly = false;
 function syncMe() {
   const staff = staffOf(session.company).find(e => e.empNo === session.id);
   const role = userRoles.includes('ADMIN') ? 'ADMIN' : userRoles.includes('HR') ? 'HR' : userRoles.includes('IT') ? 'IT' : 'EMP';
-  me = { empNo: session.id, name: session.name, dept: session.dept || (staff && staff.dept) || '경영지원팀', role };
+  // the staff record first: a department renamed in 부서 관리 shows here without signing in again
+  me = { empNo: session.id, name: session.name, dept: (staff && staff.dept) || session.dept || '경영지원팀', role };
   readonly = readOnly;
 }
 

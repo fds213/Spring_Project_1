@@ -21,6 +21,7 @@ const VIEWS = {
   'hr-attendance': { crumb: '인사 관리', title: '근태·연차 관리' },
   'hr-holiday': { crumb: '인사 관리', title: '휴일 관리' },
   'admin-dept': { crumb: '업체 관리', title: '부서 관리' },
+  'admin-rank': { crumb: '업체 관리', title: '직급 관리' },
   'admin-role': { crumb: '업체 관리', title: '역할 관리' },
   'admin-billing': { crumb: '업체 관리', title: '이용 결제' },
 };
@@ -651,6 +652,8 @@ function showView() {
   if (key === 'work-approval') openApprovalView();
   if (key === 'hr-employee') renderEmployees();
   if (key === 'hr-join') renderJoin();
+  if (key === 'admin-dept') openOrgAdmin('dept');
+  if (key === 'admin-rank') openOrgAdmin('rank');
   document.querySelector('.content').scrollTop = 0;
   // The installed app window already prefixes the app name ("IEUM - 홈"), so the page title is just the view
   document.title = views[key].title;

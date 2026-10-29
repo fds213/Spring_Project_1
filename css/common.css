@@ -275,6 +275,16 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .join-left.is-late { color: #8a4b08; font-weight: 600; }
 .empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 부서 관리·직급 관리 (org-admin.js) */
+.org-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 560px; }
+.org-add .input { flex: 1 1 220px; min-width: 0; }
+.org-add .input, .org-add .btn { height: 40px; }
+.org-count { font-size: 12px; }
+.org-move { display: flex; gap: 4px; }
+.org-move .btn { min-width: 32px; padding: 0 8px; }
+.org-move .btn:disabled { opacity: 0.35; cursor: default; }
+.org-rename { max-width: 220px; height: 34px; }
+.org-table td:first-child { width: 96px; }
 .status-requested { background: var(--accent-bg); color: var(--accent); }
 .status-approved { background: var(--accent-bg); color: var(--accent); }
 .status-waiting { background: #fff4e5; color: #8a4b08; }

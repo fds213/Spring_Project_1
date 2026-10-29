@@ -48,7 +48,7 @@ const EMP_STATUS = {
   APPROVAL_EXPIRED: '승인 만료', CANCELED: '취소',
 };
 const APPROVAL_LIMIT_MS = 60 * 60 * 1000; // an approved account must be created within 1 hour (v1.7 ACC-05)
-// Departments are per company: the company's admin keeps them (부서 관리, not built in the prototype yet), and a
+// Departments are per company: the company's admin keeps them (부서 관리, org-admin.js), and a
 // company without its own list uses DEPTS. The two built-in demo companies (ops.js demoCompanies) have different
 // lists so the join form visibly loads the company's own. The real server answers GET /join/company/{code} with
 // the company name and its departments (permitAll, like /join).
@@ -161,7 +161,8 @@ const activeStaff = code => staffOf(code).filter(e => seatOf(e) === 'SEAT');
 const waitingStaff = code => staffOf(code).filter(e => seatOf(e) === 'WAIT');
 const isFull = code => { const c = seatCaps(code); return !!c && activeStaff(code).length >= c.active; };
 // the employee's own team, for a 부서장: from the session or their staff record
-const myDept = () => session.dept || (employeesOf(session.company).find(e => e.empNo === session.id) || {}).dept;
+// the staff record first, so a department renamed in 부서 관리 (org-admin.js) applies without signing in again
+const myDept = () => (employeesOf(session.company).find(e => e.empNo === session.id) || {}).dept || session.dept;
 const isHeadOf = e => !!e.head;
 const validEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -797,6 +798,8 @@ function askConfirm(title, body, okLabel, onOk, danger) {
   dialog.querySelector('p').textContent = body;
   dialog.querySelector('[value="ok"]').textContent = okLabel;
   dialog.querySelector('[value="ok"]').className = danger ? 'btn btn-danger' : 'btn btn-primary';
+  // no onOk = a notice only (e.g. why something can't be deleted): just the 확인 button
+  dialog.querySelector('[value="cancel"]').hidden = !onOk;
   dialog.onOk = onOk;
   if (!dialog.open) dialog.showModal();
 }

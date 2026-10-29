@@ -254,6 +254,7 @@
           <div class="nav-section">
             <p class="nav-group">업체 관리</p>
             <a href="#admin-dept" class="nav-item" data-view="admin-dept" data-roles="ADMIN">부서 관리</a>
+            <a href="#admin-rank" class="nav-item" data-view="admin-rank" data-roles="ADMIN">직급 관리</a>
             <a href="#admin-role" class="nav-item" data-view="admin-role" data-roles="ADMIN">역할 관리</a>
             <a href="#admin-billing" class="nav-item" data-view="admin-billing" data-roles="ADMIN">이용 결제</a>
           </div>
@@ -659,6 +660,43 @@
                 <tr><th>이름</th><th>부서·직급</th><th>역할</th><th>상태</th><th>등록일</th><th>관리</th></tr>
               </thead>
               <tbody id="empList"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- 부서 관리·직급 관리 (업체 관리자, org-admin.js): 추가·이름 변경·삭제·순서. 사람이 있는 부서·직급은 지울 수 없고,
+             이름을 바꾸면 소속 직원과 기록도 같이 바뀐다. 여기 목록이 계정 생성·가입 활성화·사원 관리에 그대로 쓰인다 -->
+        <section class="view" id="view-admin-dept">
+          <p class="crumb">업체 관리 &gt; <span class="crumb-current">부서 관리</span></p>
+          <div class="page-head"><h1>부서 관리</h1></div>
+          <p class="muted join-scope">여기 부서가 계정 생성과 가입 활성화에 그대로 나옵니다. 직원이 있는 부서는 지울 수 없고, 이름을 바꾸면 소속 직원과 게시판·일정 기록도 함께 바뀝니다. 부서장은 사원 관리에서 정합니다.</p>
+          <form class="org-add" id="deptAddForm" novalidate>
+            <input class="input" id="deptNewName" maxlength="20" autocomplete="off" placeholder="새 부서 이름 (예: 인사팀)" aria-label="새 부서 이름" aria-describedby="deptError">
+            <button type="submit" class="btn btn-primary" data-write>부서 추가</button>
+            <span class="muted org-count" id="deptCount"></span>
+          </form>
+          <p class="form-error" id="deptError" role="alert"></p>
+          <div class="table-wrap">
+            <table class="table org-table">
+              <thead><tr><th>순서</th><th>부서</th><th>인원</th><th>부서장</th><th>관리</th></tr></thead>
+              <tbody id="deptList"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="view" id="view-admin-rank">
+          <p class="crumb">업체 관리 &gt; <span class="crumb-current">직급 관리</span></p>
+          <div class="page-head"><h1>직급 관리</h1></div>
+          <p class="muted join-scope">위에서 아래로 낮은 직급부터 높은 직급 순서입니다. 여기 직급이 계정 생성에 그대로 나오고, 직원이 있는 직급은 지울 수 없습니다. 이름을 바꾸면 그 직급의 직원도 함께 바뀝니다.</p>
+          <form class="org-add" id="rankAddForm" novalidate>
+            <input class="input" id="rankNewName" maxlength="20" autocomplete="off" placeholder="새 직급 이름 (예: 책임)" aria-label="새 직급 이름" aria-describedby="rankError">
+            <button type="submit" class="btn btn-primary" data-write>직급 추가</button>
+            <span class="muted org-count" id="rankCount"></span>
+          </form>
+          <p class="form-error" id="rankError" role="alert"></p>
+          <div class="table-wrap">
+            <table class="table org-table">
+              <thead><tr><th>순서</th><th>직급</th><th>인원</th><th>관리</th></tr></thead>
+              <tbody id="rankList"></tbody>
             </table>
           </div>
         </section>
@@ -1205,6 +1243,7 @@
   <script src="js/attendance.js"></script>
   <script src="js/schedule.js"></script>
   <script src="js/approval.js"></script>
+  <script src="js/org-admin.js"></script>
   <script src="js/seat.js"></script>
   <script src="js/common.js"></script>
 </body>
