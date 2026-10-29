@@ -28,5 +28,10 @@ ALTER TABLE test_emp ADD lock_until DATE; -- 실패시 언제까지 계정 lock 
 
 SELECT compcode, empnum, name, fail_count, lock_until FROM test_emp;
 
+-- 로그인 테스트후 db 조회용 sql문 입니다. 로그인 실패시 count잘 올라가는지? 5번틀리면 lock잘 걸리는지 ?
+--SELECT compcode, empnum, name, status, fail_count, lock_until FROM test_emp WHERE compcode = 'ieum0001';
+
+-- 테스트후 count와 lock시간 초기화 sql문 입니다.
+--UPDATE test_emp SET fail_count = 0, lock_until = NULL WHERE compcode = 'ieum0001';
 
 COMMIT;

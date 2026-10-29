@@ -8,6 +8,12 @@
 	<!-- STS3 수업 기능 관리 | Security 시작: 세션 기반 기본 설정 -->
 	<bean id="bCryptPasswordEncoder"
 		class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+	<bean id="loginAuthenticationProvider"
+		class="com.ieum.gw.common.security.LoginAuthenticationProvider">
+		<property name="userDetailsService"
+			ref="customUserDetailsService" />
+		<property name="passwordEncoder" ref="bCryptPasswordEncoder" />
+	</bean>
 	<!-- 계정은 등록하지 않습니다. 수업에서 이 빈을 커스텀 UserDetailsService로 교체하세요. -->
 	<security:http use-expressions="true"
 		create-session="ifRequired">
@@ -32,8 +38,8 @@
 		<security:form-login login-page="/login"
 			login-processing-url="/login" username-parameter="username"
 			password-parameter="password"
-			authentication-failure-url="/login?error" default-target-url="/home"
-			always-use-default-target="true" />
+			authentication-success-handler-ref="loginSuccessHandler"
+			authentication-failure-handler-ref="loginFailureHandler" />
 		<security:logout logout-url="/logout"
 			logout-success-url="/login?logout" invalidate-session="true" />
 		<security:csrf />
@@ -42,10 +48,7 @@
 	</security:http>
 	<security:authentication-manager>
 		<security:authentication-provider
-			user-service-ref="customUserDetailsService">
-			<security:password-encoder
-				ref="bCryptPasswordEncoder" />
-		</security:authentication-provider>
+			ref="loginAuthenticationProvider" />
 	</security:authentication-manager>
 	<!-- STS3 수업 기능 관리 | Security 끝: 세션 기반 기본 설정 -->
 </beans>
