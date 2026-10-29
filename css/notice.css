@@ -88,7 +88,77 @@ textarea.input { height: auto; min-height: 320px; padding: 12px; line-height: 1.
 .comment-form-actions { display: flex; justify-content: flex-end; }
 .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+/* ---------- 10-29: 공지 범위 · 에디터 · 첨부 · 익명 게시판 ---------- */
+.scope-tag { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; background: var(--accent-bg); color: var(--accent); font-size: 11px; font-weight: 600; vertical-align: 1px; }
+.scope-tag.is-dept { background: #eaf3eb; color: #2b6a2f; }
+.scope-cell { color: var(--text-sub); font-size: 13px; }
+.scope-cell.is-dept { color: #2b6a2f; }
+.home-scope { margin-right: 6px; font-size: 12px; color: var(--text-muted); }
+.home-scope.is-dept { color: #2b6a2f; }
+.file-tag { margin-left: 6px; font-size: 11px; color: var(--text-muted); }
+.page-head-actions { display: flex; gap: 8px; }
+.field-label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.field-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
+.scope-select { max-width: 320px; }
+.scope-select:disabled { background: var(--bg-sub); color: var(--text-sub); }
+
+/* 에디터 */
+.editor { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--bg); }
+.editor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.editor-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 6px 8px; border-bottom: 1px solid var(--line); background: var(--bg-sub); }
+.ed-btn { min-width: 30px; height: 30px; padding: 0 8px; border: 1px solid transparent; border-radius: 6px; background: none; font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.ed-btn:hover { background: var(--bg); border-color: var(--line); }
+.ed-sep { width: 1px; height: 18px; margin: 0 4px; background: var(--line); }
+.ed-select { height: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font: inherit; font-size: 13px; }
+.ed-colors { display: inline-flex; gap: 4px; }
+.ed-color { width: 20px; height: 20px; padding: 0; border: 2px solid var(--bg); border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+.ed-color:hover { box-shadow: 0 0 0 2px var(--accent); }
+/* 지금 상태 보여 주기: 켜진 버튼은 눌린 모양, 지금 색에는 진한 링 */
+.ed-btn[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.ed-color[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--text); }
+.ed-size-wrap { display: inline-flex; align-items: center; }
+/* 글자 크기 숫자 칸: 숫자만 넣고 Enter 또는 칸 밖을 누르면 적용 (10~40) */
+.ed-size { width: 48px; height: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font: inherit; font-size: 13px; text-align: center; font-variant-numeric: tabular-nums; }
+.ed-size:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.editor-area { min-height: 320px; max-height: 60vh; overflow-y: auto; padding: 12px 14px; font-size: 15px; line-height: 1.75; outline: none; overflow-wrap: anywhere; }
+.editor-area.is-error { box-shadow: inset 0 0 0 1px var(--danger); }
+.editor-area:empty::before { content: attr(data-placeholder); color: var(--text-muted); }
+.rich-body { white-space: normal; }
+.rich-body p, .editor-area p { margin: 0 0 8px; }
+.rich-body ul, .rich-body ol, .editor-area ul, .editor-area ol { margin: 4px 0 8px; padding-left: 22px; }
+
+/* 첨부파일 */
+.attach-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.attach-box { max-width: 860px; margin-top: 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sub); }
+.attach-box h2 { margin: 0 0 8px; font-size: 14px; }
+.attach-images { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.attach-images:empty { display: none; }
+.attach-thumb { width: 120px; height: 90px; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); cursor: zoom-in; }
+.attach-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.attach-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.attach-list li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.attach-list small { color: var(--text-muted); font-size: 12px; }
+.attach-list.is-edit li { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
+.attach-list .link-btn { margin-left: auto; font-size: 12px; }
+.attach-name { overflow-wrap: anywhere; }
+.attach-mini { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
+.modal-image { max-width: min(92vw, 900px); }
+.modal-image img { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto 12px; border-radius: 6px; }
+
+/* 익명 게시판 */
+.anon-note { margin: -8px 0 14px; padding: 8px 12px; border-radius: var(--radius); background: var(--bg-sub); font-size: 12px; color: var(--text-sub); }
+.anon-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--bg-sub); color: var(--text-sub); font-size: 11px; font-weight: 600; }
+.anon-tag.is-report { background: var(--danger-bg); color: var(--danger); }
+.anon-tag.is-hidden { margin: 0 6px 0 0; background: #fff4e5; color: #8a4b08; }
+.table tr.is-hidden-row td { background: #fffaf2; }
+.anon-writer { color: var(--accent); }
+.anon-hidden-note { max-width: 860px; margin-bottom: 8px; }
+#aBtnReport:disabled { opacity: 0.6; cursor: default; }
+
 @media (max-width: 600px) {
+  .page-head { flex-wrap: wrap; gap: 10px; }
+  .editor-area { min-height: 220px; }
+  .attach-thumb { width: 96px; height: 72px; }
   .search-row .search-input { flex: none; }
   /* 휴대폰에서는 표가 카드로 바뀐다. 번호는 빼고 제목·작성자·작성일만 */
   .table td[data-label="번호"] { display: none; }

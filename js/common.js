@@ -15,6 +15,7 @@ const VIEWS = {
   'work-approval': { crumb: '근무', title: '승인' },
   'chat': { crumb: '소통', title: '채팅' },
   'board-dept': { crumb: '소통', title: '부서 게시판' },
+  'board-anon': { crumb: '소통', title: '익명 게시판' },
   'location': { crumb: '소통', title: '지도' },
   'org': { crumb: '회사', title: '조직도' },
   'hr-employee': { crumb: '인사 관리', title: '사원 관리' },
@@ -611,9 +612,9 @@ function showView() {
   const { views } = MODES[session.type];
   const home = MODES[session.type].home;
   let key = location.hash.slice(1);
-  // 공지사항·부서 게시판은 주소 뒤에 /view/3 같은 하위 화면이 붙는다: 메뉴·권한은 앞부분으로 보고, 화면은 notice.js가 연다
+  // 공지사항·부서 게시판·익명 게시판은 주소 뒤에 /view/3 같은 하위 화면이 붙는다: 메뉴·권한은 앞부분으로 보고, 화면은 notice.js가 연다
   const full = key;
-  if (/^(notice|board-dept)\//.test(key)) key = key.split('/')[0];
+  if (/^(notice|board-dept|board-anon)\//.test(key)) key = key.split('/')[0];
   const link = document.querySelector(`.nav-item[data-view="${key}"]`);
   // not a screen of this account type, or no access with the current roles: back to its first screen
   // a write page opened by its address while read-only: back home with the reason
@@ -627,7 +628,7 @@ function showView() {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('on'));
 
   const built = document.getElementById('view-' + key);
-  if ((key === 'notice' || key === 'board-dept') && typeof routeNoticeBoard === 'function') {
+  if ((key === 'notice' || key === 'board-dept' || key === 'board-anon') && typeof routeNoticeBoard === 'function') {
     routeNoticeBoard(full);
   } else if (built) {
     built.classList.add('on');

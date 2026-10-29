@@ -75,19 +75,9 @@
         const all = loadStore(key, {});
         if (Array.isArray(all[code])) { all[code].forEach(x => { if (x.dept === from) x.dept = to; }); saveStore(key, all); }
       }
-      // per-company stores of notice.js: board posts by department, notices with the writer's department
-      const board = loadStore(`ieum-board-demo-v2:${code}`, null);
-      if (board && Array.isArray(board.posts)) {
-        board.posts.forEach(p => { if (p.dept === from) p.dept = to; });
-        saveStore(`ieum-board-demo-v2:${code}`, board);
-      }
-      const notices = loadStore(`ieum-notice-demo-v3:${code}`, null);
-      if (notices && Array.isArray(notices.list)) {
-        notices.list.forEach(n => { if (n.writerDept === from) n.writerDept = to; });
-        saveStore(`ieum-notice-demo-v3:${code}`, notices);
-      }
-      // notice.js keeps both stores in memory: drop that copy, or its next save would write the old names back
-      if (typeof resetNoticeCaches === 'function') resetNoticeCaches();
+      // per-company stores of notice.js: notice.js renames its own data (notice scope·writer department, board
+      // posts by department) and drops its in-memory copy, so the store keys and shapes stay in one file
+      if (typeof renameNoticeDept === 'function') renameNoticeDept(code, from, to);
     } else {
       // the years of career counted for 연차 follow the rank to its new name (hr.js rankCareerOf)
       setRankCareer(code, to, rankCareerOf(code, from));

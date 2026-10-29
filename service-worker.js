@@ -1,6 +1,6 @@
 // Caches the app shell so the installed app opens even when the server is briefly unreachable.
 // Bump CACHE when shell files change, or users keep seeing the old version.
-const CACHE = 'ieum-shell-v142';
+const CACHE = 'ieum-shell-v143'; // v143: 공지 범위·에디터·첨부·댓글·구분 칸, 부서 게시판 에디터·첨부, 익명 게시판
 const SHELL = [
   './',
   'index.html',
