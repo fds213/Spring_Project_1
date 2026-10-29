@@ -14,7 +14,7 @@
 
 // ---------- 로그인한 사람 (그룹웨어 로그인을 그대로 쓴다) ----------
 // 역할은 v1.7처럼 한 사람에 하나로 읽는다: 업체 관리자 > 인사 담당 > IT 담당 > 직원.
-// 시안 사이드 메뉴의 "역할 보기"로 바꾸면 그대로 따른다 (common.js userRoles).
+// 역할은 계정에 붙은 것을 그대로 따른다 (common.js userRoles).
 // 읽기 전용(만료)도 그룹웨어 값(common.js readOnly)을 쓴다.
 let me = null;
 let readonly = false;

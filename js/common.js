@@ -107,17 +107,8 @@ function enterApp() {
   document.getElementById('userSub').textContent = session.sub;
   document.getElementById('brandLink').href = '#' + MODES[mode].home;
   document.getElementById('homeGreeting').textContent = `안녕하세요, ${session.name}님`;
-  // roles come with the account; the prototype's role picker starts from them
+  // roles come with the account: only the company admin grants them (사원 관리 / 가입 승인), so a signed-in user can't switch them here
   userRoles = session.roles.split(' ');
-  const picker = document.getElementById('demoRole');
-  // a combination the presets don't have (e.g. IT + 부서장) gets its own entry, so the picker shows the truth
-  let own = picker.querySelector('#demoRoleOwn');
-  if (!own) { own = new Option('', ''); own.id = 'demoRoleOwn'; picker.prepend(own); }
-  own.value = session.roles;
-  own.textContent = `계정 역할 (${session.roles.split(' ').filter(r => r !== 'EMPLOYEE').map(r => ({ IT: 'IT', HR: '인사', ADMIN: '관리자', HEAD: '부서장' })[r] || r).join('+') || '직원'})`;
-  const preset = [...picker.options].find(opt => opt !== own && opt.value === session.roles);
-  own.hidden = !!preset;
-  (preset || own).selected = true;
   refreshReadOnly();
   renderAttendance();
   renderTrialBar();
@@ -703,14 +694,6 @@ window.addEventListener('storage', e => {
     if (key === 'hr-employee') renderEmployees();
     if (readOnly !== wasReadOnly) showView();
   }
-});
-
-document.getElementById('demoRole').addEventListener('change', e => {
-  userRoles = e.target.value.split(' ');
-  applyRoles();
-  renderTrialBar();
-  refreshJoinBadge();
-  showView();
 });
 
 applyRoles();
