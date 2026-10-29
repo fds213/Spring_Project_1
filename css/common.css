@@ -79,7 +79,16 @@ a { color: inherit; text-decoration: none; }
 .join-request-hint { margin: 0; text-align: center; }
 /* 가입 승인: 가입 활성화 box */
 .join-open { margin: 4px 0 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
-.join-open.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+/* 켜져 있는 동안 테두리 색이 천천히 한 바퀴씩 돈다 (2px 테두리라 padding을 1px 줄여 크기를 맞춤) */
+@property --join-spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.join-open.is-on {
+  padding: 15px 17px; border: 2px solid transparent; box-shadow: 0 0 0 3px var(--accent-bg);
+  background: linear-gradient(var(--bg), var(--bg)) padding-box,
+    conic-gradient(from var(--join-spin), var(--accent), #8ec5f5, var(--accent-bg), #8ec5f5, var(--accent)) border-box;
+  animation: join-spin 6s linear infinite;
+}
+@keyframes join-spin { to { --join-spin: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .join-open.is-on { animation: none; } }
 .join-open h2 { margin: 0 0 4px; font-size: 15px; }
 .join-open-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 .join-open-head .join-note { margin: 0; }
