@@ -1,6 +1,6 @@
 // Caches the app shell so the installed app opens even when the server is briefly unreachable.
 // Bump CACHE when shell files change, or users keep seeing the old version.
-const CACHE = 'ieum-shell-v130';
+const CACHE = 'ieum-shell-v131';
 const SHELL = [
   './',
   'index.html',
@@ -52,8 +52,17 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Network first, cache as fallback: real data (JSP pages, AJAX) must never come from a stale cache
+// Network first, cache as fallback: real data (JSP pages, AJAX) must never come from a stale cache.
+// The cache is used when the network fails outright, and also when the server answers with an error (5xx): a
+// tunnel or proxy that can't reach the server for a moment answers 502, and one missing script then leaves the
+// app a blank page (seen 2026-10-29). The error response is passed on only when nothing is cached for it.
+// ignoreSearch lets index.html?preview (and the like) fall back to the cached index.html.
+const fromCache = req => caches.match(req, { ignoreSearch: true });
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-  e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  e.respondWith(
+    fetch(e.request)
+      .then(res => (res.status >= 500 ? fromCache(e.request).then(hit => hit || res) : res))
+      .catch(() => fromCache(e.request).then(hit => hit || Response.error()))
+  );
 });
