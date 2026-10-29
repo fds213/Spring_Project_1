@@ -282,6 +282,8 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 500; }
 .status-failed { background: var(--danger-bg); color: var(--danger); }
 .status-trial { background: var(--accent-bg); color: var(--accent); }
 .status-expired { background: #fff4e5; color: #8a4b08; }
+/* a payment waiting for the operator's approval (ops.js PAY_RESULT) */
+.status-pending { background: #fff4e5; color: #8a4b08; }
 .status-active { background: #e5f4e4; color: #2b6a2f; }
 .status-read { background: #e5f4e4; color: #2b6a2f; }
 .status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
@@ -527,6 +529,11 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   flex: none; width: 32px; height: 32px; display: grid; place-items: center;
   border-radius: 8px; background: var(--bg-sub); color: var(--text-sub);
 }
+/* 신청 현황: a payment request waiting for approval spans the whole detail, above the three cards */
+.request-card { grid-column: 1 / -1; border-color: #fde2c1; }
+.request-card .info-card-head { background: #fff9f0; }
+.request-card .bill-actions { padding: 12px 18px 16px; border-top: 1px solid var(--line); }
+#payRejectForm textarea { min-height: 80px; resize: vertical; }
 /* card footer with an action: pinned to the card's bottom, so it lines up even when cards stretch */
 .btn-block { width: 100%; height: 40px; justify-content: center; font-weight: 500; }
 /* inside a card the list loses its own frame and tint: label muted on the left, value in front */

@@ -78,9 +78,10 @@ function firmDetail(o) {
   // sorted newest first; two tries on the same date (a failed try, then the successful one) keep the order they were recorded in
   const history = [
     ...(o.payments || []).map((p, i) => [
-      h('span', '', span(p.result === 'OK' ? '성공' : '실패', `status status-${p.result === 'OK' ? 'paid' : 'failed'}`),
+      // result: 승인 / 승인 대기 / 반려 (with the reason) / 결제 실패 (ops.js PAY_RESULT)
+      h('span', '', span((PAY_RESULT[p.result] || PAY_RESULT.FAILED).label, `status status-${(PAY_RESULT[p.result] || PAY_RESULT.FAILED).cls}`),
         ` ${PAY_KIND[p.kind] || '첫 결제'}${p.plan ? ` ${PLAN_LABEL[p.plan]}` : ''} · ${won(p.amount)}`),
-      `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}`, p.at, i + 1,
+      `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}${p.result === 'REJECTED' && p.reason ? ` · 사유: ${p.reason}` : ''}`, p.at, i + 1,
     ]),
     [h('span', '', span('체험 신청', 'status status-trial'), ' 14일 무료 체험'), `${whenFull(o.at)} · ${o.no}`, o.at, 0],
   ].sort((a, b) => (new Date(b[2]) - new Date(a[2])) || (b[3] - a[3])).map(([main, sub]) => [main, sub]);

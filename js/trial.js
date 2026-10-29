@@ -237,8 +237,8 @@ function renderResult(done) {
   // the groupware opens only in the installed app, so the way in from here is the download, not a link
   add('p', '그룹웨어는 IEUM 앱에서 사용합니다. 앱을 설치한 뒤 업체 코드, 관리자 사번, 신청할 때 정한 비밀번호로 로그인하세요.', 'note');
   add('div', `결제는 체험 중 언제든 그룹웨어의 업체 관리 > 이용 결제에서 하고, 그때 유료로 쓸 인원을 정합니다. ` +
-    `결제한 날부터 유료 이용이 시작되고(남은 체험 기간은 이어지지 않습니다), 결제하면 ${TRIAL_SEATS}명 제한이 풀립니다. ` +
-    `만료 7일·3일·1일 전과 마지막 날에 결제 안내를 드립니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.`, 'done');
+    `결제하면 이음 운영자가 확인하고 승인한 날부터 유료 이용이 시작되고(남은 체험 기간은 이어지지 않습니다), 그때 ${TRIAL_SEATS}명 제한이 풀립니다. ` +
+    `만료 7일·3일·1일 전과 마지막 날에 결제 안내를 드립니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해 승인되어도 계정과 데이터는 그대로 이어집니다.`, 'done');
   const actions = add('div', '', 'actions');
   const home = document.createElement('a'); home.className = 'btn btn-lg'; home.href = 'site.html'; home.textContent = '소개 페이지로';
   const download = document.createElement('button'); download.type = 'button'; download.className = 'btn btn-primary btn-lg'; download.textContent = 'IEUM 앱 다운로드';

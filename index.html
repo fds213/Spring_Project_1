@@ -354,13 +354,15 @@
               </header>
               <!-- 요구분석서 v1.5 SUB-03: 자동 갱신·자동 결제 없이 관리자가 직접 결제·연장한다. 매번 월간·연간을 고른다.
                    체험 중·체험 만료: 첫 결제 / 유료 이용 중: 연장(기존 만료일부터) / 유료 만료: 다시 결제(결제한 날부터)
-                   1. 요금제 선택 → 2. 결제(토스 테스트 결제 자리, 시안은 모의) → 3. 완료 -->
+                   1. 요금제 선택 → 2. 결제(토스 테스트 결제 자리, 시안은 모의) → 3. 승인 대기(운영자가 승인하면 반영) -->
               <div class="bill-pay" id="billPay">
                 <ol class="bill-steps" id="billSteps">
                   <li data-step="1">1. 요금제 선택</li>
                   <li data-step="2">2. 결제</li>
-                  <li data-step="3">3. 완료</li>
+                  <li data-step="3">3. 승인 대기</li>
                 </ol>
+                <!-- 마지막 결제 신청이 반려되었으면 다음 신청 전까지 사유를 보여 준다 -->
+                <p class="notice-warn" id="billRejected" role="status" hidden></p>
                 <!-- 1. 요금제 선택: 월간·연간과 (첫 결제·다시 결제일 때) 인원·결제 안내 이메일 -->
                 <div class="bill-step" id="billStep1">
                   <fieldset class="plan-pick">
@@ -406,11 +408,11 @@
                   </div>
                   <p class="muted" id="billBusy" aria-live="polite"></p>
                 </div>
-                <!-- 3. 완료: 확인을 누르면 1단계(다음 연장)로 돌아간다 -->
+                <!-- 3. 승인 대기: 결제는 끝났고 이음 운영자가 신청 현황에서 승인해야 반영된다 (2026-10-29 결정).
+                     기다리는 동안 업체는 지금 상태 그대로이고, 다른 결제는 할 수 없다. 승인·반려되면 이 화면이 바뀐다 -->
                 <div class="bill-step" id="billStep3" hidden>
                   <p class="notice-ok" id="payDoneText"></p>
                   <dl class="detail" id="payDone"></dl>
-                  <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayFinish">확인</button></div>
                 </div>
               </div>
             </section>
@@ -582,7 +584,7 @@
         </section>
 
         <!-- 사원 관리: 업체 관리자(또는 인사 담당자)가 직원 계정의 상태를 본다. 계정은 직원이 계정 생성에서 요청해 승인으로 생기고,
-             체험 중에는 관리자 포함 10명, 결제하면 구매 인원까지다. 실제 한도는 서버가 계정 수를 세서 막는다 -->
+             체험 중에는 관리자 포함 10명, 결제가 승인되면 구매 인원까지다. 실제 한도는 서버가 계정 수를 세서 막는다 -->
         <section class="view" id="view-hr-employee">
           <p class="crumb">인사 관리 &gt; <span class="crumb-current">사원 관리</span></p>
           <div class="page-head"><h1>사원 관리</h1><a href="#hr-join" class="btn" data-roles="ADMIN HEAD">가입 승인으로</a></div>
@@ -694,6 +696,8 @@
           <div class="cards" id="appFilters">
             <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 신청</small><strong id="cntAll">0건</strong></button>
             <button type="button" class="card card-filter" data-filter="new" aria-pressed="false"><small>새 신청</small><strong id="cntNew">0건</strong></button>
+            <!-- 업체 관리자가 결제하면 승인 대기로 들어온다. 행을 펼쳐 승인·반려 (2026-10-29 결정) -->
+            <button type="button" class="card card-filter" data-filter="PENDING" aria-pressed="false"><small>결제 승인 대기</small><strong id="cntPending">0건</strong></button>
             <button type="button" class="card card-filter" data-filter="TRIAL" aria-pressed="false"><small>체험 중</small><strong id="cntTrial">0건</strong></button>
             <button type="button" class="card card-filter" data-filter="PAID" aria-pressed="false"><small>결제 완료</small><strong id="cntPaid">0건</strong></button>
             <button type="button" class="card card-filter" data-filter="EXPIRED" aria-pressed="false"><small>읽기 전용</small><strong id="cntExpired">0건</strong></button>
@@ -1060,6 +1064,20 @@
     <h2></h2>
     <p></p>
     <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="button" class="btn btn-primary" value="ok"></button></div>
+  </dialog>
+
+  <!-- 신청 현황: 결제 신청 반려. 사유는 업체 관리자의 이용 결제 화면에 보인다. 실제 서버는 토스 결제를 취소(환불)한다 -->
+  <dialog class="modal" id="payRejectDialog">
+    <form id="payRejectForm" novalidate>
+      <h2>결제 신청을 반려할까요?</h2>
+      <p>결제가 취소되고 업체는 지금 상태 그대로입니다. 업체 관리자는 사유를 보고 다시 결제할 수 있습니다.</p>
+      <div class="field">
+        <label for="rejectReason">반려 사유</label>
+        <textarea class="input" id="rejectReason" rows="3" maxlength="200" placeholder="예: 입금자 정보가 맞지 않습니다"></textarea>
+      </div>
+      <p class="login-error" id="rejectError" role="alert"></p>
+      <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="submit" class="btn btn-danger">반려</button></div>
+    </form>
   </dialog>
 
   <dialog class="modal" id="seatDialog">

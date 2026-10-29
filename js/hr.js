@@ -230,7 +230,7 @@ function renderEmployees() {
         ? `구매 인원 ${caps.active}명을 모두 쓰고 있습니다. 잘못 승인한 경우를 대비해 ${caps.approve}명까지 승인할 수 있고, 구매 인원을 넘는 계정은 자리가 날 때까지 자리 대기로 남습니다.`
         : `구매 인원 ${caps.active}명 중 ${caps.active - n}명 더 쓸 수 있습니다. 비활성 계정은 세지 않습니다.`)
       : (full
-        ? '체험 중 쓸 수 있는 자리를 모두 썼습니다. 쓰지 않는 직원을 비활성화하면 그만큼 다른 직원을 승인할 수 있고, 결제하면 구매한 인원만큼 쓸 수 있습니다.'
+        ? '체험 중 쓸 수 있는 자리를 모두 썼습니다. 쓰지 않는 직원을 비활성화하면 그만큼 다른 직원을 승인할 수 있고, 결제가 승인되면 구매한 인원만큼 쓸 수 있습니다.'
         : `체험 중에는 관리자를 포함해 ${caps.active}명까지 쓸 수 있습니다. ${caps.active - n}명 더 승인할 수 있습니다.`));
     document.getElementById('seatPay').hidden = caps.paid || !userRoles.includes('ADMIN');
   }
@@ -367,7 +367,7 @@ function showSeatDialog() {
   dialog.querySelector('h2').textContent = paid ? '승인할 수 있는 자리가 없습니다' : '계정을 더 쓸 수 없습니다';
   dialog.querySelector('p').textContent = paid
     ? `구매 인원 ${caps.active}명에 자리 대기까지 ${caps.approve}명이 모두 찼습니다. 잘못 승인된 계정이나 쓰지 않는 직원을 비활성화한 뒤 다시 해 주세요.`
-    : `체험 중에는 관리자를 포함해 ${TRIAL_SEATS}명까지 쓸 수 있습니다. 쓰지 않는 직원을 비활성화하면 그만큼 다시 승인할 수 있고, 결제하면 구매한 인원만큼 쓸 수 있습니다.`
+    : `체험 중에는 관리자를 포함해 ${TRIAL_SEATS}명까지 쓸 수 있습니다. 쓰지 않는 직원을 비활성화하면 그만큼 다시 승인할 수 있고, 결제가 승인되면 구매한 인원만큼 쓸 수 있습니다.`
       + (admin ? '' : ' 결제는 업체 관리자에게 요청하세요.');
   dialog.querySelector('[value="pay"]').hidden = paid || !admin;
   if (!dialog.open) dialog.showModal();

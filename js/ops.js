@@ -247,6 +247,80 @@ function addMonths(t, n) {
   return d;
 }
 const findCompanyOrder = code => loadStore(ORDERS_KEY, []).find(o => o.companyCode === code);
+
+// Operator approval of payments (user decided 2026-10-29). The admin's payment goes through first and is
+// recorded as a request (result PENDING); nothing changes for the company until an IEUM operator approves it
+// in 신청 현황. First payments, extensions and paying again after expiry all go this way.
+// - While it waits the company stays as it is: a trial keeps running, and once the trial or paid period ends it
+//   is read-only until the approval. One request at a time; another payment can't start while one waits.
+// - Approving applies it from the approval day: the first payment and paying again start that day, an
+//   extension continues from the day after the current expiry (or from that day, if the period ran out while
+//   it waited). The amount and discount stay as paid.
+// - Rejecting cancels the request (the real server refunds the Toss payment) with a reason the admin sees;
+//   the company stays as it was.
+// Results: OK (approved, or paid before approvals existed), PENDING, REJECTED, FAILED (the payment itself failed).
+// Real server: the Toss confirm stores the request, POST /ops/payments/{id}/approve|reject decides it.
+const PAY_RESULT = {
+  OK: { label: '승인', cls: 'paid' },
+  PENDING: { label: '승인 대기', cls: 'pending' },
+  REJECTED: { label: '반려', cls: 'rejected' },
+  FAILED: { label: '결제 실패', cls: 'failed' },
+};
+const pendingOf = o => (o.payments || []).find(p => p.result === 'PENDING') || null;
+const lastPayment = o => (o.payments || []).length ? o.payments[o.payments.length - 1] : null;
+// one id per payment request, for the operator's "new" marks (the application itself is appId)
+const reqId = (o, p) => `${o.no}@${p.at}`;
+
+// The period a waiting request would cover if it were approved now
+function approvalPeriod(o, p) {
+  const sub = subscriptionOf(o);
+  const running = sub && trialState(o).status !== 'EXPIRED';
+  if (running && p.kind === 'EXTEND') {
+    return { extend: true, from: dayAfter(sub.expire), to: addMonths(o.subAnchorAt, o.subMonths + p.months) };
+  }
+  const today = dayStart(Date.now());
+  return { extend: false, from: today, to: addMonths(today, p.months) };
+}
+
+// Approve or reject the company's waiting request. Returns the decided payment, or null when nothing waits
+// (decided already, e.g. in another tab).
+function decidePayment(no, approve, reason) {
+  const orders = loadStore(ORDERS_KEY, []);
+  const o = orders.find(x => x.no === no);
+  const p = o && pendingOf(o);
+  if (!p) return null;
+  const at = new Date().toISOString();
+  p.decidedAt = at;
+  if (!approve) {
+    p.result = 'REJECTED';
+    p.reason = reason;
+    saveStore(ORDERS_KEY, orders);
+    return p;
+  }
+  const period = approvalPeriod(o, p);
+  p.result = 'OK';
+  p.from = period.from.toISOString();
+  p.to = period.to.toISOString();
+  if (period.extend) {
+    o.subMonths += p.months;
+    if (p.users !== plannedUsers(o)) o.seatChanges = [...(o.seatChanges || []), { from: p.from, users: p.users }];
+  } else {
+    // a new paid run from the approval day, with the headcount chosen when paying
+    o.status = 'PAID';
+    o.paidAt = o.paidAt || at;
+    o.serviceFrom = p.from;
+    o.subAnchorAt = p.from;
+    o.subMonths = p.months;
+    o.users = p.users;
+    o.total = p.users * PRICE_PER_USER;
+    o.plan = p.plan;
+    // the billing address is kept apart: o.email stays the verified signup address (password reset)
+    o.billEmail = p.email || o.billEmail;
+    delete o.seatChanges;
+  }
+  saveStore(ORDERS_KEY, orders);
+  return p;
+}
 // here, once empNo, appId, dayStart and addMonths are defined
 upgradeStoredOrders();
 applyDueSeats();
@@ -257,10 +331,16 @@ const when = iso => {
   return `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-function newApps() {
+// What the operator hasn't seen yet: trial signups (appId) and payment requests waiting for approval (reqId).
+// One id each, so a company that signed up and then paid counts twice until the status page is opened.
+function unreadIds() {
   const read = loadStore(READ_KEY, []);
-  return loadStore(ORDERS_KEY, []).filter(o => !read.includes(appId(o)));
+  return loadStore(ORDERS_KEY, []).flatMap(o => {
+    const p = pendingOf(o);
+    return [appId(o), ...(p ? [reqId(o, p)] : [])];
+  }).filter(id => !read.includes(id));
 }
+const newApps = () => unreadIds(); // kept under its old name for the badge and the status page
 
 function renderBadges() {
   const n = newApps().length;
@@ -319,8 +399,12 @@ function buildDetail(o) {
   const st = trialState(o);
   const failed = (o.payments || []).filter(p => p.result === 'FAILED').length;
   const sub = subscriptionOf(o);
-  const payText = sub ? `결제 완료 (첫 결제 ${ymd(o.paidAt)})` : failed ? `미결제 · 실패 ${failed}회` : '미결제';
+  const pending = pendingOf(o);
+  const last = lastPayment(o);
+  const payText = sub ? `결제 완료 (첫 결제 ${ymd(o.paidAt)})`
+    : pending ? '결제 승인 대기' : failed ? `미결제 · 실패 ${failed}회` : '미결제';
   fill('pay', [
+    ...(last && last.result === 'REJECTED' ? [['최근 반려', `${ymd(last.decidedAt)} ${PAY_KIND[last.kind]} · ${last.reason}`]] : []),
     ['신청번호', o.no],
     ['신청 시각', whenFull(o.at)],
     ['체험 기간', `${ymd(o.at)} ~ ${st.trialEnd}`],
@@ -332,8 +416,88 @@ function buildDetail(o) {
     ] : [['유료 이용 시작', '결제한 날부터']]),
     ['업체 코드', o.companyCode],
   ]);
+  if (pending) box.prepend(requestCard(o, pending));
   return box;
 }
+
+// The waiting payment request, across the top of the detail, with 반려 / 승인 (decidePayment)
+function requestCard(o, p) {
+  const card = document.createElement('section');
+  card.className = 'info-card request-card';
+  const head = document.createElement('header');
+  head.className = 'info-card-head';
+  const title = document.createElement('div');
+  const h2 = document.createElement('h2');
+  h2.textContent = `${PAY_KIND[p.kind]} 승인 대기`;
+  const hint = document.createElement('p');
+  hint.textContent = '결제는 끝났습니다. 승인하면 그때 반영되고, 반려하면 결제가 취소되고 업체는 지금 상태 그대로입니다.';
+  title.append(h2, hint);
+  head.append(title);
+  const period = approvalPeriod(o, p);
+  const dl = document.createElement('dl');
+  dl.className = 'detail';
+  const rows = [
+    ['결제 시각', whenFull(p.at)],
+    ['요금제', `${PLANS[p.plan].label} (${p.months}개월)`],
+    ['이용 인원', p.kind === 'EXTEND' && p.users !== o.users ? `${p.users}명 (지금 ${o.users}명, 새 기간부터)` : `${p.users}명`],
+    ['결제 금액', `${won(p.amount)}${p.pct ? ` (${p.pct}% 할인)` : ''}`],
+    ['승인하면', `${ymd(period.from)} ~ ${ymd(period.to)}${period.extend ? ' (지금 만료일 다음 날부터)' : ' (승인한 날부터)'}`],
+    ...(p.email ? [['결제 안내 이메일', p.email]] : []),
+  ];
+  dl.append(...rows.flatMap(([k, v]) => {
+    const dt = document.createElement('dt'); dt.textContent = k;
+    const dd = document.createElement('dd'); dd.textContent = v;
+    return [dt, dd];
+  }));
+  const actions = document.createElement('div');
+  actions.className = 'bill-actions';
+  const reject = document.createElement('button');
+  reject.type = 'button';
+  reject.className = 'btn';
+  reject.textContent = '반려';
+  reject.addEventListener('click', () => openRejectDialog(o));
+  const approve = document.createElement('button');
+  approve.type = 'button';
+  approve.className = 'btn btn-primary';
+  approve.textContent = '승인';
+  approve.addEventListener('click', () => {
+    const done = decidePayment(o.no, true);
+    showToast(done ? `${o.company}: ${PAY_KIND[done.kind]} 신청을 승인했습니다 (${ymd(done.from)} ~ ${ymd(done.to)})`
+      : '이미 처리된 신청입니다');
+    renderStatus();
+  });
+  actions.append(reject, approve);
+  card.append(head, dl, actions);
+  return card;
+}
+
+// 반려: a reason is required (the admin sees it on its billing page)
+let rejectFor = null;
+function openRejectDialog(o) {
+  rejectFor = o;
+  const dialog = document.getElementById('payRejectDialog');
+  dialog.querySelector('h2').textContent = `${o.company}의 ${PAY_KIND[pendingOf(o)?.kind] || '결제'} 신청을 반려할까요?`;
+  document.getElementById('rejectReason').value = '';
+  document.getElementById('rejectError').textContent = '';
+  dialog.showModal();
+  document.getElementById('rejectReason').focus();
+}
+document.getElementById('payRejectDialog').querySelector('[value="cancel"]').addEventListener('click', () => {
+  document.getElementById('payRejectDialog').close();
+});
+document.getElementById('payRejectForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const reason = document.getElementById('rejectReason').value.trim();
+  if (reason.length < 2) {
+    document.getElementById('rejectError').textContent = '반려 사유를 적어 주세요 (업체 관리자에게 보입니다)';
+    return;
+  }
+  document.getElementById('payRejectDialog').close();
+  const done = rejectFor && decidePayment(rejectFor.no, false, reason);
+  showToast(done ? `${rejectFor.company}: 결제 신청을 반려했습니다` : '이미 처리된 신청입니다');
+  rejectFor = null;
+  renderStatus();
+});
 
 // The application whose detail is open under its row (one at a time); kept across re-renders
 let openApp = null;
@@ -401,11 +565,15 @@ let appFilter = 'all';
 
 function renderStatus() {
   const orders = loadStore(ORDERS_KEY, []).slice().sort((a, b) => new Date(b.at) - new Date(a.at));
-  const fresh = new Set([...seenNew, ...newApps().map(appId)]);
+  const fresh = new Set([...seenNew, ...unreadIds()]);
   const states = new Map(orders.map(o => [o.no, trialState(o)]));
+  // a row is new for its signup or for a payment request that came in since the page was last opened
+  const newSignup = o => fresh.has(appId(o));
+  const newRequest = o => { const p = pendingOf(o); return !!p && fresh.has(reqId(o, p)); };
   const count = (id, n) => { document.getElementById(id).textContent = `${n}건`; };
   count('cntAll', orders.length);
-  count('cntNew', fresh.size);
+  count('cntNew', orders.filter(o => newSignup(o) || newRequest(o)).length);
+  count('cntPending', orders.filter(o => pendingOf(o)).length);
   count('cntTrial', orders.filter(o => states.get(o.no).status === 'TRIAL').length);
   count('cntPaid', orders.filter(o => states.get(o.no).status === 'PAID').length);
   count('cntExpired', orders.filter(o => states.get(o.no).status === 'EXPIRED').length);
@@ -425,11 +593,13 @@ function renderStatus() {
 
   document.querySelectorAll('#appFilters .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.filter === appFilter));
   const shown = orders.filter(o =>
-    appFilter === 'all' ? true : appFilter === 'new' ? fresh.has(appId(o)) : states.get(o.no).status === appFilter);
+    appFilter === 'all' ? true : appFilter === 'new' ? newSignup(o) || newRequest(o)
+      : appFilter === 'PENDING' ? !!pendingOf(o) : states.get(o.no).status === appFilter);
 
   document.getElementById('appList').replaceChildren(...shown.flatMap(o => {
     const id = appId(o);
-    const isNew = fresh.has(id);
+    const isNew = newSignup(o) || newRequest(o);
+    const pending = pendingOf(o);
     const isOpen = openApp === id;
     const tr = document.createElement('tr');
     tr.className = 'row-link' + (isNew ? ' is-new' : '') + (isOpen ? ' is-open' : '');
@@ -440,8 +610,10 @@ function renderStatus() {
     name.type = 'button';
     name.setAttribute('aria-expanded', isOpen);
     const company = [name];
-    if (isNew) company.push(el('span', '새 신청', 'tag-new'));
+    if (newSignup(o)) company.push(el('span', '새 신청', 'tag-new'));
+    else if (newRequest(o)) company.push(el('span', '새 결제 신청', 'tag-new'));
     if (o.emailVerified === false) company.push(el('span', '인증 대기', 'status'));
+    if (pending) company.push(el('span', `${PAY_KIND[pending.kind]} 승인 대기`, 'status status-pending'));
     company.push(el('small', o.no, 'cell-sub'));
 
     const st = states.get(o.no);
@@ -464,7 +636,8 @@ function renderStatus() {
     tr.className = 'row-empty';
     const td = document.createElement('td');
     td.colSpan = 6;
-    td.textContent = orders.length ? '해당하는 신청이 없습니다' : '아직 들어온 신청이 없습니다';
+    td.textContent = !orders.length ? '아직 들어온 신청이 없습니다'
+      : appFilter === 'PENDING' ? '승인을 기다리는 결제 신청이 없습니다' : '해당하는 신청이 없습니다';
     tr.append(td);
     document.getElementById('appList').append(tr);
   }
@@ -479,7 +652,8 @@ document.querySelectorAll('#appFilters .card-filter').forEach(b => b.addEventLis
 // Opening the status page counts as having seen the new applications: the list still marks them
 // this time, and the badges clear
 function markAllRead() {
-  saveStore(READ_KEY, loadStore(ORDERS_KEY, []).map(appId));
+  const read = loadStore(READ_KEY, []);
+  saveStore(READ_KEY, [...new Set([...read, ...unreadIds()])]);
   renderBadges();
 }
 
@@ -492,7 +666,7 @@ function opsViewShown(key) {
   if (key === 'ops-stats') renderStats();
   if (key === 'ops-company') openFirmView();
   if (key !== 'ops-application-status') return;
-  seenNew = new Set(newApps().map(appId));
+  seenNew = new Set(unreadIds());
   appFilter = 'all';
   openApp = null;
   renderStatus();
@@ -516,9 +690,14 @@ window.addEventListener('storage', e => {
   const before = new Map(JSON.parse(e.oldValue || '[]').map(o => [appId(o), o.status]));
   const now = JSON.parse(e.newValue || '[]');
   const added = now.filter(o => !before.has(appId(o)));
-  const paid = now.filter(o => o.status === 'PAID' && before.get(appId(o)) === 'TRIAL');
+  // a payment request that wasn't waiting before (the admin paid in another tab)
+  const waitedBefore = new Set(JSON.parse(e.oldValue || '[]').map(o => { const p = pendingOf(o); return p ? reqId(o, p) : ''; }));
+  const requested = now.filter(o => { const p = pendingOf(o); return p && !waitedBefore.has(reqId(o, p)); });
   if (added.length) showToast(`새 체험 신청: ${added[added.length - 1].company}`);
-  else if (paid.length) showToast(`결제 완료: ${paid[paid.length - 1].company}`);
+  else if (requested.length) {
+    const o = requested[requested.length - 1];
+    showToast(`새 결제 신청: ${o.company} (${PAY_KIND[pendingOf(o).kind]}) · 승인을 기다립니다`);
+  }
   // redraw the open screen in place, keeping its filters and open row
   const key = location.hash.slice(1);
   if (key === 'ops-application-status') renderStatus();
