@@ -136,16 +136,42 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
 /* a light running along the line from step 1 to step 5, again and again. It passes behind the numbered circles
    (they sit above it with a white ring), so it looks like it goes from one step to the next. The streak is a
    quarter of the line wide; background-position -33.3% → 133.3% takes it from just off the left end to just off
-   the right end */
+   the right end. Linear, so each circle's border light (below) can start exactly when the streak reaches it */
+.flow { --flow-time: 4s; }
 .flow::after {
   content: ""; position: absolute; left: 8%; right: 8%; top: 23px; height: 4px; border-radius: 2px; pointer-events: none;
   background: linear-gradient(90deg, rgba(24, 95, 165, 0) 0%, rgba(24, 95, 165, 0.55) 60%, #185fa5 92%, #8fc0f0 100%) no-repeat;
   background-size: 25% 100%; background-position: -33.3% 0;
-  animation: flow-run 2.8s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+  animation: flow-run var(--flow-time) linear infinite;
 }
 @keyframes flow-run {
   0% { background-position: -33.3% 0; }
   85%, 100% { background-position: 133.3% 0; }
+}
+/* When the streak reaches a circle, the light goes round its border: it starts on the left where the line comes
+   in, splits over the top and the bottom and meets on the right where the line goes on. --ring-sweep is the angle
+   lit on each side (0 → 180deg); @property lets it animate. The ring is a 3px band (mask) over the circle's border.
+   Each circle starts after its own delay (--ring-delay, set by site.js from where the circle really is; the
+   nth-child values are for a 1120px-wide page if the script doesn't run) */
+@property --ring-sweep { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.flow li::after {
+  content: ""; position: absolute; top: -2px; left: 50%; width: 52px; height: 52px; margin-left: -26px;
+  border-radius: 50%; pointer-events: none; z-index: 2; opacity: 0;
+  background: conic-gradient(from 270deg,
+    #185fa5 0deg, #8fc0f0 var(--ring-sweep), transparent var(--ring-sweep),
+    transparent calc(360deg - var(--ring-sweep)), #8fc0f0 calc(360deg - var(--ring-sweep)), #185fa5 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  animation: ring-run var(--flow-time) linear infinite; animation-delay: var(--ring-delay, 0s);
+}
+.flow li:nth-child(2) { --ring-delay: 0.64s; }
+.flow li:nth-child(3) { --ring-delay: 1.29s; }
+.flow li:nth-child(4) { --ring-delay: 1.94s; }
+.flow li:nth-child(5) { --ring-delay: 2.58s; }
+@keyframes ring-run {
+  0% { opacity: 1; --ring-sweep: 0deg; }
+  7% { opacity: 1; --ring-sweep: 180deg; }
+  20%, 100% { opacity: 0; --ring-sweep: 180deg; }
 }
 .flow li { position: relative; counter-increment: step; text-align: center; padding-top: 0; }
 .flow li::before {
@@ -351,7 +377,7 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 @media (max-width: 1000px) {
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 28px; }
-  .flow::before, .flow::after { display: none; }
+  .flow::before, .flow::after, .flow li::after { display: none; }
 }
 @media (max-width: 900px) {
   .inq-strip { grid-template-columns: 1fr; }
@@ -409,5 +435,5 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 }
 @media (prefers-reduced-motion: reduce) {
   .feature, body.site .btn, .btn-arrow::after, .float-card, .fab-inquiry { transition: none; }
-  .flow::after { animation: none; display: none; }
+  .flow::after, .flow li::after { animation: none; display: none; }
 }
