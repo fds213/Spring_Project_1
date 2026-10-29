@@ -270,9 +270,16 @@ const PAY_RESULT = {
   REJECTED: { label: '반려', cls: 'rejected' },
   FAILED: { label: '결제 실패', cls: 'failed' },
 };
+// 인원 증설 (seat.js) records its own payments in the same list: ADD (paid, approved separately in 증설 승인)
+// and REFUND (a rejected 증설). They are not plan payments, so they get their own result labels and never
+// count as the latest plan request.
+const isSeatPayment = p => p.kind === 'ADD' || p.kind === 'REFUND';
+const payResultOf = p => (p.kind === 'REFUND' ? { label: '환불', cls: 'expired' }
+  : p.kind === 'ADD' && p.result === 'OK' ? { label: '결제 완료', cls: 'paid' }
+  : PAY_RESULT[p.result] || PAY_RESULT.FAILED);
 const pendingOf = o => (o.payments || []).find(p => p.result === 'PENDING') || null;
-// the latest request (a failed mock payment never became one, so it doesn't hide a rejection notice)
-const lastPayment = o => (o.payments || []).slice().reverse().find(p => p.result !== 'FAILED') || null;
+// the latest plan request (a failed mock payment never became one, so it doesn't hide a rejection notice)
+const lastPayment = o => (o.payments || []).slice().reverse().find(p => p.result !== 'FAILED' && !isSeatPayment(p)) || null;
 // one id per payment request, for the operator's "new" marks (the application itself is appId)
 const reqId = (o, p) => `${o.no}@${p.at}`;
 

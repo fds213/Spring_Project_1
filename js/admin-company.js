@@ -78,8 +78,8 @@ function firmDetail(o) {
   // sorted newest first; two tries on the same date (a failed try, then the successful one) keep the order they were recorded in
   const history = [
     ...(o.payments || []).map((p, i) => [
-      // result: 승인 / 승인 대기 / 반려 (with the reason) / 결제 실패 (ops.js PAY_RESULT)
-      h('span', '', span((PAY_RESULT[p.result] || PAY_RESULT.FAILED).label, `status status-${(PAY_RESULT[p.result] || PAY_RESULT.FAILED).cls}`),
+      // result: 승인 / 승인 대기 / 반려 (with the reason) / 결제 실패, and 증설 결제·환불 (ops.js payResultOf)
+      h('span', '', span(payResultOf(p).label, `status status-${payResultOf(p).cls}`),
         ` ${PAY_KIND[p.kind] || '첫 결제'}${p.plan ? ` ${PLAN_LABEL[p.plan]}` : ''} · ${won(p.amount)}`),
       `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}${p.result === 'REJECTED' && p.reason ? ` · 사유: ${p.reason}` : ''}`, p.at, i + 1,
     ]),

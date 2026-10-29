@@ -441,7 +441,7 @@ function renderPayHistory(order) {
       (p.result === 'OK' && p.from && p.to ? ` · ${ymd(p.from)} ~ ${ymd(p.to)}` : '') +
       (p.result === 'REJECTED' && p.reason ? ` · 사유: ${p.reason}` : '');
     const result = document.createElement('span');
-    const r = PAY_RESULT[p.result] || PAY_RESULT.FAILED;
+    const r = payResultOf(p); // ops.js: 증설 결제·환불 have their own labels
     result.className = `status status-${r.cls}`;
     result.textContent = r.label;
     li.append(what, result);
