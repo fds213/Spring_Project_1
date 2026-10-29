@@ -553,6 +553,7 @@ function renderJoin() {
   const open = reqs.filter(e => !requestExpired(e));
   const set = (id, v) => { document.getElementById(id).textContent = v; };
 
+  set('joinCompanyCode', code);
   set('joinOpen', `${open.length}건`);
   set('joinActive', caps ? `${n} / ${caps.active}명` : `${n}명`);
   set('joinRoom', caps ? `${Math.max(0, caps.approve - n - w)}명` : '-');
