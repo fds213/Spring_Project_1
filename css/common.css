@@ -239,7 +239,7 @@ input::-ms-reveal { display: none; }
 .nav-item:hover { background: #ecebe6; }
 .nav-item.on { background: var(--accent-bg); color: var(--accent); }
 
-/* prototype only: role switcher at the bottom of the sidebar */
+/* prototype only: simulator link at the bottom of the sidebar */
 .demo-role { margin: 20px 10px 8px; padding-top: 12px; border-top: 1px dashed var(--line); font-size: 12px; color: var(--text-muted); }
 .demo-role label { display: block; margin-bottom: 6px; }
 .demo-link { display: block; margin-top: 10px; color: var(--accent); }
