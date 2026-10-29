@@ -25,6 +25,11 @@
 //   An approved account that hasn't been created yet already holds its seat (or its 자리 대기 place).
 // Deactivation: an employee who leaves is deactivated (status RETIRED as in the team repo's DB, can't sign in,
 // records stay) and frees the seat. The company admin can't be deactivated, nor yourself.
+// Deletion (user decided 2026-10-29): a deactivated account can then be deleted by the company admin. It leaves
+// 사원 관리 for good (no 다시 사용). What is kept is a stub with the 사번, name, department and rank (status DELETED):
+// the 사번 is never handed out again and records (결재, 근태, 게시글) still show who it was; e-mail, password and
+// roles are removed, so it can't sign in or receive a password-reset code and the address can join again.
+// The real server does the same (DELETE /employee/admin/{empNo}, only for RETIRED, ADMIN only).
 // 부서장 is a department setting, not a rank or a role (v1.7 3.7): the company admin marks one employee per
 // department in 사원 관리 (staff record head: true); the real server keeps it on the department.
 // Prototype only: requests and accounts live in localStorage per company code, the password is kept in plain
@@ -39,7 +44,7 @@ const ROLE_LABEL = { IT: 'IT 담당', HR: '인사 담당', ADMIN: '업체 관리
 // EXPIRED is not stored: it is a REQUESTED request older than 1 hour (statusOf)
 const EMP_STATUS = {
   REQUESTED: '승인 대기', EXPIRED: '요청 만료', REJECTED: '반려', APPROVED: '계정 생성 전',
-  ACTIVE: '사용 중', WAITING: '자리 대기', RETIRED: '비활성',
+  ACTIVE: '사용 중', WAITING: '자리 대기', RETIRED: '비활성', DELETED: '삭제',
   APPROVAL_EXPIRED: '승인 만료', CANCELED: '취소',
 };
 const APPROVAL_LIMIT_MS = 60 * 60 * 1000; // an approved account must be created within 1 hour (v1.7 ACC-05)
@@ -115,8 +120,8 @@ function saveStaff(code, list) {
   all[code] = list;
   saveStore(EMP_KEY, all);
 }
-// accounts that have a 사번 (the employees shown in 사원 관리); requests don't have one yet
-const employeesOf = code => staffOf(code).filter(e => e.empNo);
+// accounts that have a 사번 (the employees shown in 사원 관리); requests don't have one yet, deleted ones are left out
+const employeesOf = code => staffOf(code).filter(e => e.empNo && e.status !== 'DELETED');
 
 // a request with no readable request time counts as expired (no "NaN분 남음")
 const requestExpired = e => e.status === 'REQUESTED' && !(Date.now() - new Date(e.requestAt).getTime() <= JOIN_LIMIT_MS);
@@ -130,7 +135,8 @@ const minutesLeft = e => Math.max(0, Math.ceil((new Date(e.requestAt).getTime() 
 // (the real server takes it from a per-company, per-year sequence in the same transaction as the approval)
 function nextEmpNo(code) {
   const year = String(new Date().getFullYear());
-  const used = employeesOf(code).filter(e => e.empNo.startsWith(year)).map(e => Number(e.empNo.slice(4)));
+  // deleted accounts count too: their 사번 is never given again
+  const used = staffOf(code).filter(e => e.empNo && e.empNo.startsWith(year)).map(e => Number(e.empNo.slice(4)));
   return empNo(year, Math.max(0, ...used) + 1);
 }
 
@@ -278,6 +284,8 @@ function stateButtons(e) {
     if (admin) box.append(writeButton(e.head ? '부서장 해제' : '부서장 지정', `${e.name} ${e.head ? '부서장 해제' : '부서장 지정'}`, () => setHead(e.empNo, !e.head)));
   } else if (e.status === 'RETIRED') {
     box.append(writeButton('다시 사용', `${e.name} 다시 사용`, () => confirmState(e.empNo)));
+    // only after deactivation, and only the company admin: deleting can't be undone
+    if (admin) box.append(writeButton('삭제', `${e.name} 삭제`, () => deleteRetired(e.empNo)));
   } else {
     return dash();
   }
@@ -314,6 +322,29 @@ function cancelApproved(no) {
       showToast(`${x.name}님의 승인을 취소했습니다`);
       rerenderStaffViews();
     });
+}
+
+// 삭제: a deactivated account leaves 사원 관리 for good (see the top of this file). Checked again on confirm, since
+// another tab may have brought it back in the meantime.
+function deleteRetired(no) {
+  const e = employeesOf(session.company).find(x => x.empNo === no);
+  if (!e || e.status !== 'RETIRED') return;
+  askConfirm(`${e.name} 계정을 삭제할까요?`,
+    `사번 ${e.empNo}. 삭제하면 사원 목록에서 사라지고 다시 사용으로 되돌릴 수 없습니다. 이메일과 비밀번호는 지우고, ` +
+    '결재·근태·게시글 기록에는 이름이 그대로 남습니다. 이 사번은 다시 쓰지 않습니다.', '삭제', () => {
+      const code = session.company;
+      const list = staffOf(code);
+      const i = list.findIndex(y => y.empNo === no);
+      if (i < 0 || list[i].status !== 'RETIRED') {
+        showToast('계정 상태가 바뀌어 삭제하지 않았습니다. 목록을 다시 확인해 주세요');
+        return rerenderStaffViews();
+      }
+      const x = list[i];
+      list[i] = { empNo: x.empNo, name: x.name, dept: x.dept, rank: x.rank, at: x.at, status: 'DELETED', deletedAt: new Date().toISOString() };
+      saveStaff(code, list);
+      showToast(`${x.name} 계정을 삭제했습니다`);
+      rerenderStaffViews();
+    }, true);
 }
 
 // A deactivated account comes back where it was: 계정 생성 전 if it was never created, otherwise 사용 중.
@@ -746,7 +777,8 @@ function activateWaiting(no, after) {
 }
 
 // A small yes/no dialog made on first use (the reject confirmation)
-function askConfirm(title, body, okLabel, onOk) {
+// danger: the OK button is red (an action that can't be undone, e.g. 삭제)
+function askConfirm(title, body, okLabel, onOk, danger) {
   let dialog = document.getElementById('askDialog');
   if (!dialog) {
     dialog = document.createElement('dialog');
@@ -764,6 +796,7 @@ function askConfirm(title, body, okLabel, onOk) {
   dialog.querySelector('h2').textContent = title;
   dialog.querySelector('p').textContent = body;
   dialog.querySelector('[value="ok"]').textContent = okLabel;
+  dialog.querySelector('[value="ok"]').className = danger ? 'btn btn-danger' : 'btn btn-primary';
   dialog.onOk = onOk;
   if (!dialog.open) dialog.showModal();
 }
@@ -783,9 +816,10 @@ function refreshJoinBadge() {
 // record (the IEUM operator) are left alone. The real server ends such sessions itself.
 function staffBlockedMessage() {
   if (!session || session.type !== 'EMPLOYEE') return '';
-  const me = employeesOf(session.company).find(e => e.empNo === session.id);
+  // staffOf, not employeesOf: a deleted account must sign out too
+  const me = staffOf(session.company).find(e => e.empNo === session.id);
   if (!me || me.status === 'ACTIVE') return '';
-  return me.status === 'RETIRED' ? '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요'
+  return me.status === 'RETIRED' || me.status === 'DELETED' ? '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요'
     : '이 계정은 지금 사용할 수 없습니다. 업체 관리자에게 문의해 주세요';
 }
 
