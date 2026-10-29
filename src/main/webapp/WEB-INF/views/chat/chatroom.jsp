@@ -1,6 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 pageEncoding="UTF-8"%>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c"%>
+<%-- 임시 화면: 공통 레이아웃이 확정되면 교체한다. 모델 속성: roomList (roomId, roomName), empList (empnum, name) --%>
 <!DOCTYPE html>
 <html>
 <head>

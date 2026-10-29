@@ -1,6 +1,7 @@
 package com.ieum.gw.chat.service;
 
 import com.ieum.gw.chat.dao.ChatDAO;
+import com.ieum.gw.chat.dto.ChatEmpDto;
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,5 +31,9 @@ public class ChatService {
 
     public List<ChatRoomDTO> getRoomList(String empnum) {
         return dao.getRoomList(empnum);
+    }
+
+    public List<ChatEmpDto> getEmpList(String empnum) {
+        return dao.getEmpList(empnum);
     }
 }

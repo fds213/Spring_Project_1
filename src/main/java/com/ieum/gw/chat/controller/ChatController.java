@@ -1,5 +1,6 @@
 package com.ieum.gw.chat.controller;
 
+import com.ieum.gw.chat.dto.ChatEmpDto;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
 import com.ieum.gw.chat.service.ChatService;
 import com.ieum.gw.common.dto.LoginUser;
@@ -32,10 +33,25 @@ public class ChatController {
         // 의 참여 채팅방
         String empnum = user.getEmpnum();
         List<ChatRoomDTO> roomlist = cService.getRoomList(empnum);
-
-
-        model.addAttribute("user", user); // empnum만 넘겨도 ㄱㅊ을듯
+        model.addAttribute("user", user); // empnum만 넘겨도 ㄱㅊ을듯 나중에 판단
         model.addAttribute("roomList", roomlist);
+
+        // 사원 조회는 나중에 emp 쪽 public 메소드를 호출하는걸로
+        // 지금은 임시로 여기서 작업
+
+        // getEmpList는 나를 제외한 사원 목록임
+        List<ChatEmpDto> emplist = cService.getEmpList(user.getEmpnum());
+        model.addAttribute("empList", emplist);
+
+
         return "chat/chatlist";
+    }
+
+    @PostMapping(value = "/createroom.do")
+    public String createroom(Model model, @RequestParam String roomName, @RequestParam List<String> members, @AuthenticationPrincipal LoginUser user) {
+
+
+
+        return "chat/createroom";
     }
 }
