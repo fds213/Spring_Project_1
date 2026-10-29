@@ -77,6 +77,18 @@ a { color: inherit; text-decoration: none; }
 .join-code-input { margin-top: 8px; }
 .join-code-note:empty { display: none; }
 .join-request-hint { margin: 0; text-align: center; }
+/* 가입 승인: 가입 활성화 box */
+.join-open { margin: 4px 0 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.join-open.is-on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.join-open h2 { margin: 0 0 4px; font-size: 15px; }
+.join-open-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.join-open-head .join-note { margin: 0; }
+.join-open-actions { display: flex; gap: 8px; align-items: center; }
+.join-open-actions .select, .join-open-actions select { min-width: 110px; }
+.join-open-actions .btn { height: 42px; white-space: nowrap; }
+.join-open-list { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
+.join-open-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+@media (max-width: 560px) { .join-open-actions { width: 100%; } .join-open-actions > * { flex: 1; } }
 .join-code-note.is-ok { color: #2b6a2f; }
 .join-code-note.is-bad { color: var(--danger); }
 .login-error.is-ok { color: #2b6a2f; }
@@ -541,7 +553,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .attend-time, .user-text, .brand-word { display: none; }
   /* touch targets at least 44px */
   .icon-btn, .menu-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  .header-right .btn { height: 36px; }
+  /* 비밀번호 변경 + 로그아웃 still fit at 360px */
+  .header-right .btn { height: 36px; padding: 0 8px; font-size: 13px; }
   .company { margin-left: 10px; padding-left: 10px; font-size: 13px; }
   .badge-dot { top: 4px; right: 2px; }
 }

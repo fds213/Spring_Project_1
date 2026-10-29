@@ -1,21 +1,20 @@
 // 인사 관리 > 사원 관리 and 가입 승인, plus the 계정 생성 form on the login screen.
 //
-// How an employee gets an account (decided 2026-10-28, replaces the pre-registration of requirements v1.4 ACC-04):
-//   1. 승인 요청: on the login screen the employee opens 계정 생성, confirms the 업체 코드 (확인 loads that
-//      company's 부서 and 직급 lists), picks 부서 and 직급, types 이름, and verifies the 이메일 with a mailed code.
-//      The 승인 요청 button is grey until the company is confirmed and the e-mail verified, then blue. Sending it
-//      makes a join request (status REQUESTED, no 사번 yet) and the screen says "승인 요청을 하였습니다".
+// How an employee gets an account (user decided 2026-10-29; replaces the 가입 키 of requirements v1.8):
+//   0. 가입 활성화: on 가입 승인 a 부서장 opens joining for their own department, the company admin for the whole
+//      company, for a time picked next to the button (10분 ~ 하루). It turns itself off when the time is up.
+//      While nothing is open, the company code does nothing on the join form, so a leaked code is of little use.
+//   1. 승인 요청: on the login screen the employee opens 계정 생성 and confirms the 업체 코드. Only while joining
+//      is open does 확인 load the open departments and the ranks; otherwise nothing happens (the same as a code that
+//      doesn't exist), and 5 wrong tries in 10 minutes lock 확인 for 10 minutes (v1.8). The employee picks 부서 and
+//      직급, types 이름, verifies the 이메일 with a mailed code and sets the 비밀번호. The 승인 요청 button is grey
+//      until all of that is done. Sending it makes a join request (REQUESTED, no 사번 yet).
 //   2. 승인·반려: the company admin (every request) or the head of that team (that team's requests) approves or
-//      rejects it on 가입 승인 within 1 hour of the request. After 1 hour it has expired ("요청 만료") and must be
-//      made again. Approving gives the next 사번 in order (<year> + the next number after the highest one used,
-//      numbers of people who left are never reused) and, from the company admin, roles (IT·인사; the 업체 관리자
-//      role is never given: one per company). Status APPROVED, "승인 완료 (계정 생성 전)".
-//   3. 계정 생성: the employee's screen turns into "승인 완료되었습니다": the 사번 appears in a locked field, and
-//      비밀번호 and 비밀번호 확인 fields appear; the bottom button becomes 계정 생성. With the password set,
-//      계정 생성 makes the account (ACTIVE, or WAITING when it was approved past the headcount, see below).
-//      The account must be made within 1 hour of the approval (v1.7 ACC-05): after that the approval ends, the
-//      seat is free again and the 사번 stays used. The company admin may cancel an approved account that isn't
-//      created yet (CFG-02). The same device picks the request up again if the screen was closed.
+//      rejects it on 가입 승인 within 1 hour of the request; after that it has expired and must be made again.
+//      Approving gives the next 사번 in order (<year> + the next number after the highest one used, never reused)
+//      and, from the company admin, roles, and makes the account right away with the password from the request
+//      (ACTIVE, or WAITING when it was approved past the headcount, see below). The employee's screen shows the
+//      사번 and a way to the login. The same device picks the request up again if the screen was closed.
 // Seats (decided 2026-10-28), counted when a request is approved:
 //   - Trial: up to 10 accounts in use including the admin. The 11th approval is refused.
 //   - Paid: accounts in use up to the purchased headcount. Approvals may go 20% further (구매 인원 × 1.2, rounded
@@ -64,6 +63,36 @@ const DEMO_RANKS = {
   ieum0002: ['사원', '주임', '대리', '과장', '차장', '부장'],
 };
 const ranksOf = code => loadStore(RANK_KEY, {})[code] || DEMO_RANKS[code] || RANKS;
+
+// 가입 활성화 per company: [{ scope, until, by, byName }], scope = a department or JOIN_OPEN_ALL (the company admin).
+// Entries whose time is up are dropped when read. The real server keeps them on the company (or department) with
+// the end time and answers the join form only for an open department.
+const JOIN_OPEN_KEY = 'ieum-demo-join-open-v1';
+const JOIN_OPEN_ALL = '*';
+function joinOpenings(code) {
+  const all = loadStore(JOIN_OPEN_KEY, {});
+  const now = Date.now();
+  const list = (all[code] || []).filter(x => new Date(x.until).getTime() > now);
+  if ((all[code] || []).length !== list.length) { all[code] = list; saveStore(JOIN_OPEN_KEY, all); }
+  return list;
+}
+// minutes = 0 turns that scope off
+function setJoinOpening(code, scope, minutes) {
+  const all = loadStore(JOIN_OPEN_KEY, {});
+  const list = (all[code] || []).filter(x => x.scope !== scope);
+  if (minutes) list.push({ scope, until: new Date(Date.now() + minutes * 60000).toISOString(), by: session.id, byName: session.name });
+  all[code] = list;
+  saveStore(JOIN_OPEN_KEY, all);
+}
+// the departments an employee can join now: all of them while the company admin has it open, else the open ones
+function openDeptsOf(code) {
+  const open = joinOpenings(code);
+  if (open.some(x => x.scope === JOIN_OPEN_ALL)) return deptsOf(code);
+  return deptsOf(code).filter(d => open.some(x => x.scope === d));
+}
+const scopeLabel = s => (s === JOIN_OPEN_ALL ? '업체 전체' : s);
+const hhmm = iso => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+const minsUntil = iso => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000));
 // this device's own join request (계정 생성), so closing the screen doesn't lose it
 const MY_JOIN_KEY = 'ieum-demo-join-mine';
 
@@ -361,8 +390,59 @@ function visibleRequests() {
   return all.filter(e => e.dept === dept);
 }
 
+// 가입 활성화 box: this person's own scope (부서장 = their department, 업체 관리자 = the whole company), its end
+// time, and the other open scopes (the admin sees and can turn off all of them; a 부서장 sees the company-wide one)
+const myJoinScope = () => (userRoles.includes('ADMIN') ? JOIN_OPEN_ALL : myDept());
+function renderJoinOpen() {
+  const code = session.company;
+  const admin = userRoles.includes('ADMIN');
+  const scope = myJoinScope();
+  const list = joinOpenings(code);
+  const mine = list.find(x => x.scope === scope);
+  const what = admin ? '업체의 모든 부서' : `${scope || '내'} 부서`;
+  $j('joinOpenBox').classList.toggle('is-on', !!mine);
+  $j('joinOpenNote').textContent = mine
+    ? `켜져 있습니다 · ${hhmm(mine.until)}까지 (${minsUntil(mine.until)}분 남음). 이 동안 직원이 계정 생성에서 업체 코드를 확인하면 ${what}로 가입을 요청할 수 있습니다.`
+    : `꺼져 있습니다. 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있고, 꺼져 있으면 업체 코드를 넣어도 아무 반응이 없습니다. 켜면 ${what}가 열리고, 고른 시간이 지나면 저절로 꺼집니다.`;
+  const btn = $j('btnJoinOpen');
+  btn.textContent = mine ? '끄기' : '가입 활성화';
+  btn.classList.toggle('btn-primary', !mine);
+  btn.setAttribute('aria-label', mine ? `${scopeLabel(scope)} 가입 활성화 끄기` : `${scopeLabel(scope)} 가입 활성화`);
+  if (readOnly) btn.setAttribute('aria-disabled', 'true'); else btn.removeAttribute('aria-disabled');
+  $j('joinOpenTime').disabled = !!mine;
+  $j('joinOpenTime').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
+  const others = list.filter(x => x.scope !== scope && (admin || x.scope === JOIN_OPEN_ALL));
+  const ul = $j('joinOpenList');
+  ul.hidden = !others.length;
+  ul.replaceChildren(...others.map(x => {
+    const li = document.createElement('li');
+    const text = document.createElement('span');
+    text.textContent = `${scopeLabel(x.scope)} · ${x.byName || x.by} 님이 켬 · ${hhmm(x.until)}까지 (${minsUntil(x.until)}분 남음)`;
+    li.append(text);
+    if (admin) li.append(writeButton('끄기', `${scopeLabel(x.scope)} 가입 활성화 끄기`, () => turnJoinOff(x.scope)));
+    return li;
+  }));
+}
+function turnJoinOff(scope) {
+  setJoinOpening(session.company, scope, 0);
+  showToast(`${scopeLabel(scope)} 가입 활성화를 껐습니다`);
+  renderJoin();
+}
+document.getElementById('btnJoinOpen').addEventListener('click', () => {
+  const scope = myJoinScope();
+  if (!scope) return showToast('부서가 정해지지 않아 가입을 열 수 없습니다');
+  const on = joinOpenings(session.company).some(x => x.scope === scope);
+  if (on) return turnJoinOff(scope);
+  const minutes = Number($j('joinOpenTime').value) || 60;
+  setJoinOpening(session.company, scope, minutes);
+  const until = joinOpenings(session.company).find(x => x.scope === scope).until;
+  showToast(`${scopeLabel(scope)} 가입을 ${hhmm(until)}까지 열었습니다. 직원에게 업체 코드를 알려 주세요`);
+  renderJoin();
+});
+
 function renderJoin() {
   const code = session.company;
+  renderJoinOpen();
   const caps = seatCaps(code);
   const admin = userRoles.includes('ADMIN');
   const n = activeStaff(code).length;
@@ -379,7 +459,7 @@ function renderJoin() {
   set('joinNote', !caps ? '' : (caps.paid
     ? `구매 인원 ${caps.active}명까지 사용 중으로 바뀌고, 잘못 승인한 경우를 대비해 ${caps.approve}명까지 승인할 수 있습니다. 구매 인원을 넘는 승인은 자리 대기가 되며, 업체 관리자가 자리가 날 때 직접 골라 활성화합니다.`
     : `체험 중에는 관리자를 포함해 ${caps.active}명까지 승인할 수 있습니다.`)
-    + ` 승인하면 다음 사번(지금은 ${nextEmpNo(code)})이 순서대로 붙고, 직원은 같은 화면에서 비밀번호를 정해 계정을 만듭니다(이메일은 요청할 때 인증함). 요청 뒤 1시간이 지나면 만료되어 다시 요청해야 하고, 승인 뒤 1시간 안에 계정을 만들지 않으면 승인이 끝나 자리가 다시 빕니다.`);
+    + ` 승인하면 다음 사번(지금은 ${nextEmpNo(code)})이 순서대로 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다(이메일은 요청할 때 인증함). 요청 뒤 1시간이 지나면 만료되어 다시 요청해야 합니다.`);
 
   const rows = reqs.map(e => {
     const tr = document.createElement('tr');
@@ -484,7 +564,7 @@ function openApprove(reqId) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고, 직원이 계정 생성 화면에서 비밀번호를 정하면 계정이 만들어집니다(이메일은 요청할 때 인증함).`
+  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${nextEmpNo(code)}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다(이메일은 요청할 때 인증함).`
     + (slot === 'WAIT' ? ' 구매 인원이 모두 차서 자리 대기로 승인됩니다.' : '');
   // roles: the company admin only (who may give roles is still open, guide section 3); never 업체 관리자
   const roles = dialog.querySelector('.approve-roles');
@@ -508,15 +588,18 @@ function approveJoin(reqId, roles) {
   // checked again: another tab may have used the last seat while the dialog was open
   const slot = approvalSlot(code);
   if (!slot) return showSeatDialog();
+  // the account is made now, with the password the employee set at the request
+  const now = new Date().toISOString();
   Object.assign(e, {
-    empNo: nextEmpNo(code), status: 'APPROVED', wait: slot === 'WAIT',
+    empNo: nextEmpNo(code), status: slot === 'SEAT' ? 'ACTIVE' : 'WAITING',
     roles: userRoles.includes('ADMIN') ? roles.filter(r => r !== 'ADMIN') : [],
-    approvedAt: new Date().toISOString(), approvedBy: session.id, at: new Date().toISOString(),
+    approvedAt: now, approvedBy: session.id, createdAt: now, at: now,
   });
+  delete e.wait;
   saveStaff(code, list);
   showToast(slot === 'SEAT'
-    ? `${e.name}님을 승인했습니다. 사번 ${e.empNo}. 직원이 1시간 안에 비밀번호를 정하면 계정이 만들어집니다`
-    : `${e.name}님을 승인했습니다(사번 ${e.empNo}). 구매 인원이 모두 차서 자리 대기로 두었습니다`);
+    ? `${e.name}님을 승인했습니다. 사번 ${e.empNo}로 계정이 만들어졌고 바로 로그인할 수 있습니다`
+    : `${e.name}님을 승인했습니다(사번 ${e.empNo}). 구매 인원이 모두 차서 자리 대기 계정으로 만들었습니다`);
   rerenderStaffViews();
 }
 
@@ -640,14 +723,14 @@ function staffSignIn(company, id, pw) {
 }
 
 // ---------- 로그인 화면: 계정 생성 ----------
-// One form, three states: request (confirm the company, fill in, verify the e-mail, press 승인 요청) → waiting
-// ("승인 요청을 하였습니다") → approved ("승인 완료되었습니다": 사번 locked, password, 계정 생성). The e-mail is
-// verified before the request (user decided 2026-10-28), so an approver only ever sees requests with a working
-// address. This device remembers its request.
+// One form, three states: request (confirm the company while joining is open, fill in, verify the e-mail, set
+// the password, press 승인 요청) → waiting ("승인 요청을 하였습니다") → approved (the account exists: the 사번
+// and a way to the login). The e-mail is verified before the request (user decided 2026-10-28), so an approver
+// only ever sees requests with a working address. This device remembers its request.
 const loginForm = document.getElementById('loginForm');
 const joinForm = document.getElementById('joinForm');
 const $j = id => document.getElementById(id);
-const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinCode'];
+const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinCode', 'joinPw', 'joinPw2'];
 let checkedCompany = ''; // the company code confirmed with 확인 ('' = not confirmed)
 let joinNotice = ''; // why the last request ended (반려, 만료, 없음); cleared when the form is changed
 
@@ -659,11 +742,12 @@ function fillSelect(id, list, pick, code) {
   sel.value = list.includes(keep) ? keep : '';
   sel.dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
 }
-function setDeptOptions(code) {
-  fillSelect('joinDept', code ? deptsOf(code) : [], '부서를 고르세요', code);
+// the open departments only (all of them when a stored request is shown again, so its department stays readable)
+function setDeptOptions(code, all) {
+  fillSelect('joinDept', code ? (all ? deptsOf(code) : openDeptsOf(code)) : [], '부서를 고르세요', code);
   fillSelect('joinRank', code ? ranksOf(code) : [], '직급을 고르세요', code);
 }
-const companyLoaded = code => `부서 ${deptsOf(code).length}개, 직급 ${ranksOf(code).length}개`;
+const companyLoaded = code => `가입이 열린 부서 ${openDeptsOf(code).length}개, 직급 ${ranksOf(code).length}개`;
 function setCompanyNote(text, ok) {
   const note = $j('joinCompanyNote');
   note.textContent = text;
@@ -680,18 +764,46 @@ function joinBlock(order) {
 }
 const companyOrder = code => (code && code !== 'ieum0000' ? findCompanyOrder(code) : null);
 
-// 확인: find the company and load its departments
+// 확인 tries: a code that can't be joined now (unknown, joining off, company not usable) counts as wrong. 5 wrong
+// tries within 10 minutes lock 확인 for 10 minutes and say how long (requirements v1.8 2; a right code isn't
+// counted). The real server counts per IP; the prototype per browser.
+const CHECK_FAIL_KEY = 'ieum-demo-join-check-v1';
+const CHECK_WINDOW_MS = 10 * 60 * 1000;
+const CHECK_FAILS = 5;
+const CHECK_LOCK_MS = 10 * 60 * 1000;
+function checkLockedUntil() {
+  const s = loadStore(CHECK_FAIL_KEY, {});
+  return s.until && new Date(s.until).getTime() > Date.now() ? s.until : '';
+}
+function noteCheckFail() {
+  const s = loadStore(CHECK_FAIL_KEY, {});
+  const now = Date.now();
+  const fails = (s.fails || []).filter(t => now - t < CHECK_WINDOW_MS).concat(now);
+  saveStore(CHECK_FAIL_KEY, fails.length >= CHECK_FAILS ? { fails: [], until: new Date(now + CHECK_LOCK_MS).toISOString() } : { fails });
+}
+const lockNote = until => `업체 코드 확인을 잠시 막았습니다. ${minsUntil(until)}분 뒤(${hhmm(until)})에 다시 해 주세요.`;
+
+// 확인: while joining is open, load the open departments and the ranks. Otherwise nothing happens on screen
+// (a closed company looks exactly like a code that doesn't exist), until the tries are used up.
 function checkCompany() {
+  const locked = checkLockedUntil();
+  if (locked) return setCompanyNote(lockNote(locked), false);
   const code = $j('joinCompany').value.trim().toLowerCase();
+  if (!code) return;
   const order = companyOrder(code);
-  const why = !code ? '업체 코드를 입력해 주세요' : joinBlock(order);
-  checkedCompany = why ? '' : code;
-  setCompanyNote(why || `${order.company} · ${companyLoaded(code)}를 불러왔습니다`, !why);
+  if (joinBlock(order) || !openDeptsOf(code).length) {
+    noteCheckFail();
+    const nowLocked = checkLockedUntil();
+    if (nowLocked) setCompanyNote(lockNote(nowLocked), false);
+    return;
+  }
+  checkedCompany = code;
+  setCompanyNote(`${order.company} · ${companyLoaded(code)}를 불러왔습니다`, true);
   setDeptOptions(checkedCompany);
-  $j('joinDept').disabled = $j('joinRank').disabled = !checkedCompany;
+  $j('joinDept').disabled = $j('joinRank').disabled = false;
   syncRequestButton();
   // after select.js has turned the dropdown on (it redraws on the next tick)
-  if (checkedCompany) setTimeout(() => $j('joinDeptBtn')?.focus());
+  setTimeout(() => $j('joinDeptBtn')?.focus());
 }
 $j('btnJoinCheck').addEventListener('click', checkCompany);
 $j('joinCompany').addEventListener('keydown', e => {
@@ -718,19 +830,21 @@ function myRequest() {
   return mine ? staffOf(mine.company).find(e => e.reqId === mine.reqId) || null : null;
 }
 
-// 승인 요청 button: grey and off until the company code is confirmed with 확인 and the e-mail typed now is
-// verified, then blue. The line above it says what is still missing.
+// 승인 요청 button: grey and off until the company code is confirmed, the e-mail typed now is verified and the
+// password is set (8+ characters, typed twice the same), then blue. The line above it says what is still missing.
+const pwReady = () => $j('joinPw').value.length >= 8 && $j('joinPw').value === $j('joinPw2').value;
 function syncRequestButton() {
   const b = $j('btnJoinRequest');
   const company = !!checkedCompany && $j('joinCompany').value.trim().toLowerCase() === checkedCompany;
   const email = emailVerifiedNow();
-  const on = !b.dataset.locked && company && email;
+  const pw = pwReady();
+  const on = !b.dataset.locked && company && email && pw;
   b.disabled = !on;
   b.classList.toggle('btn-primary', on);
   const hint = $j('joinRequestHint');
   hint.hidden = !!b.dataset.locked || on;
-  hint.textContent = !company && !email ? '업체 코드 확인과 이메일 인증을 마치면 승인 요청을 할 수 있습니다'
-    : !company ? '업체 코드를 확인하면 승인 요청을 할 수 있습니다' : '이메일을 인증하면 승인 요청을 할 수 있습니다';
+  const missing = [!company && '업체 코드 확인', !email && '이메일 인증', !pw && '비밀번호 정하기(8자 이상, 확인과 같게)'].filter(Boolean);
+  hint.textContent = `승인 요청 전에 남은 것: ${missing.join(' · ')}`;
 }
 
 function setJoinStatus(text, kind) {
@@ -745,7 +859,8 @@ function renderJoinForm() {
   const e = myRequest();
   const mine = loadMyJoin();
   const waiting = !!e && e.status === 'REQUESTED' && !requestExpired(e);
-  const approved = !!e && statusOf(e) === 'APPROVED';
+  // approved = the account was made by the approval (사용 중, or 자리 대기 past the headcount)
+  const approved = !!e && ['ACTIVE', 'WAITING'].includes(e.status);
   // the request fields are locked once sent (until it ends)
   JOIN_FIELDS.forEach(id => { $j(id).disabled = waiting || approved; });
   $j('btnJoinCheck').disabled = waiting || approved;
@@ -759,10 +874,11 @@ function renderJoinForm() {
     // fill from the stored request when the screen was opened again
     $j('joinCompany').value = mine.company;
     $j('joinName').value = e.name;
-    // the request was made for this company, so it counts as confirmed and its departments are loaded
+    // the request was made for this company, so it counts as confirmed; its department stays shown even if
+    // joining has been closed since
     checkedCompany = mine.company;
-    setCompanyNote(`${(companyOrder(mine.company) || {}).company || mine.company} · ${companyLoaded(mine.company)}`, true);
-    setDeptOptions(mine.company);
+    setCompanyNote((companyOrder(mine.company) || {}).company || mine.company, true);
+    setDeptOptions(mine.company, true);
     $j('joinDept').value = e.dept;
     $j('joinDept').dispatchEvent(new Event('change')); // redraws the custom dropdown (select.js)
     $j('joinRank').value = e.rank;
@@ -772,19 +888,21 @@ function renderJoinForm() {
     verifiedEmail = e.emailVerified ? e.email.toLowerCase() : '';
     $j('joinCode').hidden = true;
     setCodeNote(e.emailVerified ? '이메일 인증을 마쳤습니다.' : '', true);
+    $j('joinPw').value = $j('joinPw2').value = waiting || approved ? '********' : '';
   }
   if (waiting) {
-    setJoinStatus(`승인 요청을 하였습니다. 업체 관리자나 부서장이 승인하면 이 화면에서 바로 계정을 만들 수 있습니다. (${minutesLeft(e)}분 안에 승인되지 않으면 다시 요청해야 합니다)`, 'wait');
+    setJoinStatus(`승인 요청을 하였습니다. 업체 관리자나 부서장이 승인하면 바로 계정이 만들어집니다. (${minutesLeft(e)}분 안에 승인되지 않으면 다시 요청해야 합니다)`, 'wait');
   } else if (approved) {
-    setJoinStatus(e.wait
-      ? '승인 완료되었습니다. 구매 인원이 모두 차서, 계정을 만든 뒤 업체 관리자가 자리를 주면 로그인할 수 있습니다.'
-      : `승인 완료되었습니다. ${approvalMinutesLeft(e)}분 안에 비밀번호를 정하고 계정 생성을 눌러 주세요.`, 'ok');
+    setJoinStatus(e.status === 'WAITING'
+      ? '승인되어 계정이 만들어졌습니다. 구매 인원이 모두 차서 업체 관리자가 자리를 주면 로그인할 수 있습니다.'
+      : '승인되어 계정이 만들어졌습니다. 업체 코드와 아래 사번, 요청할 때 정한 비밀번호로 로그인하세요.', 'ok');
     $j('joinId').textContent = e.empNo;
-  } else if (e && approvalExpired(e)) {
-    joinNotice = '승인 뒤 1시간 안에 계정을 만들지 않아 승인이 끝났습니다. 다시 승인 요청을 해 주세요.';
+  } else if (e && ['APPROVED', 'CANCELED'].includes(e.status)) {
+    // made by the earlier flow (approval first, account later): asked again in the new flow
+    joinNotice = '이전 방식으로 처리된 요청입니다. 다시 승인 요청을 해 주세요.';
     saveMyJoin(null);
-  } else if (e && e.status === 'CANCELED') {
-    joinNotice = '업체 관리자가 승인을 취소했습니다. 업체에 확인한 뒤 다시 승인 요청을 해 주세요.';
+  } else if (e && e.status === 'RETIRED') {
+    joinNotice = '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요.';
     saveMyJoin(null);
   } else if (e && e.status === 'REJECTED') {
     joinNotice = '가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.';
@@ -802,7 +920,6 @@ function renderJoinForm() {
   $j('joinDept').disabled = $j('joinRank').disabled = waiting || approved || !checkedCompany;
   $j('btnJoinSend').disabled = waiting || approved || emailVerifiedNow();
   syncRequestButton();
-  syncCreateButton();
 }
 
 // 이메일 인증 (before 승인 요청): 인증 메일 보내기 sends a 6-digit code to the typed address; typing the code
@@ -913,12 +1030,7 @@ $j('joinEmail').addEventListener('input', () => {
   syncRequestButton();
 });
 
-// 계정 생성: on only with a password of 8+ characters typed twice the same
-function syncCreateButton() {
-  const pw = $j('joinPw').value;
-  $j('btnJoinCreate').disabled = !(pw.length >= 8 && pw === $j('joinPw2').value);
-}
-['joinPw', 'joinPw2'].forEach(id => $j(id).addEventListener('input', syncCreateButton));
+['joinPw', 'joinPw2'].forEach(id => $j(id).addEventListener('input', syncRequestButton));
 
 function showJoin(open) {
   loginForm.hidden = open;
@@ -941,13 +1053,15 @@ $j('btnJoinRequest').addEventListener('click', () => {
   const rank = $j('joinRank').value;
   const email = $j('joinEmail').value.trim();
   const error = $j('joinError');
+  const pw = $j('joinPw').value;
   error.textContent = !dept ? '부서를 골라 주세요' : !rank ? '직급을 골라 주세요' : !name ? '이름을 입력해 주세요' : !validEmail(email) ? '이메일 형식을 확인해 주세요'
-    : !emailVerifiedNow() ? '이메일을 인증해 주세요' : '';
+    : !emailVerifiedNow() ? '이메일을 인증해 주세요' : pw.length < 8 ? '비밀번호는 8자 이상으로 정해 주세요'
+      : pw !== $j('joinPw2').value ? '비밀번호 확인이 맞지 않습니다' : '';
   if (error.textContent) return;
   const order = companyOrder(company);
   // checked again: the company may have changed since 확인, and the department must be one of its own
   error.textContent = company !== checkedCompany ? '업체 코드를 다시 확인해 주세요'
-    : joinBlock(order) || (!deptsOf(company).includes(dept) ? '부서를 다시 골라 주세요'
+    : joinBlock(order) || (!openDeptsOf(company).includes(dept) ? '이 부서의 가입 시간이 끝났습니다. 업체 관리자나 부서장에게 다시 열어 달라고 해 주세요.'
       : ranksOf(company).includes(rank) ? '' : '직급을 다시 골라 주세요');
   if (error.textContent) return;
   const list = staffOf(company);
@@ -955,7 +1069,7 @@ $j('btnJoinRequest').addEventListener('click', () => {
   if (taken) { error.textContent = taken; return; }
   const req = {
     reqId: `R${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
-    name, dept, rank, email, emailVerified: true, roles: [], status: 'REQUESTED', requestAt: new Date().toISOString(), at: new Date().toISOString(),
+    name, dept, rank, email, emailVerified: true, pw, roles: [], status: 'REQUESTED', requestAt: new Date().toISOString(), at: new Date().toISOString(),
   };
   saveStaff(company, [...list, req]);
   saveMyJoin({ company, reqId: req.reqId });
@@ -970,19 +1084,12 @@ $j('btnJoinCancel').addEventListener('click', () => {
   renderJoinForm();
 });
 
-// 계정 생성
+// 로그인하러 가기 (after the approval made the account): back to the login with the company code and 사번 filled in
 joinForm.addEventListener('submit', ev => {
   ev.preventDefault();
   const mine = loadMyJoin();
-  const e = myRequest();
-  if (!mine || !e || statusOf(e) !== 'APPROVED') return renderJoinForm();
-  const pw = $j('joinPw').value;
-  if (pw.length < 8 || pw !== $j('joinPw2').value) return syncCreateButton();
-  const list = staffOf(mine.company);
-  const x = list.find(y => y.reqId === mine.reqId);
-  Object.assign(x, { status: x.wait ? 'WAITING' : 'ACTIVE', pw, emailVerified: !!x.emailVerified, createdAt: new Date().toISOString() });
-  delete x.wait;
-  saveStaff(mine.company, list);
+  const x = myRequest();
+  if (!mine || !x || !['ACTIVE', 'WAITING'].includes(x.status)) return renderJoinForm();
   saveMyJoin(null);
   ['joinPw', 'joinPw2', 'joinName', 'joinEmail'].forEach(id => { $j(id).value = ''; });
   resetEmailCheck();
@@ -994,7 +1101,7 @@ joinForm.addEventListener('submit', ev => {
   $j('loginCompany').value = mine.company;
   $j('loginId').value = x.empNo;
   $j('loginError').textContent = x.status === 'ACTIVE'
-    ? `계정이 만들어졌습니다. 사번 ${x.empNo}와 방금 정한 비밀번호로 로그인하세요.`
+    ? `계정이 만들어졌습니다. 사번 ${x.empNo}와 요청할 때 정한 비밀번호로 로그인하세요.`
     : `계정이 만들어졌습니다(사번 ${x.empNo}). 구매 인원이 모두 차서 업체 관리자가 자리를 주면 로그인할 수 있습니다.`;
   $j('loginError').classList.add('is-ok');
   $j('loginPw').focus();
