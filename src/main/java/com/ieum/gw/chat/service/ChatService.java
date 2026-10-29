@@ -2,9 +2,12 @@ package com.ieum.gw.chat.service;
 
 import com.ieum.gw.chat.dao.ChatDAO;
 import com.ieum.gw.chat.dto.ChatMessageDTO;
+import com.ieum.gw.chat.dto.ChatRoomDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class ChatService {
@@ -23,5 +26,9 @@ public class ChatService {
     @Transactional
     public void insertMessage(ChatMessageDTO dto) {
         dao.insertMessage(dto);
+    }
+
+    public List<ChatRoomDTO> getRoomList(String empnum) {
+        return dao.getRoomList(empnum);
     }
 }

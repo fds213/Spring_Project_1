@@ -8,6 +8,8 @@
 	<!-- STS3 수업 기능 관리 | Security 시작: 세션 기반 기본 설정 -->
 	<bean id="bCryptPasswordEncoder"
 		class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+
+	<bean id="customUserDetailsService" class="com.ieum.gw.common.service.CustomUserDetailsService" />
 	<!-- 계정은 등록하지 않습니다. 수업에서 이 빈을 커스텀 UserDetailsService로 교체하세요. -->
 	<security:http use-expressions="true"
 		create-session="ifRequired">

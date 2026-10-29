@@ -12,4 +12,8 @@
         INSERT INTO chat_message (msgId, roomId, sender, msg_type, content)
         VALUES (#{msgId}, #{roomId}, #{sender}, #{msg_type}, #{content})
     </insert>
+
+    <select id="getRoomList" parameterType="String" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
+        SELECT r.roomId, r.room_name FROM chat_room r JOIN chat_member m ON r.roomId = m.roomId  WHERE m.empnum = #{_parameter} AND m.left_at IS NULL
+    </select>
 </mapper>
