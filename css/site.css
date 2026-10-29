@@ -133,6 +133,20 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
 /* ---------- flow (도입 절차) ---------- */
 .flow { position: relative; list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; counter-reset: step; }
 .flow::before { content: ""; position: absolute; left: 8%; right: 8%; top: 24px; height: 2px; background: linear-gradient(90deg, var(--accent) 0%, #cfe0f5 100%); }
+/* a light running along the line from step 1 to step 5, again and again. It passes behind the numbered circles
+   (they sit above it with a white ring), so it looks like it goes from one step to the next. The streak is a
+   quarter of the line wide; background-position -33.3% → 133.3% takes it from just off the left end to just off
+   the right end */
+.flow::after {
+  content: ""; position: absolute; left: 8%; right: 8%; top: 23px; height: 4px; border-radius: 2px; pointer-events: none;
+  background: linear-gradient(90deg, rgba(24, 95, 165, 0) 0%, rgba(24, 95, 165, 0.55) 60%, #185fa5 92%, #8fc0f0 100%) no-repeat;
+  background-size: 25% 100%; background-position: -33.3% 0;
+  animation: flow-run 2.8s cubic-bezier(0.45, 0, 0.35, 1) infinite;
+}
+@keyframes flow-run {
+  0% { background-position: -33.3% 0; }
+  85%, 100% { background-position: 133.3% 0; }
+}
 .flow li { position: relative; counter-increment: step; text-align: center; padding-top: 0; }
 .flow li::before {
   content: counter(step); position: relative; z-index: 1; display: inline-grid; place-items: center;
@@ -337,7 +351,7 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 @media (max-width: 1000px) {
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .flow { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 28px; }
-  .flow::before { display: none; }
+  .flow::before, .flow::after { display: none; }
 }
 @media (max-width: 900px) {
   .inq-strip { grid-template-columns: 1fr; }
@@ -395,4 +409,5 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 }
 @media (prefers-reduced-motion: reduce) {
   .feature, body.site .btn, .btn-arrow::after, .float-card, .fab-inquiry { transition: none; }
+  .flow::after { animation: none; display: none; }
 }
