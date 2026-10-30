@@ -60,7 +60,7 @@ if (heroDevice && heroCard) {
   const hero = heroDevice.closest('.hero');
   const tiltable = matchMedia('(hover: hover) and (pointer: fine) and (min-width: 901px) and (prefers-reduced-motion: no-preference)');
   const REST = { x: -5, y: 2 }; // 도 단위: 멈춰 있을 때의 기울기, CSS와 같다
-  const MAX = 9;                // 마우스 쪽으로 가장 많이 기우는 각도
+  const MAX = 6;                // 마우스 쪽으로 가장 많이 기우는 각도
   let target = { ...REST };
   let cur = { ...REST };
   let frame = 0;
