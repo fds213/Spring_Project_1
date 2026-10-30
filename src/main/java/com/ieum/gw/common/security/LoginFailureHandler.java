@@ -29,8 +29,9 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
 
         String result;
 
-        if (exception instanceof LockedException) {            // 잠긴 계정
-            result = "locked";
+        if (exception instanceof LockedException) {
+            int minutes = loginFailService.getLockMinutes(compcode, empnum);
+            result = "locked=" + minutes;
         } else if (exception instanceof DisabledException) {     // 비밀번호 맞음 + 비활성
             result = "disabled";
         } else {                                      // 비밀번호 틀림·계정 없음
