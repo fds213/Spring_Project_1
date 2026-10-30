@@ -1,7 +1,7 @@
 <%@ tag language="java" pageEncoding="UTF-8" body-content="scriptless" trimDirectiveWhitespaces="true" %>
 <%@ attribute name="title" required="true" description="페이지 제목" %>
 <%@ attribute name="description" description="검색 결과에 보일 한 줄 설명. 비우면 기본 문구" %>
-<%@ attribute name="current" description="상단 메뉴 강조. 지금은 쓰지 않는다: 소개·체험 신청·문의 헤더를 똑같이 둔다 (2026-10-27)" %>
+<%@ attribute name="current" description="상단 메뉴 강조. 지금은 쓰지 않는다: 소개·체험 신청·문의 헤더를 똑같이 둔다" %>
 <%@ attribute name="cta" type="java.lang.Boolean" description="헤더의 '무료 체험' 버튼. 체험 신청 페이지만 false (자기 자신으로 가는 버튼이라)" %>
 <%@ attribute name="fab" type="java.lang.Boolean" description="떠 있는 '도입 문의' 버튼. 소개 페이지만 true" %>
 <%@ attribute name="mainClass" description="본문 main 의 class. 체험 신청은 section, 문의는 inq-page" %>

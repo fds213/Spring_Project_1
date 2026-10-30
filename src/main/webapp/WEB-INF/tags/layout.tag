@@ -20,7 +20,7 @@
   - loginUser: Spring Security principal (저장소 com.ieum.gw.common.dto.LoginUser). 저장소에 있는 name, empnum 만 읽는다
   - loginInfo (request 속성, 없어도 됨): companyName, deptName, rankName. 담당 1이 @ControllerAdvice 등으로 넣으면 헤더에 보인다.
     없으면 업체명은 비우고 부서·직급 자리에 사번을 보여준다 (LoginUser 에 없는 값을 읽으면 화면이 500 오류로 깨지므로 따로 받는다)
-  - 역할: 저장소 DB 값 ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN (한 사람에 하나). 이음 운영자 ROLE_OPS 는 제안
+  - 역할: ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN, ROLE_OPS(이음 운영자) 중 한 사람에 하나
     (hasRole 은 ROLE_ 접두사를 붙여 찾는다)
   - companyBilling (request 속성, 업체 직원만): status(TRIAL / PAID / EXPIRED), endDate("2026.11.08"), daysLeft(0 = 마지막 날)
   - todayPunch (request 속성, 업체 직원만): inTime("08:52"), outTime(없으면 비움)

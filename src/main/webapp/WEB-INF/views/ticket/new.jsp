@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-ticket-new">
-      <%-- 장애·문의 접수: 우리 회사 IT 담당자에게 간다. 이음 운영자에게 보내는 것은 "이음 장애 문의" (ticket/it-service.js) --%>
+      <%-- 장애·문의 접수: 우리 회사 IT 담당자에게 간다 (ticket/it-service.js) --%>
       <div class="page-head"><h1>장애·문의 접수</h1></div>
       <div class="info-grid info-grid-2">
         <section class="info-card">

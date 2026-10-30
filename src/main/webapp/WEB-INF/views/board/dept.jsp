@@ -129,7 +129,7 @@
       </form>
     </section>
 
-    <%-- 공지사항·부서 게시판·익명 게시판이 같이 쓰는 창과 에디터 툴바. JSP에서는 게시판 화면 JSP 끝에 넣는다(공통 jspf로 빼도 된다) --%>
+    <%-- 공지사항·부서 게시판이 같이 쓰는 창과 에디터 툴바. 게시판 화면 JSP 끝에 둔다 --%>
     <%-- 공지사항·부서 게시판 확인 창 (board/board.js) --%>
     <dialog class="modal" id="deleteDialog">
       <h2>공지를 삭제할까요?</h2>
@@ -149,18 +149,8 @@
       </div>
     </dialog>
 
-    <%-- 고정이 5개 꽉 찼을 때: 지금 고정된 공지를 보여 주고, 풀 공지로 바로 갈 수 있게 --%>
-    <dialog class="modal modal-wide" id="pinFullDialog">
-      <h2>맨 위 고정은 5개까지예요</h2>
-      <p>지금 고정된 공지 중 하나의 고정을 먼저 풀어 주세요.</p>
-      <ul class="pin-full-list" id="pinFullList"></ul>
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary" value="ok">확인</button>
-        <button type="button" class="btn" value="cancel" hidden>닫기</button>
-      </div>
-    </dialog>
 
-    <%-- 에디터 툴바 (공지·부서 게시판·익명 게시판이 같이 쓴다. notice.js가 각 .editor-toolbar에 복사해 넣는다)
+    <%-- 에디터 툴바 (공지·부서 게시판이 같이 쓴다. board/board.js가 각 .editor-toolbar에 복사해 넣는다)
          글자 크기: 숫자를 넣고 Enter 또는 칸 밖을 누르면 적용 (10~40, 기본 15). 커서 자리의 크기가 늘 보인다
          굵게·기울임·밑줄·목록: 켜져 있으면 눌린 모양 / 글자색: 지금 색에 링 --%>
     <template id="editorToolbarTpl">
@@ -186,15 +176,6 @@
       <button type="button" class="ed-btn" data-cmd="removeFormat" aria-label="서식 지우기" title="서식 지우기">서식 지우기</button>
     </template>
 
-    <%-- 익명 게시판 신고 --%>
-    <dialog class="modal" id="reportDialog">
-      <h2>이 글을 신고할까요?</h2>
-      <p>신고한 사람도 드러나지 않아요. 업체 관리자·인사 담당이 확인한 뒤 글을 숨길 수 있어요.</p>
-      <div class="modal-actions">
-        <button type="button" class="btn" value="cancel">취소</button>
-        <button type="button" class="btn btn-danger" value="ok">신고</button>
-      </div>
-    </dialog>
 
     <%-- 첨부 이미지 크게 보기 --%>
     <dialog class="modal modal-image" id="imageDialog" aria-label="이미지 크게 보기">

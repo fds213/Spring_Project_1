@@ -52,7 +52,7 @@
               <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>
               <div>
                 <h2>최초 관리자 계정</h2>
-                <p>신청할 때 바로 만들어진 계정입니다 (운영자 발급 없음, 요구분석서 v1.4)</p>
+                <p>신청할 때 바로 만들어진 계정입니다 (운영자 발급 없음)</p>
               </div>
             </header>
             <dl class="detail" data-part="admin"></dl>

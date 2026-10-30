@@ -103,11 +103,11 @@ function firmDetail(d) {
     ['사번', d.adminNo],
   ]));
 
-  // 체험 신청, 그리고 모든 결제 시도(첫 결제, 연장, 만료 뒤 다시 결제, 증설), 최신순.
+  // 체험 신청, 그리고 모든 결제 시도(첫 결제, 연장), 최신순.
   // 같은 날짜의 두 시도(실패한 시도 뒤 성공한 시도)는 기록된 순서를 지킨다
   const history = [
     ...d.payments.map(p => [
-      // 결과: 결제 완료 / 반려(예전 데이터, 사유와 함께) / 결제 실패, 그리고 증설 환불
+      // 결과(결제 완료·결제 실패)와 종류 글자는 서버가 준다
       h('span', '', span(p.resultLabel, `status status-${p.resultTone}`),
         ` ${p.kindLabel}${p.planLabel ? ` ${p.planLabel}` : ''} · ${won(p.amount)}`),
       `${whenFull(p.at)}${p.users ? ` · ${p.users}명` : ''}${p.reason ? ` · 사유: ${p.reason}` : ''}`, p.at, p.seq,

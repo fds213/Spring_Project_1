@@ -662,7 +662,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .badge-dot { top: 4px; right: 2px; }
 }
 
-/* ---------- 운영자 화면: 장애/문의 접수, 운영 데이터, 업체 관리 ---------- */
+/* ---------- 운영자 화면: 비회원 접수, 업체 관리 ---------- */
 /* 문의(운영자): 줄 아래 상세는 카드 두 장. 왼쪽은 질문, 오른쪽은 답변 */
 .table tr.row-detail .inq-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 4px 12px 16px; }
 @media (max-width: 1200px) { .table tr.row-detail .inq-grid { grid-template-columns: minmax(0, 1fr); } }
