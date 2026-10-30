@@ -50,7 +50,7 @@ if (calcUsers) {
   fromBox();
 }
 
-// 히어로: 그룹웨어 화면이 마우스 쪽으로 기울고, 멈추면 결재 카드가 화면 앞으로 튀어나온다
+// 히어로: 그림 둘레에 마우스가 오면 그룹웨어 화면이 마우스 쪽으로 기울고, 멈추면 결재 카드가 화면 앞으로 튀어나온다
 // (화면이 움직이는 동안에는 비켜 있다). 처음 볼 때는 화면이 평평한 데서 서서히 기운 뒤 카드가
 // 나온다. 넓은 화면의 마우스에서만 하고 동작 줄이기 설정이면 끈다: 그 밖에는 화면이 정해진 기울기로
 // 있고 카드는 그대로 보인다.
@@ -61,6 +61,7 @@ if (heroDevice && heroCard) {
   const tiltable = matchMedia('(hover: hover) and (pointer: fine) and (min-width: 901px) and (prefers-reduced-motion: no-preference)');
   const REST = { x: -5, y: 2 }; // 도 단위: 멈춰 있을 때의 기울기, CSS와 같다
   const MAX = 6;                // 마우스 쪽으로 가장 많이 기우는 각도
+  const REACH = 80;             // px: 그림 둘레에서 이만큼 안에 마우스가 있을 때만 기운다
   let target = { ...REST };
   let cur = { ...REST };
   let frame = 0;
@@ -97,6 +98,10 @@ if (heroDevice && heroCard) {
   hero.addEventListener('pointermove', e => {
     if (!tiltable.matches || e.pointerType !== 'mouse') return;
     const r = heroDevice.getBoundingClientRect();
+    // 그림에서 멀리 있으면(왼쪽 글·버튼 위 등) 멈춘 기울기로 돌아간다
+    const far = e.clientX < r.left - REACH || e.clientX > r.right + REACH
+      || e.clientY < r.top - REACH || e.clientY > r.bottom + REACH;
+    if (far) { aim(REST.x, REST.y); return; }
     const nx = clamp((e.clientX - (r.left + r.width / 2)) / (r.width / 2));
     const ny = clamp((e.clientY - (r.top + r.height / 2)) / (r.height / 2));
     // rotateY > 0 은 앞면을 오른쪽으로, rotateX > 0 은 위로 돌린다: 화면이 마우스를 바라본다
