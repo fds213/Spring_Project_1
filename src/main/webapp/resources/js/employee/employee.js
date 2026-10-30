@@ -1,6 +1,6 @@
 // 인사 관리 > 사원 관리 (views/employee/admin/list.jsp)·가입 승인 (views/employee/join.jsp), 그리고 계정 생성·비밀번호 찾기
 // (views/common/join.jsp, join-password.jsp. 아직 이 파일을 불러오지 않는다: 백엔드 API가 생기면 그 주소에 맞춰 붙인다).
-// 계정이 생기는 흐름, 자리 수, 비활성화·차단 규칙은 서버가 정하고 지킨다. 이번 구현 범위(요구분석서 3장 단순화 ①②):
+// 계정이 생기는 흐름, 자리 수, 비활성화 규칙은 서버가 정하고 지킨다. 이번 구현 범위(요구분석서 3장 단순화 ①②):
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
@@ -8,10 +8,10 @@
 // 사원 관리 (업체 관리자·인사 담당):
 //   GET    /employee/admin/api/employees                    → { perms: { admin, pay }, readOnly, caps, seats, counts, items: [직원] }
 //            caps: { paid, active 쓸 수 있는 계정(체험 10명, 결제 뒤 구매 인원) } | null
-//            seats: { used 사용 중 계정, full, room }   counts: { total, off 비활성·차단, seat }
+//            seats: { used 사용 중 계정, full, room }   counts: { total, off 비활성, seat }
 //            직원: { empNo, name, email, dept, deptType, head, rank, role, empType, work, gender, status, at,
-//                    actions: ['off'|'suspend'|'head'|'on'|'unsuspend'], canRetire }
-//   POST   /employee/admin/api/employees/{empNo}/status       { action: off|suspend|on } → { name, status, wasBlocked, released }
+//                    actions: ['off'|'head'|'on'], canRetire }
+//   POST   /employee/admin/api/employees/{empNo}/status       { action: off|on } → { name, status, released }
 //   POST   /employee/admin/api/employees/{empNo}/head         { head: true|false } → { name, dept, head }
 //   POST   /employee/admin/api/employees/{empNo}/hr           { empType, work, gender } → { name, turnedOff, released }
 // 가입 승인 (업체 관리자·부서장):
@@ -43,8 +43,7 @@
 // 화면을 닫았다 열어도 요청을 이어 보려는 것이다. 쿠키나 페이지에 둔 요청 번호로 바꿔도 된다.
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
-// 서버는 공통 코드 테이블에서 읽는다. 시트에 없는 값은 화면에서 정한 값을 그대로 쓴다
-// (가입 흐름 상태 REQUESTED·REJECTED·APPROVED·WAITING·DELETED·CANCELED, 일반 부서).
+// 서버는 공통 코드 테이블에서 읽는다.
 // 계정 형태 (ROLE): 한 계정에 하나. IT 담당·인사 담당은 역할이 아니라 소속 부서의 부서 형태로 정한다.
 const ROLE_CODE = { ROLE_OPR: '이음 운영자', ROLE_ADMIN: '업체 관리자', ROLE_USR: '업체 사용자' };
 // 부서 형태 (DEPT_TYPE): 부서마다 하나 또는 없음(일반 부서, ''). 부서 관리(org-admin.js)에서 정한다.
@@ -57,17 +56,12 @@ const DEPT_DUTY = { DEPT_IT: 'IT 담당', DEPT_HR: '인사 담당' };
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
 // 상태 (STATUS): 휴직 중에도 계정은 쓸 수 있어야 해서 두 칸에 나눠 담는다.
-//   계정 상태 status: ST_ACTIVE 사용 중 / ST_INACTIVE 비활성 / ST_SUSPENDED 차단 (+ 가입 흐름 값)
+//   계정 상태 status: ST_ACTIVE 사용 중 / ST_INACTIVE 비활성 (계정은 지우지 않고 비활성화만 한다)
 //   재직 상태 work:   ST_SERVING 재직 / ST_LEAVE 휴직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
 const WORK_STATUS = { ST_SERVING: '재직', ST_LEAVE: '휴직', ST_RETIRED: '퇴사' };
-// EXPIRED·APPROVAL_EXPIRED는 서버가 시간이 지난 요청·승인에 붙여 보내는 값이다
-const EMP_STATUS = {
-  REQUESTED: '승인 대기', EXPIRED: '요청 만료', REJECTED: '반려', APPROVED: '계정 생성 전',
-  ST_ACTIVE: '사용 중', WAITING: '자리 대기', ST_INACTIVE: '비활성', ST_SUSPENDED: '차단', DELETED: '삭제',
-  APPROVAL_EXPIRED: '승인 만료', CANCELED: '취소',
-};
-// 꺼진 계정 (로그인 불가, 자리 없음): 비활성과 차단
-const offStatus = s => s === 'ST_INACTIVE' || s === 'ST_SUSPENDED';
+const EMP_STATUS = { ST_ACTIVE: '사용 중', ST_INACTIVE: '비활성' };
+// 꺼진 계정 (로그인 불가, 자리 없음)
+const offStatus = s => s === 'ST_INACTIVE';
 
 // ---------- 화면 도구 ----------
 const $j = id => document.getElementById(id);
@@ -115,7 +109,7 @@ const writeButton = (label, aria, onClick, primary) => {
   b.addEventListener('click', onClick);
   return b;
 };
-// 읽기 전용이어도 되는 버튼: 비활성화·차단은 쓰는 계정을 줄이기만 하므로 요구분석서 3.11이 허용한다
+// 읽기 전용이어도 되는 버튼: 비활성화는 쓰는 계정을 줄이기만 하므로 요구분석서 3.11이 허용한다
 // (인원을 줄여 다시 결제하려면 필요하기도 하다)
 const allowedButton = (label, aria, onClick) => {
   const b = writeButton(label, aria, onClick);
@@ -144,7 +138,7 @@ function drawEmployees(d) {
   const full = d.seats.full;
   const set = (id, v) => { $j(id).textContent = v; };
 
-  set('empTotal', counts.off ? `${counts.total}명 (비활성·차단 ${counts.off})` : `${counts.total}명`);
+  set('empTotal', counts.off ? `${counts.total}명 (비활성 ${counts.off})` : `${counts.total}명`);
   set('empActive', `${counts.seat}명`);
   set('empLimit', !caps ? '-' : d.readOnly ? '읽기 전용' : caps.paid ? `${caps.active}명 (구매 인원)` : `${caps.active}명 (체험 중)`);
 
@@ -192,16 +186,12 @@ function drawEmployees(d) {
 // 인사 정보 칸: 고용 형태 · 재직 상태, 넣었으면 성별
 const hrInfoText = e => [EMP_TYPE[e.empType], WORK_STATUS[e.work], GENDER[e.gender]].filter(Boolean).join(' · ') || '-';
 
-// 서버가 정한 버튼(actions)을 그린다. 비활성화·차단은 읽기 전용이어도 되고, 나머지는 쓰기 동작이다.
-// 계정은 지우지 않는다(기록이 남아야 한다: AGENTS.md 이력 데이터, CFG-02)
+// 서버가 정한 버튼(actions)을 그린다. 비활성화는 읽기 전용이어도 되고, 나머지는 쓰기 동작이다.
+// 계정은 지우지 않고 비활성화만 한다(기록이 남아야 한다: AGENTS.md 이력 데이터, CFG-02)
 const EMP_ACTIONS = {
   off: e => allowedButton('비활성화', `${e.name} 비활성화`, () => confirmState(e, 'off')),
-  // 차단 (ST_SUSPENDED): 업체 관리자가 잘못된 행위로 계정을 막는다. 비활성화처럼 로그인을 막고 자리를 비우지만
-  // "차단"으로 보여서 퇴사한 사람으로 오해하지 않는다
-  suspend: e => allowedButton('차단', `${e.name} 차단`, () => confirmState(e, 'suspend')),
   head: e => writeButton(e.head ? '부서장 해제' : '부서장 지정', `${e.name} ${e.head ? '부서장 해제' : '부서장 지정'}`, ev => setHead(e, !e.head, ev.currentTarget)),
   on: e => writeButton('다시 사용', `${e.name} 다시 사용`, () => confirmState(e, 'on')),
-  unsuspend: e => writeButton('차단 해제', `${e.name} 차단 해제`, () => confirmState(e, 'on')),
 };
 // 관리 칸: 계정 버튼, 그리고 인사 정보 (모든 계정. 업체 관리자와 본인 것도)
 function rowActions(e) {
@@ -223,16 +213,12 @@ function setHead(e, on, btn) {
     .done(r => showToast(r.head ? `${r.name}님을 ${r.dept} 부서장으로 지정했습니다. 그 부서의 가입 요청을 승인할 수 있습니다` : `${r.name}님의 부서장 지정을 해제했습니다`));
 }
 
-
-// mode: 'off' 비활성화 (ST_INACTIVE), 'suspend' 차단 (ST_SUSPENDED, 업체 관리자), 'on' 다시 사용 / 차단 해제
+// mode: 'off' 비활성화 (ST_INACTIVE), 'on' 다시 사용
 let stateTarget = null;
 const STATE_TEXT = {
   off: { title: n => `${n} 계정을 비활성화할까요?`, ok: () => '비활성화',
     body: no => `사번 ${no}. 비활성화하면 이 직원은 로그인할 수 없고, 결재·게시글 같은 기록은 그대로 남습니다. 쓰던 자리가 비어 다른 직원을 승인할 수 있고, 나중에 다시 사용으로 되돌릴 수 있습니다.` },
-  suspend: { title: n => `${n} 계정을 차단할까요?`, ok: () => '차단',
-    body: no => `사번 ${no}. 잘못된 행위로 계정을 막을 때 씁니다. 차단하면 로그인할 수 없고 "차단된 계정"으로 안내됩니다. 기록은 그대로 남고 쓰던 자리가 비며, 업체 관리자가 차단 해제로 되돌릴 수 있습니다.` },
-  on: { title: (n, e) => (e.status === 'ST_SUSPENDED' ? `${n} 계정의 차단을 해제할까요?` : `${n} 계정을 다시 사용할까요?`),
-    ok: e => (e.status === 'ST_SUSPENDED' ? '차단 해제' : '다시 사용'),
+  on: { title: n => `${n} 계정을 다시 사용할까요?`, ok: () => '다시 사용',
     body: no => `사번 ${no}. 이 직원이 같은 사번으로 다시 로그인할 수 있고, 계정 한 자리를 씁니다.` },
 };
 function confirmState(e, mode) {
@@ -258,11 +244,10 @@ document.querySelectorAll('#empStateDialog button').forEach(b => b.addEventListe
   const { e, mode } = target;
   afterChange(api.post(`/employee/admin/api/employees/${pathPart(e.empNo)}/status`, { action: mode })).done(r => {
     if (mode === 'on') {
-      showToast(r.wasBlocked ? `${r.name} 계정의 차단을 해제했습니다` : `${r.name} 계정을 다시 사용합니다`);
+      showToast(`${r.name} 계정을 다시 사용합니다`);
       return;
     }
-    const done = `${r.name} 계정을 ${mode === 'suspend' ? '차단' : '비활성화'}했습니다`;
-    showToast(done + (r.released ? ` · 이 사람이 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : ''));
+    showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : ''));
   });
 }));
 

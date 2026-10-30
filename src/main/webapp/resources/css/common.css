@@ -326,8 +326,6 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .status-read { background: #e5f4e4; color: #2b6a2f; }
 .status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
 .status-retired, .status-st_inactive, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
-/* 차단 (ST_SUSPENDED): 잘못 써서 막힌 계정이라 조용한 비활성보다 경고처럼 보이게 한다 */
-.status-st_suspended { background: var(--danger-bg); color: var(--danger); }
 /* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
 .table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
 
