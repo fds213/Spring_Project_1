@@ -13,7 +13,9 @@
 
     <!-- STS3 수업 기능 관리 | MyBatis XML 시작: Oracle 연결 정보 및 HikariCP 설정 -->
     <!-- DB 접속 정보는 config/db.properties에서 읽음 (저장소에는 db.properties.example만 올림) -->
-    <context:property-placeholder location="classpath:config/db.properties" />
+    <context:property-placeholder
+    location="classpath:config/db.properties, classpath:config/file.properties"
+    ignore-resource-not-found="true" />
 
     <bean id="hikariConfig" class="com.zaxxer.hikari.HikariConfig">
         <property name="driverClassName" value="${db.driver}" />

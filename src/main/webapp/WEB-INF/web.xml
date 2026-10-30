@@ -1,60 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
-<web-app version="4.0" xmlns="http://xmlns.jcp.org/xml/ns/javaee" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee https://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd">
-    <filter>
-        <filter-name>encodingFilter</filter-name>
-        <filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
-        <init-param>
-            <param-name>encoding</param-name>
-            <param-value>UTF-8</param-value>
-        </init-param>
-        <init-param>
-            <param-name>forceEncoding</param-name>
-            <param-value>true</param-value>
-        </init-param>
-    </filter>
-    <filter-mapping>
-        <filter-name>encodingFilter</filter-name>
-        <url-pattern>/*</url-pattern>
-    </filter-mapping>
-    <!-- The definition of the Root Spring Container shared by all Servlets and Filters -->
-    <context-param>
-        <param-name>contextConfigLocation</param-name>
-        <!-- STS3 수업 기능 관리 | Security 시작: security-context.xml 로드 경로 추가 -->
-        <param-value>/WEB-INF/spring/root-context.xml
-            /WEB-INF/spring/security-context.xml</param-value>
-        <!-- STS3 수업 기능 관리 | Security 끝: security-context.xml 로드 경로 추가 -->
-    </context-param>
-    <!-- Creates the Spring Container shared by all Servlets and Filters -->
-    <listener>
-        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
-    </listener>
-    <listener>
-    	<listener-class>org.springframework.web.context.request.RequestContextListener</listener-class>
-	</listener>	
-    <!-- Processes application requests -->
-    <servlet>
-        <servlet-name>appServlet</servlet-name>
-        <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
-        <init-param>
-            <param-name>contextConfigLocation</param-name>
-            <param-value>/WEB-INF/spring/appServlet/servlet-context.xml</param-value>
-        </init-param>
-        <load-on-startup>1</load-on-startup>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>appServlet</servlet-name>
-        <url-pattern>/</url-pattern>
-    </servlet-mapping>
-    <!-- STS3 수업 기능 관리 | Security 시작: 시큐리티 필터 등록 -->
-    <filter>
-        <filter-name>springSecurityFilterChain</filter-name>
-        <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
-    </filter>
-    <!-- STS3 수업 기능 관리 | Security 끝: 시큐리티 필터 등록 -->
-    <!-- STS3 수업 기능 관리 | Security 시작: 인코딩 필터 다음에 전체 요청 매핑 -->
-    <filter-mapping>
-        <filter-name>springSecurityFilterChain</filter-name>
-        <url-pattern>/*</url-pattern>
-    </filter-mapping>
-    <!-- STS3 수업 기능 관리 | Security 끝: 인코딩 필터 다음에 전체 요청 매핑 -->
+<web-app version="4.0"
+	xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee https://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd">
+	<filter>
+		<filter-name>encodingFilter</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter
+		</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>UTF-8</param-value>
+		</init-param>
+		<init-param>
+			<param-name>forceEncoding</param-name>
+			<param-value>true</param-value>
+		</init-param>
+	</filter>
+	<filter-mapping>
+		<filter-name>encodingFilter</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	<!-- The definition of the Root Spring Container shared by all Servlets 
+		and Filters -->
+	<context-param>
+		<param-name>contextConfigLocation</param-name>
+		<!-- STS3 수업 기능 관리 | Security 시작: security-context.xml 로드 경로 추가 -->
+		<param-value>/WEB-INF/spring/root-context.xml
+			/WEB-INF/spring/security-context.xml
+		</param-value>
+		<!-- STS3 수업 기능 관리 | Security 끝: security-context.xml 로드 경로 추가 -->
+	</context-param>
+	<!-- Creates the Spring Container shared by all Servlets and Filters -->
+	<listener>
+		<listener-class>org.springframework.web.context.ContextLoaderListener
+		</listener-class>
+	</listener>
+	<listener>
+		<listener-class>org.springframework.web.context.request.RequestContextListener
+		</listener-class>
+	</listener>
+	<!-- Processes application requests -->
+	<servlet>
+		<servlet-name>appServlet</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet
+		</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>/WEB-INF/spring/appServlet/servlet-context.xml
+			</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+		<!-- 첨부파일: 파일 1개 10MB, 요청 전체 30MB (계획서 8장) -->
+		<multipart-config>
+			<max-file-size>10485760</max-file-size>
+			<max-request-size>31457280</max-request-size>
+			<file-size-threshold>0</file-size-threshold>
+		</multipart-config>
+	</servlet>
+	<servlet-mapping>
+		<servlet-name>appServlet</servlet-name>
+		<url-pattern>/</url-pattern>
+	</servlet-mapping>
+	<!-- STS3 수업 기능 관리 | Security 시작: 시큐리티 필터 등록 -->
+	<filter>
+		<filter-name>springSecurityFilterChain</filter-name>
+		<filter-class>org.springframework.web.filter.DelegatingFilterProxy
+		</filter-class>
+	</filter>
+	<!-- STS3 수업 기능 관리 | Security 끝: 시큐리티 필터 등록 -->
+	<!-- STS3 수업 기능 관리 | Security 시작: 인코딩 필터 다음에 전체 요청 매핑 -->
+	<filter-mapping>
+		<filter-name>springSecurityFilterChain</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+	<!-- STS3 수업 기능 관리 | Security 끝: 인코딩 필터 다음에 전체 요청 매핑 -->
 </web-app>
