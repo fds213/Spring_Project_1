@@ -75,6 +75,47 @@ public class AttendanceController {
         return service.unlinkDevice(user.getCompanyId(), user.getEmployeeId());
     }
 
+    // ===== 인사 관리 > 근태 단말기 (Security: /attendance/admin/** 는 업체 관리자·인사 담당만) =====
+
+    @GetMapping("/attendance/admin/device")
+    public String deviceAdminPage() {
+        return "attendance/admin/device";
+    }
+
+    @GetMapping("/attendance/admin/api/device")
+    @ResponseBody
+    public Map<String, Object> deviceAdmin(@AuthenticationPrincipal LoginUser user) {
+        return service.deviceAdmin(user.getCompanyId());
+    }
+
+    /** 단말기 키 발급·다시 발급 (키 원문은 이 응답에서 한 번만 보인다) */
+    @PostMapping("/attendance/admin/api/device/key")
+    @ResponseBody
+    public Map<String, Object> issueKey(@AuthenticationPrincipal LoginUser user) {
+        return service.issueDeviceKey(user.getCompanyId());
+    }
+
+    @PostMapping("/attendance/admin/api/device/links")
+    @ResponseBody
+    public Map<String, Object> adminLink(@AuthenticationPrincipal LoginUser user, @RequestBody Map<String, Object> body) {
+        return service.adminLinkDevice(user.getCompanyId(), toLong(body.get("employeeId")), (String) body.get("userNo"));
+    }
+
+    @PostMapping("/attendance/admin/api/device/links/delete")
+    @ResponseBody
+    public Map<String, Object> adminUnlink(@AuthenticationPrincipal LoginUser user, @RequestBody Map<String, Object> body) {
+        return service.adminUnlinkDevice(user.getCompanyId(), toLong(body.get("employeeId")));
+    }
+
+    private static Long toLong(Object v) {
+        if (v == null) return null;
+        try {
+            return Long.valueOf(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            throw new AttendanceException(400, "직원을 골라 주세요");
+        }
+    }
+
     /** 거절은 상태 코드 + { message } (화면은 message 를 그대로 보여 준다) */
     @ExceptionHandler(AttendanceException.class)
     public ResponseEntity<Map<String, String>> rejected(AttendanceException e) {

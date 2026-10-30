@@ -25,6 +25,14 @@ public interface AttendanceMapper {
 
     int isCompanyExpired(Long companyId);
 
+    int insertDevice(@Param("companyId") Long companyId, @Param("deviceName") String deviceName, @Param("keyHash") String keyHash);
+
+    int updateDeviceKey(@Param("attendanceDeviceId") Long attendanceDeviceId, @Param("companyId") Long companyId, @Param("keyHash") String keyHash);
+
+    List<DevicePersonDTO> selectCompanyEmployees(Long companyId);
+
+    String selectEmploymentStatus(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+
     List<DevicePersonDTO> selectDevicePeople(Long attendanceDeviceId);
 
     DevicePersonDTO selectDevicePerson(@Param("attendanceDeviceId") Long attendanceDeviceId, @Param("deviceUserNo") String deviceUserNo);

@@ -9,6 +9,7 @@ import lombok.Setter;
 public class DevicePersonDTO {
     private String deviceUserNo;
     private Long employeeId;
+    private String employeeNo;
     private String employeeName;
     private String departmentName;
     private String employmentStatus; // ST_SERVING, ST_RETIRED, ST_LEAVE

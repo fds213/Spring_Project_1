@@ -35,6 +35,22 @@ public class AttendanceDAO {
         return mapper.isCompanyExpired(companyId) == 1;
     }
 
+    public int insertDevice(Long companyId, String deviceName, String keyHash) {
+        return mapper.insertDevice(companyId, deviceName, keyHash);
+    }
+
+    public int updateDeviceKey(Long attendanceDeviceId, Long companyId, String keyHash) {
+        return mapper.updateDeviceKey(attendanceDeviceId, companyId, keyHash);
+    }
+
+    public List<DevicePersonDTO> selectCompanyEmployees(Long companyId) {
+        return mapper.selectCompanyEmployees(companyId);
+    }
+
+    public String selectEmploymentStatus(Long companyId, Long employeeId) {
+        return mapper.selectEmploymentStatus(companyId, employeeId);
+    }
+
     public List<DevicePersonDTO> selectDevicePeople(Long attendanceDeviceId) {
         return mapper.selectDevicePeople(attendanceDeviceId);
     }

@@ -140,6 +140,7 @@
         <sec:authorize access="hasRole('ADMIN')"><ui:nav key="hr-join" path="/employee/join" current="${menu}">가입 승인 <span class="badge" data-badge="join" hidden></span></ui:nav></sec:authorize>
         <ui:nav key="hr-attendance" path="/attendance/admin/list" current="${menu}">근태·연차 관리</ui:nav>
         <ui:nav key="hr-holiday" path="/attendance/admin/holiday" current="${menu}">휴일 관리</ui:nav>
+        <ui:nav key="hr-device" path="/attendance/admin/device" current="${menu}">근태 단말기</ui:nav>
       </div>
     </sec:authorize>
     <sec:authorize access="hasRole('ADMIN')">

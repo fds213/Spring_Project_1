@@ -39,9 +39,38 @@
 		WHERE company_id = #{companyId}
 	</select>
 
-	<!-- 단말기에 등록된 사람 목록 (시뮬레이터 화면용) -->
+	<!-- 업체의 첫 단말기 등록 (근태 단말기 화면에서 키를 처음 발급할 때) -->
+	<insert id="insertDevice">
+		INSERT INTO attendance_device (company_id, device_name, device_key_hash)
+		VALUES (#{companyId}, #{deviceName}, #{keyHash})
+	</insert>
+
+	<!-- 키 다시 발급: 예전 키는 바로 쓸 수 없게 된다 -->
+	<update id="updateDeviceKey">
+		UPDATE attendance_device
+		SET device_key_hash = #{keyHash},
+		    updated_at      = <include refid="now"/>
+		WHERE attendance_device_id = #{attendanceDeviceId} AND company_id = #{companyId}
+	</update>
+
+	<!-- 업체 직원 목록 (근태 단말기 화면에서 번호를 연결할 사람 고르기) -->
+	<select id="selectCompanyEmployees" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status
+		FROM employee e
+		LEFT JOIN department dp ON dp.department_id = e.department_id
+		WHERE e.company_id = #{companyId}
+		ORDER BY e.employee_no
+	</select>
+
+	<!-- 같은 업체 직원인지와 재직 상태 (다른 업체 직원이면 null) -->
+	<select id="selectEmploymentStatus" resultType="string">
+		SELECT employment_status FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
+
+	<!-- 단말기에 등록된 사람 목록 (시뮬레이터·근태 단말기 화면) -->
 	<select id="selectDevicePeople" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
-		SELECT de.device_user_no, e.employee_id, e.employee_name, dp.department_name, e.employment_status
+		SELECT de.device_user_no, e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status
 		FROM device_employee de
 		JOIN employee e ON e.employee_id = de.employee_id AND e.company_id = de.company_id
 		LEFT JOIN department dp ON dp.department_id = e.department_id

@@ -107,10 +107,42 @@ class AttendanceServiceTest {
         assertEquals("0009", service.linkDevice(10L, 103L, "0009").get("deviceId"));
     }
 
+    @Test
+    @DisplayName("단말기가 없는 업체는 키를 발급하면 단말기가 함께 등록되고, 그 키로 바로 찍을 수 있다")
+    void issueKeyCreatesDevice() {
+        mapper.hasDevice = false;
+        Map<String, Object> r = service.issueDeviceKey(10L);
+        assertEquals(true, r.get("created"));
+        String newKey = (String) r.get("key");
+        assertEquals("IN", service.punch(newKey, "0002", "IN").get("type"));
+    }
+
+    @Test
+    @DisplayName("키를 다시 발급하면 예전 키는 바로 401로 막힌다")
+    void reissueKeyBlocksOldKey() {
+        String newKey = (String) service.issueDeviceKey(10L).get("key");
+        assertEquals(401, assertThrows(AttendanceException.class, () -> service.punch(KEY, "0002", "IN")).getStatus());
+        assertEquals("IN", service.punch(newKey, "0002", "IN").get("type"));
+    }
+
+    @Test
+    @DisplayName("만료 업체는 키를 발급할 수 없고, 관리자는 다른 업체 직원·퇴사자를 연결할 수 없다")
+    void adminRules() {
+        mapper.expired = true;
+        assertEquals(403, assertThrows(AttendanceException.class, () -> service.issueDeviceKey(10L)).getStatus());
+        mapper.expired = false;
+        assertEquals(404, assertThrows(AttendanceException.class, () -> service.adminLinkDevice(10L, 999L, "0007")).getStatus());
+        assertEquals(409, assertThrows(AttendanceException.class, () -> service.adminLinkDevice(10L, 105L, "0007")).getStatus());
+        assertEquals("0007", service.adminLinkDevice(10L, 103L, "0007").get("deviceId"));
+    }
+
     /** 팀 DB 없이 규칙만 시험하는 메모리 Mapper: 업체 10, 단말기 1, 사원 0002(재직)·0005(퇴사) */
     static class FakeMapper implements AttendanceMapper {
         String clock = "08:55:00";
         boolean expired = false;
+        boolean hasDevice = true;
+        String keyHash = sha(KEY);
+        final Map<Long, String> status = new HashMap<>(Map.of(102L, "ST_SERVING", 103L, "ST_SERVING", 105L, "ST_RETIRED"));
         final Map<Long, AttendanceDTO> today = new HashMap<>();
         final List<PunchDTO> events = new ArrayList<>();
         final Map<String, Long> links = new HashMap<>(Map.of("0002", 102L, "0005", 105L));
@@ -136,11 +168,19 @@ class AttendanceServiceTest {
 
         @Override public String selectToday() { return "2026-10-30"; }
 
-        @Override public AttendanceDeviceDTO selectDeviceByKeyHash(String keyHash) {
-            return keyHash.equals(sha(KEY)) ? device() : null;
+        @Override public AttendanceDeviceDTO selectDeviceByKeyHash(String hash) {
+            return hasDevice && hash.equals(keyHash) ? device() : null;
         }
 
-        @Override public AttendanceDeviceDTO selectCompanyDevice(Long companyId) { return companyId == 10L ? device() : null; }
+        @Override public AttendanceDeviceDTO selectCompanyDevice(Long companyId) { return hasDevice && companyId == 10L ? device() : null; }
+
+        @Override public int insertDevice(Long companyId, String deviceName, String hash) { hasDevice = true; keyHash = hash; return 1; }
+
+        @Override public int updateDeviceKey(Long deviceId, Long companyId, String hash) { keyHash = hash; return 1; }
+
+        @Override public List<DevicePersonDTO> selectCompanyEmployees(Long companyId) { return selectDevicePeople(1L); }
+
+        @Override public String selectEmploymentStatus(Long companyId, Long employeeId) { return companyId == 10L ? status.get(employeeId) : null; }
 
         @Override public int isCompanyExpired(Long companyId) { return expired ? 1 : 0; }
 

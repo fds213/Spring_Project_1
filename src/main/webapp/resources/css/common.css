@@ -746,6 +746,16 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 /* 헤더의 로그아웃: Spring Security가 POST /logout만 받아서 버튼을 form으로 감쌌다 */
 .logout-form { display: flex; margin: 0; }
 
+/* ---------- 근태 단말기 관리 (attendance/admin/device.jsp) ---------- */
+.dev-body { padding: 14px 18px 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.dev-status { margin: 0; line-height: 1.6; color: var(--text-sub); }
+.dev-key { width: 100%; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-bg); }
+.dev-key-label { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent-hover); }
+.dev-key .input { font-family: Consolas, "Courier New", monospace; letter-spacing: 0.5px; }
+.dev-body .org-add { max-width: none; width: 100%; }
+.dev-body .dev-employee { flex: 1 1 200px; }
+.dev-body .dev-no { flex: 0 0 120px; }
+
 /* ---------- 지문 단말기 시뮬레이터 (attendance/simulator.jsp) ---------- */
 body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }

@@ -3,8 +3,10 @@ package com.ieum.gw.attendance.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -256,6 +258,105 @@ public class AttendanceService {
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("deviceId", "");
         return res;
+    }
+
+    // ===== 인사 관리 > 근태 단말기 (업체 관리자·인사 담당) =====
+
+    private static final String DEFAULT_DEVICE_NAME = "정문 지문 단말기";
+    private static final SecureRandom RANDOM = new SecureRandom();
+
+    /** 근태 단말기 화면: 업체 단말기, 번호가 연결된 사람, 연결할 수 있는 재직 직원 */
+    public Map<String, Object> deviceAdmin(Long companyId) {
+        AttendanceDeviceDTO device = dao.selectCompanyDevice(companyId);
+        List<Map<String, Object>> people = new ArrayList<>();
+        Map<Long, String> linked = new HashMap<>();
+        if (device != null) {
+            for (DevicePersonDTO p : dao.selectDevicePeople(device.getAttendanceDeviceId())) {
+                linked.put(p.getEmployeeId(), p.getDeviceUserNo());
+                people.add(personView(p, p.getDeviceUserNo()));
+            }
+        }
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        for (DevicePersonDTO e : dao.selectCompanyEmployees(companyId)) {
+            if ("ST_SERVING".equals(e.getEmploymentStatus()) && !linked.containsKey(e.getEmployeeId())) {
+                candidates.add(personView(e, null));
+            }
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        if (device == null) {
+            res.put("device", null);
+        } else {
+            Map<String, Object> d = new LinkedHashMap<>();
+            d.put("name", device.getDeviceName());
+            d.put("companyName", device.getCompanyName());
+            res.put("device", d);
+        }
+        res.put("readOnly", dao.isCompanyExpired(companyId));
+        res.put("people", people);
+        res.put("employees", candidates);
+        return res;
+    }
+
+    /**
+     * 단말기 키 발급. 업체에 단말기가 없으면 함께 등록하고, 있으면 키만 바꾼다(예전 키는 바로 막힌다).
+     * 키 원문은 이 응답에서 한 번만 돌려주고 DB에는 해시만 남긴다.
+     */
+    @Transactional
+    public Map<String, Object> issueDeviceKey(Long companyId) {
+        if (dao.isCompanyExpired(companyId)) {
+            throw new AttendanceException(403, "이용 기간이 끝나 읽기 전용입니다");
+        }
+        byte[] bytes = new byte[18];
+        RANDOM.nextBytes(bytes);
+        String key = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        AttendanceDeviceDTO device = dao.selectCompanyDevice(companyId);
+        if (device == null) {
+            dao.insertDevice(companyId, DEFAULT_DEVICE_NAME, sha256(key));
+        } else {
+            dao.updateDeviceKey(device.getAttendanceDeviceId(), companyId, sha256(key));
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("key", key);
+        res.put("deviceName", device == null ? DEFAULT_DEVICE_NAME : device.getDeviceName());
+        res.put("created", device == null);
+        return res;
+    }
+
+    /** 관리자가 직원을 단말기 번호에 연결한다 (같은 업체의 재직 직원만) */
+    @Transactional
+    public Map<String, Object> adminLinkDevice(Long companyId, Long employeeId, String deviceUserNo) {
+        requireServingEmployee(companyId, employeeId);
+        return linkDevice(companyId, employeeId, deviceUserNo);
+    }
+
+    /** 관리자가 직원의 단말기 번호 연결을 끊는다 (출퇴근 기록은 남는다) */
+    @Transactional
+    public Map<String, Object> adminUnlinkDevice(Long companyId, Long employeeId) {
+        if (employeeId == null || dao.selectEmploymentStatus(companyId, employeeId) == null) {
+            throw new AttendanceException(404, "같은 업체의 직원이 아닙니다");
+        }
+        return unlinkDevice(companyId, employeeId);
+    }
+
+    private void requireServingEmployee(Long companyId, Long employeeId) {
+        String status = employeeId == null ? null : dao.selectEmploymentStatus(companyId, employeeId);
+        if (status == null) {
+            throw new AttendanceException(404, "같은 업체의 직원이 아닙니다");
+        }
+        if (!"ST_SERVING".equals(status)) {
+            throw new AttendanceException(409, "재직 중인 직원만 단말기에 연결할 수 있습니다");
+        }
+    }
+
+    private static Map<String, Object> personView(DevicePersonDTO p, String userNo) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("employeeId", p.getEmployeeId());
+        m.put("employeeNo", p.getEmployeeNo());
+        m.put("name", p.getEmployeeName());
+        m.put("dept", p.getDepartmentName() == null ? "" : p.getDepartmentName());
+        m.put("serving", "ST_SERVING".equals(p.getEmploymentStatus()));
+        if (userNo != null) m.put("userNo", userNo);
+        return m;
     }
 
     // ===== 도구 =====
