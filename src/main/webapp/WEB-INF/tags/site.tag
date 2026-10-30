@@ -1,9 +1,11 @@
 <%@ tag language="java" pageEncoding="UTF-8" body-content="scriptless" trimDirectiveWhitespaces="true" %>
 <%@ attribute name="title" required="true" description="페이지 제목" %>
 <%@ attribute name="description" description="검색 결과에 보일 한 줄 설명. 비우면 기본 문구" %>
-<%@ attribute name="current" description="상단 메뉴 강조. 지금은 쓰지 않는다: 소개·체험 신청·문의 헤더를 똑같이 둔다 (2026-10-27)" %>
+<%@ attribute name="current" description="상단 메뉴 강조. 지금은 쓰지 않는다: 소개·체험 신청·문의 헤더를 똑같이 둔다" %>
 <%@ attribute name="cta" type="java.lang.Boolean" description="헤더의 '무료 체험' 버튼. 체험 신청 페이지만 false (자기 자신으로 가는 버튼이라)" %>
 <%@ attribute name="fab" type="java.lang.Boolean" description="떠 있는 '도입 문의' 버튼. 소개 페이지만 true" %>
+<%@ attribute name="mainClass" description="본문 main 의 class. 체험 신청은 section, 문의는 inq-page" %>
+<%@ attribute name="mainStyle" description="본문 main 의 style (체험 신청의 위쪽 여백)" %>
 <%@ attribute name="scripts" fragment="true" description="화면 전용 JS. site.js 다음에 들어간다" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
@@ -31,15 +33,17 @@
   <link rel="manifest" href="${ctx}/manifest.json">
   <link rel="icon" href="${ctx}/resources/icons/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="${ctx}/resources/icons/apple-touch-icon.png">
-  <%-- 글꼴은 /resources/lib/ 에 둔다(가이드 5장). 파일이 없으면 시스템 글꼴로 보인다 --%>
-  <link rel="stylesheet" href="${ctx}/resources/lib/pretendard/pretendardvariable-dynamic-subset.css">
+  <%-- 디자인 2안 글꼴 (IBM Plex Sans KR, 그룹웨어 틀과 같음). 오프라인이면 시스템 글꼴로 보인다 --%>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
   <link rel="stylesheet" href="${ctx}/resources/css/site.css">
 </head>
 <body class="site" data-ctx="${ctx}">
   <%@ include file="/WEB-INF/views/common/site-header.jspf" %>
 
-  <main>
+  <main<c:if test="${not empty mainClass}"> class="<c:out value="${mainClass}" />"</c:if><c:if test="${not empty mainStyle}"> style="<c:out value="${mainStyle}" />"</c:if>>
     <jsp:doBody />
   </main>
 
