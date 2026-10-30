@@ -1,14 +1,6 @@
 // 이음 운영자: 비회원 접수 (views/ops/inquiry-guest.jsp). 페이지가 열리면 openInquiryView('guest')를 부른다.
 // 소개 사이트 도입 문의(WEB-02)로 들어온 접수를 보고 메일로 답변한다(WEB-03). 회원 접수(장애 문의, OPS-04)는 이번 구현 범위에서 빠졌다.
 // 작은 DOM 도구(h, span, small, dlOf, cardOf, inqCell, titleBtn, dataRow, detailTr, emptyTr)는 util.js에 있다.
-// 서버 API (프론트 제안, 운영자만):
-//   GET  /ops/api/guest-inquiries                         → 비회원 접수 전체, 최신순
-//   POST /ops/api/guest-inquiries/{no}/replies              { body } → { sent, reason, inquiry } 답변 메일 발송
-//   POST /ops/api/guest-inquiries/{no}/replies/{seq}/resend          → { sent, reason, inquiry } 실패한 가장 최근 답변 재발송
-//        메일이 실패해도 요청은 200이다 (sent: false, reason). 스팸 접수·최근 것이 아닌 답변은 409
-// 한 건: { no, at, name, email, company, phone, title, body, spam,
-//          state: WAIT|DONE|FAILED|SPAM, replies: [{ seq, body, subject, status: SENT|FAILED, at, reason }],
-//          mail: { from, subject } }   (from은 서버의 고정 발신 주소, subject는 새 답변 메일의 제목)
 // 목록은 한 번에 받고, 카드·검색·기간·"답변 없음"으로 좁히는 것은 화면에서 한다. 메뉴 배지(inquiryGuest)는 common.js 의 /badges 가 채운다.
 // 접수 내용은 바깥 사람이 쓴 글이라 textContent로만 넣는다 (innerHTML을 쓰지 않는다).
 

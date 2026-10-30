@@ -4,22 +4,6 @@
 // - 장비 지급: 최종 승인 때 IT 서비스에 지급 티켓이 만들어진다. 지급이 끝나면 내 장비에 나타난다.
 // 임시저장은 검사 없이 입력값을 그대로 저장하고, 반려·회수된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다.
 // 결재자 목록, 내 순번인지, 회수·재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
-// 서버 API (프론트 제안):
-//   GET  /approval/api/form-options    기안 작성에 필요한 것
-//        → { approvers: [{ empNo, name, dept, rank }], branches: [{ id, name }], equipKinds: [..], leave: { available, pendingDays } | null }
-//   GET  /approval/api/box             결재함 → { WAIT: [문서], PROGRESS: [문서], DONE: [문서], REJECTED: [문서], DRAFT: [임시저장] }
-//   POST /approval/api/documents       제출 { form: LEAVE|EQUIP, fields, line: [1단계 사번, 2단계 사번 또는 ''], draftId? } → { id, form }
-//        fields — LEAVE: { kind: FULL|AM|PM, from, to, reason }  EQUIP: { kind, qty, branchId, reason }
-//   POST /approval/api/documents/{id}/approve    { comment } → { id, form, name, status, ticketId }
-//   POST /approval/api/documents/{id}/reject     { comment(필수) } → 같은 모양
-//   POST /approval/api/documents/{id}/withdraw   회수 → { id, form, status }
-//   POST   /approval/api/drafts         임시저장 { form, fields, line } → 임시저장
-//   POST   /approval/api/drafts/{id}    고쳐 저장 { form, fields, line } → 임시저장 (없으면 404)
-//   POST   /approval/api/drafts/{id}/delete 삭제
-// 문서: { id, form, title, name, dept, at, status: REQUESTED|APPROVED|REJECTED|CANCELED, step, line: [{ empNo, name }],
-//         history: [{ at, name, action: APPROVE|REJECT|CANCEL, comment }], fields, days(LEAVE), branchName·ticketId(EQUIP),
-//         mine, canDecide, canWithdraw, canRedraft, rejectComment }
-// 임시저장: { id, form, fields, line: [사번, 사번], lineNames: [이름], branchName, savedAt }
 // 읽기 전용 업체는 쓰는 요청이 403으로 거절된다 (버튼의 data-write로 화면도 먼저 막는다).
 
 const EA_FORMS = { LEAVE: '휴가 신청서', EQUIP: '장비 지급 신청서' };

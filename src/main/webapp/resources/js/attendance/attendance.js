@@ -6,19 +6,6 @@
 // 연차: 15일 + 내림(총 완료 경력 연수 ÷ 3). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
 // 연차를 쓰는 것(휴가)은 전자결재의 휴가 신청서로 신청한다(요구분석서 3장 범위). 최종 승인 때 연차가 차감되고 여기 내역에 들어온다.
 // 이 화면은 기록과 연차 현황·내역만 보여 주고, 신청·회수는 전자결재(기안 작성·결재함)에서 한다.
-//
-// 서버 API (프론트 제안):
-//   GET    /attendance/api/records?month=YYYY-MM   한 달 출퇴근 기록
-//          → { month, deviceId, today: { date, punch }, thisMonth: { late, early }, days: [{ date, weekday, holiday, punch, leave }] }
-//            punch = { in, out, inStatus, outStatus } | null (상태 NORMAL|LATE|EARLY_LEAVE, 퇴근 전이면 out·outStatus 는 ''),
-//            leave = 그날의 승인된 연차 FULL|AM|PM | null, thisMonth = 오늘이 속한 달의 지각·조퇴 횟수, deviceId 는 연결 없으면 ''
-//   POST   /attendance/api/device-link  { deviceId: '0001' } → { deviceId }  숫자 4자리가 아니면 400, 같은 업체의 다른 직원이 쓰면 409
-//   POST   /attendance/api/device-link/delete → { deviceId }  (계정에 원래 붙은 번호가 있으면 그 번호, 없으면 '')
-//   GET    /attendance/api/leaves      → { summary, items }
-//          summary = { start, end (ISO. end 는 다음 부여일), years, prev, career, grant, usedDays, pendingDays, left, available } | null (직원 정보 없음)
-//          items = 이번 연차 기간의 휴가 신청서(회수한 것 제외), 시작일 늦은 순
-//          한 건 = { id, kind, from, to, days, reason, at, status: REQUESTED|APPROVED|REJECTED, step, line: [{ empNo, name }], comment(반려 사유) }
-// 쓰기는 이용 기간이 끝난 업체(읽기 전용)면 403이다.
 
 const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴' };
 const ATT_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];

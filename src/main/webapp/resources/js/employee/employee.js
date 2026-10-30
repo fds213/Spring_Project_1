@@ -4,41 +4,6 @@
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 서버 API (프론트 제안). 실패하면 { message }: 400 입력, 403 권한·읽기 전용, 404 없음, 409 그사이 바뀜, 410 다 쓴 인증, 429 너무 잦음
-// 사원 관리 (업체 관리자·인사 담당):
-//   GET    /employee/admin/api/employees                    → { perms: { admin, pay }, readOnly, caps, seats, counts, items: [직원] }
-//            caps: { paid, active 쓸 수 있는 계정(체험 10명, 결제 뒤 구매 인원) } | null
-//            seats: { used 사용 중 계정, full, room }   counts: { total, off 비활성, seat }
-//            직원: { empNo, name, email, dept, deptType, head, rank, role, empType, work, gender, status, at,
-//                    actions: ['off'|'head'|'on'], canRetire }
-//   POST   /employee/admin/api/employees/{empNo}/status       { action: off|on } → { name, status, released }
-//   POST   /employee/admin/api/employees/{empNo}/head         { head: true|false } → { name, dept, head }
-//   POST   /employee/admin/api/employees/{empNo}/hr           { empType, work, gender } → { name, turnedOff, released }
-// 가입 승인 (업체 관리자·부서장):
-//   GET    /employee/api/join        → { perms: { admin }, readOnly, companyCode, myDept, caps, seats, canApprove(자리가 남았는지), nextEmpNo,
-//            openings: [{ scope, all, until, by, byName, mine }], depts (업체 관리자만), requests: [요청] }
-//            요청: { reqId, name, dept, deptType, rank, email, requestAt }
-//   GET    /employee/api/join/count                           → { count }  (메뉴 배지: 내가 처리할 승인 대기 요청)
-//   POST   /employee/api/join/openings          { depts (업체 관리자), minutes } → { depts, until }   (가입 활성화 켜기)
-//   POST   /employee/api/join/openings/{scope}/delete        → { scope }  (한 부서 끄기)
-//   POST   /employee/api/join/openings/delete                → { count }  (모두 끄기, 업체 관리자)
-//   POST   /employee/api/join/requests/{reqId}/approve        → { name, empNo }   (구매 인원이 차 있으면 409)
-//   POST   /employee/api/join/requests/{reqId}/reject         → { name }
-// 로그인 화면 (로그인 없이):
-//   GET    /join/api/companies/{code}          → { companyCode, companyName, depts (열린 부서), ranks }
-//            가입할 수 없는 코드는 없는 코드와 똑같이 404(화면은 아무것도 보여 주지 않는다), 확인을 너무 많이 틀리면 429
-//   POST   /join/api/companies/{code}/requests  { name, dept, rank, email, password } → 요청 상태
-//   GET    /join/api/companies/{code}/requests/{reqId}  → 요청 상태 (5초마다)
-//   POST   /join/api/companies/{code}/requests/{reqId}/delete → { ok }  (요청 취소)
-//            요청 상태: { reqId, state: WAITING|APPROVED|ENDED, reason: REJECTED|OFF|OTHER|null, companyCode, companyName,
-//                         name, dept, rank, email, empNo, depts, ranks }
-//   POST   /join/api/password/code         { companyCode, empNo } → { sent: true }
-//            계정이 있든 없든 똑같이 답한다 (ACC-07)
-//   POST   /join/api/password/verify       { companyCode, empNo, code } → { resetToken }
-//   POST   /join/api/password/reset        { resetToken, password } → { companyCode, empNo }
-// 헤더 (로그인한 직원):
-//   POST   /employee/api/password                     { current, password } → { ok }   (읽기 전용이어도 된다)
-// 비밀번호 찾기 인증 코드: 6자리, 10분, 5번 틀리면 못 쓴다(410), 다시 보내기는 1분에 한 번(429).
 // 브라우저 저장소를 쓰는 곳은 하나뿐이다: 계정 생성을 한 기기가 자기 요청(업체 코드·요청 번호)을 기억하는 MY_JOIN_KEY.
 // 화면을 닫았다 열어도 요청을 이어 보려는 것이다. 쿠키나 페이지에 둔 요청 번호로 바꿔도 된다.
 

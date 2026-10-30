@@ -4,19 +4,6 @@
 // - 유료 이용 중: 연장. 지금 인원 그대로 만료일 다음 날부터 이어진다(연장 때 인원 변경 SUB-07은 이번 범위에서 빠짐)
 // 순서: 1. 요금제 선택 → 2. 결제 → 3. 결제 완료. 토스 결제가 승인되면 운영자 승인 없이 바로 반영한다(PAY-02).
 // 이번 범위에서 빠진 것(요구분석서 3장): 인원 증설, 월간→연간 전환, 결제 안내 메일, 만료 후 재구매.
-//
-// 서버 API (프론트 제안. 결제는 업체 관리자):
-//   GET  /subscription/api/billing   이 업체의 이용 상태 (신청 정보가 없으면 404)
-//        { company, companyCode, status: TRIAL|PAID|EXPIRED, paid, plan: MONTHLY|ANNUAL|null, end(마지막 날), daysLeft,
-//          trialFrom, trialEnd, serviceFrom, users, failedPayments, pricePerUser, trialSeats, maxUsers, accountsInUse,
-//          mode: FIRST|EXTEND (지금 결제하면), nextFrom(연장이면 새 기간 첫날)|null, canPay, payments: [결제 한 건...] 최신순 }
-//   GET  /subscription/api/quote?plan=MONTHLY|ANNUAL&users=n   견적
-//        → { mode, plan, months, users, pct, why, amount, from, to, formula }   (인원·요금제가 맞지 않으면 400)
-//   POST /subscription/api/payments  { plan, users, mode, from, amount, success }
-//        → 결제 한 건. 서버가 견적을 다시 계산해 mode·from·amount가 다르면 409 (화면은 다시 견적을 받는다).
-//          인원이 사용 중인 계정 수보다 적으면 400. 읽기 전용이어도 결제는 된다
-//        success 는 토스 연동 전 임시 값이다(화면의 결제 성공·실패 버튼). 토스를 붙이면 빼고, 결제 결과는 서버가 토스 승인으로 정한다
-// 결제 한 건: { id, at, kind: FIRST|EXTEND, plan, months, pct, users, amount, from, to, result: OK|FAILED }   (날짜는 ISO 문자열)
 
 const BILL_STATUS = { TRIAL: '체험 중', PAID: '이용 중', EXPIRED: '읽기 전용' };
 const BILL_PLAN = { MONTHLY: '월간', ANNUAL: '연간' };

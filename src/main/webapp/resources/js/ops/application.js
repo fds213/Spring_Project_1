@@ -1,12 +1,6 @@
 // 이음 운영자: 신청 현황 (views/ops/application.jsp). 페이지가 열리면 openApplicationView()를 부른다.
 // 신청 = 소개 사이트의 무료 체험 신청, 업체 하나에 한 줄.
 // 체험 중(TRIAL) → 결제하면 바로 결제 완료(PAID, 운영자 승인 없음: 요구분석서 PAY-02) → 체험·이용 기간이 끝나면 읽기 전용(EXPIRED).
-// 서버 API (프론트 제안, 이음 운영자만. 아니면 403):
-//   GET  /ops/api/applications          신청 목록, 신청 시각 최신순. 한 건:
-//        { no, at, company, companyCode, isNew, adminName, adminNo, email, emailVerified, verifiedAt, verifySentAt,
-//          status: TRIAL|PAID|EXPIRED, paid, plan: MONTHLY|ANNUAL|null, end(마지막 날), daysLeft, trialEnd, serviceFrom, paidAt,
-//          users, total(월 기준 이용료), failedPayments }   (날짜는 모두 ISO 문자열. 관리자 비밀번호는 주지 않는다)
-//   POST /ops/api/applications/read     { nos: [신청번호...] } 본 새 신청을 읽음으로 → { unread }
 // 메뉴의 새 신청 배지(data-badge="application")는 common.js 가 GET /badges 로 채운다.
 
 const APP_STATUS = { TRIAL: '체험 중', PAID: '결제 완료', EXPIRED: '읽기 전용' };

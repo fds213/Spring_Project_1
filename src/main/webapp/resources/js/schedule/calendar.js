@@ -3,15 +3,6 @@
 // 누가 무엇을 볼 수 있나: 개인 일정은 쓴 본인만, 부서 일정은 같은 부서 직원, 전사 일정은 업체 전체.
 // 누가 쓸 수 있나: 개인은 누구나, 부서는 부서장·업체 관리자(자기 부서), 전사는 인사 담당자·업체 관리자. 지우기는 쓴 본인·업체 관리자.
 // 이 규칙은 서버가 정하고 검사한다. 화면은 서버가 보내 준 구분(scopes)과 canDelete 로 선택지·버튼만 고른다.
-//
-// 서버 API (프론트 제안):
-//   GET    /schedule/api/schedules?month=YYYY-MM  그달 달력에 들어갈 것
-//          → { month, dept, scopes: [쓸 수 있는 구분 PERSONAL|DEPT|COMPANY], holidays: [{ date, name }],
-//              leaves: [{ from, to, kind: FULL|AM|PM }] (본인의 승인된 연차 중 그달에 걸친 것),
-//              items: [{ id, scope, title, date, memo, dept, mine, canDelete }] (내가 볼 수 있는 일정, 등록 순) }
-//   POST   /schedule/api/schedules  { scope, date: YYYY-MM-DD, title, memo } → 일정 한 건
-//          쓸 수 없는 구분이면 403, 날짜·제목(40자)·메모(200자)가 틀리면 400, 읽기 전용 업체 403
-//   POST   /schedule/api/schedules/{id}/delete → { ok: true }  볼 수 없는 일정 404, 쓴 본인·업체 관리자가 아니면 403
 
 const SCOPE_LABEL = { PERSONAL: '개인', DEPT: '부서', COMPANY: '전사' };
 const SCH_LEAVE_LABEL = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };

@@ -3,7 +3,7 @@
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
   장애·문의 접수 화면 (/ticket/new). 이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장.
-  서버 주소와 주고받는 값은 docs/front-screen-api.md(프론트 제안), 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
+  서버가 감싸 보낸 응답({ success, message, data })은 common.js 의 api 가 푼다(docs/front-screen-api.md 2장).
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />

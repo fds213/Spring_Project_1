@@ -3,40 +3,6 @@
 // 한 JSP에 목록·글 보기·글쓰기가 같이 있고, 주소(/board/notice, /board/notice/view/3, /write, /edit/3)를 보고 하나를 보인다.
 // 다른 스크립트와 이름이 겹치지 않게 함수 하나로 감싸고, 그룹웨어에는 아래 하나만 내놓는다.
 //   routeNoticeBoard(full): 화면을 연다 (JSP 페이지가 열리면 부른다. full = 'notice', 'notice/view/3', 'board-dept/write' …)
-//
-// 서버 API (프론트 제안). 글 번호·댓글 번호는 숫자, 시각은 ISO 문자열
-// 공지사항 — 범위(scope)는 'ALL'(전사) 또는 부서 이름
-//   GET    /board/api/notices?tab=all|DEPT&q=&page=   목록 → { page, pages, total, items: [행], pinned: [행] (검색할 때는 []),
-//                                                           myDept, perms: { canWrite, allDepts } }
-//          행: { id, no (번호, 고정 공지는 null), scope, title, writerName, createdAt, updatedAt, pinned, commentCount, fileCount }
-//   GET    /board/api/notices/home                     홈 공지 5개 → [행]
-//   GET    /board/api/notices/pinned?scope=             그 범위에 고정된 공지 → [행] (고정이 꽉 찼을 때 보여 준다)
-//   GET    /board/api/notices/form[?id=]                작성·수정 화면 → { scopes: [범위], scopeLocked, myDept, notice: 상세 | null }
-//                                                       쓸 권한이 없거나 읽기 전용이면 403
-//   GET    /board/api/notices/{id}                      상세 → { id, scope, title, content (서식 글 HTML), files: [파일], writerName, writerDept,
-//                                                       createdAt, updatedAt, pinned, canEdit, comments: [{ id, writerName, writerDept, text, createdAt, canDelete }] }
-//                                                       볼 수 없는 공지(다른 부서)와 없는 공지는 같은 404
-//   POST   /board/api/notices                           { scope, title, content, pinned, files: [보낼 파일] } → { id }
-//   POST   /board/api/notices/{id}                      위와 같음 → { id }. 고정 5개를 넘으면 409
-//   POST   /board/api/notices/{id}/pin                  { pinned } → { pinned }. 고정 5개를 넘으면 409
-//   POST   /board/api/notices/{id}/delete
-//   POST   /board/api/notices/{id}/comments             { text } → [댓글] (그 공지의 댓글 전체)
-//   POST   /board/api/notices/{id}/comments/{cid}/delete → [댓글]
-// 부서 게시판 — 부서는 서버가 로그인한 사람의 부서로 정한다
-//   GET    /board/api/dept/posts?q=&page=               → { page, pages, total, dept, items: [{ id, no, title, writerName, createdAt, updatedAt, commentCount, fileCount }] }
-//   GET    /board/api/dept/posts/form[?id=]             → { dept, post: 상세 | null }
-//   GET    /board/api/dept/posts/{id}                   → { id, title, content, files, writerName, createdAt, updatedAt, mine,
-//                                                           comments: [{ id, writerName, text, createdAt, canDelete }] }
-//   POST   /board/api/dept/posts                        { title, content, files } → { id }
-//   POST   /board/api/dept/posts/{id}                   { title, content, files } → { id }
-//   POST   /board/api/dept/posts/{id}/delete
-//   POST   /board/api/dept/posts/{id}/comments          { text } → [댓글]
-//   POST   /board/api/dept/posts/{id}/comments/{cid}/delete → [댓글]
-// 파일: 받을 때 { id, name, size, type, url }. 보낼 때 이미 있던 파일은 { id }, 새 파일은 { name, size, type, data (data URL) }.
-//   첨부는 지금 data URL(base64)로 JSON에 실어 보낸다. 서버가 파일 받는 방식(multipart 등)을 정하면 그에 맞춘다(AGENTS.md: 파일로 저장)
-//   url은 "이 사람이 이 글을 볼 수 있나"를 확인한 뒤 파일을 주는 내려받기 주소다.
-// 실패: 400 입력값, 403 권한·읽기 전용(이용 기간 만료), 404 없거나 볼 수 없는 글, 409 고정 개수, 413 파일이 너무 큼.
-//   문구는 apiMessage(xhr)로 꺼내 보여 준다.
 (() => {
 // - 화면에 글자를 넣을 때는 모두 textContent를 쓴다(innerHTML 금지). 남이 쓴 글에 들어 있는
 //   <script> 같은 코드가 실행되지 않게 하려는 것이다. 서식 글만 허용한 태그를 남기고 걸러서(sanitizeHtml) 넣는다.

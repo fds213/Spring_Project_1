@@ -88,7 +88,6 @@
 
   // ---------- 7) 비밀번호 변경 (헤더 버튼, 창은 layout.tag; ACC-07) ----------
   // 현재 비밀번호가 맞아야 하고 새 비밀번호는 8자 이상을 두 번 같게. 읽기 전용이어도 된다(계정 보안). 맞는지는 서버가 본다.
-  // 서버 API (프론트 제안): POST /employee/api/password { current, password } → { success, message }
   const pwDialog = document.getElementById('pwChangeDialog');
   if (pwDialog) {
     const $id = id => document.getElementById(id);
@@ -137,7 +136,7 @@
   // 화면 JS는 서버를 api.get('/approval/api/docs') 처럼 부르고, 성공하면 데이터 자체를, 실패하면 xhr 에서
   // apiMessage(xhr)로 안내 문구를 꺼낸다. 서버가 { success, message, data } 로 감싸 보내면 여기서 풀어 준다:
   //   success true → data 를 넘긴다 / success false → 실패로 바꾸고 message 를 안내 문구로 쓴다.
-  // 감싸지 않은 JSON 을 보내도 그대로 넘긴다. 주소 목록은 docs/front-screen-api.md.
+  // 감싸지 않은 JSON 을 보내도 그대로 넘긴다.
   const unwrap = req => req.then(res => {
     if (res && typeof res === 'object' && !Array.isArray(res) && 'success' in res) {
       return res.success ? res.data : $.Deferred().reject({ status: 200, responseJSON: { message: res.message } }).promise();

@@ -2,16 +2,6 @@
 // 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
 // 장비 지급 신청서(전자결재)가 최종 승인되면 EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
-// 서버 API (프론트 제안):
-//   GET   /ticket/api/form-options          접수에 필요한 것
-//         → { assets: [{ id, name, serial, branchId }](내 장비), branches: [{ id, name }], defaultBranchId }
-//   GET   /ticket/api/tickets               내가 접수한 티켓, 최신순 → [티켓]
-//   POST  /ticket/api/tickets               { type: INCIDENT|INQUIRY, title, body, branchId, assetId('' = 해당 없음) } → 티켓. 읽기 전용 업체는 403
-//   POST  /ticket/api/tickets/{id}/comments { body } → 티켓. 완료된 티켓은 409
-//   GET   /asset/api/assets                 내 장비 → { items: [{ id, name, serial, branchName, assignedAt, ticketId }],
-//                                                       waiting: [{ id, kind, qty, branchName, status }](지급 대기 중인 장비 지급 티켓) }
-// 티켓: { id, type: INCIDENT|INQUIRY|EQUIPMENT, title, body, branchId, branchName, asset: { id, name, serial } | null,
-//         status: RECEIVED|ASSIGNED|IN_PROGRESS|RESOLVED|CLOSED|CANCELED|REJECTED (AGENTS.md 티켓 상태), at, kind, qty, history: [{ at, name, text }], comments: [{ at, name, body }], canComment }
 
 const TICKET_TYPE = { INCIDENT: '장애', INQUIRY: '문의', EQUIPMENT: '장비 지급' };
 // 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려
