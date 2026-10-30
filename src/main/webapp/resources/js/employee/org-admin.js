@@ -3,7 +3,7 @@
 // 규칙 (서버가 지키고, 화면은 먼저 알려 준다):
 //   - 이름은 1~20자, 목록 안에서 겹치지 않는다(빈칸·대소문자 무시). '관리자'는 첫 관리자 표시라 직급 이름으로 못 쓴다.
 //   - 부서는 30개, 직급은 15개까지, 하나 이상 남긴다.
-//   - 사람이 없을 때만 지운다: 계정(사용 중, 비활성)과 아직 열린 가입 요청. 계정은 지우지 않으므로 비활성 계정이 있어도 못 지운다.
+//   - 사용 중 계정이나 아직 열린 가입 요청이 있으면 못 지운다. 비활성 계정만 남았으면 지울 수 있다(계정과 기록은 그대로 남는다).
 //     부서를 지우면 그 부서의 가입 활성화도 꺼진다.
 //   - 이름을 바꿔도 사람은 그대로 그 부서·직급에 있다 (게시판·일정·휴가 기록, 연차 경력도 따라간다).
 //   - 직급은 위(낮은 직급)에서 아래(높은 직급) 순서다. 화살표로 순서를 바꾼다.
@@ -15,7 +15,7 @@
 //                                                      type, head (부서만: 부서 형태, 부서장 이름 | null), careerYears (직급만) }] }
 //   POST   /employee/admin/api/{kind}               { name } → { name }                 409: 이미 있음, 개수 초과
 //   POST   /employee/admin/api/{kind}/{name}        { name } → { from, to, mySub }      mySub: 바뀐 내 헤더 표시("부서 · 직급") | null
-//   POST   /employee/admin/api/{kind}/{name}/delete → { name }                          409: 사람이 있음, 마지막 하나
+//   POST   /employee/admin/api/{kind}/{name}/delete → { name }                          409: 사용 중 계정·가입 요청이 있음, 마지막 하나
 //   POST   /employee/admin/api/{kind}/{name}/move   { dir: -1 | 1 } → { ok }
 //   POST   /employee/admin/api/depts/{name}/type    { type: DEPT_IT | DEPT_HR | DEPT_OPS | '' } → { name, type }
 // 같은 모듈의 employee/employee.js에서 cellOf, writeButton, askConfirm, DEPT_TYPE, deptTypeLabel, viewShown, readOnlyUi를 쓴다.
@@ -103,13 +103,15 @@
     const { name } = item;
     if (names(kind).length <= 1) return showToast(`${ORG[kind].topic} 하나 이상 있어야 합니다`);
     const m = item.members;
-    if (m.all) {
-      const parts = [m.inUse && `사용 중 ${m.inUse}명`, m.retired && `비활성 ${m.retired}명`, m.requests && `가입 요청 ${m.requests}건`].filter(Boolean).join(', ');
+    // 사용 중 계정이나 가입 요청이 있으면 막는다. 비활성 계정만 남았으면 지울 수 있다
+    if (m.inUse || m.requests) {
+      const parts = [m.inUse && `사용 중 ${m.inUse}명`, m.requests && `가입 요청 ${m.requests}건`].filter(Boolean).join(', ');
       return askConfirm(`'${name}' ${ORG[kind].obj} 지울 수 없습니다`,
         `${parts}이 이 ${word}에 있어 지울 수 없습니다. 가입 요청은 가입 승인에서 처리할 수 있고, 이름은 바꿀 수 있습니다.`, '확인', null);
     }
     askConfirm(`'${name}' ${ORG[kind].obj} 삭제할까요?`,
-      `목록에서 사라지고, 계정 생성에서도 더 이상 고를 수 없습니다.${kind === 'dept' ? ' 이 부서의 가입 활성화도 꺼집니다.' : ''}`, '삭제', () => {
+      `목록에서 사라지고, 계정 생성에서도 더 이상 고를 수 없습니다.${kind === 'dept' ? ' 이 부서의 가입 활성화도 꺼집니다.' : ''}`
+        + (m.retired ? ` 이 ${word}의 비활성 계정 ${m.retired}명은 계정과 기록이 그대로 남습니다.` : ''), '삭제', () => {
         // 서버가 다시 본다: 그사이 누가 들어왔을 수 있다
         api.post(`${url(kind, name)}/delete`)
           .done(r => showToast(`${word} '${r.name}'을(를) 삭제했습니다`))
