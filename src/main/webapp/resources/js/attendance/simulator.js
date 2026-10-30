@@ -47,6 +47,8 @@ async function simFetch(method, path, body) {
 function showConnect(message) {
   simEl('simConnect').hidden = false;
   simEl('simMain').hidden = true;
+  simEl('simChangeKey').hidden = true;
+  simEl('simTitle').textContent = '지문 단말기';
   simEl('simKeyError').textContent = message || '';
   simEl('simKey').value = '';
   simEl('simKey').focus();
@@ -58,7 +60,8 @@ async function connect(key) {
     const info = await simFetch('GET', '/api/attendance/device');
     simStoreKey(key);
     sim.people = info.people;
-    simEl('simTitle').textContent = `${info.companyName} · ${info.deviceName}`;
+    simEl('simTitle').textContent = `${info.companyName} 지문 단말기`;
+    simEl('simChangeKey').hidden = false;
     simEl('simDevice').textContent = `등록된 사람 ${info.people.length}명`;
     renderPeople();
     simEl('simConnect').hidden = true;
@@ -94,7 +97,14 @@ function simGo(step) {
     li.classList.toggle('done', n < now);
   });
   document.querySelector('.sim-first-only').hidden = step !== 1 && step !== '1';
-  if (String(step) === '1') sim.selected = null;
+  if (String(step) === '1') {
+    // 처음 화면: 검색어를 비우고 검색 칸에 바로 입력할 수 있게
+    sim.selected = null;
+    simEl('simSearch').value = '';
+    sim.page = 1;
+    renderPeople();
+    simEl('simSearch').focus();
+  }
   if (String(step) === '2') simEl('simChosenPerson').textContent = simWho(sim.selected);
   if (String(step) === '3') simEl('simChosenPunch').textContent = `${simWho(sim.selected)} · ${SIM_TYPE[sim.type]}`;
   if (step === 'done') {
@@ -113,29 +123,76 @@ function simGo(step) {
 const simWho = p => (p ? (p.unregistered ? p.name : `${p.name} (${p.userNo}번)`) : '');
 document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => simGo(b.dataset.go)));
 
-// ---------- 1) 사람 고르기 → 2) 출근·퇴근 고르기 ----------
+// ---------- 1) 사람 고르기 (검색 + 한 줄에 한 사람) → 2) 출근·퇴근 고르기 ----------
+const SIM_UNREGISTERED = { name: '등록 안 된 사람', unregistered: true };
+const simNorm = s => String(s || '').replace(/\s+/g, '').toLowerCase();
+
+function personRow(p) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'sim-person';
+  b.setAttribute('role', 'listitem');
+  const cell = (cls, text) => { const s = document.createElement('span'); s.className = cls; s.textContent = text; return s; };
+  if (p.unregistered) {
+    b.classList.add('is-unregistered');
+    b.append(cell('sim-no', '-'), cell('sim-name', p.name), cell('sim-dept', '단말기에 지문 없음'), cell('sim-state', ''));
+  } else {
+    b.append(cell('sim-no', p.userNo), cell('sim-name', p.name), cell('sim-dept', p.dept || '-'),
+      cell(`sim-state${p.serving ? '' : ' is-off'}`, p.serving ? '' : '재직 아님'));
+  }
+  b.addEventListener('click', () => { sim.selected = p; simGo(2); });
+  return b;
+}
+
+// 검색어로 거른 목록: 이름·사용자 번호·부서에 검색어가 들어 있으면 보인다. "등록 안 된 사람"은 검색어가 없을 때만 맨 아래에
+function filteredPeople() {
+  const q = simNorm(simEl('simSearch').value);
+  const hits = q ? sim.people.filter(p => [p.name, p.userNo, p.dept].some(v => simNorm(v).includes(q))) : sim.people;
+  return q ? hits : hits.concat([SIM_UNREGISTERED]);
+}
+
+// 한 페이지에 5명. 검색어가 바뀌면 1페이지로
+const SIM_PAGE_SIZE = 5;
+sim.page = 1;
+
 function renderPeople() {
-  const list = simEl('simPeople');
-  const people = sim.people.map(p => ({ ...p, unregistered: false }))
-    .concat([{ name: '등록 안 된 사람', unregistered: true }]);
-  list.replaceChildren(...people.map(p => {
+  const people = filteredPeople();
+  const pages = Math.max(1, Math.ceil(people.length / SIM_PAGE_SIZE));
+  sim.page = Math.min(Math.max(1, sim.page), pages);
+  const start = (sim.page - 1) * SIM_PAGE_SIZE;
+  simEl('simPeople').replaceChildren(...people.slice(start, start + SIM_PAGE_SIZE).map(personRow));
+  simEl('simEmpty').hidden = people.length > 0;
+  simRenderPager(pages);
+}
+
+function simRenderPager(pages) {
+  const nav = simEl('simPager');
+  const btn = (label, page, opts = {}) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'sim-person';
-    b.setAttribute('aria-pressed', 'false');
-    const name = document.createElement('span');
-    name.textContent = p.name;
-    const meta = document.createElement('small');
-    meta.textContent = p.unregistered ? '단말기에 지문 없음' : `${p.userNo}번${p.dept ? ' · ' + p.dept : ''}${p.serving ? '' : ' · 재직 아님'}`;
-    b.append(name, meta);
-    b.addEventListener('click', () => {
-      sim.selected = p;
-      simGo(2);
-    });
+    b.className = 'sim-page';
+    b.textContent = label;
+    if (opts.aria) b.setAttribute('aria-label', opts.aria);
+    if (opts.current) b.setAttribute('aria-current', 'page');
+    b.disabled = !!opts.disabled;
+    b.addEventListener('click', () => { sim.page = page; renderPeople(); });
     return b;
-  }));
-  sim.selected = null;
+  };
+  const items = [btn('이전', sim.page - 1, { disabled: sim.page === 1, aria: '이전 페이지' })];
+  for (let p = 1; p <= pages; p++) items.push(btn(String(p), p, { current: p === sim.page, aria: `${p}페이지` }));
+  items.push(btn('다음', sim.page + 1, { disabled: sim.page === pages, aria: '다음 페이지' }));
+  nav.replaceChildren(...items);
+  nav.hidden = pages <= 1;
 }
+
+simEl('simSearch').addEventListener('input', () => { sim.page = 1; renderPeople(); });
+// 한 명만 남았으면 Enter 로 바로 고른다
+simEl('simSearch').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const people = filteredPeople();
+  if (people.length === 1) { sim.selected = people[0]; simGo(2); }
+});
 
 document.querySelectorAll('.sim-type').forEach(b => b.addEventListener('click', () => {
   sim.type = b.dataset.type;

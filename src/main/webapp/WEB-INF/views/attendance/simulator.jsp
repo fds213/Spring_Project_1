@@ -25,7 +25,8 @@
     <div class="sim-head">
       <img src="${ctx}/resources/img/logo-mark.svg" alt="">
       <strong id="simTitle">지문 단말기</strong>
-      <span class="sim-badge">시연용 단말기</span>
+      <%-- 단말기 키 재설정: 연결된 뒤에만 보인다. 누르면 저장한 키를 지우고 키 입력 칸으로 --%>
+      <button type="button" class="btn sim-reset" id="simChangeKey" hidden>단말기 키 재설정</button>
     </div>
 
     <%-- 1) 단말기 키: 업체마다 발급한 키. 없거나 틀리면 이 칸만 보인다 --%>
@@ -55,7 +56,13 @@
 
       <section class="sim-panel sim-step" data-step="1">
         <p class="sim-title">1. 지문을 댈 사람을 고르세요</p>
-        <div class="sim-people" id="simPeople"></div>
+        <%-- 이름·사용자 번호·부서로 바로 찾는다. 한 명만 남으면 Enter 로 고른다 --%>
+        <input class="input sim-search" id="simSearch" type="search" autocomplete="off"
+               placeholder="이름, 사용자 번호, 부서로 찾기" aria-label="지문을 댈 사람 찾기" aria-controls="simPeople">
+        <div class="sim-people" id="simPeople" role="list"></div>
+        <p class="sim-empty muted" id="simEmpty" hidden>찾는 사람이 없습니다</p>
+        <%-- 한 번에 5명. 더 있으면 페이지로 넘긴다 --%>
+        <nav class="sim-pager" id="simPager" aria-label="사람 목록 페이지" hidden></nav>
       </section>
 
       <section class="sim-panel sim-step" data-step="2" hidden>
@@ -91,15 +98,12 @@
         <small class="sim-hint" id="simBackHint"></small>
       </section>
 
-      <%-- 첫 단계에서만: 이번에 찍은 기록과 키 바꾸기 --%>
+      <%-- 첫 단계에서만: 이번에 찍은 기록 --%>
       <div class="sim-first-only">
         <section class="sim-panel">
           <p class="sim-title">이번에 찍은 기록</p>
           <ul class="sim-log" id="simLog"><li class="muted">기록이 없습니다</li></ul>
         </section>
-        <div class="sim-foot">
-          <button type="button" class="btn" id="simChangeKey">단말기 키 바꾸기</button>
-        </div>
       </div>
     </div>
   </div>

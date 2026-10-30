@@ -762,7 +762,7 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-head { display: flex; align-items: center; gap: 10px; }
 .sim-head img { height: 26px; }
 .sim-head strong { font-weight: 600; }
-.sim-badge { margin-left: auto; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: #faeeda; color: #854f0b; white-space: nowrap; }
+.sim-reset { margin-left: auto; height: 30px; font-size: 12px; white-space: nowrap; }
 .sim-panel { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 18px; margin-top: 14px; }
 .sim-title { font-size: 13px; color: var(--text-sub); margin: 0 0 10px; }
 .sim-help { margin: 0 0 10px; font-size: 13px; color: var(--text-sub); line-height: 1.6; }
@@ -770,14 +770,36 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-time { font-size: 44px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .sim-date, .sim-device { color: var(--text-sub); font-size: 13px; }
 .sim-device { margin-top: 4px; color: var(--text); font-weight: 500; }
-.sim-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.sim-person, .sim-type {
+/* 사람 고르기: 위에 검색, 아래에 한 줄에 한 사람 (번호 · 이름 · 부서 · 상태) */
+.sim-search { width: 100%; margin-bottom: 10px; }
+.sim-people { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.sim-person {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 64px; align-items: center; gap: 10px;
+  min-height: 48px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--line);
+  background: var(--bg); font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.sim-person:last-child { border-bottom: 0; }
+.sim-person:hover, .sim-person:focus-visible { background: var(--accent-bg); outline: none; }
+.sim-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.sim-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-dept { color: var(--text-sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-state { font-size: 12px; text-align: right; }
+.sim-state.is-off { color: var(--danger); }
+.sim-person.is-unregistered .sim-name { font-weight: 400; color: var(--text-sub); }
+.sim-empty { margin: 12px 0 0; text-align: center; }
+.sim-pager { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+.sim-page {
+  min-width: 34px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.sim-page:hover:not(:disabled) { background: var(--bg-sub); }
+.sim-page[aria-current="page"] { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.sim-page:disabled { color: var(--text-muted); cursor: default; }
+.sim-type {
   border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: inherit; color: var(--text); cursor: pointer;
 }
-.sim-person { min-height: 56px; text-align: left; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
-.sim-person small { color: var(--text-muted); font-size: 12px; }
-.sim-person:hover, .sim-type:hover { background: var(--bg-sub); }
-.sim-person[aria-pressed="true"], .sim-type[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
+.sim-type:hover { background: var(--bg-sub); }
+.sim-type[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
 .sim-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .sim-type { height: 48px; font-size: 15px; font-weight: 600; }
 .sim-scan { display: flex; flex-direction: column; align-items: center; gap: 10px; }
@@ -822,4 +844,3 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-log { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .sim-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .sim-log li:last-child { border-bottom: 0; }
-.sim-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; }
