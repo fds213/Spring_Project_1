@@ -21,10 +21,22 @@
 
     <!-- 본인이 참여중인 대화방 목록 -->
     <select id="getRoomList" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
-        SELECT r.chat_room_id, r.room_name, r.room_type
+        SELECT r.chat_room_id, r.room_type,
+               CASE
+                   WHEN r.room_type = 'ROOM_DIRECT' THEN e.employee_name
+                   ELSE
+                       r.room_name END AS display_name
         FROM chat_room r
-                 JOIN chat_member m ON r.chat_room_id = m.chat_room_id AND r.company_id = m.company_id
-        WHERE m.employee_id = #{employeeId} AND m.company_id = #{companyId}
+                 JOIN chat_member m ON m.company_id = r.company_id AND m.chat_room_id = r.chat_room_id
+                 LEFT JOIN employee e
+                           ON r.room_type = 'ROOM_DIRECT' AND e.company_id = r.company_id
+                               AND e.employee_id = CASE
+                                                       WHEN r.direct_employee_low = m.employee_id
+                                                           THEN r.direct_employee_high
+                                                       ELSE r.direct_employee_low
+                                                        END
+        WHERE m.company_id = #{companyId}
+          AND m.employee_id = #{employeeId}
           AND m.left_at IS NULL
     </select>
 

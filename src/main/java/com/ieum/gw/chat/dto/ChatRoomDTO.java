@@ -12,4 +12,5 @@ public class ChatRoomDTO {
     private Long companyId;
     private String roomType;
     private String roomName;
+    private String displayName;
 }

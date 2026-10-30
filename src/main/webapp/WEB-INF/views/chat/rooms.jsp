@@ -58,8 +58,8 @@
       <ul class="room-list">
         <c:forEach var="room" items="${roomList}">
           <li>
-            <a href="${pageContext.request.contextPath}/chat/room/${room.roomId}">
-              <c:out value="${room.roomName}"/>
+            <a href="${pageContext.request.contextPath}/chat/room/${room.chatRoomId}">
+              <c:out value="${room.displayName}"/>
             </a>
           </li>
         </c:forEach>
