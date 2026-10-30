@@ -1,35 +1,40 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.chat.mapper.ChatMapper">
+
+    <!--  comp_code 조건도 추가해야함  -->
     <select id="isMember" resultType="int">
         SELECT count(*)
         FROM chat_member
-        WHERE roomId = #{roomId}
-          AND empnum = #{empnum}
+        WHERE room_id = #{roomId}
+          AND emp_num = #{empnum}
           AND left_at IS NULL
     </select>
+
 
     <insert id="insertMessage" parameterType="com.ieum.gw.chat.dto.ChatMessageDTO">
         <selectKey keyProperty="msgId" resultType="long" order="BEFORE">
             SELECT seq_chat_message.NEXTVAL FROM dual
         </selectKey>
-        INSERT INTO chat_message (msgId, roomId, sender, msg_type, content)
-        VALUES (#{msgId}, #{roomId}, #{sender}, #{msg_type}, #{content})
+        INSERT INTO chat_message (msg_id, room_id, sender_emp_num, message_type, content, created_at)
+        VALUES (#{msgId}, #{roomId}, #{senderEmpNum}, #{messageType}, #{content}, default)
     </insert>
 
     <!-- 본인이 참여중인 대화방 목록 -->
+    <!-- comp_code 조건도 추가해야함 -->
     <select id="getRoomList" parameterType="String" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
-        SELECT r.roomId, r.room_name
+        SELECT r.room_id, r.room_name
         FROM chat_room r
-                 JOIN chat_member m ON r.roomId = m.roomId
-        WHERE m.empnum = #{_parameter}
+                 JOIN chat_member m ON r.room_id = m.room_id
+        WHERE m.emp_num = #{_parameter}
           AND m.left_at IS NULL
     </select>
 
     <!-- 본인 제외 활성 상태의 직원 목록 -->
+    <!-- comp_code 조건도 추가해야함 -->
     <select id="getEmpList" parameterType="String" resultType="com.ieum.gw.chat.dto.ChatEmpDto">
         SELECT name, role, empnum
-        FROM tbltestemp
+        FROM test_emp
         WHERE empnum &lt;&gt; #{_parameter}
           AND status = 'ACTIVE'
     </select>

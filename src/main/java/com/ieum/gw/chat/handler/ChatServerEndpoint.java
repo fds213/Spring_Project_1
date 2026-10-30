@@ -15,7 +15,7 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@ServerEndpoint(value = "/chat/{roomId}", configurator = SpringConfigurator.class)
+@ServerEndpoint(value = "/chat/room/{roomId}", configurator = SpringConfigurator.class)
 public class ChatServerEndpoint {
 
     @Autowired
@@ -104,16 +104,16 @@ public class ChatServerEndpoint {
         Long rId = (Long) senderSession.getUserProperties().get("roomId");
         if (rId == null) return;
 
-        String sender = ((LoginUser) ((Authentication)senderSession.getUserPrincipal()).getPrincipal()).getEmpnum();
+        String senderEmpNum = ((LoginUser) ((Authentication)senderSession.getUserPrincipal()).getPrincipal()).getEmpnum();
 
         // isMember 넣어서 검증
 
         // 메시지 DB 저장
 
         dto.setRoomId(rId);
-        dto.setSender(sender);
+        dto.setSenderEmpNum(senderEmpNum);
         dto.setContent(message);
-        dto.setMsg_type("TEXT");
+        dto.setMessageType("MSG_TEXT");
 
         cService.insertMessage(dto);
 
