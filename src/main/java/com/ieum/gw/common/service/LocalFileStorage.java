@@ -40,6 +40,8 @@ public class LocalFileStorage implements FileStorage {
             }
         }
 
+        FileTypeChecker.check(file, ext, module);
+        
         // ② 저장 키
         String key = companyId + "/" + module + "/" + UUID.randomUUID() + "." + ext;
 
