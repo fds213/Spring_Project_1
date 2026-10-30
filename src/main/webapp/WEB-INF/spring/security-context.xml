@@ -40,9 +40,9 @@
 
 		<!-- 3. 인사·IT 관리 화면 -->
 		<security:intercept-url pattern="/ticket/admin/**"     access="hasAnyRole('IT','ADMIN')" />
-		<security:intercept-url pattern="/asset/admin/**"      access="hasRole('IT')" />
+		<security:intercept-url pattern="/asset/admin/**"      access="hasAnyRole('IT','ADMIN')" />
 		<security:intercept-url pattern="/employee/admin/list" access="hasAnyRole('HR','ADMIN')" />
-		<security:intercept-url pattern="/attendance/admin/**" access="hasRole('HR')" />
+		<security:intercept-url pattern="/attendance/admin/**" access="hasAnyRole('HR','ADMIN')" />
 
 		<!-- 4. 그 밖의 관리 화면 (부서·역할 관리 등) -->
 		<security:intercept-url pattern="/*/admin/**"        access="hasRole('ADMIN')" />

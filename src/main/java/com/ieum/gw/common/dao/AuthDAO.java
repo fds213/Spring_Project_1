@@ -25,4 +25,8 @@ public class AuthDAO {
 	public int resetFail(String compcode, String empnum) {
 		return mapper.resetFail(compcode, empnum);
 	}
+	
+	public int getLockMinutes(String compcode, String empnum) {
+		return mapper.getLockMinutes(compcode, empnum);
+	}
 }
