@@ -30,3 +30,6 @@ src/main/resources/config/db.properties
 # STS가 자동으로 만드는 IDE 설정 (Lombok 어노테이션 처리)
 .factorypath
 .settings/org.eclipse.jdt.apt.core.prefs
+
+# 근태 단말기 키 원본 (db/device-keys.example 을 복사해서 사용)
+db/device-keys.local.txt

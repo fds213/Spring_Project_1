@@ -32,6 +32,8 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/ticket/mine` | `ticket/mine` |
 | `/asset/mine` | `asset/mine` |
 | `/attendance/my` | `attendance/my` |
+| `/attendance/leave` | `attendance/leave` |
+| `/attendance/simulator` (로그인 없이) | `attendance/simulator` (지문 단말기 시뮬레이터. 출퇴근은 단말기 키로 `/api/attendance/**`에 보낸다) |
 | `/schedule/calendar` | `schedule/calendar` |
 | `/employee/admin/list` | `employee/admin/list` |
 | `/employee/join` | `employee/join` |

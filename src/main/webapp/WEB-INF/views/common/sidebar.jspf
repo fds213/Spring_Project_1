@@ -22,7 +22,7 @@
   <c:when test="${fn:startsWith(menu, 'ops-')}"><c:set var="navCat" value="ops" /></c:when>
   <c:when test="${fn:startsWith(menu, 'approval-')}"><c:set var="navCat" value="approval" /></c:when>
   <c:when test="${fn:startsWith(menu, 'ticket-') or fn:startsWith(menu, 'asset-')}"><c:set var="navCat" value="it" /></c:when>
-  <c:when test="${menu eq 'attendance' or menu eq 'schedule'}"><c:set var="navCat" value="work" /></c:when>
+  <c:when test="${menu eq 'attendance' or menu eq 'leave' or menu eq 'schedule'}"><c:set var="navCat" value="work" /></c:when>
   <c:when test="${menu eq 'chat' or menu eq 'board-dept' or menu eq 'location'}"><c:set var="navCat" value="talk" /></c:when>
   <c:when test="${menu eq 'org'}"><c:set var="navCat" value="company" /></c:when>
   <c:when test="${fn:startsWith(menu, 'hr-')}"><c:set var="navCat" value="hr" /></c:when>
@@ -116,8 +116,11 @@
     </div>
     <div class="nav-cat" id="navCat-work" data-cat="work"${navCat eq 'work' ? '' : ' hidden'}>
       <p class="nav-title">근무</p>
-      <ui:nav key="attendance" path="/attendance/my" current="${menu}">근태·연차</ui:nav>
+      <ui:nav key="attendance" path="/attendance/my" current="${menu}">근태</ui:nav>
+      <ui:nav key="leave" path="/attendance/leave" current="${menu}">연차</ui:nav>
       <ui:nav key="schedule" path="/schedule/calendar" current="${menu}">일정</ui:nav>
+      <%-- 지문 시뮬레이터: 단말기 역할이라 새 탭에서 연다 (요구분석서 3.10: 직원은 그룹웨어의 링크로 시뮬레이터를 연다) --%>
+      <a href="${ctx}/attendance/simulator" class="nav-item" target="_blank" rel="noopener">지문 시뮬레이터 <span aria-hidden="true">↗</span></a>
     </div>
     <div class="nav-cat" id="navCat-talk" data-cat="talk"${navCat eq 'talk' ? '' : ' hidden'}>
       <p class="nav-title">소통</p>

@@ -1,0 +1,4 @@
+# 근태 단말기 키 (지문 시뮬레이터에 입력). 실제 값은 db/device-keys.local.txt 에 두고 git에 올리지 않는다.
+# DB에는 이 키의 SHA-256 해시만 들어간다(db/data/attendance_device_seed.sql).
+ieum0001=
+ieum0002=

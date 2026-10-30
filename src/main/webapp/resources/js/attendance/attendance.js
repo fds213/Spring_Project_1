@@ -1,19 +1,14 @@
-// 근무 > 근태·연차 (views/attendance/my.jsp): 로그인한 본인의 출퇴근 기록과 연차 현황만 보여 준다 (요구분석서 3.1, 3.9, 3.10).
-// 다른 직원의 근태, 근태·연차 관리(인사)는 이 화면에 없다.
+// 근무 > 근태 (views/attendance/my.jsp): 로그인한 본인의 출퇴근 기록만 보여 준다 (요구분석서 3.1, 3.10).
+// 다른 직원의 근태, 근태·연차 관리(인사)는 이 화면에 없다. 연차는 연차 화면(leave.js)에 있다.
 //
 // 출퇴근 기록: 지문 단말기가 보낸 기록을 단말기 사용자 번호로 찾는다. 로그인한 사람과 단말기 사용자 번호의 연결은 요구분석서 3.10 의
 // "업체·단말기 사용자 번호·사번 계정의 연결"이다. 이 화면에서는 본인이 번호를 연결한다 (원래는 인사 담당자·서버가 관리할 일이다).
-// 연차: 15일 + 내림(총 완료 경력 연수 ÷ 3). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
-// 연차를 쓰는 것(휴가)은 전자결재의 휴가 신청서로 신청한다(요구분석서 3장 범위). 최종 승인 때 연차가 차감되고 여기 내역에 들어온다.
-// 이 화면은 기록과 연차 현황·내역만 보여 주고, 신청·회수는 전자결재(기안 작성·결재함)에서 한다.
+// 승인된 연차가 있는 날은 기록의 비고에 연차 구분을 적는다.
 
 const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴' };
 const ATT_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-// 연차 구분·신청 상태 이름
-const LEAVE_LABEL = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
-const LEAVE_STATUS = { REQUESTED: '승인 대기', APPROVED: '승인', REJECTED: '반려', CANCELED: '회수' };
-const LEAVE_STATUS_CLASS = { REQUESTED: 'waiting', APPROVED: 'paid', REJECTED: 'failed', CANCELED: 'expired' };
-const dayText = n => `${Number.isInteger(n) ? n : n.toFixed(1)}일`;
+// 기록 비고에 쓰는 연차 구분 이름
+const ATT_LEAVE_NOTE = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
 
 const attEl = id => document.getElementById(id);
 const attNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
@@ -30,7 +25,6 @@ function openAttendanceView() {
 function renderAttendanceView() {
   if (!attState.month) return openAttendanceView();
   loadAttRecords();
-  loadAttLeaves();
 }
 
 const attMonthParam = () => `${attState.month.y}-${pad2(attState.month.m + 1)}`;
@@ -39,12 +33,6 @@ function loadAttRecords() {
   api.get('/attendance/api/records', { month: attMonthParam() })
     .done(r => { if (r.month === attMonthParam()) renderAttRecords(r); }) // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
     .fail(xhr => showToast(apiMessage(xhr, '출퇴근 기록을 불러오지 못했습니다')));
-}
-
-function loadAttLeaves() {
-  api.get('/attendance/api/leaves')
-    .done(renderLeaveInfo)
-    .fail(xhr => showToast(apiMessage(xhr, '연차 현황을 불러오지 못했습니다')));
 }
 
 function renderAttRecords(r) {
@@ -64,7 +52,7 @@ function renderAttRecords(r) {
     const weekend = wk === 0 || wk === 6;
     const rest = weekend || !!day.holiday;
     const rec = day.punch;
-    const note = day.holiday || (weekend ? '주말' : '') || (day.leave ? LEAVE_LABEL[day.leave] : '');
+    const note = day.holiday || (weekend ? '주말' : '') || (day.leave ? ATT_LEAVE_NOTE[day.leave] : '');
     const status = rec ? [rec.inStatus && rec.inStatus !== 'NORMAL' ? ATT_STATUS[rec.inStatus] : '', rec.outStatus && rec.outStatus !== 'NORMAL' ? ATT_STATUS[rec.outStatus] : ''].filter(Boolean).join(' · ') || '정상' : '';
     const tr = attNode('tr', (rest ? 'att-rest' : '') + (day.date === r.today.date ? ' att-today' : ''),
       attNode('td', '', `${Number(day.date.slice(8))}일 (${ATT_WEEKDAYS[wk]})`),
@@ -120,39 +108,6 @@ function renderDeviceLink(dev) {
   box.append(
     attNode('p', 'att-link-text', '연결된 단말기 사용자 번호가 없어 출퇴근 기록이 보이지 않습니다. 지문 단말기에 등록된 내 사용자 번호를 연결해 주세요.'),
     attNode('div', 'input-action att-link-form', input, go), error);
-}
-
-// 연차 현황과 이번 연차 기간의 신청 내역
-function renderLeaveInfo(r) {
-  const sum = r.summary;
-  const dl = attEl('leaveInfo');
-  const hist = attEl('leaveHistory');
-  attEl('attLeft').textContent = sum ? dayText(sum.left) : '-';
-  if (!sum) {
-    dl.replaceChildren(attNode('dt', '', '안내'), attNode('dd', '', '직원 정보를 찾을 수 없어 연차를 계산할 수 없습니다'));
-    hist.replaceChildren();
-    return;
-  }
-  const row = (k, v) => [attNode('dt', '', k), attNode('dd', '', v)];
-  dl.replaceChildren(
-    ...row('이번 연차 기간', `${ymd(sum.start)} ~ ${ymd(new Date(new Date(sum.end).getTime() - DAY_MS))}`),
-    ...row('부여', `${dayText(sum.grant)} (15일 + 총 경력 ${sum.career}년 ÷ 3의 몫 ${Math.floor(sum.career / 3)}일)`),
-    ...row('총 경력', `이전 경력 ${sum.prev}년 + 현재 업체 근속 ${sum.years}년`),
-    ...row('사용 (승인됨)', dayText(sum.usedDays)),
-    ...row('승인 대기', dayText(sum.pendingDays)),
-    ...row('남은 연차', dayText(sum.left)),
-    ...row('다음 부여', `${ymd(sum.end)} 입사기념일 (남은 연차는 이월되지 않습니다)`));
-
-  // 신청 내역: 상태와, 대기 중이면 지금 결재할 사람, 반려면 사유 (회수는 결재함에서)
-  hist.replaceChildren(...(r.items.length ? r.items.map(l => {
-    const range = `${l.from}${l.to !== l.from ? ` ~ ${l.to}` : ''} · ${LEAVE_LABEL[l.kind]} · ${dayText(l.days)}`;
-    const now = l.line[l.step];
-    const sub = l.status === 'REQUESTED' ? `${l.step + 1}단계 ${now ? now.name : '-'} 결재 대기`
-      : l.status === 'REJECTED' ? `반려${l.comment ? `: ${l.comment}` : ''}` : '';
-    const li = attNode('li', '', attNode('span', 'leave-line', attNode('span', '', range), ...(sub ? [attNode('small', 'cell-sub', sub)] : [])),
-      attNode('span', `status status-${LEAVE_STATUS_CLASS[l.status]}`, LEAVE_STATUS[l.status]));
-    return li;
-  }) : [attNode('li', 'muted', '이번 연차 기간에 신청한 내역이 없습니다')]));
 }
 
 const attMoveMonth = step => {

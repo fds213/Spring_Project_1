@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.attendance.mapper.AttendanceMapper">
+
+	<!-- 서울 시각 (테이블 기본값과 같은 기준). 출퇴근 시각은 단말기가 보낸 값이 아니라 이음이 받은 시각이다 -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<select id="selectToday" resultType="string">
+		SELECT TO_CHAR(<include refid="now"/>, 'YYYY-MM-DD') FROM dual
+	</select>
+
+	<!-- ===== 단말기 ===== -->
+
+	<!-- 단말기 키 해시로 쓰는 중인 단말기 1대 -->
+	<select id="selectDeviceByKeyHash" resultType="com.ieum.gw.attendance.dto.AttendanceDeviceDTO">
+		SELECT d.attendance_device_id, d.company_id, c.company_name, d.device_name
+		FROM attendance_device d
+		JOIN company c ON c.company_id = d.company_id
+		WHERE d.device_key_hash = #{keyHash} AND d.use_yn = 'Y'
+	</select>
+
+	<!-- 업체의 단말기 (여러 대면 먼저 등록한 것) -->
+	<select id="selectCompanyDevice" resultType="com.ieum.gw.attendance.dto.AttendanceDeviceDTO">
+		SELECT d.attendance_device_id, d.company_id, c.company_name, d.device_name
+		FROM attendance_device d
+		JOIN company c ON c.company_id = d.company_id
+		WHERE d.company_id = #{companyId} AND d.use_yn = 'Y'
+		ORDER BY d.attendance_device_id
+		FETCH FIRST 1 ROWS ONLY
+	</select>
+
+	<!-- 이용 기간이 있는데 모두 끝났으면 1 (읽기 전용 업체: 단말기 기록도 받지 않는다). 기간 자료가 없으면 0 -->
+	<select id="isCompanyExpired" resultType="int">
+		SELECT CASE WHEN COUNT(*) = 0 THEN 0
+		            WHEN MAX(ends_at) &lt;= <include refid="now"/> THEN 1
+		            ELSE 0 END
+		FROM service_period
+		WHERE company_id = #{companyId}
+	</select>
+
+	<!-- 단말기에 등록된 사람 목록 (시뮬레이터 화면용) -->
+	<select id="selectDevicePeople" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+		SELECT de.device_user_no, e.employee_id, e.employee_name, dp.department_name, e.employment_status
+		FROM device_employee de
+		JOIN employee e ON e.employee_id = de.employee_id AND e.company_id = de.company_id
+		LEFT JOIN department dp ON dp.department_id = e.department_id
+		WHERE de.attendance_device_id = #{attendanceDeviceId} AND de.use_yn = 'Y'
+		ORDER BY de.device_user_no
+	</select>
+
+	<select id="selectDevicePerson" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+		SELECT de.device_user_no, e.employee_id, e.employee_name, dp.department_name, e.employment_status
+		FROM device_employee de
+		JOIN employee e ON e.employee_id = de.employee_id AND e.company_id = de.company_id
+		LEFT JOIN department dp ON dp.department_id = e.department_id
+		WHERE de.attendance_device_id = #{attendanceDeviceId} AND de.device_user_no = #{deviceUserNo} AND de.use_yn = 'Y'
+	</select>
+
+	<!-- ===== 출퇴근 기록 ===== -->
+
+	<!-- 출근: 같은 직원·같은 날 근태는 고유 제약(UQ_36_01)으로 하나뿐이라, 두 번째 출근은 여기서 막힌다 -->
+	<insert id="insertCheckIn" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+		<selectKey keyProperty="attendanceId" resultType="long" order="BEFORE">
+			SELECT sq_attendance.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO attendance (attendance_id, company_id, employee_id, work_date, check_in_at)
+		VALUES (#{attendanceId}, #{companyId}, #{employeeId}, TRUNC(<include refid="now"/>), <include refid="now"/>)
+	</insert>
+
+	<!-- 퇴근: 오늘 출근했고 아직 퇴근하지 않은 근태에만. 영향 받은 행이 0이면 Service가 이유를 다시 확인한다 -->
+	<update id="updateCheckOut" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+		UPDATE attendance
+		SET check_out_at = <include refid="now"/>,
+		    updated_at   = <include refid="now"/>
+		WHERE attendance_id = #{attendanceId}
+		  AND company_id = #{companyId}
+		  AND check_out_at IS NULL
+	</update>
+
+	<!-- 수신 이력: 받은 시각은 방금 기록한 출근·퇴근 시각과 같게 -->
+	<insert id="insertEvent" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+		INSERT INTO attendance_event (company_id, attendance_id, attendance_device_id, event_type, received_at, event_key)
+		SELECT a.company_id, a.attendance_id, #{attendanceDeviceId}, #{eventType},
+		       CASE WHEN #{eventType} = 'ATT_IN' THEN a.check_in_at ELSE a.check_out_at END,
+		       #{eventKey}
+		FROM attendance a
+		WHERE a.attendance_id = #{attendanceId} AND a.company_id = #{companyId}
+	</insert>
+
+	<sql id="attendanceColumns">
+		attendance_id,
+		TO_CHAR(work_date, 'YYYY-MM-DD')    AS work_date,
+		TO_CHAR(check_in_at, 'HH24:MI:SS')  AS check_in,
+		TO_CHAR(check_out_at, 'HH24:MI:SS') AS check_out
+	</sql>
+
+	<select id="selectTodayAttendance" resultType="com.ieum.gw.attendance.dto.AttendanceDTO">
+		SELECT <include refid="attendanceColumns"/>
+		FROM attendance
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND work_date = TRUNC(<include refid="now"/>)
+	</select>
+
+	<!-- 한 달 근태 (month = YYYY-MM) -->
+	<select id="selectMonthAttendance" resultType="com.ieum.gw.attendance.dto.AttendanceDTO">
+		SELECT <include refid="attendanceColumns"/>
+		FROM attendance
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND work_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
+		  AND work_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+		ORDER BY work_date
+	</select>
+
+	<select id="selectMonthHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
+		SELECT TO_CHAR(holiday_date, 'YYYY-MM-DD') AS holiday_date, holiday_name
+		FROM holiday
+		WHERE company_id = #{companyId}
+		  AND holiday_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
+		  AND holiday_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+	</select>
+
+	<!-- ===== 본인과 단말기 사용자 번호 연결 ===== -->
+
+	<select id="selectMyDeviceUserNo" resultType="string">
+		SELECT device_user_no
+		FROM device_employee
+		WHERE attendance_device_id = #{attendanceDeviceId} AND employee_id = #{employeeId} AND use_yn = 'Y'
+	</select>
+
+	<select id="countDeviceUserNoOfOthers" resultType="int">
+		SELECT COUNT(*)
+		FROM device_employee
+		WHERE attendance_device_id = #{attendanceDeviceId} AND device_user_no = #{deviceUserNo}
+		  AND employee_id &lt;&gt; #{employeeId}
+	</select>
+
+	<!-- 연결표(이력 아님)라 끊을 때 행을 지운다. 출퇴근 기록은 attendance 에 그대로 남는다 -->
+	<delete id="deleteMyDeviceLink">
+		DELETE FROM device_employee
+		WHERE attendance_device_id = #{attendanceDeviceId} AND employee_id = #{employeeId}
+	</delete>
+
+	<insert id="insertDeviceLink">
+		INSERT INTO device_employee (company_id, attendance_device_id, device_user_no, employee_id)
+		VALUES (#{companyId}, #{attendanceDeviceId}, #{deviceUserNo}, #{employeeId})
+	</insert>
+</mapper>
