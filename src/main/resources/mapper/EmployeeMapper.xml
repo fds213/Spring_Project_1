@@ -8,6 +8,7 @@
         <if test="excludeEmpId != null">
             AND employee_id &lt;&gt; #{excludeEmpId}
         </if>
+        AND employment_status = 'ST_SERVING'
         ORDER BY employee_name
     </select>
 

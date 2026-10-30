@@ -1,10 +1,8 @@
 package com.ieum.gw.chat.mapper;
 
-import com.ieum.gw.chat.dto.ChatEmpDto;
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
 import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -15,6 +13,4 @@ public interface ChatMapper {
     void insertMessage(ChatMessageDTO dto);
 
     List<ChatRoomDTO> getRoomList(Long companyId, Long employeeId);
-
-    List<ChatEmpDto> getEmpList(String empNum);
 }

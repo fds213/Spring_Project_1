@@ -1,6 +1,5 @@
 package com.ieum.gw.chat.dao;
 
-import com.ieum.gw.chat.dto.ChatEmpDto;
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
 import com.ieum.gw.chat.mapper.ChatMapper;
@@ -26,7 +25,4 @@ public class ChatDAO {
         return mapper.getRoomList(companyId, employeeId);
     }
 
-    public List<ChatEmpDto> getEmpList(String empnum) {
-        return mapper.getEmpList(empnum);
-    }
 }

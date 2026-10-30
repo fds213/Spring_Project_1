@@ -31,8 +31,5 @@ public class ChatService {
     public List<ChatRoomDTO> getRoomList(Long companyId, Long employeeId) {
         return dao.getRoomList(companyId, employeeId);
     }
-
-//    public List<ChatEmpDto> getEmpList(String empnum) {
-//        return dao.getEmpList(empnum);
-//    }
+    
 }

@@ -36,16 +36,16 @@ public class ChatServerEndpoint {
     @OnOpen
     public void handleOpen(Session session, @PathParam("roomId") Long roomId) {
 
-        Long empNum =((LoginUser) ((Authentication)session.getUserPrincipal()).getPrincipal()).getEmployeeId();
+        Long empNum = ((LoginUser) ((Authentication) session.getUserPrincipal()).getPrincipal()).getEmployeeId();
 
 
-        if(!cService.isMember(roomId, empNum)) {
+        if (!cService.isMember(roomId, empNum)) {
             sessionClose(session);
             System.out.println("개찐빠~!~");
             return;
         }
 
-        String name = ((LoginUser) ((Authentication)session.getUserPrincipal()).getPrincipal()).getName();
+        String name = ((LoginUser) ((Authentication) session.getUserPrincipal()).getPrincipal()).getName();
         session.getUserProperties().put("roomId", roomId);
         session.getUserProperties().put("name", name);
 
@@ -94,16 +94,19 @@ public class ChatServerEndpoint {
         Long roomId = (Long) senderSession.getUserProperties().get("roomId");
         if (roomId == null) return;
 
-        Long senderEmployeeNum = ((LoginUser) ((Authentication)senderSession.getUserPrincipal()).getPrincipal()).getEmployeeId();
+        Long senderEmployeeId = ((LoginUser) ((Authentication) senderSession.getUserPrincipal()).getPrincipal()).getEmployeeId();
+        Long companyId = ((LoginUser) ((Authentication) senderSession.getUserPrincipal()).getPrincipal()).getCompanyId();
 
         // isMember 넣어서 검증
 
         // 메시지 DB 저장
 
         dto.setChatRoomId(roomId);
-        dto.setSenderEmployeeNum(senderEmployeeNum);
+        dto.setCompanyId(companyId);
+        dto.setSenderEmployeeId(senderEmployeeId);
         dto.setMessageText(message);
         dto.setMessageType("MSG_TEXT");
+        dto.setClientMessageKey(UUID.randomUUID().toString()); // 임시로 랜덤값 넣어둔거라 중복 방지 안 됨.
 
         cService.insertMessage(dto);
 
