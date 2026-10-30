@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.common.mapper.AttachmentMapper">
+
+	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<!-- 업로드 직후 1행 기록. 번호를 먼저 뽑아 dto.attachmentId에 넣고 INSERT -->
+	<insert id="insert" parameterType="com.ieum.gw.common.dto.AttachmentDTO">
+		<selectKey keyProperty="attachmentId" resultType="long" order="BEFORE">
+			SELECT SQ_ATTACHMENT.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO attachment
+			(attachment_id, company_id, uploader_account_id,
+			 original_name, storage_key, mime_type, byte_size, category_code)
+		VALUES
+			(#{attachmentId}, #{companyId}, #{uploaderAccountId},
+			 #{originalName}, #{storageKey}, #{mimeType}, #{byteSize}, #{categoryCode})
+	</insert>
+
+	<!-- 같은 업체 파일만 찾음. 삭제 표시된 파일은 제외 -->
+	<select id="getById" resultType="com.ieum.gw.common.dto.AttachmentDTO">
+		SELECT attachment_id, company_id, uploader_account_id,
+		       original_name, storage_key, mime_type, byte_size, sha256,
+		       category_code, status_code, removed_at, created_at, updated_at
+		FROM attachment
+		WHERE attachment_id = #{attachmentId}
+		  AND company_id = #{companyId}
+		  AND status_code != 'FILE_REMOVED'
+	</select>
+
+	<!-- 업로드됨 → 업무 자료에 연결됨. 이미 연결됐거나 다른 업체면 0행 -->
+	<update id="markAttached">
+		UPDATE attachment
+		SET status_code = 'FILE_ATTACHED',
+		    updated_at = <include refid="now"/>
+		WHERE attachment_id = #{attachmentId}
+		  AND company_id = #{companyId}
+		  AND status_code = 'FILE_UPLOADED'
+	</update>
+
+</mapper>

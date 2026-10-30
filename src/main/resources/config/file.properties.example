@@ -1,0 +1,3 @@
+# 이 파일을 복사해 file.properties로 이름을 바꾸고 자기 PC 경로로 수정
+# WAR·Tomcat 폴더 밖이어야 함 (재배포해도 파일이 안 지워지게)
+file.root=C:/ieum-files

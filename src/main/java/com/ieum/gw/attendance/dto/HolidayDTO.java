@@ -2,11 +2,15 @@ package com.ieum.gw.attendance.dto;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.ToString;
 
-/** 업체 휴일 (holiday) */
+import java.time.LocalDate;
+
+// 휴일(HOLIDAY 한 줄)
 @Getter
 @Setter
+@ToString
 public class HolidayDTO {
-    private String holidayDate; // YYYY-MM-DD
-    private String holidayName;
+    private LocalDate holidayDate; // holiday_date
+    private String holidayName;    // holiday_name
 }
