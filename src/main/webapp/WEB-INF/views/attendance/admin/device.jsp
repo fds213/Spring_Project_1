@@ -7,14 +7,14 @@
   키 원문은 발급 직후 한 번만 보이고 DB에는 해시만 남는다. 동작은 resources/js/attendance/device-admin.js.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
-<ui:layout title="근태 단말기" crumb="인사 관리" menu="hr-device">
+<ui:layout title="근태 단말기" crumb="근무" menu="attendance-device">
   <jsp:attribute name="scripts">
     <script src="${ctx}/resources/js/util.js"></script>
     <script src="${ctx}/resources/js/attendance/device-admin.js"></script>
     <script>openDeviceAdmin();</script>
   </jsp:attribute>
   <jsp:body>
-    <section class="view on" id="view-hr-device">
+    <section class="view on" id="view-attendance-device">
       <div class="page-head">
         <h1>근태 단말기</h1>
         <div class="page-actions"><a class="btn" href="${ctx}/attendance/simulator" target="_blank" rel="noopener">지문 시뮬레이터 열기 ↗</a></div>

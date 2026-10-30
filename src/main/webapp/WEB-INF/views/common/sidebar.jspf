@@ -22,7 +22,7 @@
   <c:when test="${fn:startsWith(menu, 'ops-')}"><c:set var="navCat" value="ops" /></c:when>
   <c:when test="${fn:startsWith(menu, 'approval-')}"><c:set var="navCat" value="approval" /></c:when>
   <c:when test="${fn:startsWith(menu, 'ticket-') or fn:startsWith(menu, 'asset-')}"><c:set var="navCat" value="it" /></c:when>
-  <c:when test="${menu eq 'attendance' or menu eq 'leave' or menu eq 'schedule'}"><c:set var="navCat" value="work" /></c:when>
+  <c:when test="${menu eq 'attendance' or menu eq 'leave' or menu eq 'schedule' or menu eq 'attendance-device'}"><c:set var="navCat" value="work" /></c:when>
   <c:when test="${menu eq 'chat' or menu eq 'board-dept' or menu eq 'location'}"><c:set var="navCat" value="talk" /></c:when>
   <c:when test="${menu eq 'org'}"><c:set var="navCat" value="company" /></c:when>
   <c:when test="${fn:startsWith(menu, 'hr-')}"><c:set var="navCat" value="hr" /></c:when>
@@ -119,8 +119,18 @@
       <ui:nav key="attendance" path="/attendance/my" current="${menu}">근태</ui:nav>
       <ui:nav key="leave" path="/attendance/leave" current="${menu}">연차</ui:nav>
       <ui:nav key="schedule" path="/schedule/calendar" current="${menu}">일정</ui:nav>
-      <%-- 지문 시뮬레이터: 단말기 역할이라 새 탭에서 연다 (요구분석서 3.10: 직원은 그룹웨어의 링크로 시뮬레이터를 연다) --%>
-      <a href="${ctx}/attendance/simulator" class="nav-item" target="_blank" rel="noopener">지문 시뮬레이터 <span aria-hidden="true">↗</span></a>
+      <%-- 업체 관리자·인사 담당: 근태 단말기 화면(키 발급·직원 연결, 지문 시뮬레이터 열기 버튼이 그 화면에 있다).
+           그 밖의 직원: 지문 시뮬레이터를 새 탭으로 (요구분석서 3.10: 직원은 그룹웨어의 링크로 시뮬레이터를 연다).
+           근태 단말기 주소는 /attendance/admin/** 라 Security 도 같은 역할만 통과시킨다 --%>
+      <sec:authorize access="hasAnyRole('HR','ADMIN')" var="canManageDevice" />
+      <c:choose>
+        <c:when test="${canManageDevice}">
+          <ui:nav key="attendance-device" path="/attendance/admin/device" current="${menu}">근태 단말기</ui:nav>
+        </c:when>
+        <c:otherwise>
+          <a href="${ctx}/attendance/simulator" class="nav-item" target="_blank" rel="noopener" title="새 탭에서 열립니다">지문 시뮬레이터</a>
+        </c:otherwise>
+      </c:choose>
     </div>
     <div class="nav-cat" id="navCat-talk" data-cat="talk"${navCat eq 'talk' ? '' : ' hidden'}>
       <p class="nav-title">소통</p>
@@ -140,7 +150,6 @@
         <sec:authorize access="hasRole('ADMIN')"><ui:nav key="hr-join" path="/employee/join" current="${menu}">가입 승인 <span class="badge" data-badge="join" hidden></span></ui:nav></sec:authorize>
         <ui:nav key="hr-attendance" path="/attendance/admin/list" current="${menu}">근태·연차 관리</ui:nav>
         <ui:nav key="hr-holiday" path="/attendance/admin/holiday" current="${menu}">휴일 관리</ui:nav>
-        <ui:nav key="hr-device" path="/attendance/admin/device" current="${menu}">근태 단말기</ui:nav>
       </div>
     </sec:authorize>
     <sec:authorize access="hasRole('ADMIN')">

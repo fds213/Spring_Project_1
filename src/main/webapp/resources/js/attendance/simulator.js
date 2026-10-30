@@ -59,10 +59,11 @@ async function connect(key) {
     simStoreKey(key);
     sim.people = info.people;
     simEl('simTitle').textContent = `${info.companyName} · ${info.deviceName}`;
-    simEl('simDevice').textContent = `${info.companyName} · ${info.deviceName} · 등록 ${info.people.length}명`;
+    simEl('simDevice').textContent = `등록된 사람 ${info.people.length}명`;
     renderPeople();
     simEl('simConnect').hidden = true;
     simEl('simMain').hidden = false;
+    simGo(1);
   } catch (err) {
     // 키가 틀렸을 때만 저장한 키를 지운다 (서버가 잠깐 꺼진 것이면 키는 그대로 두고 다시 시도하게 한다)
     if (err.status === 401) simStoreKey('');
@@ -78,7 +79,41 @@ simEl('simKeyForm').addEventListener('submit', e => {
 });
 simEl('simChangeKey').addEventListener('click', () => { simStoreKey(''); sim.key = ''; showConnect(''); });
 
-// ---------- 2) 사람·출퇴근 고르기 ----------
+// ---------- 단계: 한 화면에 하나씩 (1 사람 → 2 출근·퇴근 → 3 지문 → 결과) ----------
+const SIM_BACK_MS = 5000; // 결과를 보여 준 뒤 처음으로 돌아가기까지
+let simBackTimer = 0;
+
+function simGo(step) {
+  clearTimeout(simBackTimer);
+  document.querySelectorAll('.sim-step').forEach(s => { s.hidden = s.dataset.step !== String(step); });
+  // 진행 표시: 지금 단계는 강조, 지난 단계는 완료 표시 (결과 화면에서는 셋 다 완료)
+  const now = step === 'done' ? 4 : Number(step);
+  document.querySelectorAll('#simSteps li').forEach(li => {
+    const n = Number(li.dataset.step);
+    li.classList.toggle('on', n === now);
+    li.classList.toggle('done', n < now);
+  });
+  document.querySelector('.sim-first-only').hidden = step !== 1 && step !== '1';
+  if (String(step) === '1') sim.selected = null;
+  if (String(step) === '2') simEl('simChosenPerson').textContent = simWho(sim.selected);
+  if (String(step) === '3') simEl('simChosenPunch').textContent = `${simWho(sim.selected)} · ${SIM_TYPE[sim.type]}`;
+  if (step === 'done') {
+    let left = SIM_BACK_MS / 1000;
+    const hint = simEl('simBackHint');
+    hint.textContent = `${left}초 뒤 처음 화면으로 돌아갑니다`;
+    const tickBack = () => {
+      left -= 1;
+      if (left <= 0) return simGo(1);
+      hint.textContent = `${left}초 뒤 처음 화면으로 돌아갑니다`;
+      simBackTimer = setTimeout(tickBack, 1000);
+    };
+    simBackTimer = setTimeout(tickBack, 1000);
+  }
+}
+const simWho = p => (p ? (p.unregistered ? p.name : `${p.name} (${p.userNo}번)`) : '');
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => simGo(b.dataset.go)));
+
+// ---------- 1) 사람 고르기 → 2) 출근·퇴근 고르기 ----------
 function renderPeople() {
   const list = simEl('simPeople');
   const people = sim.people.map(p => ({ ...p, unregistered: false }))
@@ -91,11 +126,11 @@ function renderPeople() {
     const name = document.createElement('span');
     name.textContent = p.name;
     const meta = document.createElement('small');
-    meta.textContent = p.unregistered ? '단말기에 지문 없음' : `${p.dept ? p.dept + ' · ' : ''}사용자 번호 ${p.userNo}${p.serving ? '' : ' · 재직 아님'}`;
+    meta.textContent = p.unregistered ? '단말기에 지문 없음' : `${p.userNo}번${p.dept ? ' · ' + p.dept : ''}${p.serving ? '' : ' · 재직 아님'}`;
     b.append(name, meta);
     b.addEventListener('click', () => {
       sim.selected = p;
-      list.querySelectorAll('.sim-person').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      simGo(2);
     });
     return b;
   }));
@@ -104,32 +139,24 @@ function renderPeople() {
 
 document.querySelectorAll('.sim-type').forEach(b => b.addEventListener('click', () => {
   sim.type = b.dataset.type;
-  document.querySelectorAll('.sim-type').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  simGo(3);
 }));
 
-// ---------- 3) 지문 대기 → 서버로 체크 ----------
+// ---------- 3) 지문 대기 → 서버로 체크 → 결과 ----------
 function showResult(kind, big, sub) {
   const box = simEl('simResult');
-  box.className = `sim-panel sim-result ${kind}`;
+  box.className = `sim-panel sim-step sim-result ${kind}`;
   box.querySelector('.sim-big').textContent = big;
   simEl('simResultSub').textContent = sub || '';
-}
-
-function showRequest(body) {
-  simEl('simRequest').textContent = body
-    ? `POST ${simCtx}/api/attendance/punch\nX-Device-Key: (이 단말기의 키)\n\n${JSON.stringify(body, null, 2)}`
-    : '보낸 요청 없음 (단말기가 지문을 찾지 못하면 서버로 보내지 않음)';
+  simGo('done');
 }
 
 async function punch(person) {
   if (person.unregistered) {
-    showRequest(null);
     return showResult('err', '등록되지 않은 지문입니다', '단말기에 지문을 먼저 등록해 주세요');
   }
-  const body = { userNo: person.userNo, type: sim.type };
-  showRequest(body);
   try {
-    const r = await simFetch('POST', '/api/attendance/punch', body);
+    const r = await simFetch('POST', '/api/attendance/punch', { userNo: person.userNo, type: sim.type });
     const hm = r.time.slice(0, 5);
     showResult(r.status === 'NORMAL' ? 'ok' : 'warn', `${r.name}님 ${SIM_TYPE[r.type]} ${hm}`, SIM_STATUS[r.status]);
     sim.log.unshift(`${hm} · ${r.name} · ${SIM_TYPE[r.type]} · ${SIM_STATUS[r.status]}`);
@@ -149,7 +176,7 @@ function scan() {
   simEl('simHint').textContent = '지문을 읽는 중…';
   setTimeout(async () => {
     finger.classList.remove('scanning');
-    simEl('simHint').textContent = '사람을 고른 뒤 지문 버튼을 누르세요';
+    simEl('simHint').textContent = '지문 버튼을 누르세요';
     await punch(sim.selected);
     sim.scanning = false;
   }, SIM_SCAN_MS);

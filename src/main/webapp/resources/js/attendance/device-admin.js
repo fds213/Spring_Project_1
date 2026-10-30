@@ -1,4 +1,4 @@
-// 인사 관리 > 근태 단말기 (views/attendance/admin/device.jsp). 업체 관리자·인사 담당 (요구분석서 3.10, 기능명세서 1.9).
+// 근무 > 근태 단말기 (views/attendance/admin/device.jsp). 업체 관리자·인사 담당 (요구분석서 3.10, 기능명세서 1.9).
 // 단말기 키를 발급·다시 발급하고(처음이면 단말기가 함께 등록된다), 직원을 단말기 사용자 번호에 연결·해제한다.
 //
 //   GET  /attendance/admin/api/device              → { device: { name, companyName } | null, readOnly,

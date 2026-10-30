@@ -790,15 +790,36 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 @keyframes sim-pulse { from { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.25); } to { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); } }
 @media (prefers-reduced-motion: reduce) { .sim-finger.scanning { animation: none; } }
 .sim-hint { font-size: 13px; color: var(--text-sub); }
-.sim-result { text-align: center; min-height: 72px; display: flex; flex-direction: column; justify-content: center; gap: 4px; }
+.sim-result { text-align: center; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; }
+.sim-result .btn { margin-top: 10px; }
+.sim-result .sim-hint { font-size: 12px; color: var(--text-muted); }
+/* 진행 단계 표시: 1 사람 · 2 출근·퇴근 · 3 지문 */
+.sim-steps { list-style: none; display: flex; gap: 6px; margin: 14px 0 0; padding: 0; counter-reset: simstep; }
+.sim-steps li {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 4px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line);
+  font-size: 13px; color: var(--text-muted);
+}
+.sim-steps li::before {
+  counter-increment: simstep; content: counter(simstep);
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-sub); font-size: 11px; font-weight: 600;
+}
+.sim-steps li.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.sim-steps li.on::before { background: var(--accent); color: #fff; }
+.sim-steps li.done { color: var(--text-sub); }
+.sim-steps li.done::before { content: "✓"; background: var(--accent-bg); color: var(--accent); }
+/* 한 단계 화면 */
+.sim-step { min-height: 260px; }
+.sim-chosen { margin: -2px 0 14px; font-size: 16px; font-weight: 600; }
+.sim-step-actions { display: flex; justify-content: flex-start; width: 100%; margin-top: 16px; }
+.sim-types .sim-type { height: 72px; font-size: 18px; }
 .sim-big { font-size: 20px; font-weight: 600; }
 .sim-result.ok { color: #0f6e56; }
 .sim-result.warn { color: #854f0b; }
 .sim-result.err { color: var(--danger); }
 .sim-result.idle { color: var(--text-muted); }
-.sim-request { margin: 0; background: var(--bg-sub); border-radius: var(--radius); padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre; }
 .sim-log { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .sim-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .sim-log li:last-child { border-bottom: 0; }
-.sim-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; }
-.sim-foot a { color: var(--accent); }
+.sim-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 14px; font-size: 13px; }
