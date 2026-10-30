@@ -16,9 +16,9 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | 소개 사이트 | `WEB-INF/views/site/{intro,trial,inquiry}.jsp` | `<ui:site>` 틀. 주소 `/`, `/trial`, `/inquiry` (화면 모양만, 체험 신청·문의 접수 JS는 API가 정해지면 붙인다) |
 | 계정 만들기·비밀번호 찾기 | `WEB-INF/views/common/{join,join-password}.jsp` | 주소 `/join`, `/join/password` (화면 모양만. JS는 백엔드 API가 생긴 뒤에 그 주소에 맞춰 붙인다) |
 | 화면 JS | `resources/js/util.js` + `resources/js/<모듈>/*.js` | 페이지마다 `util.js`(같이 쓰는 도구)와 그 모듈 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다 |
-| 화면 주소 Controller | 없음 (모듈 담당이 만든다) | 아래 표의 GET 주소에서 그 JSP 이름을 돌려주면 된다. 화면 JS는 페이지가 열리면 스스로 데이터를 받으므로 Model 값은 없어도 된다 |
+| Controller·Service·DAO·Mapper | 없음 (이 브랜치는 프론트 파일만) | 각 기능은 팀 규칙대로 담당이 Controller → Service → DAO → Mapper → SQL 한 세트로 만든다. 프론트는 그 결과(주소·응답)에 맞춰 화면 JS를 고친다 |
 
-화면 주소 → JSP (프론트가 화면을 확인할 때 쓴 값. 주소는 사이드 메뉴와 같다):
+화면 주소 → JSP 파일 (참고용. 주소는 사이드 메뉴와 같고, 담당이 정하면 바꿔도 된다):
 
 | 화면 주소 (GET) | 돌려줄 JSP (view 이름) |
 |---|---|
