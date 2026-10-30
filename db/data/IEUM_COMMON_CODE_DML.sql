@@ -1,0 +1,751 @@
+-- 대상: Oracle / COMMON_CODE
+-- 출처: https://docs.google.com/spreadsheets/d/1qBiMeyeUHtTa1W2TPY9VwphQEKBTNFclOThhCXRFbo0/edit
+-- 상위공통코드의 null 표기는 실제 NULL로 변환한다.
+-- 비어 있는 CREATED_AT / UPDATED_AT은 컬럼 기본값(Asia/Seoul)을 사용한다.
+-- 부모 코드를 먼저 입력하여 자기 참조 FK를 만족시킨다.
+-- 오류 발생 시 이번 블록에서 입력한 데이터 전체를 SAVEPOINT까지 되돌린다.
+
+SET DEFINE OFF
+SET SERVEROUTPUT ON
+
+BEGIN
+    SAVEPOINT SP_IEUM_COMMON_CODE;
+
+    -- ROLE : 계정 역할
+    -- 원본 시트 4행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE', NULL, '계정 역할', '직원 계정이 가지는 하나의 업무 역할', 'Y', 0);
+    -- 원본 시트 5행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE_OPS', 'ROLE', '이음 운영자', '이음 운영 업체 ieum0000에 소속된 서비스 운영자', 'Y', 1);
+    -- 원본 시트 6행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE_ADMIN', 'ROLE', '업체 관리자', '업체의 직원·조직·이용 결제를 관리하는 관리자', 'Y', 2);
+    -- 원본 시트 7행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE_EMP', 'ROLE', '직원', '업체의 기본 업무 기능을 사용하는 직원', 'Y', 3);
+    -- 원본 시트 8행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE_IT', 'ROLE', 'IT 담당', 'IT 티켓 처리와 자산 관리를 담당하는 직원', 'Y', 4);
+    -- 원본 시트 9행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROLE_HR', 'ROLE', '인사 담당', '사원·근태·연차·휴일 관리를 담당하는 직원', 'Y', 5);
+    -- DEPT_TYPE : 부서 형태
+    -- 원본 시트 10행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DEPT_TYPE', NULL, '부서 형태', '조직을 담당 업무에 따라 구분하는 분류', 'N', 0);
+    -- 원본 시트 11행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DEPT_IT', 'DEPT_TYPE', 'IT 부서', 'IT 업무를 수행하는 부서', 'N', 1);
+    -- 원본 시트 12행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DEPT_HR', 'DEPT_TYPE', '인사 부서', '인사 업무를 수행하는 부서', 'N', 2);
+    -- 원본 시트 13행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DEPT_OPS', 'DEPT_TYPE', '운영 부서', '운영 업무를 수행하는 부서', 'N', 3);
+    -- EMP_TYPE : 고용 형태
+    -- 원본 시트 14행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMP_TYPE', NULL, '고용 형태', '직원의 고용 계약 형태', 'N', 0);
+    -- 원본 시트 15행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMP_REGULAR', 'EMP_TYPE', '정규직', '기간을 정하지 않은 근로계약으로 고용된 직원', 'N', 1);
+    -- 원본 시트 16행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMP_CONTRACT', 'EMP_TYPE', '계약직', '계약 기간을 정하여 고용된 직원', 'N', 2);
+    -- 원본 시트 17행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMP_DISPATCH', 'EMP_TYPE', '파견직', '파견 형태로 근무하는 직원', 'N', 3);
+    -- 원본 시트 18행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMP_INTERN', 'EMP_TYPE', '인턴', '인턴 형태로 근무하는 직원', 'N', 4);
+    -- PERMISSION : 위임 권한
+    -- 원본 시트 19행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PERMISSION', NULL, '위임 권한', '계정 또는 역할에 부여하는 개별 기능 접근 권한', 'N', 0);
+    -- 원본 시트 20행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PERM_SUB_VIEW', 'PERMISSION', '구독 조회', '업체의 구독 현황을 조회하는 권한', 'N', 1);
+    -- 원본 시트 21행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PERM_PAYMENT', 'PERMISSION', '결제', '업체의 구독 결제를 수행하는 권한', 'N', 2);
+    -- 원본 시트 22행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PERM_CAPACITY', 'PERMISSION', '인원 증설 신청', '업체의 이용 인원 증설을 신청하는 권한', 'N', 3);
+    -- STATUS : 상태 분류
+    -- 원본 시트 23행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('STATUS', NULL, '상태 분류', '계정·재직·업무 처리 상태의 상위 분류', 'Y', 0);
+    -- 원본 시트 24행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACCOUNT_STATUS', 'STATUS', '계정 상태', '계정의 로그인 가능 여부와 가입 처리 상태', 'Y', 1);
+    -- 원본 시트 25행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('REQUESTED', 'ACCOUNT_STATUS', '승인 대기', '직원이 가입 승인을 요청하고 처리 결과를 기다리는 상태', 'Y', 1);
+    -- 원본 시트 26행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACTIVE', 'ACCOUNT_STATUS', '사용 중', '계정이 활성화되어 로그인과 업무 사용이 가능한 상태', 'Y', 2);
+    -- 원본 시트 27행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('RETIRED', 'ACCOUNT_STATUS', '비활성', '계정을 비활성화하여 로그인을 차단하고 기존 기록은 유지하는 상태', 'Y', 3);
+    -- 원본 시트 28행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ST_SUSPENDED', 'ACCOUNT_STATUS', '운영 차단', '운영 정책에 따라 계정 사용을 차단한 상태', 'N', 4);
+    -- 원본 시트 29행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EMPLOYMENT_STATUS', 'STATUS', '재직 상태', '직원의 재직·퇴사·휴직 여부', 'Y', 2);
+    -- 원본 시트 30행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ST_SERVING', 'EMPLOYMENT_STATUS', '재직', '직원이 업체에 재직 중인 상태', 'Y', 1);
+    -- 원본 시트 31행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ST_RETIRED', 'EMPLOYMENT_STATUS', '퇴사', '직원이 업체에서 퇴사한 상태', 'Y', 2);
+    -- 원본 시트 32행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ST_LEAVE', 'EMPLOYMENT_STATUS', '휴직', '직원이 휴직 중인 상태', 'N', 3);
+    -- 원본 시트 33행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('WORKFLOW_STATUS', 'STATUS', '공유 업무 상태', '여러 업무에서 공통으로 사용하는 처리 단계와 결과', 'Y', 3);
+    -- 원본 시트 34행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DRAFT', 'WORKFLOW_STATUS', '임시저장', '작성 중인 문서를 제출하지 않고 저장한 상태', 'N', 1);
+    -- 원본 시트 35행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('WAITING', 'WORKFLOW_STATUS', '대기', '결재선의 결재자가 자신의 처리 순서를 기다리는 상태', 'Y', 2);
+    -- 원본 시트 36행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IN_PROGRESS', 'WORKFLOW_STATUS', '진행 중', '결재 문서 또는 IT 티켓을 처리하고 있는 상태', 'Y', 3);
+    -- 원본 시트 37행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APPROVED', 'WORKFLOW_STATUS', '승인·완료', '결재 단계가 승인되거나 문서의 최종 승인이 완료된 상태', 'Y', 4);
+    -- 원본 시트 38행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('REJECTED', 'WORKFLOW_STATUS', '반려', '가입 요청·결재·티켓이 반려된 상태', 'Y', 5);
+    -- 원본 시트 39행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('RECEIVED', 'WORKFLOW_STATUS', '접수', 'IT 티켓이 접수된 상태', 'Y', 6);
+    -- 원본 시트 40행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ASSIGNED', 'WORKFLOW_STATUS', '배정', 'IT 티켓의 처리 담당자가 배정된 상태', 'Y', 7);
+    -- 원본 시트 41행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('RESOLVED', 'WORKFLOW_STATUS', '처리 완료', 'IT 티켓의 처리가 끝나 요청자의 확인을 기다리는 상태', 'Y', 8);
+    -- 원본 시트 42행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CLOSED', 'WORKFLOW_STATUS', '종료', '요청자 확인까지 마쳐 IT 티켓이 종료된 상태', 'Y', 9);
+    -- 원본 시트 43행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CANCELED', 'WORKFLOW_STATUS', '취소', 'IT 티켓의 요청 또는 처리가 취소된 상태', 'N', 10);
+    -- GENDER : 성별
+    -- 원본 시트 44행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('GENDER', NULL, '성별', '직원의 성별 또는 공개 여부', 'N', 0);
+    -- 원본 시트 45행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('GD_MALE', 'GENDER', '남성', '남성', 'N', 1);
+    -- 원본 시트 46행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('GD_FEMALE', 'GENDER', '여성', '여성', 'N', 2);
+    -- 원본 시트 47행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('GD_OTHER', 'GENDER', '기타·비공개', '기타 성별 또는 비공개', 'N', 3);
+    -- DOC_TYPE : 결재 문서 종류
+    -- 원본 시트 48행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DOC_TYPE', NULL, '결재 문서 종류', '전자결재 문서의 신청 양식 구분', 'Y', 0);
+    -- 원본 시트 49행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DOC_LEAVE', 'DOC_TYPE', '휴가 신청', '연차 또는 반차 사용을 신청하는 결재 문서', 'Y', 1);
+    -- 원본 시트 50행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('DOC_EQUIPMENT', 'DOC_TYPE', '장비 지급 신청', '장비 지급을 신청하는 결재 문서', 'Y', 2);
+    -- LEAVE_TYPE : 휴가 구분
+    -- 원본 시트 51행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LEAVE_TYPE', NULL, '휴가 구분', '휴가의 사용 시간과 차감 일수 구분', 'Y', 0);
+    -- 원본 시트 52행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LV_FULL', 'LEAVE_TYPE', '종일 연차', '하루 전체를 사용하는 연차로 1일 차감', 'Y', 1);
+    -- 원본 시트 53행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LV_AM', 'LEAVE_TYPE', '오전 반차', '오전 시간을 사용하는 반차로 0.5일 차감', 'Y', 2);
+    -- 원본 시트 54행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LV_PM', 'LEAVE_TYPE', '오후 반차', '오후 시간을 사용하는 반차로 0.5일 차감', 'Y', 3);
+    -- TIME_SLOT : 휴가 시간대
+    -- 원본 시트 55행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TIME_SLOT', NULL, '휴가 시간대', '휴가 중복 여부를 확인하는 오전·오후 시간대', 'Y', 0);
+    -- 원본 시트 56행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SLOT_AM', 'TIME_SLOT', '오전', '근무일의 오전 시간대', 'Y', 1);
+    -- 원본 시트 57행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SLOT_PM', 'TIME_SLOT', '오후', '근무일의 오후 시간대', 'Y', 2);
+    -- LEAVE_CHANGE : 연차 변동 종류
+    -- 원본 시트 58행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LEAVE_CHANGE', NULL, '연차 변동 종류', '연차 잔여량이 변동하는 원인', 'Y', 0);
+    -- 원본 시트 59행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LC_USE', 'LEAVE_CHANGE', '사용 차감', '승인된 휴가의 사용량을 차감하는 기록', 'Y', 1);
+    -- 원본 시트 60행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('LC_RESTORE', 'LEAVE_CHANGE', '사용 복원', '취소 또는 정정된 휴가의 사용량을 복원하는 기록', 'N', 2);
+    -- TICKET_TYPE : 티켓 종류
+    -- 원본 시트 61행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TICKET_TYPE', NULL, '티켓 종류', '업체 내부 IT 티켓의 업무 종류', 'Y', 0);
+    -- 원본 시트 62행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TK_INCIDENT', 'TICKET_TYPE', '장애', 'IT 장애의 조치를 요청하는 티켓', 'Y', 1);
+    -- 원본 시트 63행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TK_EQUIPMENT', 'TICKET_TYPE', '장비 지급', '승인된 장비 신청에 따라 지급을 처리하는 티켓', 'Y', 2);
+    -- 원본 시트 64행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TK_QUESTION', 'TICKET_TYPE', 'IT 문의', '업체 내부 IT 사용 문의를 처리하는 티켓', 'N', 3);
+    -- ASSET_STATUS : 자산 상태
+    -- 원본 시트 65행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ASSET_STATUS', NULL, '자산 상태', '자산의 지급 가능 여부와 사용 상태', 'Y', 0);
+    -- 원본 시트 66행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AS_AVAILABLE', 'ASSET_STATUS', '지급 가능', '아직 지급되지 않아 지급할 수 있는 자산', 'Y', 1);
+    -- 원본 시트 67행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AS_IN_USE', 'ASSET_STATUS', '사용 중', '직원에게 지급되어 사용 중인 자산', 'Y', 2);
+    -- 원본 시트 68행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AS_INACTIVE', 'ASSET_STATUS', '사용 중지', '사용을 중지하여 새로 지급할 수 없는 자산', 'Y', 3);
+    -- 원본 시트 69행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AS_DISPOSED', 'ASSET_STATUS', '폐기', '폐기 처리되었으나 관리 이력은 보존하는 자산', 'Y', 4);
+    -- ASSET_TYPE : 자산 종류
+    -- 원본 시트 70행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ASSET_TYPE', NULL, '자산 종류', '관리하는 장비의 종류', 'Y', 0);
+    -- 원본 시트 71행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_LAPTOP', 'ASSET_TYPE', '노트북', '휴대용 노트북 컴퓨터', 'Y', 1);
+    -- 원본 시트 72행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_DESKTOP', 'ASSET_TYPE', '데스크톱', '고정 설치형 데스크톱 컴퓨터', 'Y', 2);
+    -- 원본 시트 73행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_MONITOR', 'ASSET_TYPE', '모니터', '화면 출력용 모니터', 'Y', 3);
+    -- 원본 시트 74행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_OTHER', 'ASSET_TYPE', '기타 장비', '다른 분류에 속하지 않는 장비', 'Y', 4);
+    -- 원본 시트 75행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_PRINTER', 'ASSET_TYPE', '프린터', '문서 출력용 프린터', 'N', 5);
+    -- 원본 시트 76행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_NETWORK', 'ASSET_TYPE', '네트워크 장비', '공유기·스위치 등 통신 장비', 'N', 6);
+    -- 원본 시트 77행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_TABLET', 'ASSET_TYPE', '태블릿', '터치스크린 기반의 휴대용 단말기', 'N', 7);
+    -- 원본 시트 78행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AT_PHONE', 'ASSET_TYPE', '업무용 전화', '업무용 유선 또는 휴대 전화', 'N', 8);
+    -- PERIOD_TYPE : 이용 기간 종류
+    -- 원본 시트 79행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PERIOD_TYPE', NULL, '이용 기간 종류', '업체에 부여된 서비스 이용 기간의 종류', 'Y', 0);
+    -- 원본 시트 80행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PD_TRIAL', 'PERIOD_TYPE', '무료 체험', '체험 신청일부터 시작하는 14일 무료 이용 기간', 'Y', 1);
+    -- 원본 시트 81행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PD_PAID', 'PERIOD_TYPE', '유료 구독', '결제 승인에 따라 부여된 유료 이용 기간', 'Y', 2);
+    -- PLAN_TYPE : 요금제 종류
+    -- 원본 시트 82행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PLAN_TYPE', NULL, '요금제 종류', '구독 기간을 구분하는 요금제', 'Y', 0);
+    -- 원본 시트 83행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PLAN_MONTHLY', 'PLAN_TYPE', '월간', '1인 월 4,000원을 기준으로 달력 1개월을 구매하는 요금제', 'Y', 1);
+    -- 원본 시트 84행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PLAN_YEARLY', 'PLAN_TYPE', '연간', '달력 1년의 이용 기간을 구매하는 요금제', 'N', 2);
+    -- ORDER_STATUS : 주문 상태
+    -- 원본 시트 85행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ORDER_STATUS', NULL, '주문 상태', '주문 생성부터 결제와 서비스 반영까지의 처리 상태', 'Y', 0);
+    -- 원본 시트 86행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ORD_CREATED', 'ORDER_STATUS', '주문 생성', '결제할 상품·인원·금액이 정해진 주문', 'Y', 1);
+    -- 원본 시트 87행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ORD_CONFIRMED', 'ORDER_STATUS', '결제 승인 확인', '서버가 주문 정보와 결제 승인을 확인한 상태', 'Y', 2);
+    -- 원본 시트 88행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ORD_APPLIED', 'ORDER_STATUS', '이용 반영 완료', '승인된 주문을 업체의 이용 기간에 반영한 상태', 'Y', 3);
+    -- 원본 시트 89행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ORD_FAILED', 'ORDER_STATUS', '결제 실패', '결제 실패로 이용 권한이 부여되지 않은 주문', 'Y', 4);
+    -- PAYMENT_STATUS : 외부 결제 결과
+    -- 원본 시트 90행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PAYMENT_STATUS', NULL, '외부 결제 결과', '외부 결제 승인 요청의 결과', 'Y', 0);
+    -- 원본 시트 91행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PAY_APPROVED', 'PAYMENT_STATUS', '승인 성공', '결제 서비스에서 승인을 성공한 결과', 'Y', 1);
+    -- 원본 시트 92행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PAY_FAILED', 'PAYMENT_STATUS', '승인 실패', '결제 서비스에서 승인을 실패한 결과', 'Y', 2);
+    -- SCOPE_TYPE : 공개 범위
+    -- 원본 시트 93행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SCOPE_TYPE', NULL, '공개 범위', '자료를 조회할 수 있는 대상의 범위', 'Y', 0);
+    -- 원본 시트 94행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SCOPE_PERSONAL', 'SCOPE_TYPE', '개인', '자료 소유자 본인에게만 공개하는 범위', 'Y', 1);
+    -- 원본 시트 95행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SCOPE_COMPANY', 'SCOPE_TYPE', '전사', '동일 업체의 직원에게 공개하는 범위', 'Y', 2);
+    -- 원본 시트 96행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SCOPE_DEPARTMENT', 'SCOPE_TYPE', '부서', '동일 업체의 지정 부서에 공개하는 범위', 'N', 3);
+    -- BOARD_TYPE : 게시판 종류
+    -- 원본 시트 97행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('BOARD_TYPE', NULL, '게시판 종류', '게시판의 사용 목적과 공개 대상', 'Y', 0);
+    -- 원본 시트 98행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('BOARD_NOTICE', 'BOARD_TYPE', '전사 공지', '동일 업체의 직원에게 공지를 전달하는 게시판', 'Y', 1);
+    -- 원본 시트 99행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('BOARD_DEPT', 'BOARD_TYPE', '부서 게시판', '지정 부서의 직원이 사용하는 게시판', 'N', 2);
+    -- ROOM_TYPE : 채팅방 종류
+    -- 원본 시트 100행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROOM_TYPE', NULL, '채팅방 종류', '채팅방의 참여 형태', 'Y', 0);
+    -- 원본 시트 101행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROOM_DIRECT', 'ROOM_TYPE', '일대일', '두 직원이 대화하는 채팅방', 'Y', 1);
+    -- 원본 시트 102행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ROOM_GROUP', 'ROOM_TYPE', '그룹', '여러 직원이 함께 대화하는 채팅방', 'Y', 2);
+    -- MESSAGE_TYPE : 메시지 종류
+    -- 원본 시트 103행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MESSAGE_TYPE', NULL, '메시지 종류', '채팅 메시지에 담긴 내용의 종류', 'Y', 0);
+    -- 원본 시트 104행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MSG_TEXT', 'MESSAGE_TYPE', '텍스트', '문자 본문을 담은 채팅 메시지', 'Y', 1);
+    -- 원본 시트 105행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MSG_IMAGE', 'MESSAGE_TYPE', '이미지', 'JPG 또는 PNG 이미지 한 장을 담은 최대 10MB 메시지', 'N', 2);
+    -- MAP_TYPE : 지도 종류
+    -- 원본 시트 106행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAP_TYPE', NULL, '지도 종류', '지도 자료의 소유와 공개 형태', 'Y', 0);
+    -- 원본 시트 107행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAP_COMMON', 'MAP_TYPE', '공통 지도', '동일 업체에서 공통으로 사용하는 지도', 'Y', 1);
+    -- 원본 시트 108행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAP_PERSONAL', 'MAP_TYPE', '개인 지도', '소유자 본인만 열람하는 개인 지도', 'N', 2);
+    -- NOTIFICATION_TYPE : 알림 종류
+    -- 원본 시트 109행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NOTIFICATION_TYPE', NULL, '알림 종류', '직원에게 전달되는 업무 알림의 종류', 'Y', 0);
+    -- 원본 시트 110행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_APPROVAL_REQUEST', 'NOTIFICATION_TYPE', '결재 요청', '현재 결재자에게 결재 처리를 요청하는 알림', 'Y', 1);
+    -- 원본 시트 111행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_APPROVAL_DONE', 'NOTIFICATION_TYPE', '결재 완료', '결재 문서의 최종 승인을 알려 주는 알림', 'Y', 2);
+    -- 원본 시트 112행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_APPROVAL_REJECT', 'NOTIFICATION_TYPE', '결재 반려', '결재 문서의 반려를 알려 주는 알림', 'Y', 3);
+    -- 원본 시트 113행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_TICKET_ASSIGNED', 'NOTIFICATION_TYPE', '티켓 배정', '티켓 담당자 배정을 알려 주는 알림', 'Y', 4);
+    -- 원본 시트 114행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_TICKET_RESOLVED', 'NOTIFICATION_TYPE', '티켓 처리 완료', '티켓 처리 완료와 요청자 확인 필요를 알려 주는 알림', 'Y', 5);
+    -- FILE_STATUS : 첨부 파일 상태
+    -- 원본 시트 115행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FILE_STATUS', NULL, '첨부 파일 상태', '업로드 파일과 업무 자료의 연결 상태', 'Y', 0);
+    -- 원본 시트 116행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FILE_UPLOADED', 'FILE_STATUS', '업로드 완료', '원본 업로드가 끝났으나 업무 자료에 연결되기 전 상태', 'Y', 1);
+    -- 원본 시트 117행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FILE_ATTACHED', 'FILE_STATUS', '업무 연결 완료', '파일이 게시글 등 업무 자료에 연결된 상태', 'Y', 2);
+    -- 원본 시트 118행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FILE_REMOVED', 'FILE_STATUS', '연결 해제·삭제 대상', '업무 자료와 연결이 해제되어 정리 대상인 상태', 'N', 3);
+    -- AUTH_PURPOSE : 인증 목적
+    -- 원본 시트 119행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AUTH_PURPOSE', NULL, '인증 목적', '이메일 인증을 수행하는 목적', 'N', 0);
+    -- 원본 시트 120행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AUTH_ADMIN_EMAIL', 'AUTH_PURPOSE', '관리자 이메일 인증', '체험 신청 관리자의 이메일 소유를 확인하는 인증', 'N', 1);
+    -- 원본 시트 121행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AUTH_PASSWORD_RESET', 'AUTH_PURPOSE', '비밀번호 찾기', '등록된 이메일로 비밀번호 재설정 권한을 확인하는 인증', 'N', 2);
+    -- MAIL_STATUS : 메일 발송 상태
+    -- 원본 시트 122행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAIL_STATUS', NULL, '메일 발송 상태', '이메일 발송 작업의 처리 상태', 'N', 0);
+    -- 원본 시트 123행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAIL_PENDING', 'MAIL_STATUS', '발송 대기', '발송 기록을 생성하고 전송을 기다리는 상태', 'N', 1);
+    -- 원본 시트 124행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAIL_SENT', 'MAIL_STATUS', '발송 완료', '메일 서버에 전송을 완료한 상태', 'N', 2);
+    -- 원본 시트 125행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAIL_FAILED', 'MAIL_STATUS', '발송 실패', '메일 서버 전송에 실패한 상태', 'N', 3);
+    -- ATTENDANCE_EVENT : 출퇴근 체크 종류
+    -- 원본 시트 126행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ATTENDANCE_EVENT', NULL, '출퇴근 체크 종류', '직원이 근태 시뮬레이터에서 보내는 체크 구분', 'Y', 0);
+    -- 원본 시트 127행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ATT_IN', 'ATTENDANCE_EVENT', '출근', '해당 근무일의 출근을 기록하는 체크', 'Y', 1);
+    -- 원본 시트 128행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ATT_OUT', 'ATTENDANCE_EVENT', '퇴근', '해당 근무일의 퇴근을 기록하는 체크', 'Y', 2);
+    -- ATTENDANCE_RESULT : 근태 판정
+    -- 원본 시트 129행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ATTENDANCE_RESULT', NULL, '근태 판정', '출퇴근 시각과 휴가·휴일을 기준으로 구분하는 결과', 'N', 0);
+    -- 원본 시트 130행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_NORMAL', 'ATTENDANCE_RESULT', '정상 근무', '기준 근무시간에 맞게 출퇴근한 결과', 'N', 1);
+    -- 원본 시트 131행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_LATE', 'ATTENDANCE_RESULT', '지각', '기준 출근시각보다 늦게 출근한 결과', 'N', 2);
+    -- 원본 시트 132행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_EARLY', 'ATTENDANCE_RESULT', '조퇴', '기준 퇴근시각보다 일찍 퇴근한 결과', 'N', 3);
+    -- 원본 시트 133행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_ABSENT', 'ATTENDANCE_RESULT', '결근', '근무가 필요한 날에 유효한 근무 기록이 없는 결과', 'N', 4);
+    -- 원본 시트 134행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_LEAVE', 'ATTENDANCE_RESULT', '휴가', '승인된 휴가에 해당하는 날짜 또는 시간대', 'N', 5);
+    -- 원본 시트 135행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AR_HOLIDAY', 'ATTENDANCE_RESULT', '휴일', '주말 또는 업체 등록 휴일', 'N', 6);
+    -- APPROVAL_ACTION : 결재 처리 종류
+    -- 원본 시트 136행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APPROVAL_ACTION', NULL, '결재 처리 종류', '결재 문서에 발생한 처리 이력의 종류', 'Y', 0);
+    -- 원본 시트 137행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APR_SUBMIT', 'APPROVAL_ACTION', '제출', '문서를 제출하고 순차 결재를 시작한 처리', 'Y', 1);
+    -- 원본 시트 138행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APR_APPROVE', 'APPROVAL_ACTION', '승인', '현재 순번 결재자가 승인한 처리', 'Y', 2);
+    -- 원본 시트 139행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APR_REJECT', 'APPROVAL_ACTION', '반려', '현재 순번 결재자가 반려한 처리', 'Y', 3);
+    -- 원본 시트 140행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APR_RESUBMIT', 'APPROVAL_ACTION', '재기안', '기존 문서를 참조하여 새 문서를 제출한 처리', 'N', 4);
+    -- 원본 시트 141행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('APR_SAVE', 'APPROVAL_ACTION', '임시저장', '제출 전 문서를 저장한 처리', 'N', 5);
+    -- ASSET_ACTION : 자산 처리 종류
+    -- 원본 시트 142행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ASSET_ACTION', NULL, '자산 처리 종류', '자산 지급·회수·이동·폐기 이력의 구분', 'Y', 0);
+    -- 원본 시트 143행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AA_ISSUE', 'ASSET_ACTION', '지급', '직원에게 자산을 지급한 처리', 'Y', 1);
+    -- 원본 시트 144행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AA_RETURN', 'ASSET_ACTION', '회수', '직원에게 지급했던 자산을 회수한 처리', 'Y', 2);
+    -- 원본 시트 145행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AA_MOVE', 'ASSET_ACTION', '지점 이동', '자산의 배치 지점을 변경한 처리', 'N', 3);
+    -- 원본 시트 146행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AA_REPAIR', 'ASSET_ACTION', '수리', '자산의 수리 또는 점검을 수행한 처리', 'N', 4);
+    -- 원본 시트 147행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('AA_DISPOSE', 'ASSET_ACTION', '폐기', '자산을 폐기하고 사용을 종료한 처리', 'N', 5);
+    -- TICKET_PRIORITY : 티켓 우선순위
+    -- 원본 시트 148행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TICKET_PRIORITY', NULL, '티켓 우선순위', '티켓을 처리할 우선순위', 'N', 0);
+    -- 원본 시트 149행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PRI_LOW', 'TICKET_PRIORITY', '낮음', '다른 업무에 비해 긴급도가 낮은 요청', 'N', 1);
+    -- 원본 시트 150행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PRI_NORMAL', 'TICKET_PRIORITY', '보통', '일반적인 순서로 처리하는 요청', 'N', 2);
+    -- 원본 시트 151행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PRI_HIGH', 'TICKET_PRIORITY', '높음', '업무 영향이 커 우선 처리가 필요한 요청', 'N', 3);
+    -- 원본 시트 152행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PRI_URGENT', 'TICKET_PRIORITY', '긴급', '즉시 확인과 조치가 필요한 요청', 'N', 4);
+    -- TICKET_CATEGORY : IT 문의 분류
+    -- 원본 시트 153행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TICKET_CATEGORY', NULL, 'IT 문의 분류', 'IT 장애 또는 문의의 상세 분야', 'N', 0);
+    -- 원본 시트 154행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TC_DEVICE', 'TICKET_CATEGORY', '장비', '컴퓨터·모니터·주변기기 관련 문의', 'N', 1);
+    -- 원본 시트 155행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TC_NETWORK', 'TICKET_CATEGORY', '네트워크', '유선·무선 연결과 통신 관련 문의', 'N', 2);
+    -- 원본 시트 156행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TC_SOFTWARE', 'TICKET_CATEGORY', '소프트웨어', '프로그램 설치·실행·오류 관련 문의', 'N', 3);
+    -- 원본 시트 157행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TC_ACCOUNT', 'TICKET_CATEGORY', '계정·접근', '계정 사용과 시스템 접근 관련 문의', 'N', 4);
+    -- 원본 시트 158행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('TC_OTHER', 'TICKET_CATEGORY', '기타', '다른 분야에 해당하지 않는 문의', 'N', 5);
+    -- EVENT_TYPE : 일정 종류
+    -- 원본 시트 159행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EVENT_TYPE', NULL, '일정 종류', '일정의 업무 목적에 따른 구분', 'N', 0);
+    -- 원본 시트 160행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_WORK', 'EVENT_TYPE', '업무', '개별 또는 공동 업무 일정', 'N', 1);
+    -- 원본 시트 161행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_MEETING', 'EVENT_TYPE', '회의', '회의 또는 협의 일정', 'N', 2);
+    -- 원본 시트 162행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_LEAVE', 'EVENT_TYPE', '휴가', '승인된 연차·반차에 연결된 일정', 'N', 3);
+    -- 원본 시트 163행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_COMPANY', 'EVENT_TYPE', '회사 행사', '업체의 행사 또는 공통 일정', 'N', 4);
+    -- EVENT_STATUS : 일정 상태
+    -- 원본 시트 164행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EVENT_STATUS', NULL, '일정 상태', '일정의 진행 또는 취소 상태', 'N', 0);
+    -- 원본 시트 165행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_SCHEDULED', 'EVENT_STATUS', '예정', '아직 시작하지 않은 일정', 'N', 1);
+    -- 원본 시트 166행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_COMPLETED', 'EVENT_STATUS', '완료', '진행을 마친 일정', 'N', 2);
+    -- 원본 시트 167행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('EV_CANCELED', 'EVENT_STATUS', '취소', '진행하지 않기로 한 일정', 'N', 3);
+    -- POST_STATUS : 게시글 상태
+    -- 원본 시트 168행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('POST_STATUS', NULL, '게시글 상태', '게시글을 노출하거나 숨기는 상태', 'N', 0);
+    -- 원본 시트 169행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('POST_PUBLISHED', 'POST_STATUS', '게시', '권한 있는 사용자가 조회할 수 있는 게시글', 'N', 1);
+    -- 원본 시트 170행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('POST_HIDDEN', 'POST_STATUS', '숨김', '내용을 보존하면서 화면 노출을 중지한 게시글', 'N', 2);
+    -- 원본 시트 171행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('POST_REMOVED', 'POST_STATUS', '삭제 처리', '삭제 요청에 따라 조회 대상에서 제외한 게시글', 'N', 3);
+    -- FILE_CATEGORY : 첨부 파일 종류
+    -- 원본 시트 172행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FILE_CATEGORY', NULL, '첨부 파일 종류', '파일 내용의 형식에 따른 분류', 'N', 0);
+    -- 원본 시트 173행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_IMAGE', 'FILE_CATEGORY', '이미지', '사진 또는 그림 형식의 파일', 'N', 1);
+    -- 원본 시트 174행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_DOCUMENT', 'FILE_CATEGORY', '문서', 'PDF·워드 등 문서 형식의 파일', 'N', 2);
+    -- 원본 시트 175행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_SPREADSHEET', 'FILE_CATEGORY', '스프레드시트', '엑셀·CSV 등 표 형식의 파일', 'N', 3);
+    -- 원본 시트 176행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_PRESENTATION', 'FILE_CATEGORY', '프레젠테이션', '슬라이드 형식의 파일', 'N', 4);
+    -- 원본 시트 177행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_ARCHIVE', 'FILE_CATEGORY', '압축 파일', '여러 파일을 묶은 압축 파일', 'N', 5);
+    -- 원본 시트 178행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('FC_OTHER', 'FILE_CATEGORY', '기타 파일', '다른 분류에 속하지 않는 파일', 'N', 6);
+    -- INQUIRY_TYPE : 홈페이지 문의 종류
+    -- 원본 시트 179행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('INQUIRY_TYPE', NULL, '홈페이지 문의 종류', '서비스 도입 또는 이용에 대한 비회원 문의 분류', 'N', 0);
+    -- 원본 시트 180행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_INTRODUCTION', 'INQUIRY_TYPE', '서비스 도입', '업체의 서비스 도입에 관한 문의', 'N', 1);
+    -- 원본 시트 181행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_PRICE', 'INQUIRY_TYPE', '가격·계약', '요금·계약 조건에 관한 문의', 'N', 2);
+    -- 원본 시트 182행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_FUNCTION', 'INQUIRY_TYPE', '기능', '서비스 기능에 관한 문의', 'N', 3);
+    -- 원본 시트 183행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_OTHER', 'INQUIRY_TYPE', '기타', '다른 분류에 속하지 않는 문의', 'N', 4);
+    -- INQUIRY_STATUS : 홈페이지 문의 상태
+    -- 원본 시트 184행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('INQUIRY_STATUS', NULL, '홈페이지 문의 상태', '접수된 문의의 답변 처리 상태', 'N', 0);
+    -- 원본 시트 185행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_RECEIVED', 'INQUIRY_STATUS', '접수', '문의가 등록되고 답변을 기다리는 상태', 'N', 1);
+    -- 원본 시트 186행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_PROCESSING', 'INQUIRY_STATUS', '확인 중', '운영자가 문의 내용을 확인하는 상태', 'N', 2);
+    -- 원본 시트 187행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_ANSWERED', 'INQUIRY_STATUS', '답변 완료', '문의에 대한 답변이 등록된 상태', 'N', 3);
+    -- 원본 시트 188행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('IQ_CLOSED', 'INQUIRY_STATUS', '종료', '문의 처리를 마친 상태', 'N', 4);
+    -- MAIL_TYPE : 메일 종류
+    -- 원본 시트 189행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAIL_TYPE', NULL, '메일 종류', '발송하는 이메일의 업무 목적', 'N', 0);
+    -- 원본 시트 190행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MT_TRIAL_VERIFY', 'MAIL_TYPE', '체험 인증', '체험 신청 관리자에게 보내는 인증 메일', 'N', 1);
+    -- 원본 시트 191행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MT_PASSWORD_RESET', 'MAIL_TYPE', '비밀번호 찾기', '비밀번호 재설정을 위한 인증 메일', 'N', 2);
+    -- 원본 시트 192행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MT_INQUIRY_RECEIPT', 'MAIL_TYPE', '문의 접수', '접수된 문의 내용을 알려 주는 메일', 'N', 3);
+    -- 원본 시트 193행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MT_INQUIRY_REPLY', 'MAIL_TYPE', '문의 답변', '운영자가 작성한 문의 답변 메일', 'N', 4);
+    -- 원본 시트 194행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MT_PAYMENT_NOTICE', 'MAIL_TYPE', '결제 안내', '이용 만료일과 결제 방법을 알려 주는 메일', 'N', 5);
+    -- PAYMENT_PURPOSE : 결제 목적
+    -- 원본 시트 195행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PAYMENT_PURPOSE', NULL, '결제 목적', '업체가 이용 기간 또는 인원을 구매하는 목적', 'Y', 0);
+    -- 원본 시트 196행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PP_FIRST', 'PAYMENT_PURPOSE', '최초 유료 전환', '무료 체험 업체가 유료 이용을 시작하는 결제', 'Y', 1);
+    -- 원본 시트 197행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PP_RENEW', 'PAYMENT_PURPOSE', '기간 연장', '기존 유료 이용 기간을 연장하는 결제', 'N', 2);
+    -- 원본 시트 198행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PP_CAPACITY', 'PAYMENT_PURPOSE', '인원 증설', '현재 이용 기간의 인원 한도를 늘리는 결제', 'N', 3);
+    -- 원본 시트 199행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('PP_REPURCHASE', 'PAYMENT_PURPOSE', '재구매', '이용 만료 후 새 이용 기간을 구매하는 결제', 'N', 4);
+    -- CAPACITY_STATUS : 증설 신청 상태
+    -- 원본 시트 200행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAPACITY_STATUS', NULL, '증설 신청 상태', '추가 이용 인원 신청의 승인·결제 처리 상태', 'N', 0);
+    -- 원본 시트 201행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAP_REQUESTED', 'CAPACITY_STATUS', '신청', '추가 인원 사용을 신청한 상태', 'N', 1);
+    -- 원본 시트 202행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAP_APPROVED', 'CAPACITY_STATUS', '승인', '운영자가 증설을 승인하고 결제를 기다리는 상태', 'N', 2);
+    -- 원본 시트 203행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAP_REJECTED', 'CAPACITY_STATUS', '반려', '운영자가 증설 신청을 반려한 상태', 'N', 3);
+    -- 원본 시트 204행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAP_PAID', 'CAPACITY_STATUS', '결제 완료', '증설 결제가 승인되고 인원 한도가 반영된 상태', 'N', 4);
+    -- 원본 시트 205행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CAP_EXPIRED', 'CAPACITY_STATUS', '기한 만료', '승인 후 결제 가능 기한이 지난 상태', 'N', 5);
+    -- SUPPORT_STATUS : 장애 지원 상태
+    -- 원본 시트 206행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUPPORT_STATUS', NULL, '장애 지원 상태', '이음 운영자에게 요청한 장애 지원의 진행 상태', 'N', 0);
+    -- 원본 시트 207행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUP_RECEIVED', 'SUPPORT_STATUS', '접수', '장애 지원 문의가 등록된 상태', 'N', 1);
+    -- 원본 시트 208행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUP_PROCESSING', 'SUPPORT_STATUS', '지원 중', '운영자가 장애를 확인하고 지원하는 상태', 'N', 2);
+    -- 원본 시트 209행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUP_RESOLVED', 'SUPPORT_STATUS', '해결', '장애가 해결된 상태', 'N', 3);
+    -- 원본 시트 210행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUP_CLOSED', 'SUPPORT_STATUS', '종료', '장애 지원 처리가 종료된 상태', 'N', 4);
+    -- SUPPORT_GRANT_STATUS : 지원 허가 상태
+    -- 원본 시트 211행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SUPPORT_GRANT_STATUS', NULL, '지원 허가 상태', '운영자의 업체 자료 접근 허가 상태', 'N', 0);
+    -- 원본 시트 212행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SG_REQUESTED', 'SUPPORT_GRANT_STATUS', '허가 요청', '필요한 자료의 접근 허가를 요청한 상태', 'N', 1);
+    -- 원본 시트 213행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SG_APPROVED', 'SUPPORT_GRANT_STATUS', '허가 중', '승인된 범위에서 접근할 수 있는 상태', 'N', 2);
+    -- 원본 시트 214행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SG_REJECTED', 'SUPPORT_GRANT_STATUS', '허가 반려', '자료 접근 요청이 거절된 상태', 'N', 3);
+    -- 원본 시트 215행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SG_REVOKED', 'SUPPORT_GRANT_STATUS', '허가 취소', '업체 관리자가 기존 허가를 취소한 상태', 'N', 4);
+    -- 원본 시트 216행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('SG_ENDED', 'SUPPORT_GRANT_STATUS', '허가 종료', '지원 종료 또는 문의 해결로 접근이 종료된 상태', 'N', 5);
+    -- ACCESS_TYPE : 자료 접근 구분
+    -- 원본 시트 217행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACCESS_TYPE', NULL, '자료 접근 구분', '자료에 허용하는 작업의 종류', 'N', 0);
+    -- 원본 시트 218행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACCESS_READ', 'ACCESS_TYPE', '조회', '자료의 내용을 열람하는 작업', 'N', 1);
+    -- 원본 시트 219행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACCESS_WRITE', 'ACCESS_TYPE', '수정', '허가받은 자료의 내용을 변경하는 작업', 'N', 2);
+    -- MAP_SHARE_STATUS : 지도 공유 상태
+    -- 원본 시트 220행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MAP_SHARE_STATUS', NULL, '지도 공유 상태', '개인 지도 자료의 열람 요청 처리 상태', 'N', 0);
+    -- 원본 시트 221행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MS_REQUESTED', 'MAP_SHARE_STATUS', '열람 요청', '소유자에게 자료 열람을 요청한 상태', 'N', 1);
+    -- 원본 시트 222행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MS_APPROVED', 'MAP_SHARE_STATUS', '열람 허가', '소유자가 열람을 허용한 상태', 'N', 2);
+    -- 원본 시트 223행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MS_REJECTED', 'MAP_SHARE_STATUS', '열람 반려', '소유자가 열람을 허용하지 않은 상태', 'N', 3);
+    -- 원본 시트 224행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('MS_REVOKED', 'MAP_SHARE_STATUS', '허가 취소', '소유자가 기존 열람 허가를 해제한 상태', 'N', 4);
+    -- NOTIFICATION_CHANNEL : 알림 전달 경로
+    -- 원본 시트 225행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NOTIFICATION_CHANNEL', NULL, '알림 전달 경로', '업무 알림을 전달하는 수단', 'Y', 0);
+    -- 원본 시트 226행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NC_IN_APP', 'NOTIFICATION_CHANNEL', '서비스 내 알림', '이음의 헤더와 알림 목록에 표시하는 알림', 'Y', 1);
+    -- 원본 시트 227행
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NC_EMAIL', 'NOTIFICATION_CHANNEL', '이메일', '이메일 주소로 전달하는 알림', 'N', 2);
+
+    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 224행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
+EXCEPTION
+    WHEN OTHERS THEN
+        ROLLBACK TO SP_IEUM_COMMON_CODE;
+        RAISE;
+END;
+/
+
+-- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 224)
+SELECT COUNT(*) AS TOTAL_COUNT,
+       SUM(CASE WHEN USE_YN = 'Y' THEN 1 ELSE 0 END) AS Y_COUNT,
+       SUM(CASE WHEN USE_YN = 'N' THEN 1 ELSE 0 END) AS N_COUNT,
+       SUM(CASE WHEN PARENT_CODE IS NULL THEN 1 ELSE 0 END) AS ROOT_COUNT
+  FROM COMMON_CODE;
+
+-- 결과 확인 후 다음 문장 중 하나를 별도로 실행한다.
+-- COMMIT;
+-- ROLLBACK;
+

@@ -16,5 +16,20 @@ desktop.ini
 .vscode/
 .idea/
 *.iml
+docs/local
+
+# STS 수업 플러그인 기록 파일과 주석 처리기가 만드는 소스 폴더
+.sts3-class-manager-*.xml
+.apt_generated/
+.apt_generated_tests/
 
 *.log
+
+# DB 접속 정보 (각자 PC에서 db.properties.example을 복사해서 사용)
+src/main/resources/config/db.properties
+# 첨부파일 저장 경로 (각자 PC에서 file.properties.example을 복사해서 사용)
+src/main/resources/config/file.properties
+
+# STS가 자동으로 만드는 IDE 설정 (Lombok 어노테이션 처리)
+.factorypath
+.settings/org.eclipse.jdt.apt.core.prefs

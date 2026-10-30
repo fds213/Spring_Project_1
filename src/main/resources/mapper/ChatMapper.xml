@@ -1,0 +1,43 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.chat.mapper.ChatMapper">
+
+    <!-- companyId 조건 넣어야 함 -->
+    <select id="isMember" resultType="int">
+        SELECT count(*)
+        FROM chat_member
+        WHERE chat_room_id = #{roomId}
+          AND employee_id = #{employeeId}
+          AND left_at IS NULL
+    </select>
+
+    <insert id="insertMessage" parameterType="com.ieum.gw.chat.dto.ChatMessageDTO">
+        <selectKey keyProperty="chatMessageId" resultType="long" order="BEFORE">
+            SELECT sq_chat_message.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO chat_message (company_id, chat_message_id, chat_room_id, sender_employee_id, message_type, message_text, client_message_key, created_at)
+        VALUES (#{companyId}, #{chatMessageId}, #{chatRoomId}, #{senderEmployeeId}, #{messageType}, #{messageText}, #{clientMessageKey}, default)
+    </insert>
+
+    <!-- 본인이 참여중인 대화방 목록 -->
+    <select id="getRoomList" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
+        SELECT r.chat_room_id, r.room_type,
+               CASE
+                   WHEN r.room_type = 'ROOM_DIRECT' THEN e.employee_name
+                   ELSE
+                       r.room_name END AS display_name
+        FROM chat_room r
+                 JOIN chat_member m ON m.company_id = r.company_id AND m.chat_room_id = r.chat_room_id
+                 LEFT JOIN employee e
+                           ON r.room_type = 'ROOM_DIRECT' AND e.company_id = r.company_id
+                               AND e.employee_id = CASE
+                                                       WHEN r.direct_employee_low = m.employee_id
+                                                           THEN r.direct_employee_high
+                                                       ELSE r.direct_employee_low
+                                                        END
+        WHERE m.company_id = #{companyId}
+          AND m.employee_id = #{employeeId}
+          AND m.left_at IS NULL
+    </select>
+
+</mapper>

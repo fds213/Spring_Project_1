@@ -1,0 +1,718 @@
+/* 공통 CSS (프론트 공통 담당만 고친다). dev2 가 같이 쓰는 스타일로, 디자인 2안 네이비 사이드바를 따른다:
+   남색 사이드바, 회색 본문에 흰 카드, 파란 포인트, IBM Plex Sans KR.
+   화면별 규칙(결제·사원 관리·근태·일정·운영자 화면 등)도 여러 JSP가 같이 쓰도록 여기에 둔다. */
+:root {
+  --bg: #ffffff;
+  --bg-sub: #f3f5f8;
+  --page-bg: #f3f5f8;
+  --line: #e3e7ed;
+  --text: #1c2430;
+  --text-sub: #5b6676;
+  --text-muted: #677282;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-bg: #e8effd;
+  --danger: #a32d2d;
+  --danger-bg: #fcebeb;
+  --radius: 8px;
+  --radius-card: 12px;
+  --header-h: 60px;
+  --sidebar-w: 220px;
+  --nav-bg: #1e2a3b;
+  --nav-text: #c9d2de;
+  --nav-group: #8ea0b6;
+  --nav-hover: #26364b;
+  --nav-on: #2c3c52;
+  --nav-line: #34465e;
+}
+
+* { box-sizing: border-box; }
+
+/* .btn·.nav-item 처럼 display 를 정하는 클래스가 hidden 속성을 덮어쓰지 않게 한다 */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  /* IBM Plex Sans KR: layout.tag·login.jsp·site.tag 가 Google Fonts 에서 불러온다. 오프라인이면 시스템 글꼴로 보인다 */
+  font-family: "IBM Plex Sans KR", -apple-system, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* 로그인한 앱 화면: 헤더 + 사이드바 + 본문. 로그인 뒤에 보인다 */
+.app-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+
+/* 입력 필드 */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.input {
+  height: 42px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius);
+  font: inherit; color: var(--text); background: var(--bg);
+}
+.input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+
+/* 로그인 화면: 가운데 상자 하나. 업체 직원과 이음 운영자가 같은 칸을 쓴다 */
+.login-screen { flex: 1; overflow-y: auto; display: grid; place-items: center; padding: 24px 16px; background: var(--bg-sub); }
+.login-box {
+  width: 100%; max-width: 380px; padding: 32px 28px; background: var(--bg);
+  border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.login-brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 24px; }
+.login-brand .brand-mark { height: 34px; }
+.login-brand .brand-word { height: 18px; }
+/* 앱이 아닌 브라우저 탭에서 열었을 때: 다운로드 안내만 */
+.app-only { text-align: center; }
+.app-only h1 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.app-only p { margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text-sub); }
+#loginForm, .join-form { display: flex; flex-direction: column; gap: 14px; }
+.login-error { margin: 0; min-height: 18px; font-size: 13px; color: var(--danger); }
+.login-help { margin: 0; text-align: center; font-size: 12px; color: var(--text-muted); }
+/* 로그인 아래 "계정 생성 / 비밀번호 찾기" 링크 */
+.link-btn { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.join-account { display: flex; flex-direction: column; gap: 14px; }
+/* 입력칸 오른쪽에 붙는 버튼 (업체 코드 확인, 인증 메일 보내기) */
+.input-action { display: flex; gap: 8px; }
+.input-action .input { flex: 1; min-width: 0; }
+.input-action .btn { flex-shrink: 0; height: auto; }
+/* 승인 요청: 업체 코드를 넣기 전에는 회색으로 꺼져 있다 */
+.btn-request[disabled] { opacity: 1; background: var(--bg-sub); border-color: var(--line); color: var(--text-muted); }
+.join-status { margin: 0; padding: 10px 14px; border-radius: var(--radius); font-size: 13px; line-height: 1.6; background: var(--accent-bg); color: var(--accent); }
+.join-status.is-ok { background: #e5f4e4; color: #2b6a2f; }
+.join-status.is-bad { background: var(--danger-bg); color: var(--danger); }
+.join-code-input { margin-top: 8px; }
+.join-code-note:empty { display: none; }
+.join-request-hint { margin: 0; text-align: center; }
+/* 가입 승인: 가입 활성화 box */
+.join-open { margin: 4px 0 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+/* 켜져 있는 동안 테두리 색이 천천히 한 바퀴씩 돈다 (2px 테두리라 padding을 1px 줄여 크기를 맞춤) */
+@property --join-spin { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.join-open.is-on {
+  padding: 15px 17px; border: 2px solid transparent; box-shadow: 0 0 0 3px var(--accent-bg);
+  background: linear-gradient(var(--bg), var(--bg)) padding-box,
+    conic-gradient(from var(--join-spin), var(--accent), #93b4f8, var(--accent-bg), #93b4f8, var(--accent)) border-box;
+  animation: join-spin 6s linear infinite;
+}
+@keyframes join-spin { to { --join-spin: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .join-open.is-on { animation: none; } }
+.join-open h2 { margin: 0 0 4px; font-size: 15px; }
+.join-open-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.join-open-head .join-note { margin: 0; }
+.join-open-actions { display: flex; gap: 8px; align-items: center; }
+.join-open-actions .select, .join-open-actions select { min-width: 110px; }
+.join-open-actions .btn { height: 42px; white-space: nowrap; }
+.join-open-pick { margin-top: 14px; padding: 14px; border-radius: var(--radius); background: var(--bg-sub); }
+.join-open-pick-title { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text-sub); }
+.join-open-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.join-open-checks label { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 14px; cursor: pointer; }
+.join-open-checks label:has(input:checked) { border-color: var(--accent); }
+.join-open-checks input { margin: 0; accent-color: var(--accent); }
+.join-open-checks label span { white-space: nowrap; }
+/* 열린 부서의 종료 시각은 이름 아래 줄에 따로 둔다 */
+.join-open-checks small { flex-basis: 100%; padding-left: 21px; font-size: 11px; color: var(--accent); white-space: nowrap; }
+.join-open-pick-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.join-open-pick-actions .btn { height: 40px; }
+.join-open-list { list-style: none; margin: 12px 0 0; padding: 0; font-size: 13px; }
+.join-open-list li { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+@media (max-width: 560px) { .join-open-actions { width: 100%; } .join-open-actions > * { flex: 1; } }
+.join-code-note.is-ok { color: #2b6a2f; }
+.join-code-note.is-bad { color: var(--danger); }
+.login-error.is-ok { color: #2b6a2f; }
+/* 비활성 입력칸(계정 생성·비밀번호 찾기 화면): 회색 바탕 */
+.join-form select:disabled, .join-form input:disabled, .join-form .select-trigger:disabled { background: var(--bg-sub); color: var(--text-sub); }
+
+/* 직접 만든 드롭다운 (js/select.js): 원래 select 는 숨겨 값만 들고, 이 버튼과 목록이 보여 준다.
+   열면 목록이 아래로 펼쳐지고 화살표가 위를 향한다 */
+.select { position: relative; }
+.select-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+.select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
+.select-trigger .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-trigger.is-placeholder .select-value { color: var(--text-muted); }
+.select-trigger:disabled { cursor: default; }
+.select-arrow { flex: none; color: var(--text-sub); transition: transform 0.22s ease, color 0.22s ease; }
+.select.open .select-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+.select.open .select-arrow { transform: rotate(180deg); color: var(--accent); }
+.select-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
+  margin: 0; padding: 6px; list-style: none; max-height: 240px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+  opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top center;
+  transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
+}
+.select.open .select-list { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s ease, transform 0.18s ease; }
+.select-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 10px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer;
+}
+.select.open .select-option { animation: select-option-in 0.2s ease both; animation-delay: calc(var(--i) * 25ms); }
+.select-option.is-active { background: var(--bg-sub); }
+.select-option[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.select-check { flex: none; opacity: 0; transform: scale(0.6); transition: opacity 0.15s ease, transform 0.15s ease; }
+.select-option[aria-selected="true"] .select-check { opacity: 1; transform: none; }
+@keyframes select-option-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .select-arrow, .select-list, .select.open .select-list, .select-check { transition: none; }
+  .select.open .select-option { animation: none; }
+}
+/* 로그인 상자 안의 다른 화면 제목·안내 (계정 생성, 비밀번호 찾기) */
+.login-title { margin: 0; font-size: 18px; font-weight: 600; }
+.login-lead { margin: -6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+
+/* 헤더 */
+.app-header {
+  height: var(--header-h);
+  flex: none;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 10px; flex: none; }
+.brand-mark { height: 28px; }
+.brand-word { height: 15px; }
+/* 업체명: 이 계정이 속한 업체(테넌트). IEUM 로고와 구분선으로 나눈다 */
+.company {
+  margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line);
+  font-size: 14px; font-weight: 500; color: var(--text);
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+.attend-time { font-size: 13px; color: var(--text-sub); }
+.user { display: flex; align-items: center; gap: 8px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--nav-bg); color: #fff; font-size: 13px; font-weight: 600;
+}
+.user-text { display: flex; flex-direction: column; line-height: 1.3; }
+.user-text strong { font-weight: 600; font-size: 13px; }
+.user-text small { font-size: 12px; color: var(--text-sub); }
+
+/* 버튼 */
+.btn {
+  height: 32px; padding: 0 12px;
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13px;
+  cursor: pointer;
+}
+.btn:hover { background: var(--bg-sub); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-ghost { border-color: transparent; color: var(--accent); }
+.icon-btn {
+  position: relative; display: inline-flex; align-items: center; border: 0; background: none; padding: 4px;
+  color: var(--text-sub); cursor: pointer;
+}
+.badge {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  background: var(--danger-bg); color: var(--danger);
+}
+.badge-dot { position: absolute; top: -4px; right: -6px; padding: 0 5px; }
+
+/* 비밀번호 칸: js/password-toggle.js 가 input 을 감싸고 눈 모양 버튼을 붙인다.
+   눈 위의 사선은 "숨김"을 뜻하며, 비밀번호가 보이는 동안에는 사라진다 */
+.pw-field { position: relative; display: flex; }
+.pw-field > input { flex: 1; min-width: 0; padding-right: 44px; }
+.pw-toggle {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 44px;
+  display: grid; place-items: center;
+  border: 0; background: none; color: var(--text-muted); cursor: pointer;
+}
+.pw-toggle:hover { color: var(--text); }
+.pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: var(--radius); }
+.pw-toggle[aria-pressed="true"] .pw-slash { display: none; }
+/* Edge 는 비밀번호 칸 안에 자체 보기 버튼을 그린다. 우리 버튼으로 대신한다 */
+input::-ms-reveal { display: none; }
+
+/* 본문 */
+.app-body { flex: 1; display: flex; min-height: 0; }
+/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색 */
+.sidebar {
+  width: var(--sidebar-w); flex: none;
+  padding: 14px 12px; overflow-y: auto;
+  background: var(--nav-bg); color: var(--nav-text);
+}
+.nav-group { margin: 16px 12px 4px; font-size: 12px; color: var(--nav-group); }
+.nav-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-radius: var(--radius); color: var(--nav-text);
+}
+.nav-item:hover { background: var(--nav-hover); color: #fff; }
+.nav-item.on { background: var(--nav-on); color: #fff; font-weight: 600; }
+.nav-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
+/* 메뉴의 개수 표시: 포인트 색 바탕에 흰 글자라 남색 위에서도 잘 읽힌다 */
+.sidebar .badge { background: var(--accent); color: #fff; }
+
+/* 흰 카드·표·목록 아래의 회색 바탕 (2안) */
+.content { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px; background: var(--page-bg); }
+/* 화면 자리. 보이는 것은 on 이 붙은 것 하나: JSP는 그 화면 section 에 처음부터 on 을 붙여 두고,
+   게시판처럼 한 페이지에 목록·글·글쓰기가 같이 있으면 화면 JS(board.js)가 on 을 옮긴다 */
+.view { display: none; }
+.view.on { display: block; }
+.crumb { margin: 0; font-size: 12px; color: var(--text-muted); }
+.crumb-current { color: var(--text); font-weight: 500; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 18px; }
+h1 { margin: 0; font-size: 22px; font-weight: 700; }
+/* 제목 옆의 회색 보조 글자 (가입 승인의 업체 코드) */
+.page-code { margin-left: 6px; font-size: 15px; font-weight: 400; color: var(--text-sub); }
+h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
+.muted { color: var(--text-sub); }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.card small { color: var(--text-sub); font-size: 13px; }
+.card strong { font-size: 20px; font-weight: 700; }
+/* 아래 목록을 거르는 요약 카드. 고른 카드는 포인트 색 테두리 */
+.card-filter { font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.card-filter:hover { border-color: #c5cfdc; }
+.card-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-filter[aria-pressed="true"] { background: var(--accent-bg); border-color: var(--accent); }
+.card-filter[aria-pressed="true"] small, .card-filter[aria-pressed="true"] strong { color: var(--accent); }
+.table-gap { margin-top: 20px; }
+/* 가입 승인 */
+.join-scope { margin: -10px 0 16px; font-size: 13px; }
+.join-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+.empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 부서 관리·직급 관리 (org-admin.js) */
+.org-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 560px; }
+.org-add .input { flex: 1 1 220px; min-width: 0; }
+.org-add .input, .org-add .btn { height: 40px; }
+.org-count { font-size: 12px; }
+.org-move { display: flex; gap: 4px; }
+.org-move .btn { min-width: 32px; padding: 0 8px; }
+.org-move .btn:disabled { opacity: 0.35; cursor: default; }
+.org-rename { max-width: 220px; height: 34px; }
+/* 부서 관리 > 부서 형태 (공통 코드 DEPT_TYPE) */
+.org-type { width: auto; min-width: 110px; height: 34px; }
+/* 사원 관리 > 인사 정보 dialog: 고용 형태 · 재직 상태 · 성별 */
+.hr-info-fields { display: grid; gap: 12px; margin: 4px 0 8px; }
+.org-table td:first-child { width: 96px; }
+.status-requested { background: var(--accent-bg); color: var(--accent); }
+.status-approved { background: var(--accent-bg); color: var(--accent); }
+.status-waiting { background: #fff4e5; color: #8a4b08; }
+
+.tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-sub); }
+.tabs span { padding-bottom: 9px; cursor: pointer; }
+.tabs .on { color: var(--accent); border-bottom: 2px solid var(--accent); }
+
+.list { list-style: none; margin: 0; padding: 0; }
+/* 홈: 공지 목록을 흰 카드에 담는다 (2안) */
+.home-panel { margin-top: 20px; padding: 6px 20px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); }
+.home-panel h2 { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 0 4px; }
+.home-panel .list li:last-child { border-bottom: 0; }
+.page-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.page-actions .btn { height: 40px; padding: 0 16px; font-size: 14px; font-weight: 500; }
+.list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.list small { color: var(--text-muted); font-size: 12px; }
+
+/* 상태 코드: class status-<소문자 코드>, 글자는 서버가 준다 (가이드 9장) */
+.status { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg-sub); color: var(--text-sub); white-space: nowrap; }
+.status-paid { background: #e5f4e4; color: #2b6a2f; }
+.status-failed { background: var(--danger-bg); color: var(--danger); }
+.status-trial { background: var(--accent-bg); color: var(--accent); }
+.status-expired { background: #fff4e5; color: #8a4b08; }
+.status-pending { background: #fff4e5; color: #8a4b08; }
+.status-active, .status-st_active { background: #e5f4e4; color: #2b6a2f; }
+.status-read { background: #e5f4e4; color: #2b6a2f; }
+.status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
+.status-retired, .status-st_inactive, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
+/* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
+.table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
+
+/* 사원 관리: 체험 중 계정 사용량 (관리자 포함 10명). 2명 이하 남으면 주황, 꽉 차면 빨강 */
+.seat-bar { padding: 14px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 10px; }
+.seat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.seat-head strong { font-weight: 600; font-variant-numeric: tabular-nums; }
+.seat-head .btn { height: 32px; font-size: 13px; }
+.seat-meter { height: 8px; border-radius: 999px; background: var(--bg-sub); overflow: hidden; }
+.seat-meter span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.3s ease; }
+.seat-bar p { margin: 0; font-size: 13px; color: var(--text-sub); }
+.seat-bar.is-near { background: #fff4e5; border-color: #fde2c1; }
+.seat-bar.is-near .seat-meter span { background: #c26a0a; }
+.seat-bar.is-near p, .seat-bar.is-near strong { color: #8a4b08; }
+.seat-bar.is-full { background: var(--danger-bg); border-color: #f3cccc; }
+.seat-bar.is-full .seat-meter span { background: var(--danger); }
+.seat-bar.is-full p, .seat-bar.is-full strong { color: var(--danger); }
+.seat-bar.is-full .btn-primary { background: var(--danger); border-color: var(--danger); }
+
+/* 사번은 자동으로 정해진다: 입력칸처럼 보이지만 고칠 수 없다 */
+.emp-no { display: flex; align-items: center; background: var(--bg-sub); color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.emp-roles { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; flex-direction: row; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.emp-roles legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.emp-roles label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; color: var(--text); }
+.emp-roles input { accent-color: var(--accent); }
+.emp-roles-hint { flex-basis: 100%; margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+/* 사원 등록 폼 (예전 공통 틀로 만든 화면이 있을 수 있어 남긴다) */
+.emp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding: 16px 18px 4px; }
+.emp-fields .form-error { margin-top: -2px; }
+.emp-fields .emp-roles-hint { margin: -2px 0 10px; }
+.emp-form .info-card-foot { margin-top: 8px; }
+.emp-form .bill-actions .btn { height: 40px; }
+@media (max-width: 600px) {
+  .emp-fields { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* 헤더 아래 체험 띠: 남은 날짜, 업체 관리자에게는 결제 화면으로 가는 버튼 */
+.trial-bar {
+  flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
+  padding: 8px 20px; font-size: 13px; background: var(--accent-bg); color: var(--accent-hover); border-bottom: 1px solid #c7d7fb;
+}
+/* 마지막 3일은 주황으로 눈에 띄게, 읽기 전용이면 빨강 */
+.trial-bar.is-urgent { background: #fff4e5; color: #8a4b08; border-bottom-color: #fde2c1; }
+.trial-bar.is-expired { background: var(--danger-bg); color: var(--danger); border-bottom-color: #f3cccc; }
+.trial-bar.is-expired .btn-primary { background: var(--danger); border-color: var(--danger); }
+/* 읽기 전용 업체(체험이 끝났고 결제하지 않음): 쓰기 동작은 보이되 흐리게, 누르면 이유를 알린다 */
+body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
+.trial-bar strong { font-weight: 600; }
+.trial-bar .btn { height: 30px; padding: 0 12px; font-size: 12px; }
+@media (max-width: 600px) {
+  .trial-bar { padding: 4px 12px; gap: 10px; font-size: 12px; }
+  .trial-bar .trial-more { display: none; }
+  .trial-bar .btn { height: 36px; } /* 누르기 쉬운 크기 */
+}
+
+/* 결제 화면: 결제 카드 안의 안내·동의·버튼 */
+.bill-pay { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bill-pay .detail { border: 1px solid var(--line); border-radius: var(--radius); }
+.bill-pay .detail dt { padding-left: 14px; }
+.notice-warn { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #fff4e5; color: #8a4b08; font-size: 13px; border: 1px solid #fde2c1; }
+.notice-ok { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #e5f4e4; color: #2b6a2f; font-size: 13px; line-height: 1.6; }
+.agree { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-sub); }
+.agree input { margin-top: 3px; accent-color: var(--accent); }
+.form-error { margin: 0; min-height: 16px; font-size: 12px; color: var(--danger); }
+.bill-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.bill-actions .btn { height: 40px; }
+.bill-steps { list-style: none; margin: 0 0 4px; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; color: var(--text-muted); }
+.bill-steps li { padding-top: 8px; border-top: 3px solid var(--line); }
+.bill-steps li.on { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
+.bill-steps li.done-step { color: var(--text-sub); border-top-color: #9db8f5; }
+.bill-step { display: flex; flex-direction: column; gap: 18px; }
+/* 1단계: 없는 오류 자리를 비워 두지 않아 칸 사이가 고르다 */
+.bill-step .form-error:empty { display: none; }
+/* 인원 칸 바로 아래의 요금: 왼쪽에 항목, 오른쪽에 금액 */
+.pay-summary {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 4px 0 0;
+  padding: 12px 14px; border-radius: var(--radius); background: var(--bg-sub);
+}
+.pay-summary dt, .pay-summary dd { margin: 0; }
+.pay-summary dt { font-size: 13px; color: var(--text-sub); }
+.pay-summary dd { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.bill-seats { display: flex; flex-direction: column; gap: 6px; }
+.bill-seats label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.bill-seats-row { display: flex; align-items: center; gap: 8px; }
+.bill-seats-row .input { width: 110px; }
+.bill-seats-row .btn { height: 42px; }
+.bill-note { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+/* 1단계: 월간·연간을 나란히, 카드가 둘 다 넣기에 좁으면 위아래로 */
+.plan-pick { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.plan-pick legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
+.plan-opt {
+  position: relative; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 12px 38px;
+  border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer;
+}
+.plan-opt input { position: absolute; left: 14px; top: 15px; margin: 0; accent-color: var(--accent); }
+.plan-opt:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.plan-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.plan-opt-name { font-weight: 600; }
+.plan-opt-price { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.plan-opt-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.bill-history-box { padding: 4px 18px 14px; border-top: 1px solid var(--line); }
+.bill-sub { margin: 4px 0 6px; font-size: 14px; font-weight: 600; }
+/* 근태·연차 / 일정 */
+.att-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 13px; }
+.att-link-text { margin: 0; line-height: 1.6; color: var(--text-sub); }
+.att-link-form { width: 220px; }
+.att-month { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.att-month strong { min-width: 110px; text-align: center; font-size: 15px; }
+.att-table { margin: 0 16px 16px; max-height: 520px; overflow-y: auto; }
+.att-table tr.att-rest td { background: var(--bg-sub); color: var(--text-muted); }
+.att-table tr.att-today td { box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent); font-weight: 600; }
+.att-note { color: var(--text-sub); }
+.leave-form { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 6px; }
+.leave-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 10px; font-size: 13px; }
+.leave-row .input, .leave-row .filter-select { min-width: 0; }
+.leave-form .bill-note, .info-card > .bill-history { margin: 0; padding: 0 16px 16px; }
+.info-card > .bill-sub { padding: 0 16px; }
+.leave-line { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.sch-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.sch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-right: 16px; }
+.sch-filters { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.sch-filters label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.sch-week, .sch-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.sch-week { padding: 0 16px; font-size: 12px; color: var(--text-sub); text-align: center; }
+.sch-week span { padding: 6px 0; }
+.sch-grid { padding: 0 16px 16px; gap: 4px; }
+.sch-cell { display: flex; flex-direction: column; align-items: stretch; gap: 3px; min-height: 92px; min-width: 0; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font: inherit; text-align: left; cursor: pointer; overflow: hidden; }
+.sch-cell.is-blank { border-color: transparent; background: none; cursor: default; }
+.sch-cell:hover:not(.is-blank) { border-color: var(--accent); }
+.sch-cell.is-selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-bg); }
+.sch-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.sch-num { font-size: 12px; font-weight: 600; }
+.sch-cell.is-today .sch-num { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: #fff; }
+.is-red { color: var(--danger); }
+.is-blue { color: var(--accent); }
+.sch-chip { display: block; padding: 1px 6px; border-radius: 4px; font-size: 11px; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sch-more { font-size: 11px; color: var(--text-sub); }
+.chip-personal { background: var(--accent-bg); color: var(--accent); }
+.chip-dept { background: #efe9fb; color: #5b3fa3; }
+.chip-company { background: #fff4e5; color: #8a4b08; }
+.chip-leave { background: #e5f4e4; color: #2b6a2f; }
+.chip-holiday { background: var(--danger-bg); color: var(--danger); }
+.sch-day-list { list-style: none; margin: 0; padding: 0 16px 8px; font-size: 13px; }
+.sch-day-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.sch-day-list li:last-child { border-bottom: 0; }
+.sch-day-list .sch-chip { flex-shrink: 0; }
+.sch-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.sch-day-list .btn { height: 28px; padding: 0 10px; font-size: 12px; }
+@media (max-width: 1100px) { .sch-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .sch-cell { min-height: 64px; padding: 4px; } .sch-chip { font-size: 10px; padding: 0 3px; } .att-link-form { width: 100%; } }
+.bill-history { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.bill-history li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.bill-history li:last-child { border-bottom: 0; }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+
+/* 표: 모든 칸에 여백, 머리글 줄은 옅은 바탕, 모든 열 왼쪽 정렬.
+   600px 이하에서는 한 줄이 카드 하나가 된다 (가이드 4장) */
+.table-wrap { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  padding: 11px 16px; text-align: left; white-space: nowrap;
+  font-size: 12px; font-weight: 500; color: var(--text-sub);
+  background: var(--bg-sub); border-bottom: 1px solid var(--line);
+}
+.table td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover td { background: #f7f9fc; }
+.table-fixed { table-layout: fixed; }
+.table-fixed td { overflow-wrap: anywhere; }
+/* 숫자를 포함해 모든 열을 왼쪽에서 시작한다. 고정폭 숫자(tabular)로 읽기 쉽게 */
+.table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table .cell { display: flex; flex-direction: column; gap: 3px; }
+.table .cell strong { font-weight: 600; }
+.cell-sub { font-size: 12px; color: var(--text-muted); }
+.table tr.is-new td, .table tr.is-new:hover td { background: var(--accent-bg); }
+.tag-new { align-self: flex-start; font-size: 11px; font-weight: 500; color: var(--accent); }
+.table .status { align-self: flex-start; }
+/* 누를 수 있는 줄: 줄 전체를 누르면 바로 아래에 상세가 열린다. 안의 제목은 키보드 사용자를 위한 버튼 */
+.table tr.row-link { cursor: pointer; }
+.table .row-title {
+  align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--text); text-align: left;
+}
+/* 누를 수 있는 줄에 마우스를 올리면 열린 줄과 같은 파랑. 줄 색만으로 "열 수 있다"를 알린다 */
+.table tr.row-link:hover td { background: var(--accent-bg); }
+.table .row-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.table tr.is-open td, .table tr.is-open:hover td { background: var(--accent-bg); border-bottom-color: transparent; }
+/* 펼친 상세 줄: 옅은 파란 띠(고른 요약 카드와 같은 파랑) 위의 카드들이 위의 열린 줄과 이어진다 */
+.table tr.row-detail td, .table tr.row-detail:hover td { padding: 0; background: var(--accent-bg); cursor: default; }
+.table tr.row-detail .info-grid { padding: 4px 12px 16px; }
+.table td { transition: background-color 0.2s ease; }
+/* 열고 닫기: grid 행이 0fr 에서 1fr 로 늘어나 내용에 맞는 높이까지 움직인다 */
+.slide { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s ease; }
+.slide.open { grid-template-rows: 1fr; }
+.slide-inner { min-height: 0; overflow: hidden; opacity: 0; transition: opacity 0.2s ease; }
+.slide.open .slide-inner { opacity: 1; transition-delay: 0.06s; }
+@media (prefers-reduced-motion: reduce) {
+  .slide, .slide-inner, .table td { transition: none; }
+}
+/* 표 안은 자리가 좁아 첫 카드(가장 긴 값: 이메일)를 더 넓게 준다 */
+.table tr.row-detail .info-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 12px; }
+.table tr.row-detail td dd { overflow-wrap: normal; word-break: keep-all; }
+@media (max-width: 1200px) {
+  .table tr.row-detail .info-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .table tr.row-detail td dd { overflow-wrap: anywhere; }
+}
+
+/* 상세: 항목 열은 옅은 바탕, 값은 그 옆 */
+.detail {
+  display: grid; grid-template-columns: 160px minmax(0, 1fr); margin: 0;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+}
+.detail dt, .detail dd { margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.detail dt { background: var(--bg-sub); color: var(--text-sub); font-size: 13px; }
+.detail dd { overflow-wrap: anywhere; }
+.detail dt:nth-last-of-type(1), .detail dd:last-child { border-bottom: 0; }
+
+/* 정보 카드: 구역마다 카드 하나, 같은 너비로 나란히 놓아 넓은 화면에서도 균형을 맞춘다.
+   1200px 이하에서는 위아래로 쌓는다. 모든 카드 모양은 같다 */
+/* 첫 카드는 조금 넓게: 가장 긴 값(담당자 이메일)이 들어간다 */
+.info-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+/* 카드 두 장 형태(결제 화면): .info-grid 뒤에 선언해 이기게 하고, 카드 세 장보다 먼저 쌓인다 */
+.info-grid.info-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 900px) {
+  .info-grid.info-grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+.info-card {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card);
+}
+/* 부제가 있든 없든 머리 높이를 같게 해 아래 줄이 카드끼리 맞는다 */
+.info-card-head { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.info-card-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.info-card-head p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
+.info-card-head .ic {
+  flex: none; width: 32px; height: 32px; display: grid; place-items: center;
+  border-radius: 8px; background: var(--bg-sub); color: var(--text-sub);
+}
+/* 동작 버튼이 있는 카드 아래쪽: 카드 바닥에 붙여 카드가 늘어나도 줄이 맞는다 */
+.info-card-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--line); }
+.btn-block { width: 100%; height: 40px; justify-content: center; font-weight: 500; }
+/* 카드 안의 목록은 자체 테두리·바탕을 뺀다: 왼쪽에 흐린 항목, 그 옆에 값 */
+.info-card .detail { border: 0; border-radius: 0; grid-template-columns: 128px minmax(0, 1fr); }
+.info-card .detail dt { background: none; padding-left: 18px; padding-right: 12px; white-space: nowrap; }
+.info-card .detail dd { padding-right: 18px; font-weight: 500; }
+@media (max-width: 1200px) {
+  .info-grid { grid-template-columns: minmax(0, 1fr); }
+  .info-card .detail { grid-template-columns: 160px minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .info-card .detail { grid-template-columns: 116px minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .detail { grid-template-columns: 110px minmax(0, 1fr); }
+}
+
+/* 거른 결과가 없을 때의 빈 줄: 두 줄짜리 칸이 있는 줄과 같은 높이, 안내는 가운데 */
+.table .row-empty td { height: 66px; text-align: center; color: var(--text-muted); }
+.table tbody tr.row-empty:hover td { background: none; }
+
+@media (max-width: 600px) {
+  .table thead { display: none; }
+  .table, .table tbody, .table tr, .table td { display: block; width: 100%; }
+  .table tr { padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .table tbody tr:last-child { border-bottom: 0; }
+  .table td { display: flex; justify-content: space-between; gap: 16px; padding: 7px 16px; border: 0; text-align: right; }
+  .table td::before { content: attr(data-label); flex: none; font-size: 12px; color: var(--text-muted); text-align: left; }
+  .table .cell, .table .num .cell { align-items: flex-end; }
+  .tag-new, .table .status { align-self: flex-end; }
+  .table tr.is-new { background: var(--accent-bg); }
+  .table .row-empty td { justify-content: center; align-items: center; }
+  .table .row-title { align-self: flex-end; text-align: right; }
+  .table tr.row-detail td { display: block; padding: 0; text-align: left; }
+  .table tr.row-detail td::before { content: none; }
+  .table tr.is-open { background: var(--accent-bg); border-bottom: 0; }
+  .table .row-empty td::before { content: none; }
+}
+
+/* 모달 (<dialog>): 버튼 하나와 짧은 안내. 예: 앱 설치 방법 */
+.modal {
+  width: min(360px, calc(100% - 32px)); padding: 24px; border: 1px solid var(--line); border-radius: 12px;
+  background: var(--bg); color: var(--text); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+}
+.modal::backdrop { background: rgba(0, 0, 0, 0.35); }
+.modal h2 { margin: 0 0 8px; font-size: 17px; font-weight: 600; }
+.modal p { margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text-sub); }
+.modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modal form .field { margin-bottom: 12px; }
+.modal form .login-error:empty { display: none; }
+.modal form .login-error { margin: 0 0 12px; }
+/* 다운로드 안내창: 확인 순서가 있는 안내는 조금 넓게 */
+.modal-actions .btn { height: 40px; padding: 0 16px; }
+
+/* 토스트: 오른쪽 아래의 짧은 알림. 예: 새 신청이 들어옴 */
+.toast {
+  position: fixed; right: 20px; bottom: 20px; z-index: 30; max-width: calc(100% - 40px);
+  padding: 12px 16px; border-radius: var(--radius); background: var(--text); color: #fff;
+  font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* 좁은 화면: 사이드바가 햄버거 버튼으로 여는 서랍이 된다 */
+.menu-btn { display: none; margin: 0 6px 0 -6px; }
+.backdrop { display: none; }
+
+@media (max-width: 900px) {
+  .menu-btn { display: inline-flex; }
+  .sidebar {
+    position: fixed; top: var(--header-h); bottom: 0; left: 0; z-index: 20;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  body.menu-open .sidebar { transform: none; }
+  body.menu-open .backdrop {
+    display: block;
+    position: fixed; inset: var(--header-h) 0 0 0; z-index: 10;
+    background: rgba(0, 0, 0, 0.3);
+  }
+  .content { padding: 16px 20px; }
+}
+
+@media (max-width: 600px) {
+  .app-header { padding: 0 8px 0 14px; }
+  .header-right { gap: 4px; }
+  .header-right > * { flex: none; white-space: nowrap; }
+  /* 휴대폰: 로고 마크만 */
+  .attend-time, .user-text, .brand-word { display: none; }
+  /* 누르는 자리는 44px 이상 */
+  .icon-btn, .menu-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+  /* 비밀번호 변경 + 로그아웃 버튼이 360px 에서도 들어가게 */
+  .header-right .btn { height: 36px; padding: 0 8px; font-size: 13px; }
+  .company { margin-left: 10px; padding-left: 10px; font-size: 13px; }
+  .badge-dot { top: 4px; right: 2px; }
+}
+
+/* ---------- 운영자 화면: 비회원 접수, 업체 관리 ---------- */
+/* 문의(운영자): 줄 아래 상세는 카드 두 장. 왼쪽은 질문, 오른쪽은 답변 */
+.table tr.row-detail .inq-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 4px 12px 16px; }
+@media (max-width: 1200px) { .table tr.row-detail .inq-grid { grid-template-columns: minmax(0, 1fr); } }
+.inq-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
+.inq-body + .inq-body { border-top: 1px solid var(--line); }
+.inq-text { width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); resize: vertical; }
+.inq-text:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.inq-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
+.inq-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inq-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sub); }
+.inq-check input { accent-color: var(--accent); }
+.reply-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.reply-log li { padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.reply-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; color: var(--text-muted); }
+.reply-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reply-fail { margin-top: 6px; font-size: 12px; color: var(--danger); }
+.status-wait, .status-unread { background: var(--accent-bg); color: var(--accent); }
+.status-done { background: #e5f4e4; color: #2b6a2f; }
+
+/* 표 위의 문의 검색 상자 */
+.search-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0 10px; }
+.filter-select { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); background: var(--bg); }
+.filter-select:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.search-input { flex: 1; max-width: 380px; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); background: var(--bg); }
+.search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+@media (max-width: 600px) { .search-row { flex-direction: column; align-items: stretch; gap: 6px; } .search-input { max-width: none; } }
+
+/* 업체 관리 상세: 두 줄짜리 짧은 항목으로 된 이력 카드 */
+.mini-list { list-style: none; margin: 0; padding: 0; }
+.mini-list li { display: flex; flex-direction: column; gap: 2px; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; overflow-wrap: anywhere; }
+.mini-list li:last-child { border-bottom: 0; }
+.mini-sub { font-size: 12px; color: var(--text-muted); }
+.mini-empty { margin: 0; padding: 14px 18px; font-size: 13px; color: var(--text-muted); }
+
+/* 업체 관리 상세: 관리자 카드와 직원 카드를 grid 칸 하나에 쌓는다. 직원 목록은 카드 안에서 스크롤 */
+.info-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.emp-scroll { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
+.mini-list li.emp-row { flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 18px; }
+.emp-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* 카드 위의 탭 (공지사항의 전체·부서 공지): 열린 탭에 밑줄, 다른 탭에는 아직 볼 것의 수 */
+.type-tabs { display: flex; gap: 22px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
+.type-tab { display: inline-flex; align-items: center; gap: 6px; margin-bottom: -1px; padding: 0 2px 10px; border: 0; border-bottom: 2px solid transparent; background: none; font: inherit; font-size: 15px; color: var(--text-sub); cursor: pointer; }
+.type-tab:hover { color: var(--text); }
+.type-tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent); font-weight: 600; }
+.type-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.type-tab .badge { position: static; }
+
+/* ---------- JSP 공통 틀에서 더한 것 ---------- */
+/* 홈 공지 패널의 "더보기" 링크 */
+.more-link { margin-left: 8px; font-size: 12px; color: var(--accent); }
+/* 헤더의 로그아웃: Spring Security가 POST /logout만 받아서 버튼을 form으로 감쌌다 */
+.logout-form { display: flex; margin: 0; }

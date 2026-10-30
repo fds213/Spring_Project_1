@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<beans
+	xmlns:security="http://www.springframework.org/schema/security"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/security https://www.springframework.org/schema/security/spring-security.xsd"
+	xmlns="http://www.springframework.org/schema/beans">
+
+	<!-- 비밀번호 BCrypt -->
+	<bean id="bCryptPasswordEncoder"
+		class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+
+	<!-- 로그인 검사기: 잠금 → 비밀번호 → 상태 순서 (계정당 5회 실패 시 10분 잠금) -->
+	<bean id="loginAuthenticationProvider"
+		class="com.ieum.gw.common.security.LoginAuthenticationProvider">
+		<property name="userDetailsService" ref="customUserDetailsService" />
+		<property name="passwordEncoder" ref="bCryptPasswordEncoder" />
+	</bean>
+	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.common.security.AjaxAwareEntryPoint">
+    <constructor-arg value="/login" />
+</bean>
+
+	<security:http use-expressions="true" create-session="ifRequired"
+    entry-point-ref="ajaxAwareEntryPoint">
+
+		<!-- URL 권한 규칙은 위에서부터 먼저 맞는 것 하나만 적용된다. 구체적인 규칙을 위에 둔다. -->
+
+		<!-- 1. 로그인 없이 여는 주소 (요구분석서 3.12: /는 그 주소만, 나머지는 하위 주소까지) -->
+		<security:intercept-url pattern="/"                  access="permitAll" />
+		<security:intercept-url pattern="/trial/**"          access="permitAll" />
+		<security:intercept-url pattern="/inquiry/**"        access="permitAll" />
+		<security:intercept-url pattern="/join/**"           access="permitAll" />
+		<security:intercept-url pattern="/login"             access="permitAll" />
+		<security:intercept-url pattern="/resources/**"      access="permitAll" />
+		<security:intercept-url pattern="/manifest.json"     access="permitAll" />
+		<security:intercept-url pattern="/service-worker.js" access="permitAll" />
+
+		<!-- 2. 이음 운영자 화면 -->
+		<security:intercept-url pattern="/ops/**"            access="hasRole('OPS')" />
+
+		<!-- 3. 인사·IT 관리 화면 -->
+		<security:intercept-url pattern="/ticket/admin/**"     access="hasAnyRole('IT','ADMIN')" />
+		<security:intercept-url pattern="/asset/admin/**"      access="hasAnyRole('IT','ADMIN')" />
+		<security:intercept-url pattern="/employee/admin/list" access="hasAnyRole('HR','ADMIN')" />
+		<security:intercept-url pattern="/attendance/admin/**" access="hasAnyRole('HR','ADMIN')" />
+
+		<!-- 4. 그 밖의 관리 화면 (부서·역할 관리 등) -->
+		<security:intercept-url pattern="/*/admin/**"        access="hasRole('ADMIN')" />
+
+		<!-- 5. 나머지는 로그인한 사람 (가입 승인·이용 결제는 서버가 요청마다 따로 확인) -->
+		<security:intercept-url pattern="/**"                access="isAuthenticated()" />
+
+		<!-- 로그인: 성공·실패 이동은 핸들러가 정한다 -->
+		<security:form-login login-page="/login"
+			login-processing-url="/login"
+			username-parameter="username"
+			password-parameter="password"
+			authentication-success-handler-ref="loginSuccessHandler"
+			authentication-failure-handler-ref="loginFailureHandler" />
+
+		<security:logout logout-url="/logout"
+			logout-success-url="/login?logout" invalidate-session="true" />
+
+		<security:csrf />
+	</security:http>
+
+	<security:authentication-manager>
+		<security:authentication-provider ref="loginAuthenticationProvider" />
+	</security:authentication-manager>
+</beans>
