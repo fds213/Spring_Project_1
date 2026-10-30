@@ -1,16 +1,16 @@
-// "다운로드" = install IEUM as an app (PWA). The installed app opens straight on the groupware login
-// (manifest start_url). The login page can require that app window (login.jsp, data-app-only).
-// Any button with data-download starts the install; browsers that can't install from a button get a short guide.
+// "다운로드" = 이음을 앱(PWA)으로 설치한다. 설치한 앱은 그룹웨어 로그인 화면에서 바로 열린다
+// (manifest start_url). 로그인 페이지는 그 앱 창에서만 열리게 할 수 있다 (login.jsp, data-app-only).
+// data-download 가 붙은 버튼은 모두 설치를 시작한다. 버튼으로 설치할 수 없는 브라우저에는 짧은 안내를 보여 준다.
 const runningAsApp = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const UA = navigator.userAgent;
 
-// Inside the installed app the window is the groupware. If a homepage-style page (site.tag sets body.site)
-// opens there, go to the login screen. This also covers an app made from the browser menu while one of these
-// pages was open: such an app starts on that page instead of the manifest start_url (login).
+// 설치한 앱 안에서는 창이 곧 그룹웨어다. 소개 사이트 같은 페이지(site.tag 가 body.site 를 붙인다)가
+// 거기서 열리면 로그인 화면으로 보낸다. 이런 페이지를 연 채로 브라우저 메뉴에서 만든 앱도 여기서 처리된다:
+// 그런 앱은 manifest start_url(로그인) 대신 그 페이지에서 시작하기 때문이다.
 if (runningAsApp && document.body.classList.contains('site')) location.replace((document.body.dataset.ctx || '') + '/login');
 const isIOS = /iphone|ipad|ipod/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-// Chrome/Edge (PC, Android) fire this when the page can be installed; keep it for the button
+// Chrome/Edge(PC, Android)는 페이지를 설치할 수 있을 때 이 이벤트를 보낸다. 버튼에 쓰려고 받아 둔다
 let installPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
@@ -21,8 +21,8 @@ window.addEventListener('appinstalled', () => {
   showInstallGuide('installed');
 });
 
-// Shown when the browser didn't hand over its install prompt: it can't install from a button, or IEUM is
-// already installed (Chrome stops offering it then). One guide per browser; menu names as of 2026-10.
+// 브라우저가 설치 창을 넘겨주지 않았을 때 보여 준다: 버튼으로 설치할 수 없거나, 이음이
+// 이미 설치되어 있다(그러면 Chrome이 더 권하지 않는다). 브라우저마다 안내 하나, 메뉴 이름은 2026-10 기준.
 const ALREADY = ' 이미 설치했다면 설치된 IEUM 앱을 열면 됩니다.';
 const INSTALL_GUIDE = {
   installed: {
@@ -54,7 +54,7 @@ const INSTALL_GUIDE = {
     body: '이 브라우저에서는 IEUM 앱을 설치할 수 없습니다. 크롬이나 엣지로 이 주소를 열고 다운로드를 다시 눌러 주세요.',
   },
 };
-// which guide fits this browser (Edge and Whale also say "Chrome" in their user agent, so check them first)
+// 이 브라우저에 맞는 안내 (Edge와 Whale도 user agent에 "Chrome"이 들어 있어 먼저 확인한다)
 function guideKind() {
   if (isIOS) return 'ios';
   if (/Edg\//.test(UA)) return 'edge';
@@ -89,7 +89,7 @@ function showInstallGuide(kind) {
 async function startDownload() {
   if (installPrompt) {
     installPrompt.prompt();
-    await installPrompt.userChoice; // "installed" guide comes from the appinstalled event
+    await installPrompt.userChoice; // "설치됨" 안내는 appinstalled 이벤트에서 보여 준다
     installPrompt = null;
     return;
   }
@@ -98,9 +98,9 @@ async function startDownload() {
 
 document.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', startDownload));
 
-// The service worker must come from the top of the site (/<context>/service-worker.js), not /resources/,
-// or it can't look after the app's pages. Where it is served from is still to be set up (guide section 6);
-// until then the registration just fails quietly.
+// 서비스 워커는 /resources/ 가 아니라 사이트 맨 위(/<context>/service-worker.js)에서 받아야
+// 앱의 페이지를 맡을 수 있다. 어디서 내려 줄지는 아직 정하지 않았다(가이드 6장).
+// 그때까지는 등록이 조용히 실패한다.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register((document.body.dataset.ctx || '') + '/service-worker.js').catch(() => {});
 }

@@ -69,10 +69,12 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | 사원 관리 데이터 | 화면 `/employee/admin/list`는 HR·ADMIN, API `/employee/admin/api/employees/**`는 `/*/admin/**` 규칙이라 ADMIN만 | 인사 담당(HR)도 사원 목록 API를 쓰도록 규칙 추가 |
 | 본인 비밀번호 변경 | 헤더 버튼과 창은 있다 (`common.js` 7) | `POST /employee/api/password` `{ current, password }` |
 | 메뉴 배지 | `common.js`가 15초마다 `GET /badges` | 업체 직원 `{ notification, approval, chat, join }`, 운영자 `{ application, inquiryGuest }` |
+| 티켓 상태 코드 | 내 티켓 화면은 AGENTS.md 의 티켓 상태로 보여 준다 | `RECEIVED` → `ASSIGNED` → `IN_PROGRESS` → `RESOLVED` → `CLOSED`(요청자 확인), `CANCELED`, `REJECTED`. 상태는 IT 담당자가 티켓 처리에서 바꾼다 |
+| 결제 | 토스 결제창 연동 전이라 이용 결제 2단계에 "결제 성공/실패로 진행" 임시 버튼이 있고 `success`를 보낸다 | 토스 테스트 결제를 붙이면 `success`는 빼고, 결제 결과는 서버가 토스 승인으로 정한다(AGENTS.md: 서버가 승인 결과를 확인한 뒤에만 반영) |
 | 휴가 | 근태·연차 화면은 기록과 연차 현황·내역만 본다 | 휴가 신청·회수는 전자결재(`/approval/api/...` 휴가 양식). 최종 승인 때 연차 차감, `GET /attendance/api/leaves`의 내역에 나온다 |
 | 소개 사이트 체험 신청·도입 문의 | 화면 모양만 있다 | 체험 신청과 `POST /inquiry` API를 정하면 화면 JS를 붙인다 |
 
-## 4. API 목록 — 프론트 제안 (모두 85개)
+## 4. API 목록 — 프론트 제안 (모두 79개)
 
 ### 이용 결제 (subscription) + 운영자 신청 현황
 
@@ -85,7 +87,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | POST | `/subscription/api/payments` | 필요 |
 | GET | `/ops/api/applications` | 필요 |
 | POST | `/ops/api/applications/read` | 필요 |
-| GET | `/ops/api/applications/badge` | 필요 |
 
 ### 사원·가입·부서·직급·비밀번호 (employee)
 
@@ -96,7 +97,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | GET | `/employee/admin/api/employees` | 필요 |
 | POST | `/employee/admin/api/employees/{empNo}/status` | 필요 |
 | POST | `/employee/admin/api/employees/{empNo}/head` | 필요 |
-| POST | `/employee/admin/api/employees/{empNo}/delete` | 필요 |
 | POST | `/employee/admin/api/employees/{empNo}/hr` | 필요 |
 | GET | `/employee/api/join` | 필요 |
 | GET | `/employee/api/join/count` | 필요 |
@@ -154,7 +154,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 |---|---|---|
 | GET | `/approval/api/form-options` | 필요 |
 | GET | `/approval/api/box` | 필요 |
-| GET | `/approval/api/box/count` | 필요 |
 | POST | `/approval/api/documents` | 필요 |
 | POST | `/approval/api/documents/{id}/approve` | 필요 |
 | POST | `/approval/api/documents/{id}/reject` | 필요 |
@@ -173,7 +172,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | GET | `/ticket/api/tickets` | 필요 |
 | POST | `/ticket/api/tickets` | 필요 |
 | POST | `/ticket/api/tickets/{id}/comments` | 필요 |
-| POST | `/ticket/api/tickets/{id}/status` | 필요 |
 | GET | `/asset/api/assets` | 필요 |
 
 ### 공지·부서 게시판 (board)
@@ -183,7 +181,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 | 메서드 | 주소 | 로그인 |
 |---|---|---|
 | GET | `/board/api/notices` | 필요 |
-| GET | `/board/api/notices/home` | 필요 |
 | GET | `/board/api/notices/pinned` | 필요 |
 | GET | `/board/api/notices/form` | 필요 |
 | GET | `/board/api/notices/{id}` | 필요 |
@@ -208,7 +205,6 @@ dev2에 넣은 화면과, 화면 JS가 서버에 요청하는 주소를 정리�
 
 | 메서드 | 주소 | 로그인 |
 |---|---|---|
-| GET | `/ops/api/inquiry-counts` | 필요 |
 | GET | `/ops/api/guest-inquiries` | 필요 |
 | POST | `/ops/api/guest-inquiries/{no}/replies` | 필요 |
 | POST | `/ops/api/guest-inquiries/{no}/replies/{seq}/resend` | 필요 |

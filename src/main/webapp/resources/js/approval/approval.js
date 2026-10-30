@@ -4,11 +4,10 @@
 // - 장비 지급: 최종 승인 때 IT 서비스에 지급 티켓이 만들어진다. 지급이 끝나면 내 장비에 나타난다.
 // 임시저장은 검사 없이 입력값을 그대로 저장하고, 반려·회수된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다.
 // 결재자 목록, 내 순번인지, 회수·재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
-// 서버 API (시안은 demo/approval.js가 답한다):
+// 서버 API (프론트 제안):
 //   GET  /approval/api/form-options    기안 작성에 필요한 것
 //        → { approvers: [{ empNo, name, dept, rank }], branches: [{ id, name }], equipKinds: [..], leave: { available, pendingDays } | null }
 //   GET  /approval/api/box             결재함 → { WAIT: [문서], PROGRESS: [문서], DONE: [문서], REJECTED: [문서], DRAFT: [임시저장] }
-//   GET  /approval/api/box/count       메뉴 숫자 → { wait }
 //   POST /approval/api/documents       제출 { form: LEAVE|EQUIP, fields, line: [1단계 사번, 2단계 사번 또는 ''], draftId? } → { id, form }
 //        fields — LEAVE: { kind: FULL|AM|PM, from, to, reason }  EQUIP: { kind, qty, branchId, reason }
 //   POST /approval/api/documents/{id}/approve    { comment } → { id, form, name, status, ticketId }
@@ -50,17 +49,6 @@ const eaDays = n => `${Number.isInteger(n) ? n : n.toFixed(1)}일`;
 const eaSpan = f => (f.from ? `${f.from}${f.to && f.to !== f.from ? ` ~ ${f.to}` : ''}` : '');
 const eaState = { tab: 'WAIT', open: null, draftId: null, pre: null, box: null, opts: null };
 
-// 사이드 메뉴 "결재함" 옆의 숫자: 내 순번에 와 있는 문서 수
-function eaSetBadge(n) {
-  const el = eaEl('navApprBoxCount');
-  if (!el) return;
-  el.textContent = n;
-  el.hidden = !n;
-}
-function eaRefreshBadge() {
-  if (!eaEl('navApprBoxCount')) return;
-  api.get('/approval/api/box/count').done(r => eaSetBadge(r.wait)); // 숫자를 못 받으면 그대로 둔다
-}
 
 // "박관리 ✓ → 최팀장 (결재 중)"처럼 결재선의 진행을 한 줄로
 function eaLineText(d) {
@@ -128,7 +116,7 @@ function eaApplyForm(p) {
 // 다른 화면(내 장비, 결재함의 재기안·이어서 쓰기)에서 기안 작성을 열 때 쓴다 (util.js startApprovalWrite)
 const eaStartWrite = (form, pre) => startApprovalWrite(form, pre);
 
-// 화면을 열 때 (시안은 proto/app.js showView, JSP는 페이지가 열릴 때). 결재자·지점 목록을 받은 뒤 입력칸을 채운다
+// 화면을 열 때 (JSP 페이지가 열리면 부른다). 결재자·지점 목록을 받은 뒤 입력칸을 채운다
 function openApprovalWriteView() {
   const pre = takeApprovalPre();
   eaState.draftId = pre && pre.draftId ? pre.draftId : null;
@@ -234,7 +222,7 @@ function renderApprovalBox() {
   const buckets = eaState.box || Object.fromEntries(Object.keys(EA_TABS).map(t => [t, []]));
   Object.keys(EA_TABS).forEach(t => { eaEl(`eaCnt${t}`).textContent = `${(buckets[t] || []).length}건`; });
   document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === eaState.tab));
-  eaSetBadge((buckets.WAIT || []).length);
+  IEUM.refreshBadges(); // 메뉴의 결재함 숫자 (common.js /badges)
 
   const draft = eaState.tab === 'DRAFT';
   eaEl('eaHead').replaceChildren(eaNode('tr', '', ...(draft ? ['문서', '저장 시각'] : ['문서', '기안자', '결재선', '상태', '기안일']).map(t => eaNode('th', '', t))));

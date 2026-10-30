@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
 </head>
-<%-- data-app-only="true": 설치한 IEUM 앱이 아닌 브라우저 탭에서는 다운로드 안내만 보인다(시연 때 켠다).
+<%-- data-app-only="true": 설치한 IEUM 앱이 아닌 브라우저 탭에서는 다운로드 안내만 보인다.
      개발 중에는 false 로 두어 브라우저에서 바로 로그인한다 --%>
 <body data-ctx="${ctx}" data-app-only="false">
   <section class="login-screen" id="appOnlyScreen" hidden>
@@ -74,14 +74,14 @@
           <c:when test="${param.locked ne null}">비밀번호를 5번 틀려 이 계정은 잠겼습니다. <c:choose><c:when test="${param.locked.matches('[0-9]{1,2}')}"><c:out value="${param.locked}" />분</c:when><c:otherwise>10분</c:otherwise></c:choose> 뒤에 다시 시도해 주세요</c:when>
           <c:when test="${param.disabled ne null}">사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요</c:when>
           <c:when test="${param.expired ne null}">로그인이 끝났습니다. 다시 로그인해 주세요</c:when>
-          <%-- 체험 신청 이메일을 아직 인증하지 않은 업체 (요구분석서 v1.4 ACC-06): 서버가 /login?unverified 로 보낸다 --%>
+          <%-- 체험 신청 이메일을 아직 인증하지 않은 업체 (ACC-06): 서버가 /login?unverified 로 보낸다 --%>
           <c:when test="${param.unverified ne null}">신청할 때 적은 이메일을 아직 인증하지 않았습니다. 인증 메일의 링크를 누른 뒤 로그인해 주세요</c:when>
         </c:choose></p>
         <c:if test="${param.logout ne null}">
           <p class="login-help" role="status">로그아웃했습니다</p>
         </c:if>
         <button class="btn btn-primary btn-block" type="submit">로그인</button>
-        <%-- 시안(10/28 결정): 직원 계정 생성과 이메일 인증 비밀번호 찾기. 둘 다 로그인 없이 여는 /join/** 아래에 둔다(화면·서버는 아직 없음) --%>
+        <%-- 직원 계정 생성과 이메일 인증 비밀번호 찾기. 둘 다 로그인 없이 여는 /join/** 아래에 둔다 --%>
         <p class="login-help"><a class="link-btn" href="${ctx}/join">계정 생성</a> / <a class="link-btn" href="${ctx}/join/password">비밀번호 찾기</a></p>
       </form>
     </div>

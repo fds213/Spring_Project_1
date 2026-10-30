@@ -1,24 +1,30 @@
 // IT 서비스(사원): 장애·문의 접수(ticket-new), 내 티켓(ticket-mine), 내 장비(asset-mine) (요구분석서 3.4 IT 티켓·자산, 지점).
 // 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
-// 이음 운영자에게 보내는 "이음 장애 문의"는 우리 회사 IT 티켓과 다른 것이라 support/inquiry.js 에서 따로 한다 (요구분석서 3.7 문의 구분).
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
 // 장비 지급 신청서(전자결재)가 최종 승인되면 EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
-// 서버 API (시안은 demo/ticket.js가 답한다):
+// 서버 API (프론트 제안):
 //   GET   /ticket/api/form-options          접수에 필요한 것
 //         → { assets: [{ id, name, serial, branchId }](내 장비), branches: [{ id, name }], defaultBranchId }
 //   GET   /ticket/api/tickets               내가 접수한 티켓, 최신순 → [티켓]
 //   POST  /ticket/api/tickets               { type: INCIDENT|INQUIRY, title, body, branchId, assetId('' = 해당 없음) } → 티켓. 읽기 전용 업체는 403
 //   POST  /ticket/api/tickets/{id}/comments { body } → 티켓. 완료된 티켓은 409
-//   POST  /ticket/api/tickets/{id}/status   { status: IN_PROGRESS|DONE } → 티켓 + { granted: 지급한 장비 수 }
-//         시연 전용: 실제로는 IT 담당자가 티켓 처리 화면에서 바꾼다 (이 시안에는 그 화면이 없다)
 //   GET   /asset/api/assets                 내 장비 → { items: [{ id, name, serial, branchName, assignedAt, ticketId }],
 //                                                       waiting: [{ id, kind, qty, branchName, status }](지급 대기 중인 장비 지급 티켓) }
 // 티켓: { id, type: INCIDENT|INQUIRY|EQUIPMENT, title, body, branchId, branchName, asset: { id, name, serial } | null,
-//         status: RECEIVED|IN_PROGRESS|DONE, at, kind, qty, history: [{ at, name, text }], comments: [{ at, name, body }], canComment }
+//         status: RECEIVED|ASSIGNED|IN_PROGRESS|RESOLVED|CLOSED|CANCELED|REJECTED (AGENTS.md 티켓 상태), at, kind, qty, history: [{ at, name, text }], comments: [{ at, name, body }], canComment }
 
 const TICKET_TYPE = { INCIDENT: '장애', INQUIRY: '문의', EQUIPMENT: '장비 지급' };
-const TICKET_STATUS = { RECEIVED: '접수', IN_PROGRESS: '처리 중', DONE: '완료' };
-const TICKET_CLASS = { RECEIVED: 'requested', IN_PROGRESS: 'waiting', DONE: 'paid' };
+// 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려
+const TICKET_STATUS = {
+  RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려',
+};
+const TICKET_CLASS = {
+  RECEIVED: 'requested', ASSIGNED: 'requested', IN_PROGRESS: 'waiting', RESOLVED: 'paid', CLOSED: 'paid', CANCELED: 'expired', REJECTED: 'failed',
+};
+// 내 티켓 요약 카드는 세 묶음으로 센다: 접수(접수·배정), 처리 중, 완료(처리 완료·종료·취소·반려)
+const TICKET_GROUP = {
+  RECEIVED: 'RECEIVED', ASSIGNED: 'RECEIVED', IN_PROGRESS: 'IN_PROGRESS', RESOLVED: 'DONE', CLOSED: 'DONE', CANCELED: 'DONE', REJECTED: 'DONE',
+};
 const TICKET_TITLE_MAX = 60;
 const TICKET_BODY_MAX = 1000;
 const TICKET_COMMENT_MAX = 300;
@@ -98,12 +104,12 @@ function loadTicketMine() {
 
 function renderTicketMine() {
   const mine = itMine.items;
-  const count = st => mine.filter(t => st === 'all' || t.status === st).length;
+  const count = st => mine.filter(t => st === 'all' || TICKET_GROUP[t.status] === st).length;
   [['all', 'ticketCntAll'], ['RECEIVED', 'ticketCntReceived'], ['IN_PROGRESS', 'ticketCntProgress'], ['DONE', 'ticketCntDone']]
     .forEach(([st, id]) => { itEl(id).textContent = `${count(st)}건`; });
   document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.filter === itMine.filter));
 
-  const shown = mine.filter(t => itMine.filter === 'all' || t.status === itMine.filter);
+  const shown = mine.filter(t => itMine.filter === 'all' || TICKET_GROUP[t.status] === itMine.filter);
   const rows = [];
   shown.forEach(t => {
     const isOpen = itMine.open === t.id;
@@ -159,21 +165,6 @@ function ticketDetail(t) {
     send.addEventListener('click', () => addComment(t.id, box.value, send));
     parts[1].append(itNode('div', 'inq-body', box, itNode('div', 'inq-actions', send)));
   }
-  if (t.status !== 'DONE') {
-    // 시연 전용: 실제로는 IT 담당자가 티켓 처리 화면에서 상태를 바꾼다 (이 시안에는 그 화면이 없다)
-    const demo = itNode('div', 'inq-body', itNode('p', 'inq-hint', '시연 전용: 실제로는 IT 담당자가 티켓 처리 화면에서 바꿉니다.'));
-    const acts = itNode('div', 'inq-actions');
-    if (t.status === 'RECEIVED') {
-      const start = itButton('처리 중으로 바꾸기', 'btn');
-      start.addEventListener('click', () => setTicketStatus(t.id, 'IN_PROGRESS', start));
-      acts.append(start);
-    }
-    const done = itButton(t.type === 'EQUIPMENT' ? '장비 지급 완료로 처리' : '완료로 바꾸기', 'btn');
-    done.addEventListener('click', () => setTicketStatus(t.id, 'DONE', done));
-    acts.append(done);
-    demo.append(acts);
-    parts.push(demo);
-  }
   return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1], ...(parts[2] ? [itNode('section', 'info-card', parts[2])] : [])));
 }
 
@@ -196,17 +187,6 @@ function addComment(id, bodyRaw, btn) {
     .always(() => { btn.disabled = false; });
 }
 
-function setTicketStatus(id, status, btn) {
-  btn.disabled = true;
-  api.post(`/ticket/api/tickets/${encodeURIComponent(id)}/status`, { status })
-    .done(t => {
-      if (t.granted) showToast(`장비 ${t.granted}대를 지급했습니다. 내 장비에서 봅니다`);
-      loadTicketMine();
-      if (itEl('view-asset-mine').classList.contains('on')) loadAssetMine();
-    })
-    .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); })
-    .always(() => { btn.disabled = false; });
-}
 
 // ---------- 내 장비 ----------
 function openAssetMineView() { loadAssetMine(); }

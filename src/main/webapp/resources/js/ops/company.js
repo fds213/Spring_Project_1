@@ -1,9 +1,8 @@
-// 이음 운영자: 업체 관리 (조각 views/ops/company.html). 업체를 누르면 그 업체에 대해 아는 것이 모두 그 줄 아래에 펼쳐진다.
+// 이음 운영자: 업체 관리 (views/ops/company.jsp). 업체를 누르면 그 업체에 대해 아는 것이 모두 그 줄 아래에 펼쳐진다.
 // 이 화면이 만드는 데이터는 없다: 다른 화면이 가진 것(신청과 결제, 사원 관리의 계정, 장애·문의 접수)을 모아 보여 준다.
 // 그래서 다른 모듈의 코드 값은 서버가 표시 글자(label)를 같이 준다 (이 화면에 다른 모듈의 코드표를 두지 않는다).
-// 불리는 순서: ops/inquiry.js 다음 (그 파일의 h, span, small, dlOf, cardOf, inqCell, titleBtn, dataRow, detailTr, emptyTr를 쓴다).
-// 이름이 "firm"으로 시작하는 것은 ops/inquiry.js가 이미 "company..."(companyDetail, renderCompany, ...)를 쓰기 때문이다.
-// 서버 API (운영자만. 시안은 demo/ops.js가 답한다):
+// 불리는 순서: util.js 다음 (그 파일의 h, span, small, dlOf, cardOf, inqCell, titleBtn, dataRow, detailTr, emptyTr를 쓴다).
+// 서버 API (프론트 제안, 운영자만):
 //   GET /ops/api/companies         → 모든 업체(체험 중·읽기 전용 포함), 가입 최신순
 //       [{ companyCode, company, adminName, adminNo, users, total, at, state: { status: TRIAL|PAID|EXPIRED, label } }]
 //   GET /ops/api/companies/{code}  → 위 한 건 + {

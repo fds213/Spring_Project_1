@@ -1,15 +1,14 @@
-// Custom dropdown for <select data-ui="select">. A native select's open list can't be styled, so the select
-// stays in the page (hidden) as the source of truth: other scripts keep reading .value, setting .disabled and
-// adding options as before, and a button + list drawn over it shows the same state.
-// - Opening slides the list down and turns the arrow up; choosing an option writes select.value and fires
-//   'change' and 'input' on the select.
-// - Keyboard: Enter/Space/Arrow keys open, Arrow Up/Down move, Enter picks, Escape or Tab closes.
-// - A script that sets select.value itself must dispatch 'change' afterwards so the button redraws (hr.js does).
-// The JSP version can use the same markup and file.
+// <select data-ui="select">용 꾸민 드롭다운. 기본 select의 펼친 목록은 꾸밀 수 없어서 select는
+// 페이지에 (숨긴 채) 남아 값의 기준이 된다: 다른 스크립트는 전처럼 .value를 읽고 .disabled를 바꾸고
+// option을 더하며, 그 위에 그린 버튼과 목록이 같은 상태를 보여 준다.
+// - 열면 목록이 아래로 펼쳐지고 화살표가 위를 향한다. 고르면 select.value를 바꾸고 select에
+//   'change'와 'input'을 보낸다.
+// - 키보드: Enter/Space/화살표로 열고, 위·아래 화살표로 옮기고, Enter로 고르고, Escape나 Tab으로 닫는다.
+// - select.value를 직접 바꾸는 스크립트는 뒤에 'change'를 보내야 버튼이 다시 그려진다 (employee.js가 그렇게 한다).
 (function () {
   const CHEVRON = '<svg class="select-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
   const CHECK = '<svg class="select-check" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
-  let openOne = null; // only one list open at a time
+  let openOne = null; // 한 번에 목록 하나만 연다
 
   function enhance(select) {
     const wrap = document.createElement('div');
@@ -35,7 +34,7 @@
     button.setAttribute('aria-controls', list.id);
     wrap.append(button, list);
 
-    // the field's label now points at the button, so clicking it focuses what the user sees
+    // 칸의 label이 이제 버튼을 가리키므로, label을 누르면 사용자가 보는 버튼에 초점이 간다
     const label = select.id && document.querySelector(`label[for="${select.id}"]`);
     if (label) {
       label.htmlFor = button.id;
@@ -43,14 +42,14 @@
       list.setAttribute('aria-labelledby', label.id);
     }
 
-    let active = -1; // index of the highlighted option while open
+    let active = -1; // 열려 있는 동안 강조된 option의 번호
     const options = () => [...select.options].filter(o => o.value !== '');
     const items = () => [...list.children];
 
     function draw() {
       const chosen = select.selectedOptions[0];
       const empty = !chosen || chosen.value === '';
-      // the empty option ("부서를 고르세요") is the placeholder, not a choice in the list
+      // 빈 option("부서를 고르세요")은 안내 문구라 목록에 넣지 않는다
       button.querySelector('.select-value').textContent = chosen ? chosen.text : '';
       button.classList.toggle('is-placeholder', empty);
       button.disabled = select.disabled;
@@ -131,7 +130,7 @@
     document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) close(); });
 
     select.addEventListener('change', draw);
-    // options added later (hr.js fills the departments) and disabled toggled by other scripts
+    // 나중에 더해지는 option(employee.js가 부서를 채운다)과 다른 스크립트가 바꾸는 disabled
     new MutationObserver(draw).observe(select, { childList: true, attributes: true, attributeFilter: ['disabled'] });
     select.form?.addEventListener('reset', () => setTimeout(draw));
     draw();

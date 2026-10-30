@@ -1,13 +1,13 @@
-// 근무 > 근태·연차 (조각 views/attendance/my.html): 로그인한 본인의 출퇴근 기록과 연차 현황만 보여 준다 (요구분석서 v1.5 3.1, 3.9, 3.10).
+// 근무 > 근태·연차 (views/attendance/my.jsp): 로그인한 본인의 출퇴근 기록과 연차 현황만 보여 준다 (요구분석서 3.1, 3.9, 3.10).
 // 다른 직원의 근태, 근태·연차 관리(인사)는 이 화면에 없다.
 //
 // 출퇴근 기록: 지문 단말기가 보낸 기록을 단말기 사용자 번호로 찾는다. 로그인한 사람과 단말기 사용자 번호의 연결은 요구분석서 3.10 의
-// "업체·단말기 사용자 번호·사번 계정의 연결"이다. 시안에서는 본인이 화면에서 번호를 연결한다 (실제로는 인사 담당자·서버가 관리한다).
+// "업체·단말기 사용자 번호·사번 계정의 연결"이다. 이 화면에서는 본인이 번호를 연결한다 (원래는 인사 담당자·서버가 관리할 일이다).
 // 연차: 15일 + 내림(총 완료 경력 연수 ÷ 3). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
 // 연차를 쓰는 것(휴가)은 전자결재의 휴가 신청서로 신청한다(요구분석서 3장 범위). 최종 승인 때 연차가 차감되고 여기 내역에 들어온다.
 // 이 화면은 기록과 연차 현황·내역만 보여 주고, 신청·회수는 전자결재(기안 작성·결재함)에서 한다.
 //
-// 서버 API (시안은 demo/attendance.js가 답한다):
+// 서버 API (프론트 제안):
 //   GET    /attendance/api/records?month=YYYY-MM   한 달 출퇴근 기록
 //          → { month, deviceId, today: { date, punch }, thisMonth: { late, early }, days: [{ date, weekday, holiday, punch, leave }] }
 //            punch = { in, out, inStatus, outStatus } | null (상태 NORMAL|LATE|EARLY_LEAVE, 퇴근 전이면 out·outStatus 는 ''),
@@ -32,17 +32,11 @@ const attEl = id => document.getElementById(id);
 const attNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
 const attState = { month: null }; // month = { y, m } 보고 있는 달
 
-// 화면을 열 때 (시안은 proto/app.js showView, JSP는 페이지가 열릴 때)
+// 화면을 열 때 (JSP 페이지가 열리면 부른다)
 function openAttendanceView() {
   const now = new Date();
   attState.month = { y: now.getFullYear(), m: now.getMonth() };
-  attRefreshHeader();
   renderAttendanceView();
-}
-
-// 헤더의 오늘 출퇴근 (공통 틀이 그린다. 이 화면을 열 때와 단말기 연결을 바꿨을 때 새로 그리게 한다)
-function attRefreshHeader() {
-  if (typeof renderAttendance === 'function') renderAttendance();
 }
 
 // 화면 전체를 서버에서 다시 받아 그린다 (다른 탭에서 바뀌었을 때도 이것을 부른다)
@@ -107,7 +101,7 @@ function renderDeviceLink(dev) {
     unlink.addEventListener('click', () => {
       unlink.disabled = true;
       api.post('/attendance/api/device-link/delete')
-        .done(() => { loadAttRecords(); attRefreshHeader(); })
+        .done(() => loadAttRecords())
         .fail(xhr => { showToast(apiMessage(xhr)); unlink.disabled = false; });
     });
     box.append(attNode('p', 'att-link-text', `단말기 사용자 번호 ${dev}번과 연결되어 있습니다. 이 번호로 찍힌 출퇴근만 보입니다.`), unlink);
@@ -130,14 +124,14 @@ function renderDeviceLink(dev) {
     if (!/^\d{4}$/.test(v)) { error.textContent = '단말기 사용자 번호는 숫자 4자리입니다 (시뮬레이터에서 확인)'; return input.focus(); }
     go.disabled = true;
     api.post('/attendance/api/device-link', { deviceId: v })
-      .done(() => { loadAttRecords(); attRefreshHeader(); })
+      .done(() => loadAttRecords())
       .fail(xhr => { error.textContent = apiMessage(xhr); go.disabled = false; input.focus(); });
   };
   go.addEventListener('click', connect);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); connect(); } });
   input.addEventListener('input', () => { error.textContent = ''; });
   box.append(
-    attNode('p', 'att-link-text', '연결된 단말기 사용자 번호가 없어 출퇴근 기록이 보이지 않습니다. 지문 단말기에 등록된 내 사용자 번호를 연결해 주세요 (시안: 시뮬레이터의 0001~0004).'),
+    attNode('p', 'att-link-text', '연결된 단말기 사용자 번호가 없어 출퇴근 기록이 보이지 않습니다. 지문 단말기에 등록된 내 사용자 번호를 연결해 주세요.'),
     attNode('div', 'input-action att-link-form', input, go), error);
 }
 

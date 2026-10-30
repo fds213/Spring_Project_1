@@ -10,7 +10,7 @@
     <%-- 화면 전용 JS가 있으면 여기에: <script src="${pageContext.request.contextPath}/resources/js/home.js"></script> --%>
   </jsp:attribute>
   <jsp:body>
-    <%-- 시안 2안 홈. 카드 수치와 공지는 각 모듈이 조회 결과를 넘겨 주면 채운다(그 전까지 "-") --%>
+    <%-- 디자인 2안 홈. 카드 수치와 공지는 각 모듈이 조회 결과를 넘겨 주면 채운다(그 전까지 "-") --%>
     <div class="page-head">
       <h1>안녕하세요, <c:out value="${loginUser.name}" />님</h1>
       <%-- 자주 쓰는 일 바로 가기 --%>

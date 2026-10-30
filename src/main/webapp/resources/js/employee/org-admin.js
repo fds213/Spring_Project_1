@@ -1,6 +1,6 @@
-// 업체 관리 > 부서 관리 · 직급 관리 (조각 views/employee/admin/dept.html, rank.html. 업체 관리자만, 2026-10-29 요청).
+// 업체 관리 > 부서 관리 · 직급 관리 (views/employee/admin/dept.jsp, rank.jsp. 업체 관리자만).
 // 업체의 부서와 직급을 추가·이름 변경·삭제·순서 바꾸기 한다. 이 목록이 계정 생성·가입 활성화·사원 관리에 그대로 쓰인다.
-// 규칙 (서버가 지키고, 화면은 먼저 알려 준다. 시안은 demo/employee.js):
+// 규칙 (서버가 지키고, 화면은 먼저 알려 준다):
 //   - 이름은 1~20자, 목록 안에서 겹치지 않는다(빈칸·대소문자 무시). '관리자'는 첫 관리자 표시라 직급 이름으로 못 쓴다.
 //   - 부서는 30개, 직급은 15개까지, 하나 이상 남긴다.
 //   - 사람이 없을 때만 지운다: 계정(사용 중, 자리 대기, 승인되고 만들기 전, 비활성, 차단)과 아직 열린 가입 요청. 삭제한 계정은 세지 않는다.
@@ -10,7 +10,7 @@
 //   - 부서 형태 (공통 코드 DEPT_TYPE: IT 부서, 인사 부서, 운영 부서, 없음 = 일반): 부서마다 고른다. IT 부서 사람은 IT 담당 메뉴, 인사 부서
 //     사람은 인사 담당 메뉴를 다음 화면부터 받는다. 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
 //   - 읽기 전용 업체(이용 기간 끝남): 여기 버튼은 모두 쓰기라 흐리게 보이고(data-write) 서버가 403으로 거절한다.
-// 서버 API ({kind} = depts | ranks, {name}은 시안에서 이름이고 실제로는 id다):
+// 서버 API ({kind} = depts | ranks, {name}은 서버가 정하는 부서·직급 식별값(이름 또는 id)):
 //   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { all, inUse, retired, blocked, requests },
 //                                                      type, head (부서만: 부서 형태, 부서장 이름 | null), careerYears (직급만) }] }
 //   POST   /employee/admin/api/{kind}               { name } → { name }                 409: 이미 있음, 개수 초과
@@ -202,7 +202,7 @@
       if (kind === 'dept') tr.append(cellOf('부서 형태', typeSelect(item)));
       tr.append(cellOf('인원', people));
       if (kind === 'rank') {
-        // 연차 계산에서 이 직급의 이전 경력으로 치는 연수 (시연 값, 새 직급은 0년)
+        // 연차 계산에서 이 직급의 이전 경력으로 치는 연수 (서버가 준 careerYears, 새 직급은 0년)
         const c = document.createElement('span');
         c.textContent = `${item.careerYears}년`;
         if (!item.careerYears) c.className = 'muted';
@@ -224,14 +224,8 @@
     $o(`${ORG[kind].prefix}NewName`)?.addEventListener('input', () => showError(kind, ''));
   }
 
-  // 열려 있는 부서 관리·직급 관리를 다시 받는다 (이름을 쓰는 중이면 두지 않는다). 시안은 다른 탭에서 바뀌면 demo/employee.js가 부른다
-  window.refreshOrgAdmin = () => {
-    for (const kind of ['dept', 'rank']) {
-      if (viewShown(`view-admin-${kind}`) && !editing[kind]) load(kind);
-    }
-  };
 
-  // 화면을 열 때 (시안은 proto/app.js showView, JSP는 페이지가 열릴 때)
+  // 화면을 열 때 (JSP 페이지가 열리면 부른다)
   window.openOrgAdmin = kind => {
     editing[kind] = null;
     showError(kind, '');

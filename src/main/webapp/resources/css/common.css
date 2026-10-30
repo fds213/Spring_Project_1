@@ -1,6 +1,6 @@
-/* 공통 CSS (프론트 공통 담당만 고친다). 시안 feature/front-prototype 의 common.css 와 같은 규칙을 쓴다.
-   디자인 2안 네이비 사이드바 (2026-10-29 결정): 남색 사이드바, 회색 본문에 흰 카드, 파란 포인트, IBM Plex Sans KR.
-   화면별 규칙(결제·사원 관리·근태·일정·운영자 화면 등)은 시안 본문을 JSP로 옮길 때 그대로 쓰도록 함께 둔다. */
+/* 공통 CSS (프론트 공통 담당만 고친다). dev2 가 같이 쓰는 스타일로, 디자인 2안 네이비 사이드바를 따른다:
+   남색 사이드바, 회색 본문에 흰 카드, 파란 포인트, IBM Plex Sans KR.
+   화면별 규칙(결제·사원 관리·근태·일정·운영자 화면 등)도 여러 JSP가 같이 쓰도록 여기에 둔다. */
 :root {
   --bg: #ffffff;
   --bg-sub: #f3f5f8;
@@ -28,7 +28,7 @@
 
 * { box-sizing: border-box; }
 
-/* classes like .btn and .nav-item set display, which would otherwise override the hidden attribute */
+/* .btn·.nav-item 처럼 display 를 정하는 클래스가 hidden 속성을 덮어쓰지 않게 한다 */
 [hidden] { display: none !important; }
 
 html, body { height: 100%; margin: 0; }
@@ -46,10 +46,10 @@ body {
 
 a { color: inherit; text-decoration: none; }
 
-/* signed-in app: header + sidebar + content, shown after login */
+/* 로그인한 앱 화면: 헤더 + 사이드바 + 본문. 로그인 뒤에 보인다 */
 .app-shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-/* form field */
+/* 입력 필드 */
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
 .input {
@@ -58,7 +58,7 @@ a { color: inherit; text-decoration: none; }
 }
 .input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 
-/* login screen: one centered box, the same fields for company employees and IEUM operators */
+/* 로그인 화면: 가운데 상자 하나. 업체 직원과 이음 운영자가 같은 칸을 쓴다 */
 .login-screen { flex: 1; overflow-y: auto; display: grid; place-items: center; padding: 24px 16px; background: var(--bg-sub); }
 .login-box {
   width: 100%; max-width: 380px; padding: 32px 28px; background: var(--bg);
@@ -67,7 +67,7 @@ a { color: inherit; text-decoration: none; }
 .login-brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 24px; }
 .login-brand .brand-mark { height: 34px; }
 .login-brand .brand-word { height: 18px; }
-/* opened in a browser tab instead of the app: only the download */
+/* 앱이 아닌 브라우저 탭에서 열었을 때: 다운로드 안내만 */
 .app-only { text-align: center; }
 .app-only h1 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
 .app-only p { margin: 0 0 20px; font-size: 14px; line-height: 1.6; color: var(--text-sub); }
@@ -114,7 +114,7 @@ a { color: inherit; text-decoration: none; }
 .join-open-checks label:has(input:checked) { border-color: var(--accent); }
 .join-open-checks input { margin: 0; accent-color: var(--accent); }
 .join-open-checks label span { white-space: nowrap; }
-/* an open department's end time goes on its own line under the name */
+/* 열린 부서의 종료 시각은 이름 아래 줄에 따로 둔다 */
 .join-open-checks small { flex-basis: 100%; padding-left: 21px; font-size: 11px; color: var(--accent); white-space: nowrap; }
 .join-open-pick-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .join-open-pick-actions .btn { height: 40px; }
@@ -127,8 +127,8 @@ a { color: inherit; text-decoration: none; }
 /* 비활성 입력칸(계정 생성·비밀번호 찾기 화면): 회색 바탕 */
 .join-form select:disabled, .join-form input:disabled, .join-form .select-trigger:disabled { background: var(--bg-sub); color: var(--text-sub); }
 
-/* custom dropdown (js/select.js): the native select stays hidden as the value; this button + list show it.
-   Opening slides the list down and turns the arrow up */
+/* 직접 만든 드롭다운 (js/select.js): 원래 select 는 숨겨 값만 들고, 이 버튼과 목록이 보여 준다.
+   열면 목록이 아래로 펼쳐지고 화살표가 위를 향한다 */
 .select { position: relative; }
 .select-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
 .select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
@@ -165,7 +165,7 @@ a { color: inherit; text-decoration: none; }
 .login-title { margin: 0; font-size: 18px; font-weight: 600; }
 .login-lead { margin: -6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 
-/* header */
+/* 헤더 */
 .app-header {
   height: var(--header-h);
   flex: none;
@@ -178,7 +178,7 @@ a { color: inherit; text-decoration: none; }
 .brand { display: flex; align-items: center; gap: 10px; flex: none; }
 .brand-mark { height: 28px; }
 .brand-word { height: 15px; }
-/* company name: the tenant this account belongs to, set off from the IEUM brand by a divider */
+/* 업체명: 이 계정이 속한 업체(테넌트). IEUM 로고와 구분선으로 나눈다 */
 .company {
   margin-left: 14px; padding-left: 14px; border-left: 1px solid var(--line);
   font-size: 14px; font-weight: 500; color: var(--text);
@@ -196,7 +196,7 @@ a { color: inherit; text-decoration: none; }
 .user-text strong { font-weight: 600; font-size: 13px; }
 .user-text small { font-size: 12px; color: var(--text-sub); }
 
-/* buttons */
+/* 버튼 */
 .btn {
   height: 32px; padding: 0 12px;
   display: inline-flex; align-items: center;
@@ -218,8 +218,8 @@ a { color: inherit; text-decoration: none; }
 }
 .badge-dot { position: absolute; top: -4px; right: -6px; padding: 0 5px; }
 
-/* password field: js/password-toggle.js wraps the input and adds the eye button.
-   The slash on the eye means "hidden"; it disappears while the password is shown */
+/* 비밀번호 칸: js/password-toggle.js 가 input 을 감싸고 눈 모양 버튼을 붙인다.
+   눈 위의 사선은 "숨김"을 뜻하며, 비밀번호가 보이는 동안에는 사라진다 */
 .pw-field { position: relative; display: flex; }
 .pw-field > input { flex: 1; min-width: 0; padding-right: 44px; }
 .pw-toggle {
@@ -230,12 +230,12 @@ a { color: inherit; text-decoration: none; }
 .pw-toggle:hover { color: var(--text); }
 .pw-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -6px; border-radius: var(--radius); }
 .pw-toggle[aria-pressed="true"] .pw-slash { display: none; }
-/* Edge draws its own reveal button inside password fields; ours replaces it */
+/* Edge 는 비밀번호 칸 안에 자체 보기 버튼을 그린다. 우리 버튼으로 대신한다 */
 input::-ms-reveal { display: none; }
 
-/* body */
+/* 본문 */
 .app-body { flex: 1; display: flex; min-height: 0; }
-/* navy sidebar (2안): light text on dark, the open screen on a lighter navy */
+/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색 */
 .sidebar {
   width: var(--sidebar-w); flex: none;
   padding: 14px 12px; overflow-y: auto;
@@ -249,10 +249,10 @@ input::-ms-reveal { display: none; }
 .nav-item:hover { background: var(--nav-hover); color: #fff; }
 .nav-item.on { background: var(--nav-on); color: #fff; font-weight: 600; }
 .nav-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
-/* counts in the menu: white on the accent, so they read on the navy */
+/* 메뉴의 개수 표시: 포인트 색 바탕에 흰 글자라 남색 위에서도 잘 읽힌다 */
 .sidebar .badge { background: var(--accent); color: #fff; }
 
-/* grey page under white cards, tables and lists (2안) */
+/* 흰 카드·표·목록 아래의 회색 바탕 (2안) */
 .content { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px; background: var(--page-bg); }
 /* 화면 자리. 보이는 것은 on 이 붙은 것 하나: JSP는 그 화면 section 에 처음부터 on 을 붙여 두고,
    게시판처럼 한 페이지에 목록·글·글쓰기가 같이 있으면 화면 JS(board.js)가 on 을 옮긴다 */
@@ -271,7 +271,7 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
 .card small { color: var(--text-sub); font-size: 13px; }
 .card strong { font-size: 20px; font-weight: 700; }
-/* summary card that filters the list below it; the selected one is outlined in the accent color */
+/* 아래 목록을 거르는 요약 카드. 고른 카드는 포인트 색 테두리 */
 .card-filter { font: inherit; color: inherit; text-align: left; cursor: pointer; }
 .card-filter:hover { border-color: #c5cfdc; }
 .card-filter:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -281,8 +281,6 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 /* 가입 승인 */
 .join-scope { margin: -10px 0 16px; font-size: 13px; }
 .join-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
-.join-left { font-variant-numeric: tabular-nums; }
-.join-left.is-late { color: #8a4b08; font-weight: 600; }
 .empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 부서 관리·직급 관리 (org-admin.js) */
@@ -317,7 +315,7 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .list li { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .list small { color: var(--text-muted); font-size: 12px; }
 
-/* status codes: class status-<lowercase code>, label from the server (guide section 9) */
+/* 상태 코드: class status-<소문자 코드>, 글자는 서버가 준다 (가이드 9장) */
 .status { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg-sub); color: var(--text-sub); white-space: nowrap; }
 .status-paid { background: #e5f4e4; color: #2b6a2f; }
 .status-failed { background: var(--danger-bg); color: var(--danger); }
@@ -328,12 +326,12 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .status-read { background: #e5f4e4; color: #2b6a2f; }
 .status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
 .status-retired, .status-st_inactive, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
-/* 차단 (ST_SUSPENDED): stopped for misuse, so it reads as a warning rather than a quiet 비활성 */
+/* 차단 (ST_SUSPENDED): 잘못 써서 막힌 계정이라 조용한 비활성보다 경고처럼 보이게 한다 */
 .status-st_suspended { background: var(--danger-bg); color: var(--danger); }
 /* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
 .table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
 
-/* 사원 관리: trial seat usage (10 incl. the admin). Orange with 2 or fewer left, red when full */
+/* 사원 관리: 체험 중 계정 사용량 (관리자 포함 10명). 2명 이하 남으면 주황, 꽉 차면 빨강 */
 .seat-bar { padding: 14px 16px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 10px; }
 .seat-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .seat-head strong { font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -349,14 +347,14 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .seat-bar.is-full p, .seat-bar.is-full strong { color: var(--danger); }
 .seat-bar.is-full .btn-primary { background: var(--danger); border-color: var(--danger); }
 
-/* 사번 is given automatically: shown like a field but not editable */
+/* 사번은 자동으로 정해진다: 입력칸처럼 보이지만 고칠 수 없다 */
 .emp-no { display: flex; align-items: center; background: var(--bg-sub); color: var(--text-sub); font-variant-numeric: tabular-nums; }
 .emp-roles { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; flex-direction: row; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
 .emp-roles legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
 .emp-roles label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; color: var(--text); }
 .emp-roles input { accent-color: var(--accent); }
 .emp-roles-hint { flex-basis: 100%; margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
-/* 사원 등록 폼 (develop 공통 틀 10/28 판에 있던 규칙, 그 판으로 만든 화면이 있을 수 있어 남긴다) */
+/* 사원 등록 폼 (예전 공통 틀로 만든 화면이 있을 수 있어 남긴다) */
 .emp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding: 16px 18px 4px; }
 .emp-fields .form-error { margin-top: -2px; }
 .emp-fields .emp-roles-hint { margin: -2px 0 10px; }
@@ -366,30 +364,29 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
   .emp-fields { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* trial strip under the header: days left and, for the company admin, the way to the billing page */
+/* 헤더 아래 체험 띠: 남은 날짜, 업체 관리자에게는 결제 화면으로 가는 버튼 */
 .trial-bar {
   flex: none; display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
   padding: 8px 20px; font-size: 13px; background: var(--accent-bg); color: var(--accent-hover); border-bottom: 1px solid #c7d7fb;
 }
-/* last 3 days: orange, so the reminder stands out; read-only: red */
+/* 마지막 3일은 주황으로 눈에 띄게, 읽기 전용이면 빨강 */
 .trial-bar.is-urgent { background: #fff4e5; color: #8a4b08; border-bottom-color: #fde2c1; }
 .trial-bar.is-expired { background: var(--danger-bg); color: var(--danger); border-bottom-color: #f3cccc; }
 .trial-bar.is-expired .btn-primary { background: var(--danger); border-color: var(--danger); }
-/* read-only company (trial over, unpaid): write actions stay visible but greyed out; clicking says why */
+/* 읽기 전용 업체(체험이 끝났고 결제하지 않음): 쓰기 동작은 보이되 흐리게, 누르면 이유를 알린다 */
 body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .trial-bar strong { font-weight: 600; }
 .trial-bar .btn { height: 30px; padding: 0 12px; font-size: 12px; }
 @media (max-width: 600px) {
   .trial-bar { padding: 4px 12px; gap: 10px; font-size: 12px; }
   .trial-bar .trial-more { display: none; }
-  .trial-bar .btn { height: 36px; } /* touch target */
+  .trial-bar .btn { height: 36px; } /* 누르기 쉬운 크기 */
 }
 
-/* billing page: notices, agreement, buttons inside the payment card */
-.bill-pay, .bill-done { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
-.bill-pay .detail, .bill-done .detail { border: 1px solid var(--line); border-radius: var(--radius); }
-.bill-pay .detail dt, .bill-done .detail dt { padding-left: 14px; }
-.bill-intro { margin: 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+/* 결제 화면: 결제 카드 안의 안내·동의·버튼 */
+.bill-pay { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bill-pay .detail { border: 1px solid var(--line); border-radius: var(--radius); }
+.bill-pay .detail dt { padding-left: 14px; }
 .notice-warn { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #fff4e5; color: #8a4b08; font-size: 13px; border: 1px solid #fde2c1; }
 .notice-ok { margin: 0; padding: 10px 14px; border-radius: var(--radius); background: #e5f4e4; color: #2b6a2f; font-size: 13px; line-height: 1.6; }
 .agree { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text-sub); }
@@ -402,9 +399,9 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-steps li.on { color: var(--accent); border-top-color: var(--accent); font-weight: 600; }
 .bill-steps li.done-step { color: var(--text-sub); border-top-color: #9db8f5; }
 .bill-step { display: flex; flex-direction: column; gap: 18px; }
-/* step 1: no gap held for an error that isn't there, so the fields sit evenly */
+/* 1단계: 없는 오류 자리를 비워 두지 않아 칸 사이가 고르다 */
 .bill-step .form-error:empty { display: none; }
-/* what the headcount costs, right under the headcount field: label left, amount right */
+/* 인원 칸 바로 아래의 요금: 왼쪽에 항목, 오른쪽에 금액 */
 .pay-summary {
   display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 4px 0 0;
   padding: 12px 14px; border-radius: var(--radius); background: var(--bg-sub);
@@ -418,8 +415,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-seats-row .input { width: 110px; }
 .bill-seats-row .btn { height: 42px; }
 .bill-note { margin: 0; font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-.bill-renew { display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px dashed var(--line); }
-/* step 1: monthly / annual side by side, stacked when the card is too narrow for both */
+/* 1단계: 월간·연간을 나란히, 카드가 둘 다 넣기에 좁으면 위아래로 */
 .plan-pick { margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .plan-pick legend { padding: 0; margin-bottom: 6px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
 .plan-opt {
@@ -450,13 +446,6 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .leave-form .bill-note, .info-card > .bill-history { margin: 0; padding: 0 16px 16px; }
 .info-card > .bill-sub { padding: 0 16px; }
 .leave-line { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.appr-table { margin: 0 16px 16px; }
-.appr-date { width: 160px; }
-.appr-reason { width: 100%; min-width: 120px; height: 32px; font-size: 13px; }
-.appr-actions { display: flex; flex-direction: column; gap: 6px; }
-.appr-actions .row { display: flex; gap: 6px; }
-.appr-actions .btn { height: 30px; padding: 0 12px; font-size: 12px; }
-.appr-history { padding: 0 16px 16px; }
 .sch-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .sch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-right: 16px; }
 .sch-filters { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
@@ -494,8 +483,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .bill-history li:last-child { border-bottom: 0; }
 .btn[disabled] { opacity: 0.5; cursor: default; }
 
-/* table: every cell padded, header on a tinted row, all columns left-aligned.
-   600px and below it turns into one card per row (guide section 4) */
+/* 표: 모든 칸에 여백, 머리글 줄은 옅은 바탕, 모든 열 왼쪽 정렬.
+   600px 이하에서는 한 줄이 카드 하나가 된다 (가이드 4장) */
 .table-wrap { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); overflow-x: auto; }
 .table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table th {
@@ -508,7 +497,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .table tbody tr:hover td { background: #f7f9fc; }
 .table-fixed { table-layout: fixed; }
 .table-fixed td { overflow-wrap: anywhere; }
-/* every column starts at the left, numbers included; tabular digits keep them readable */
+/* 숫자를 포함해 모든 열을 왼쪽에서 시작한다. 고정폭 숫자(tabular)로 읽기 쉽게 */
 .table .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table .cell { display: flex; flex-direction: column; gap: 3px; }
 .table .cell strong { font-weight: 600; }
@@ -516,21 +505,21 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .table tr.is-new td, .table tr.is-new:hover td { background: var(--accent-bg); }
 .tag-new { align-self: flex-start; font-size: 11px; font-weight: 500; color: var(--accent); }
 .table .status { align-self: flex-start; }
-/* clickable row: the whole row opens its detail right below; the title inside is a button for keyboard users */
+/* 누를 수 있는 줄: 줄 전체를 누르면 바로 아래에 상세가 열린다. 안의 제목은 키보드 사용자를 위한 버튼 */
 .table tr.row-link { cursor: pointer; }
 .table .row-title {
   align-self: flex-start; padding: 0; border: 0; background: none; cursor: pointer;
   font: inherit; font-weight: 600; color: var(--text); text-align: left;
 }
-/* hovering a clickable row shows the same blue as an open one; the row color alone says "you can open this" */
+/* 누를 수 있는 줄에 마우스를 올리면 열린 줄과 같은 파랑. 줄 색만으로 "열 수 있다"를 알린다 */
 .table tr.row-link:hover td { background: var(--accent-bg); }
 .table .row-title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .table tr.is-open td, .table tr.is-open:hover td { background: var(--accent-bg); border-bottom-color: transparent; }
-/* the expanded detail row: cards on a light-blue strip (same blue as a selected summary card) that joins the open row above it */
+/* 펼친 상세 줄: 옅은 파란 띠(고른 요약 카드와 같은 파랑) 위의 카드들이 위의 열린 줄과 이어진다 */
 .table tr.row-detail td, .table tr.row-detail:hover td { padding: 0; background: var(--accent-bg); cursor: default; }
 .table tr.row-detail .info-grid { padding: 4px 12px 16px; }
 .table td { transition: background-color 0.2s ease; }
-/* slide open/shut: the grid row grows from 0fr to 1fr, so the height animates to whatever the content needs */
+/* 열고 닫기: grid 행이 0fr 에서 1fr 로 늘어나 내용에 맞는 높이까지 움직인다 */
 .slide { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.28s ease; }
 .slide.open { grid-template-rows: 1fr; }
 .slide-inner { min-height: 0; overflow: hidden; opacity: 0; transition: opacity 0.2s ease; }
@@ -538,7 +527,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   .slide, .slide-inner, .table td { transition: none; }
 }
-/* inside the table there's less room, so the first card (longest value: email) takes a bigger share */
+/* 표 안은 자리가 좁아 첫 카드(가장 긴 값: 이메일)를 더 넓게 준다 */
 .table tr.row-detail .info-grid { grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr) minmax(0, 1.25fr); gap: 12px; }
 .table tr.row-detail td dd { overflow-wrap: normal; word-break: keep-all; }
 @media (max-width: 1200px) {
@@ -548,7 +537,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .table tr.row-detail td dd { overflow-wrap: anywhere; }
 }
 
-/* detail: label column on a tinted background, value next to it */
+/* 상세: 항목 열은 옅은 바탕, 값은 그 옆 */
 .detail {
   display: grid; grid-template-columns: 160px minmax(0, 1fr); margin: 0;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
@@ -558,11 +547,11 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .detail dd { overflow-wrap: anywhere; }
 .detail dt:nth-last-of-type(1), .detail dd:last-child { border-bottom: 0; }
 
-/* info cards: one card per section, side by side in equal columns so the page stays balanced on wide
-   screens; 1200px and below they stack. All cards look the same */
-/* the first card is a little wider: it holds the longest value (contact email) */
+/* 정보 카드: 구역마다 카드 하나, 같은 너비로 나란히 놓아 넓은 화면에서도 균형을 맞춘다.
+   1200px 이하에서는 위아래로 쌓는다. 모든 카드 모양은 같다 */
+/* 첫 카드는 조금 넓게: 가장 긴 값(담당자 이메일)이 들어간다 */
 .info-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
-/* two-card variant (billing page); declared after .info-grid so it wins, and stacks earlier than the 3-card grid */
+/* 카드 두 장 형태(결제 화면): .info-grid 뒤에 선언해 이기게 하고, 카드 세 장보다 먼저 쌓인다 */
 .info-grid.info-grid-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 @media (max-width: 900px) {
   .info-grid.info-grid-2 { grid-template-columns: minmax(0, 1fr); }
@@ -571,7 +560,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card);
 }
-/* same header height whether or not there's a subtitle, so the rows below line up across cards */
+/* 부제가 있든 없든 머리 높이를 같게 해 아래 줄이 카드끼리 맞는다 */
 .info-card-head { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
 .info-card-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
 .info-card-head p { margin: 2px 0 0; font-size: 12px; color: var(--text-muted); }
@@ -579,10 +568,10 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   flex: none; width: 32px; height: 32px; display: grid; place-items: center;
   border-radius: 8px; background: var(--bg-sub); color: var(--text-sub);
 }
-/* card footer with an action: pinned to the card's bottom, so it lines up even when cards stretch */
+/* 동작 버튼이 있는 카드 아래쪽: 카드 바닥에 붙여 카드가 늘어나도 줄이 맞는다 */
 .info-card-foot { margin-top: auto; padding: 14px 18px; border-top: 1px solid var(--line); }
 .btn-block { width: 100%; height: 40px; justify-content: center; font-weight: 500; }
-/* inside a card the list loses its own frame and tint: label muted on the left, value in front */
+/* 카드 안의 목록은 자체 테두리·바탕을 뺀다: 왼쪽에 흐린 항목, 그 옆에 값 */
 .info-card .detail { border: 0; border-radius: 0; grid-template-columns: 128px minmax(0, 1fr); }
 .info-card .detail dt { background: none; padding-left: 18px; padding-right: 12px; white-space: nowrap; }
 .info-card .detail dd { padding-right: 18px; font-weight: 500; }
@@ -593,14 +582,11 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 600px) {
   .info-card .detail { grid-template-columns: 116px minmax(0, 1fr); }
 }
-/* read-only password inside a detail row: looks like plain text, eye button at the row's right edge */
-.detail dd:has(.pw-field) { padding: 0 0 0 16px; }
-.pw-readonly { border: 0; background: none; padding: 12px 0; font: inherit; color: inherit; outline: none; }
 @media (max-width: 600px) {
   .detail { grid-template-columns: 110px minmax(0, 1fr); }
 }
 
-/* empty row when a filter matches nothing: same height as a row with a two-line cell, notice centered */
+/* 거른 결과가 없을 때의 빈 줄: 두 줄짜리 칸이 있는 줄과 같은 높이, 안내는 가운데 */
 .table .row-empty td { height: 66px; text-align: center; color: var(--text-muted); }
 .table tbody tr.row-empty:hover td { background: none; }
 
@@ -622,7 +608,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .table .row-empty td::before { content: none; }
 }
 
-/* modal (<dialog>): short message with one button, e.g. how to install the app */
+/* 모달 (<dialog>): 버튼 하나와 짧은 안내. 예: 앱 설치 방법 */
 .modal {
   width: min(360px, calc(100% - 32px)); padding: 24px; border: 1px solid var(--line); border-radius: 12px;
   background: var(--bg); color: var(--text); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
@@ -637,14 +623,14 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 /* 다운로드 안내창: 확인 순서가 있는 안내는 조금 넓게 */
 .modal-actions .btn { height: 40px; padding: 0 16px; }
 
-/* toast: short notice at the bottom right, e.g. a new application arrived */
+/* 토스트: 오른쪽 아래의 짧은 알림. 예: 새 신청이 들어옴 */
 .toast {
   position: fixed; right: 20px; bottom: 20px; z-index: 30; max-width: calc(100% - 40px);
   padding: 12px 16px; border-radius: var(--radius); background: var(--text); color: #fff;
   font-size: 13px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* narrow screens: the sidebar becomes a drawer opened by the hamburger button */
+/* 좁은 화면: 사이드바가 햄버거 버튼으로 여는 서랍이 된다 */
 .menu-btn { display: none; margin: 0 6px 0 -6px; }
 .backdrop { display: none; }
 
@@ -668,18 +654,18 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .app-header { padding: 0 8px 0 14px; }
   .header-right { gap: 4px; }
   .header-right > * { flex: none; white-space: nowrap; }
-  /* phones: logo mark only */
+  /* 휴대폰: 로고 마크만 */
   .attend-time, .user-text, .brand-word { display: none; }
-  /* touch targets at least 44px */
+  /* 누르는 자리는 44px 이상 */
   .icon-btn, .menu-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
-  /* 비밀번호 변경 + 로그아웃 still fit at 360px */
+  /* 비밀번호 변경 + 로그아웃 버튼이 360px 에서도 들어가게 */
   .header-right .btn { height: 36px; padding: 0 8px; font-size: 13px; }
   .company { margin-left: 10px; padding-left: 10px; font-size: 13px; }
   .badge-dot { top: 4px; right: 2px; }
 }
 
-/* ---------- operator screens merged from a teammate (2026-10-27): 장애/문의 접수, 운영 데이터, 업체 관리 ---------- */
-/* inquiries (admin): detail under a row is two cards, left = the question, right = the reply */
+/* ---------- 운영자 화면: 장애/문의 접수, 운영 데이터, 업체 관리 ---------- */
+/* 문의(운영자): 줄 아래 상세는 카드 두 장. 왼쪽은 질문, 오른쪽은 답변 */
 .table tr.row-detail .inq-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 4px 12px 16px; }
 @media (max-width: 1200px) { .table tr.row-detail .inq-grid { grid-template-columns: minmax(0, 1fr); } }
 .inq-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
@@ -698,59 +684,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .status-wait, .status-unread { background: var(--accent-bg); color: var(--accent); }
 .status-done { background: #e5f4e4; color: #2b6a2f; }
 
-/* charts (admin 운영 데이터): bars <= 24px, 4px rounded data end, square at the baseline, 2px surface gap between stacked fills.
-   Series colors are slots 1 and 2 of the validated categorical palette; text never wears them (a colored key sits beside it). */
-#view-ops-stats {
-  --series-1: #2a78d6; --series-2: #eb6834;
-  /* 반투명: 막대·조각·범례 키가 같은 투명도를 쓴다. 호버·포커스하면 원색(100%)으로 진해져 어느 마크인지 보인다 */
-  --fill-1: color-mix(in srgb, var(--series-1) 55%, transparent);
-  --fill-2: color-mix(in srgb, var(--series-2) 55%, transparent);
-}
-.chart-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-@media (max-width: 1000px) { .chart-grid { grid-template-columns: minmax(0, 1fr); } }
-.chart-card { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 16px 18px 18px; }
-.chart-card h2 { margin: 0 0 2px; font-size: 16px; font-weight: 600; }
-.chart-card > .inq-hint { margin-bottom: 14px; }
-.chart-legend { display: flex; gap: 16px; margin: -6px 0 12px; font-size: 12px; color: var(--text-sub); }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; }
-.key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none; }
-.key-1 { background: var(--fill-1); }
-.key-2 { background: var(--fill-2); }
-
-.bar-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) 92px; align-items: center; gap: 12px; padding: 5px 0; font-size: 13px; }
-.bar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-sub); }
-.bar-value { text-align: right; font-variant-numeric: tabular-nums; }
-.bar-track { height: 20px; }
-.bar { display: block; height: 20px; min-width: 4px; max-width: 100%; padding: 0; border: 0; background: var(--fill-1); border-radius: 0 4px 4px 0; cursor: pointer; transition: background-color 0.15s ease; }
-.bar:hover, .bar:focus-visible { background: var(--series-1); }
-.bar:focus-visible, .col:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-.col-plot { position: relative; height: 180px; margin-left: 30px; border-bottom: 1px solid var(--line); }
-.col-grid { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--line); }
-.col-tick { position: absolute; left: -30px; width: 22px; text-align: right; transform: translateY(50%); font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.col-row { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.col { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; }
-.col-stack { width: min(24px, 60%); display: flex; flex-direction: column-reverse; gap: 2px; }
-.seg { min-height: 2px; }
-.seg { transition: background-color 0.15s ease; }
-.seg-1 { background: var(--fill-1); }
-.seg-2 { background: var(--fill-2); }
-.seg-top { border-radius: 4px 4px 0 0; }
-.col:hover .seg-1, .col:focus-visible .seg-1 { background: var(--series-1); }
-.col:hover .seg-2, .col:focus-visible .seg-2 { background: var(--series-2); }
-.col-labels { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin: 6px 0 0 30px; text-align: center; font-size: 11px; color: var(--text-muted); }
-
-.chart-table { margin-top: 16px; font-size: 13px; }
-.chart-table summary { cursor: pointer; color: var(--accent); }
-.chart-table .inq-hint { margin: 12px 0 6px; }
-
-.chart-tip { position: fixed; z-index: 60; min-width: 130px; padding: 8px 10px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1); font-size: 12px; pointer-events: none; }
-.tip-row { display: flex; align-items: center; gap: 6px; padding: 1px 0; }
-.tip-row strong { font-size: 14px; font-weight: 600; }
-.tip-row span { color: var(--text-sub); }
-@media (max-width: 600px) { .bar-row { grid-template-columns: 72px minmax(0, 1fr) 78px; gap: 8px; } }
-
-/* inquiry search box above the table */
+/* 표 위의 문의 검색 상자 */
 .search-row { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 20px 0 10px; }
 .filter-select { height: 36px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); background: var(--bg); }
 .filter-select:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
@@ -758,23 +692,20 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
 @media (max-width: 600px) { .search-row { flex-direction: column; align-items: stretch; gap: 6px; } .search-input { max-width: none; } }
 
-/* month-over-month line under a stat card: text tokens only, the arrow and the words carry the direction */
-.card .delta { font-size: 12px; color: var(--text-sub); }
-
-/* 업체 관리 detail: history cards made of short two-line entries */
+/* 업체 관리 상세: 두 줄짜리 짧은 항목으로 된 이력 카드 */
 .mini-list { list-style: none; margin: 0; padding: 0; }
 .mini-list li { display: flex; flex-direction: column; gap: 2px; padding: 10px 18px; border-bottom: 1px solid var(--line); font-size: 13px; overflow-wrap: anywhere; }
 .mini-list li:last-child { border-bottom: 0; }
 .mini-sub { font-size: 12px; color: var(--text-muted); }
 .mini-empty { margin: 0; padding: 14px 18px; font-size: 13px; color: var(--text-muted); }
 
-/* 업체 관리 detail: admin card + employee card stacked in one grid cell; the employee list scrolls inside its card */
+/* 업체 관리 상세: 관리자 카드와 직원 카드를 grid 칸 하나에 쌓는다. 직원 목록은 카드 안에서 스크롤 */
 .info-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .emp-scroll { max-height: 260px; overflow-y: auto; overscroll-behavior: contain; }
 .mini-list li.emp-row { flex-direction: row; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 18px; }
 .emp-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* 장애 접수 / 문의 접수 tabs above the cards: the open tab is underlined, the other shows how many intakes still need a reply */
+/* 카드 위의 탭 (공지사항의 전체·부서 공지): 열린 탭에 밑줄, 다른 탭에는 아직 볼 것의 수 */
 .type-tabs { display: flex; gap: 22px; margin-bottom: 18px; border-bottom: 1px solid var(--line); }
 .type-tab { display: inline-flex; align-items: center; gap: 6px; margin-bottom: -1px; padding: 0 2px 10px; border: 0; border-bottom: 2px solid transparent; background: none; font: inherit; font-size: 15px; color: var(--text-sub); cursor: pointer; }
 .type-tab:hover { color: var(--text); }
@@ -782,24 +713,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .type-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
 .type-tab .badge { position: static; }
 
-/* type label in front of the title in the 접수 lists. Text carries the meaning; the tint only helps the eye.
-   장애 is amber, not the red of 발송 실패/결제 실패, so a fault report is never mistaken for a failed status */
-.title-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.type-pill { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 600; line-height: 1.6; background: var(--bg-sub); color: var(--text-sub); }
-.type-pill.type-incident { background: #fdf0dc; color: #8a4b00; }
-/* phones: the cell's value is right-aligned, so keep the label in front of the title and push the pair to the right */
-@media (max-width: 600px) { .title-line { justify-content: flex-end; } }
-/* 인원 증설: 연장 카드 아래에 점선으로 구분해 붙이고, 4단계라 단계 표시를 4칸으로 나눈다 */
-.seat-box { display: flex; flex-direction: column; gap: 12px; padding-top: 14px; border-top: 1px dashed var(--line); }
-.seat-box[hidden], .seat-add[hidden] { display: none; }
-.seat-add { display: flex; flex-direction: column; gap: 12px; }
-.seat-add .bill-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.seat-add .bill-step { display: flex; flex-direction: column; gap: 12px; }
-.seat-add .bill-step[hidden] { display: none; }
-.seat-add .detail { border: 1px solid var(--line); border-radius: var(--radius); }
-
-/* ---------- JSP 공통 틀에서 더한 것 (시안에는 없거나 다른 파일에 있던 것) ---------- */
-/* 홈 공지 패널의 "더보기" 링크 (시안 css/notice.css에 있던 규칙) */
+/* ---------- JSP 공통 틀에서 더한 것 ---------- */
+/* 홈 공지 패널의 "더보기" 링크 */
 .more-link { margin-left: 8px; font-size: 12px; color: var(--accent); }
 /* 헤더의 로그아웃: Spring Security가 POST /logout만 받아서 버튼을 form으로 감쌌다 */
 .logout-form { display: flex; margin: 0; }

@@ -1,8 +1,8 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" trimDirectiveWhitespaces="true" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
-  계정 생성 (GET /join → common/join, 로그인 없이 연다). 시안 views/common/login.html 의 joinForm 를 옮긴 것이다.
-  지금은 화면 모양만 있다. 업체 코드 확인·요청 처리(시안 employee/employee.js)와 서버 API는 담당이 붙인다.
+  계정 생성 (GET /join → common/join, 로그인 없이 연다).
+  지금은 화면 모양만 있다. 업체 코드 확인·요청 처리(employee/employee.js)와 서버 API는 담당이 붙인다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <!doctype html>
@@ -37,7 +37,7 @@
         <div class="field">
           <label for="joinCompany">업체 코드</label>
           <%-- 확인: 가입 활성화가 켜진 업체면 열린 부서와 직급을 목록에 불러온다. 꺼져 있거나 없는 코드면 아무 반응이 없다.
-               틀린 확인이 10분 안에 5번이면 10분 동안 확인을 막는다(v1.8) --%>
+               틀린 확인이 10분 안에 5번이면 10분 동안 확인을 막는다 --%>
           <div class="input-action">
             <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
             <button type="button" class="btn" id="btnJoinCheck">확인</button>

@@ -1,8 +1,8 @@
 <%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" trimDirectiveWhitespaces="true" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
-  비밀번호 찾기 (GET /join/password → common/join-password, 로그인 없이 연다). 시안 views/common/login.html 의 pwForm 를 옮긴 것이다.
-  지금은 화면 모양만 있다. 업체 코드 확인·인증 메일·요청 처리(시안 employee/employee.js)와 서버 API는 담당이 붙인다.
+  비밀번호 찾기 (GET /join/password → common/join-password, 로그인 없이 연다).
+  지금은 화면 모양만 있다. 업체 코드 확인·인증 메일·요청 처리(employee/employee.js)와 서버 API는 담당이 붙인다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <!doctype html>
@@ -29,7 +29,7 @@
         <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
       </div>
       <%-- 비밀번호 찾기: 업체 코드·사번 → 가입할 때 쓴 이메일로 인증 코드 → 코드가 맞으면 새 비밀번호·확인으로 재설정 (employee/employee.js).
-           서버는 비밀번호를 BCrypt로만 저장하므로 지금 비밀번호를 보여주지 않고 새로 정하게 한다 (10월 28일 결정) --%>
+           서버는 비밀번호를 BCrypt로만 저장하므로 지금 비밀번호를 보여주지 않고 새로 정하게 한다 --%>
       <form id="pwForm" class="join-form" novalidate>
         <h2 class="login-title">비밀번호 찾기</h2>
         <p class="login-lead">업체 코드와 사번을 넣으면 가입할 때 쓴 이메일로 인증 코드를 보냅니다. 인증하면 새 비밀번호를 정할 수 있습니다.</p>

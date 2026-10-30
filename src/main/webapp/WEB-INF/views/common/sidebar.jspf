@@ -27,7 +27,7 @@
       <ui:nav key="ops-application-status" path="/ops/application-status" current="${menu}">신청 현황 <span class="badge" data-badge="application" hidden></span></ui:nav>
     </div>
     <div class="nav-section">
-      <p class="nav-group">장애/문의</p>
+      <p class="nav-group">문의</p>
       <ui:nav key="ops-inquiry-guest" path="/ops/inquiry-guest" current="${menu}">비회원 접수 <span class="badge" data-badge="inquiryGuest" hidden></span></ui:nav>
     </div>
   </c:if>

@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  소개 사이트: 2주 무료 체험 신청 (GET /trial, 로그인 없이 연다). 시안 trial.html 의 본문을 옮긴 것이다 (시안 탭 제목 "무료 체험 신청 - IEUM 그룹웨어").
+  소개 사이트: 2주 무료 체험 신청 (GET /trial, 로그인 없이 연다).
   헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -25,7 +25,7 @@
           <h3>업체 정보</h3>
           <div class="form-grid">
             <div class="form-row"><label for="pCompany">업체명</label><input class="input" id="pCompany" autocomplete="organization"><span class="field-error"></span></div>
-            <%-- 업체 코드는 입력받지 않는다: ieum + 임의 숫자로 자동 발급 (site/trial.js). 사번 칸처럼 잠긴 칸으로 미리 보여준다 --%>
+            <%-- 업체 코드는 입력받지 않는다: ieum + 임의 숫자로 서버가 신청할 때 정한다(ACC-03). 사번 칸처럼 잠긴 칸으로 미리 보여준다 --%>
             <div class="form-row"><label for="pCode">업체 코드</label><output class="input input-readonly" id="pCode" aria-describedby="pCodeHint"></output><span class="field-hint" id="pCodeHint">자동으로 정해지며, 사번과 함께 로그인할 때 씁니다</span><span class="field-error" id="pCodeError"></span></div>
             <%-- 무료 체험 양식이라 인원은 1~10명만 받는다 (체험 중 계정 한도 = 관리자 포함 10명). 유료 인원은 이용 결제 1단계에서 다시 정한다 --%>
             <div class="form-row"><label for="pUsers">이용 인원</label><input class="input" id="pUsers" type="number" min="1" max="10" value="10" inputmode="numeric" aria-describedby="pUsersHint"><span class="field-hint" id="pUsersHint">관리자 포함 최대 10명 (체험 중 계정 한도)</span><span class="field-error"></span></div>
@@ -35,7 +35,7 @@
           <p class="note" style="margin-top: -8px">체험이 시작되면 이 계정으로 로그인하고, 직원들이 로그인 화면의 계정 생성으로 요청한 계정을 승인합니다(관리자 포함 10명까지).</p>
           <div class="form-grid">
             <div class="form-row"><label for="pAdminName">관리자 이름</label><input class="input" id="pAdminName" autocomplete="name"><span class="field-error"></span></div>
-            <%-- 사번은 입력받지 않는다: 가입 연도 + 0001로 자동으로 정해진다 (site/trial.js) --%>
+            <%-- 사번은 입력받지 않는다: 가입 연도 + 0001로 서버가 정한다(ACC-03) --%>
             <div class="form-row"><label for="pAdminNo">관리자 사번</label><output class="input input-readonly" id="pAdminNo" aria-describedby="pAdminNoHint"></output><span class="field-hint" id="pAdminNoHint">자동으로 정해지며, 업체 코드와 함께 로그인할 때 씁니다</span></div>
             <div class="form-row"><label for="pPw">비밀번호</label><input class="input" id="pPw" type="password" autocomplete="new-password" placeholder="8자 이상"><span class="field-error"></span></div>
             <div class="form-row"><label for="pPw2">비밀번호 확인</label><input class="input" id="pPw2" type="password" autocomplete="new-password"><span class="field-error"></span></div>
@@ -60,7 +60,7 @@
           <div class="actions"><button class="btn btn-lg" type="button" data-go="1">이전</button><button class="btn btn-primary btn-lg" type="submit">무료 체험 시작</button></div>
         </form>
 
-        <%-- 3. 결과: 신청 완료 + 이메일 인증 (요구분석서 v1.4 ACC-02·06). trial.html?verify=업체코드 로 다시 열 수 있다 --%>
+        <%-- 3. 결과: 신청 완료 + 이메일 인증 안내 (ACC-02·06) --%>
         <div class="box step" id="step3" hidden aria-live="polite"></div>
       </div>
   </jsp:body>

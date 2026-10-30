@@ -12,7 +12,7 @@
   화면 JSP는 이 태그 안에 본문만 쓴다:
 
     <ui:layout title="결재함" crumb="전자결재" menu="approval-box">
-      <jsp:attribute name="scripts"><script src="${pageContext.request.contextPath}/resources/js/approval.js"></script></jsp:attribute>
+      <jsp:attribute name="scripts"><script src="${pageContext.request.contextPath}/resources/js/approval/approval.js"></script></jsp:attribute>
       <jsp:body> ...본문... </jsp:body>
     </ui:layout>
 
@@ -71,32 +71,30 @@
   <div class="toast" id="toast" role="status" hidden></div>
 
   <%-- 헤더의 "비밀번호 변경" 창. 현재 비밀번호가 맞아야 새 비밀번호(8자 이상, 두 번 같게)로 바꾼다 (common.js 7) --%>
-  <c:if test="${not isOps}">
-    <dialog class="modal" id="pwChangeDialog">
-      <form id="pwChangeForm" novalidate>
-        <h2>비밀번호 변경</h2>
-        <div class="field">
-          <label for="pwCur">현재 비밀번호</label>
-          <input class="input" id="pwCur" type="password" autocomplete="current-password">
-        </div>
-        <div class="field">
-          <label for="pwChgNew">새 비밀번호</label>
-          <input class="input" id="pwChgNew" type="password" autocomplete="new-password" placeholder="8자 이상">
-        </div>
-        <div class="field">
-          <label for="pwChgNew2">새 비밀번호 확인</label>
-          <input class="input" id="pwChgNew2" type="password" autocomplete="new-password">
-        </div>
-        <p class="login-error" id="pwChgError" role="alert"></p>
-        <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="submit" class="btn btn-primary" id="btnPwChangeOk" disabled>바꾸기</button></div>
-      </form>
-    </dialog>
-  </c:if>
+  <dialog class="modal" id="pwChangeDialog">
+    <form id="pwChangeForm" novalidate>
+      <h2>비밀번호 변경</h2>
+      <div class="field">
+        <label for="pwCur">현재 비밀번호</label>
+        <input class="input" id="pwCur" type="password" autocomplete="current-password">
+      </div>
+      <div class="field">
+        <label for="pwChgNew">새 비밀번호</label>
+        <input class="input" id="pwChgNew" type="password" autocomplete="new-password" placeholder="8자 이상">
+      </div>
+      <div class="field">
+        <label for="pwChgNew2">새 비밀번호 확인</label>
+        <input class="input" id="pwChgNew2" type="password" autocomplete="new-password">
+      </div>
+      <p class="login-error" id="pwChgError" role="alert"></p>
+      <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="submit" class="btn btn-primary" id="btnPwChangeOk" disabled>바꾸기</button></div>
+    </form>
+  </dialog>
 
   <script src="${ctx}/resources/lib/jquery-3.7.1.min.js"></script>
   <script src="${ctx}/resources/js/common.js"></script>
   <script src="${ctx}/resources/js/password-toggle.js"></script>
-  <%-- 선택 상자 부품: <select data-ui="select"> 를 시안과 같은 모양으로 바꾼다 --%>
+  <%-- 선택 상자 부품: <select data-ui="select"> 를 디자인 2안 모양으로 바꾼다 --%>
   <script src="${ctx}/resources/js/select.js"></script>
   <script src="${ctx}/resources/js/install.js"></script>
   <jsp:invoke fragment="scripts" />

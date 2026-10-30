@@ -2,8 +2,8 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  가입 승인 화면 (/employee/join). 시안 views/employee/join.html 를 옮긴 것이다 (이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장).
-  화면 JS도 시안 것을 그대로 쓴다: 서버 주소와 주고받는 값은 시안 API.md, 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
+  가입 승인 화면 (/employee/join). 이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장.
+  서버 주소와 주고받는 값은 docs/front-screen-api.md(프론트 제안), 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-hr-join">
-      <%-- 가입 승인: 업체 관리자는 모든 요청, 부서장은 자기 부서 요청. 요청 뒤 1시간 안에 승인하거나 반려한다 (employee/employee.js) --%>
+      <%-- 가입 승인: 업체 관리자는 모든 요청, 부서장은 자기 부서 요청. 승인하면 바로 계정이 만들어진다 (employee/employee.js) --%>
       <div class="page-head"><h1>가입 승인 <span class="page-code" id="joinCompanyCode"></span></h1></div>
       <p class="muted join-scope" id="joinScope"></p>
       <%-- 가입 활성화 (10/29 결정): 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있다. 부서장은 자기 부서를 바로 열고,
@@ -61,7 +61,7 @@
       <div class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>이름</th><th>부서·직급</th><th>이메일</th><th>요청 시각</th><th>남은 시간</th><th>처리</th></tr>
+            <tr><th>이름</th><th>부서·직급</th><th>이메일</th><th>요청 시각</th><th>처리</th></tr>
           </thead>
           <tbody id="joinList"></tbody>
         </table>

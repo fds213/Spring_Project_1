@@ -1,6 +1,6 @@
-// Every password field gets an eye button. Hidden by default (eye with a slash);
-// pressing it shows the password and removes the slash. Pages only write a plain
-// <input type="password">; this file adds the button, so JSP pages need nothing extra.
+// 모든 비밀번호 칸에 눈 버튼을 붙인다. 처음에는 가려져 있고(빗금 친 눈),
+// 누르면 비밀번호가 보이고 빗금이 없어진다. 페이지는 평범한
+// <input type="password">만 쓴다. 버튼은 이 파일이 붙이므로 JSP에 따로 넣을 것이 없다.
 const EYE_ICON =
   '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>' +

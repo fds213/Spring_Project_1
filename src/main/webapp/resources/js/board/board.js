@@ -1,13 +1,10 @@
-// 공지사항·부서 게시판·익명 게시판 (PR #10 시안을 그룹웨어 안으로 옮김, 2026-10-29)
-// 10-29 추가: 공지 범위(전사·부서), 부서장 권한, 공지 에디터·첨부파일·댓글, 회사 전체 익명 게시판
-// 10-29 서버 API로 바꿈: 데이터는 api.*(jQuery AJAX)로만 받고 바꾼다. 누가 무엇을 할 수 있는지(글쓰기·수정·삭제·고정·숨기기)는
-// 서버가 응답에 담아 보내고, 서버가 다시 검사한다. 시안은 demo/board.js가 같은 주소로 답한다.
-// 다른 스크립트와 이름이 겹치지 않게 함수 하나로 감싸고, 그룹웨어에는 아래 두 가지만 내놓는다.
-//   routeNoticeBoard(full): 공지·부서 게시판·익명 게시판 화면을 연다 (proto/app.js showView가 부른다. full = 'notice/view/3')
-//   renderHomeNotices(): 홈 화면의 공지 5개를 그린다
-// 실제 프로젝트에서는 목록·상세·작성 화면이 각각 JSP(/board/notice, /board/notice/view/3 ...)가 되고, 이 파일의 화면 코드를 나눠 쓴다.
+// 공지사항·부서 게시판 (views/board/notice.jsp, dept.jsp). 공지 범위(전사·부서), 부서장 권한, 에디터·첨부파일·댓글.
+// 데이터는 api.*(jQuery AJAX)로만 받고 바꾼다. 누가 무엇을 할 수 있는지(글쓰기·수정·삭제·고정)는 서버가 응답에 담아 보내고, 서버가 다시 검사한다.
+// 한 JSP에 목록·글 보기·글쓰기가 같이 있고, 주소(/board/notice, /board/notice/view/3, /write, /edit/3)를 보고 하나를 보인다.
+// 다른 스크립트와 이름이 겹치지 않게 함수 하나로 감싸고, 그룹웨어에는 아래 하나만 내놓는다.
+//   routeNoticeBoard(full): 화면을 연다 (JSP 페이지가 열리면 부른다. full = 'notice', 'notice/view/3', 'board-dept/write' …)
 //
-// 서버 API (시안은 demo/board.js가 답한다). 글 번호·댓글 번호는 숫자, 시각은 ISO 문자열
+// 서버 API (프론트 제안). 글 번호·댓글 번호는 숫자, 시각은 ISO 문자열
 // 공지사항 — 범위(scope)는 'ALL'(전사) 또는 부서 이름
 //   GET    /board/api/notices?tab=all|DEPT&q=&page=   목록 → { page, pages, total, items: [행], pinned: [행] (검색할 때는 []),
 //                                                           myDept, perms: { canWrite, allDepts } }
@@ -35,23 +32,10 @@
 //   POST   /board/api/dept/posts/{id}/delete
 //   POST   /board/api/dept/posts/{id}/comments          { text } → [댓글]
 //   POST   /board/api/dept/posts/{id}/comments/{cid}/delete → [댓글]
-// 익명 게시판 — 응답에 글쓴이 정보는 없다. "내 글인지(mine)"와 댓글의 익명 이름만 온다
-//   GET    /board/api/anon/posts?q=&page=               → { page, pages, total, items: [{ id, no, title, createdAt, updatedAt, commentCount, mine, hidden, reportCount? }] }
-//                                                       reportCount는 업체 관리자·인사 담당에게만 온다
-//   GET    /board/api/anon/posts/form[?id=]             → { post: { id, title, content } | null }
-//   GET    /board/api/anon/posts/{id}                   → { id, title, content, createdAt, updatedAt, mine, hidden, reported, canHide, reportCount?,
-//                                                           comments: [{ id, name ('글쓴이' | '익명1' …), byWriter, mine, canDelete, text, createdAt }] }
-//   POST   /board/api/anon/posts                        { title, content } → { id }
-//   POST   /board/api/anon/posts/{id}                   { title, content } → { id }
-//   POST   /board/api/anon/posts/{id}/delete
-//   POST   /board/api/anon/posts/{id}/comments          { text } → [댓글]
-//   POST   /board/api/anon/posts/{id}/comments/{cid}/delete → [댓글]
-//   POST   /board/api/anon/posts/{id}/report            → { reported: true }. 내 글이면 400, 이미 신고했으면 409
-//   POST   /board/admin/api/anon/posts/{id}/hidden      { hidden } → { hidden }. 업체 관리자·인사 담당만
 // 파일: 받을 때 { id, name, size, type, url }. 보낼 때 이미 있던 파일은 { id }, 새 파일은 { name, size, type, data (data URL) }.
-//   시안은 파일을 data URL로 보내 저장소에 그대로 넣는다(파일당 1MB). 실제 서버는 multipart(FormData)로 파일을 받아 저장하고,
+//   첨부는 지금 data URL(base64)로 JSON에 실어 보낸다. 서버가 파일 받는 방식(multipart 등)을 정하면 그에 맞춘다(AGENTS.md: 파일로 저장)
 //   url은 "이 사람이 이 글을 볼 수 있나"를 확인한 뒤 파일을 주는 내려받기 주소다.
-// 실패: 400 입력값, 403 권한·읽기 전용(이용 기간 만료), 404 없거나 볼 수 없는 글, 409 고정 개수·이미 신고, 413 저장 공간(시안 한계).
+// 실패: 400 입력값, 403 권한·읽기 전용(이용 기간 만료), 404 없거나 볼 수 없는 글, 409 고정 개수, 413 파일이 너무 큼.
 //   문구는 apiMessage(xhr)로 꺼내 보여 준다.
 (() => {
 // - 화면에 글자를 넣을 때는 모두 textContent를 쓴다(innerHTML 금지). 남이 쓴 글에 들어 있는
@@ -122,7 +106,7 @@ function textOf(html) {
 }
 
 // ---------- 공통 ----------
-// jQuery의 $ 와 겹치지 않게 byId 로 쓴다 (시안도 jQuery를 불러온다)
+// jQuery의 $ 와 겹치지 않게 byId 로 쓴다
 const byId = id => document.getElementById(id);
 const fmtDate = ymd;      // 2026.10.29 (util.js)
 const fmtTime = whenFull; // 2026.10.29 14:05 (util.js)
@@ -152,9 +136,8 @@ const ticket = () => { const n = ++loadSeq; return () => n === loadSeq; };
 // 읽기 전용 업체: data-write 버튼은 보이되 흐리고, 누르면 이유를 알려 준다(그룹웨어 공통 동작).
 // 주소로 바로 들어온 작성 화면은 서버가 403으로 막고, 화면은 그 안내를 보여 주고 목록으로 돌려보낸다
 
-// ---------- 화면 전환 (주소 # 뒤로 구분) ----------
-// notice · notice/view/12 · notice/write · notice/edit/12 (board-dept, board-anon도 같은 모양)
-// 그룹웨어 화면 전환(proto/app.js showView)이 메뉴 표시·권한·제목을 맡고, 이 세 메뉴의 화면만 여기로 넘긴다
+// ---------- 화면 전환 ----------
+// notice · notice/view/12 · notice/write · notice/edit/12 (board-dept도 같은 모양). 메뉴 표시·권한은 공통 틀과 서버가 맡는다
 function showSub(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === id));
   document.querySelector('.content').scrollTop = 0;
@@ -163,29 +146,25 @@ function showSub(id) {
 function route(hash) {
   const [view, action, id] = decodeURIComponent(hash).split('/');
   if (view === 'board-dept') return routeBoard(action, id);
-  if (view === 'board-anon') return routeAnon(action, id);
   if (action === 'view') return openDetail(id);
   if (action === 'write' || action === 'edit') return openForm(action === 'edit' ? id : null);
   showSub('view-notice-list');
   loadList();
 }
 
-// 작성 중에 다른 곳으로 가려 하면 먼저 물어본다
+// 작성 중에 다른 페이지로 가려 하면 먼저 물어본다 (메뉴·목록 같은 페이지 링크. 새 창으로 여는 링크는 빼고)
 document.addEventListener('click', async e => {
-  const a = e.target.closest('a[href^="#"]');
-  if (!a || !anyFormDirty()) return;
+  const a = e.target.closest('a[href]');
+  if (!a || a.target || a.getAttribute('href').startsWith('#') || !anyFormDirty()) return;
   e.preventDefault();
-  if (await confirmDialog('leaveDialog')) { setLeaving(true); location.href = a.getAttribute('href'); }
+  if (await confirmDialog('leaveDialog')) { setLeaving(true); location.href = a.href; }
 });
-// 공지·부서 게시판·익명 게시판 작성 화면을 모두 확인한다
-const anyFormDirty = () => formDirty() || boardFormDirty() || anonFormDirty();
+// 공지·부서 게시판 작성 화면을 모두 확인한다
+const anyFormDirty = () => formDirty() || boardFormDirty();
 function setLeaving(v) {
   formState.leaving = v;
   boardFormState.leaving = v;
-  anonFormState.leaving = v;
 }
-// 화면은 proto/app.js가 주소가 바뀔 때 다시 그린다. 여기서는 떠나는 중 표시만 지운다
-window.addEventListener('hashchange', () => setLeaving(false));
 
 // 페이지 번호 (공지·게시판 같이 씀): state.page를 바꾸고 reload로 그 페이지를 다시 받는다
 function renderPager(navId, state, pages, reload) {
@@ -243,27 +222,6 @@ function failTo(listHash, fallback) {
   };
 }
 
-// ---------- 홈 ----------
-let homeSeq = 0;
-function loadHome() {
-  const n = ++homeSeq;
-  api.get('/board/api/notices/home')
-    .done(rows => { if (n === homeSeq) renderHome(rows); })
-    .fail(xhr => toast(apiMessage(xhr, '공지를 불러오지 못했습니다')));
-}
-function renderHome(rows) {
-  // 고정 공지 2개까지 + 최신 공지, 모두 5개 (서버가 골라 준다)
-  byId('homeNotices').replaceChildren(...rows.map(n => {
-    const li = el('li');
-    const a = el('a', { href: pageHref(`/board/notice/view/${n.id}`) });
-    if (n.pinned) a.append(el('span', { class: 'pin-label' }, '고정 '));
-    // 목록의 구분 칸과 같은 정보: 전사 / 부서 이름
-    a.append(el('span', { class: n.scope === ALL ? 'home-scope' : 'home-scope is-dept' }, scopeShort(n.scope)));
-    a.append(el('span', {}, n.title));
-    li.append(a, el('small', {}, fmtDate(n.createdAt).slice(5)));
-    return li;
-  }));
-}
 
 // ---------- 1. 목록 ----------
 // 탭: 전체 / 부서 공지. 검색: 제목 + 내용 (서버가 띄어쓴 단어가 모두 들어 있는 것만 찾는다)
@@ -343,12 +301,6 @@ function renderList(res) {
 liveSearch('searchInput', 'searchForm', listState, loadList);
 
 // 사이드 메뉴 "공지사항"은 항상 처음 목록 (상세의 "목록으로"는 검색 결과를 그대로 둔다)
-document.querySelector('.nav-item[data-view="notice"]')?.addEventListener('click', () => {
-  listState.q = '';
-  listState.page = 1;
-  listState.tab = 'all';
-  if (isPage('/board/notice')) { loadList(); closeMenu(); } // 이미 목록이면 주소가 안 바뀌어서 직접 다시 받는다
-});
 
 // ---------- 2. 상세 ----------
 let current = null; // 열려 있는 공지 (상세 응답)
@@ -456,7 +408,7 @@ function renderFilesBox(files, ids) {
   }));
 }
 
-// ---------- 댓글 (공지 · 부서 게시판 · 익명 게시판이 같이 쓴다) ----------
+// ---------- 댓글 (공지 · 부서 게시판이 같이 쓴다) ----------
 // 삭제 버튼은 서버가 준 canDelete로 보인다. name(c)은 댓글 쓴 사람 표시, extra(c)는 이름 옆 꼬리표
 function renderCommentList(ids, comments, opts) {
   byId(ids.count).textContent = String(comments.length);
@@ -549,9 +501,9 @@ byId('btnDelete')?.addEventListener('click', async () => {
     .always(() => { btn.disabled = false; });
 });
 
-// ---------- 공통: 에디터 (공지 · 부서 게시판 · 익명 게시판이 같이 쓴다) ----------
-// 브라우저의 글 꾸미기 기능(execCommand)을 쓴 간단한 에디터. 시안용이라 라이브러리 없이 만들었다.
-// 실제 JSP에서는 팀이 고른 에디터 라이브러리(Bootstrap 없이 동작하는 것)로 바꿔도 된다.
+// ---------- 공통: 에디터 (공지 · 부서 게시판이 같이 쓴다) ----------
+// 브라우저의 글 꾸미기 기능(execCommand)을 쓴 간단한 에디터. 라이브러리 없이 만들었다.
+// 팀이 에디터 라이브러리(Bootstrap 없이 동작하는 것)를 고르면 그것으로 바꿔도 된다.
 // - 툴바는 지금 커서 자리의 상태(크기·색·굵게 등)를 늘 보여 준다
 // - 글자 크기: 숫자를 넣고 Enter 또는 칸 밖을 누르면 적용. 10~40, 기본 15
 const SIZE_MIN = 10;
@@ -750,11 +702,10 @@ function makeEditor(areaId) {
 document.addEventListener('selectionchange', () => editors.forEach(ed => ed.onSelection()));
 
 // ---------- 공통: 첨부파일 (공지 · 부서 게시판) ----------
-// 글 하나에 5개까지. 실제는 파일당 10MB(서버 저장). 시안은 브라우저에 저장해서 1MB까지만 (서버가 다시 검사한다)
-// 고른 파일은 data URL로 읽어 두었다가 저장할 때 JSON으로 보낸다. 실제 서버로 옮길 때는 FormData(multipart)로 보낸다
+// 글 하나에 5개까지, 파일당 10MB (AGENTS.md 파일 규칙. 서버가 다시 검사한다)
+// 고른 파일은 data URL로 읽어 두었다가 저장할 때 JSON으로 보낸다. 서버가 파일 받는 방식(FormData·multipart 등)을 정하면 그에 맞춘다
 const FILE_MAX = 5;
-const FILE_SIZE_MAX = 1024 * 1024;        // 시안
-const FILE_SIZE_REAL = 10 * 1024 * 1024;  // 실제 프로젝트 기준 (안내 문구에만 쓴다)
+const FILE_SIZE_MAX = 10 * 1024 * 1024;
 const FILE_EXT = /\.(jpe?g|png|gif|webp|pdf|hwpx?|docx?|xlsx?|pptx?|txt|zip)$/i;
 const fileSig = files => files.map(f => f.id).join(',');
 
@@ -793,7 +744,7 @@ function makeFilePicker(ids) {
       if (fp.files.length >= FILE_MAX) { errors.push(`첨부파일은 ${FILE_MAX}개까지입니다`); break; }
       if (!FILE_EXT.test(file.name)) { errors.push(`${file.name}: 이미지·문서 파일만 올릴 수 있습니다`); continue; }
       if (file.size > FILE_SIZE_MAX) {
-        errors.push(`${file.name}: 시안은 1MB까지만 저장할 수 있어요 (실제는 ${fmtSize(FILE_SIZE_REAL)}까지)`);
+        errors.push(`${file.name}: 파일당 ${fmtSize(FILE_SIZE_MAX)}까지 올릴 수 있어요`);
         continue;
       }
       const data = await new Promise((resolve, reject) => {
@@ -812,7 +763,7 @@ function makeFilePicker(ids) {
 }
 
 // 저장할 첨부파일: 이미 올라가 있던 파일은 { id }만, 새로 고른 파일은 내용(data URL)까지 보낸다
-// (실제 서버로 옮길 때는 새 파일을 FormData에 담아 multipart로 보낸다)
+// (서버가 multipart로 받기로 하면 새 파일을 FormData에 담아 보낸다)
 const filesToSend = files => files.map(f => (f.data ? { name: f.name, size: f.size, type: f.type, data: f.data } : { id: f.id }));
 
 // 작성 화면 공통 도구
@@ -837,7 +788,7 @@ function validate(title, content) {
 }
 // 작성 화면을 열지 못했을 때: 안내하고, 수정 권한이 없으면 그 글로, 나머지(읽기 전용·권한 없음·없는 글)는 목록으로
 // 게시판 키 → 화면 주소 (formOpenFailed가 쓴다)
-const BOARD_PATH = { notice: '/board/notice', 'board-dept': '/board/dept', 'board-anon': '/board/anon' };
+const BOARD_PATH = { notice: '/board/notice', 'board-dept': '/board/dept' };
 function formOpenFailed(xhr, id, key) {
   toast(apiMessage(xhr));
   location.replace(id && xhr.status === 403 ? pageHref(`${BOARD_PATH[key]}/view/${id}`) : pageHref(BOARD_PATH[key]));
@@ -944,7 +895,7 @@ byId('noticeForm')?.addEventListener('submit', e => {
       setSaving('btnSave', false, '저장');
       const msg = apiMessage(xhr);
       if (xhr.status === 409) byId('fPinnedError').textContent = msg; // 고정 5개가 꽉 참
-      else if (xhr.status === 413) noticeFiles.error(msg);             // 시안 한계: 저장 공간
+      else if (xhr.status === 413) noticeFiles.error(msg);             // 파일이 너무 큼
       else if (xhr.status === 404) { toast(msg); formState.leaving = true; location.href = pageHref('/board/notice'); }
       else toast(msg);
     });
@@ -956,8 +907,6 @@ byId('btnCancel')?.addEventListener('click', async () => {
   location.href = formState.id ? pageHref(`/board/notice/view/${formState.id}`) : pageHref('/board/notice');
 });
 
-// ---------- 좁은 화면 메뉴 서랍: 그룹웨어 것(common.js setMenu)을 쓴다 ----------
-function closeMenu() { setMenu(false); }
 
 // ======================================================================
 // 부서 게시판 (목록 · 상세+댓글 · 작성/수정)
@@ -1011,11 +960,6 @@ function renderBoardList(res) {
 }
 
 liveSearch('bSearchInput', 'bSearchForm', boardState, loadBoardList);
-// 사이드 메뉴 "부서 게시판"은 항상 처음 목록
-document.querySelector('.nav-item[data-view="board-dept"]')?.addEventListener('click', () => {
-  boardState.q = ''; boardState.page = 1;
-  if (isPage('/board/dept')) { loadBoardList(); closeMenu(); }
-});
 
 // ---------- 2. 상세 + 댓글 ----------
 let bCurrent = null;
@@ -1147,7 +1091,7 @@ byId('bForm')?.addEventListener('submit', e => {
       boardFormState.saving = false;
       setSaving('bBtnSave', false, '저장');
       const msg = apiMessage(xhr);
-      if (xhr.status === 413) boardFiles.error(msg); // 시안 한계: 저장 공간
+      if (xhr.status === 413) boardFiles.error(msg); // 파일이 너무 큼
       else if (xhr.status === 404) { toast(msg); boardFormState.leaving = true; location.href = pageHref('/board/dept'); }
       else toast(msg);
     });
@@ -1159,226 +1103,7 @@ byId('bBtnCancel')?.addEventListener('click', async () => {
   location.href = boardFormState.id ? pageHref(`/board/dept/view/${boardFormState.id}`) : pageHref('/board/dept');
 });
 
-// ======================================================================
-// 익명 게시판 (목록 · 상세+익명 댓글 · 작성/수정) - 10-29 팀 요청
-// - 회사 전체 하나. 직원 누구나 보고 쓴다 (읽기 전용 업체는 쓰기 모두 막음)
-// - 화면에서만 익명이 아니라 응답에도 글쓴이가 없다: 서버는 "내 글인지(mine)"만 보낸다. 업체 관리자·인사 담당도 작성자를 볼 수 없다
-// - 댓글은 글마다 "익명1, 익명2"로 구분하고, 글쓴이가 단 댓글은 "글쓴이" (이름은 서버가 붙여 준다)
-// - 신고: 본인 글이 아니면 한 사람이 한 번. 업체 관리자·인사 담당이 숨기기·숨김 풀기
-// - 에디터는 있고 첨부파일은 없음 (사진 위치·문서 작성자·파일 이름 같은 파일 속 정보로 작성자가 드러날 수 있어서)
-const ANON_NOT_FOUND = '없는 글이거나 볼 수 없는 글입니다';
-
-function routeAnon(action, id) {
-  if (action === 'view') return openAnonDetail(id);
-  if (action === 'write' || action === 'edit') return openAnonForm(action === 'edit' ? id : null);
-  showSub('view-anon-list');
-  loadAnonList();
-}
-
-// ---------- 1. 목록 ----------
-const anonState = { page: 1, q: '' };
-
-function loadAnonList() {
-  const live = ticket();
-  api.get('/board/api/anon/posts', { q: anonState.q, page: anonState.page })
-    .done(res => { if (live()) renderAnonList(res); })
-    .fail(xhr => { if (live()) toast(apiMessage(xhr, '게시글을 불러오지 못했습니다')); });
-}
-
-function renderAnonList(res) {
-  anonState.page = res.page;
-  if (document.activeElement !== byId('aSearchInput')) byId('aSearchInput').value = anonState.q;
-  byId('aResultInfo').textContent = anonState.q ? `"${anonState.q}" 검색 결과 ${res.total}건` : `전체 ${res.total}건`;
-
-  if (!res.items.length) {
-    byId('aRows').replaceChildren(emptyRow(4, anonState.q ? '검색 결과가 없습니다.' : '아직 글이 없습니다. 첫 글을 써 보세요.'));
-  } else {
-    byId('aRows').replaceChildren(...res.items.map(p => {
-      const tr = el('tr');
-      if (p.hidden) tr.classList.add('is-hidden-row');
-      const titleTd = titleCell(pageHref(`/board/anon/view/${p.id}`), p, p.hidden ? el('span', { class: 'anon-tag is-hidden' }, '숨김') : null);
-      // 신고 수는 업체 관리자·인사 담당에게만 온다
-      if (p.reportCount) titleTd.firstChild.append(el('span', { class: 'anon-tag is-report' }, `신고 ${p.reportCount}`));
-      tr.append(
-        el('td', { 'data-label': '번호', class: 'num' }, String(p.no)),
-        titleTd,
-        el('td', { 'data-label': '작성자' }, p.mine ? '익명 (내 글)' : '익명'),
-        el('td', { 'data-label': '작성일', class: 'num' }, fmtDate(p.createdAt)),
-      );
-      return tr;
-    }));
-  }
-  renderPager('aPager', anonState, res.pages, loadAnonList);
-}
-
-liveSearch('aSearchInput', 'aSearchForm', anonState, loadAnonList);
-document.querySelector('.nav-item[data-view="board-anon"]')?.addEventListener('click', () => {
-  anonState.q = ''; anonState.page = 1;
-  if (isPage('/board/anon')) { loadAnonList(); closeMenu(); }
-});
-
-// ---------- 2. 상세 + 익명 댓글 ----------
-let aCurrent = null;
-
-function openAnonDetail(id) {
-  const live = ticket();
-  api.get(`/board/api/anon/posts/${enc(id)}`)
-    .done(p => { if (live()) { renderAnonDetail(p); showSub('view-anon-detail'); } })
-    .fail(xhr => { if (live()) { toast(apiMessage(xhr, ANON_NOT_FOUND)); location.replace(pageHref('/board/anon')); } });
-}
-
-function renderAnonDetail(p) {
-  aCurrent = p;
-  byId('aHiddenNote').hidden = !p.hidden;
-  byId('aDetailTitle').textContent = p.title;
-  const parts = [el('strong', {}, p.mine ? '익명 (내 글)' : '익명'), el('span', {}, `${fmtTime(p.createdAt)} 작성`)];
-  if (p.updatedAt) parts.push(el('span', {}, `${fmtTime(p.updatedAt)} 수정`));
-  if (p.reportCount) parts.push(el('span', { class: 'anon-tag is-report' }, `신고 ${p.reportCount}`));
-  byId('aDetailMeta').replaceChildren(...parts);
-  byId('aDetailBody').innerHTML = sanitizeHtml(p.content);
-  renderAnonActions(p);
-  byId('aBtnEdit').setAttribute('href', pageHref(`/board/anon/edit/${p.id}`));
-  byId('aCommentText').value = '';
-  setFieldError('aCommentText', 'aCommentError', '');
-  updateCount('aCommentText', 'aCommentCountNow', COMMENT_MAX);
-  renderAnonComments(p);
-}
-
-function renderAnonActions(p) {
-  byId('aOwnerActions').hidden = !p.mine;
-  // 신고: 내 글이 아니면 보인다. 이미 신고했으면 "신고함"으로 잠근다
-  byId('aBtnReport').hidden = p.mine;
-  byId('aBtnReport').disabled = p.reported;
-  byId('aBtnReport').textContent = p.reported ? '신고함' : '신고';
-  byId('aBtnHide').hidden = !p.canHide;
-  byId('aBtnHide').textContent = p.hidden ? '숨김 풀기' : '숨기기';
-}
-
-function renderAnonComments(p) {
-  renderCommentList({ count: 'aCommentCount', empty: 'aCommentEmpty', list: 'aComments' }, p.comments, {
-    name: c => el('strong', { class: c.byWriter ? 'anon-writer' : '' }, c.name),
-    extra: c => (c.mine ? el('span', { class: 'anon-tag' }, '나') : null),
-    onDelete: cid => deleteCommentAt(`/board/api/anon/posts/${p.id}/comments/${cid}`, pageHref('/board/anon'),
-      comments => { p.comments = comments; renderAnonComments(p); }),
-  });
-}
-bindCommentForm({ form: 'aCommentForm', text: 'aCommentText', counter: 'aCommentCountNow', error: 'aCommentError', save: 'aCommentSave' },
-  () => aCurrent && `/board/api/anon/posts/${aCurrent.id}/comments`, pageHref('/board/anon'),
-  comments => { if (aCurrent) { aCurrent.comments = comments; renderAnonComments(aCurrent); } }, '익명 댓글을 등록했습니다');
-
-byId('aBtnReport')?.addEventListener('click', async () => {
-  const p = aCurrent;
-  const btn = byId('aBtnReport');
-  if (!p || p.mine || p.reported || btn.disabled) return;
-  if (!(await confirmDialog('reportDialog'))) return;
-  btn.disabled = true;
-  api.post(`/board/api/anon/posts/${p.id}/report`)
-    .done(() => { p.reported = true; toast('신고했습니다. 관리자가 확인할 거예요'); })
-    .fail(xhr => { if (xhr.status === 409) p.reported = true; failTo(pageHref('/board/anon'))(xhr); }) // 409: 다른 탭에서 이미 신고함
-    .always(() => renderAnonActions(p));
-});
-
-byId('aBtnHide')?.addEventListener('click', () => {
-  const p = aCurrent;
-  const btn = byId('aBtnHide');
-  if (!p || btn.disabled) return;
-  btn.disabled = true;
-  api.post(`/board/admin/api/anon/posts/${p.id}/hidden`, { hidden: !p.hidden })
-    .done(r => { toast(r.hidden ? '글을 숨겼습니다. 직원들에게는 보이지 않아요' : '숨김을 풀었습니다'); openAnonDetail(p.id); })
-    .fail(failTo(pageHref('/board/anon')))
-    .always(() => { btn.disabled = false; });
-});
-
-byId('aBtnDelete')?.addEventListener('click', async () => {
-  const p = aCurrent;
-  if (!p) return;
-  const d = byId('deleteDialog');
-  d.querySelector('h2').textContent = '익명 글을 삭제할까요?';
-  d.querySelector('p').textContent = p.comments.length
-    ? `댓글 ${p.comments.length}개도 함께 삭제되며 되돌릴 수 없습니다.` : '삭제한 글은 되돌릴 수 없습니다.';
-  const ok = await confirmDialog('deleteDialog');
-  if (!ok) return;
-  const btn = byId('aBtnDelete');
-  btn.disabled = true;
-  api.post(`/board/api/anon/posts/${p.id}/delete`)
-    .done(() => { toast('글을 삭제했습니다'); location.href = pageHref('/board/anon'); })
-    .fail(failTo(pageHref('/board/anon')))
-    .always(() => { btn.disabled = false; });
-});
-
-// ---------- 3. 작성 · 수정 ----------
-const anonEditor = makeEditor('aContent'); // 에디터는 있고 첨부파일은 없다
-const anonFormState = { id: null, initial: { title: '', content: '' }, saving: false, leaving: false };
-const anonFormDirty = () => byId('view-anon-form').classList.contains('on') && !anonFormState.leaving && !anonFormState.saving &&
-  (byId('aTitle').value !== anonFormState.initial.title || anonEditor.html() !== anonFormState.initial.content);
-
-function openAnonForm(id) {
-  const live = ticket();
-  api.get('/board/api/anon/posts/form', id ? { id } : undefined)
-    .done(res => { if (live()) fillAnonForm(res); })
-    .fail(xhr => { if (live()) formOpenFailed(xhr, id, 'board-anon'); });
-}
-
-function fillAnonForm(res) {
-  const p = res.post;
-  anonFormState.id = p ? p.id : null;
-  anonFormState.saving = false;
-  byId('aFormTitle').textContent = p ? '익명 글 수정' : '익명 글쓰기';
-  byId('aFormCrumb').textContent = p ? '수정' : '글쓰기';
-  byId('aTitle').value = p ? p.title : '';
-  anonEditor.set(p ? p.content : '');
-  anonFormState.initial = { title: byId('aTitle').value, content: anonEditor.html() };
-  setSaving('aBtnSave', false, '익명으로 저장');
-  setFieldError('aTitle', 'aTitleError', '');
-  setFieldError('aContent', 'aContentError', '');
-  updateCount('aTitle', 'aTitleCount', TITLE_MAX);
-  updateCount('aContent', 'aContentCount', CONTENT_MAX);
-  showSub('view-anon-form');
-  byId('aTitle').focus();
-}
-byId('aTitle')?.addEventListener('input', () => { updateCount('aTitle', 'aTitleCount', TITLE_MAX); setFieldError('aTitle', 'aTitleError', ''); });
-byId('aContent')?.addEventListener('input', () => { updateCount('aContent', 'aContentCount', CONTENT_MAX); setFieldError('aContent', 'aContentError', ''); });
-
-byId('aForm')?.addEventListener('submit', e => {
-  e.preventDefault();
-  if (anonFormState.saving) return;
-  setFieldError('aTitle', 'aTitleError', '');
-  setFieldError('aContent', 'aContentError', '');
-  const title = byId('aTitle').value.trim();
-  const content = anonEditor.html();
-  const err = validate(title, textOf(content));
-  if (err) {
-    const [input, errId] = err.field === 'title' ? ['aTitle', 'aTitleError'] : ['aContent', 'aContentError'];
-    setFieldError(input, errId, err.message);
-    byId(input).focus();
-    return;
-  }
-  const editing = anonFormState.id;
-  anonFormState.saving = true;
-  setSaving('aBtnSave', true, '익명으로 저장');
-  (editing ? api.post(`/board/api/anon/posts/${editing}`, { title, content }) : api.post('/board/api/anon/posts', { title, content }))
-    .done(r => {
-      toast(editing ? '글을 수정했습니다' : '익명 글을 등록했습니다');
-      if (!editing) { anonState.page = 1; anonState.q = ''; }
-      location.href = pageHref(`/board/anon/view/${r.id}`);
-    })
-    .fail(xhr => {
-      anonFormState.saving = false;
-      setSaving('aBtnSave', false, '익명으로 저장');
-      const msg = apiMessage(xhr);
-      toast(msg);
-      if (xhr.status === 404) { anonFormState.leaving = true; location.href = pageHref('/board/anon'); }
-    });
-});
-
-byId('aBtnCancel')?.addEventListener('click', async () => {
-  if (anonFormDirty() && !(await confirmDialog('leaveDialog'))) return;
-  anonFormState.leaving = true;
-  location.href = anonFormState.id ? pageHref(`/board/anon/view/${anonFormState.id}`) : pageHref('/board/anon');
-});
 
 // ---------- 그룹웨어에 내놓는 것 ----------
-// 다른 탭에서 바뀐 것을 다시 불러오는 일(시안 전용)과 부서 이름 변경(renameNoticeDept)은 demo/board.js가 맡는다
 window.routeNoticeBoard = route;
-window.renderHomeNotices = loadHome;
 })();

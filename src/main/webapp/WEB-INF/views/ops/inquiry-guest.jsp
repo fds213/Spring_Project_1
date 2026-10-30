@@ -2,12 +2,12 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  비회원 접수 화면 (/ops/inquiry-guest). 시안 views/ops/inquiry-guest.html 를 옮긴 것이다 (이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장).
-  화면 JS도 시안 것을 그대로 쓴다: 서버 주소와 주고받는 값은 시안 API.md, 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
+  비회원 접수 화면 (/ops/inquiry-guest). 이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장.
+  서버 주소와 주고받는 값은 docs/front-screen-api.md(프론트 제안), 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
-<ui:layout title="비회원 접수" crumb="장애/문의" menu="ops-inquiry-guest">
+<ui:layout title="비회원 접수" crumb="문의" menu="ops-inquiry-guest">
   <jsp:attribute name="scripts">
     <script src="${ctx}/resources/js/util.js"></script>
     <script src="${ctx}/resources/js/ops/inquiry.js"></script>
@@ -15,12 +15,8 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-ops-inquiry-guest">
-      <%-- 비회원 접수: 답변은 메일로 나간다. 발송 성공 뒤에만 "답변 완료". 장애 접수 / 문의 접수 두 탭으로 나눠 본다 --%>
+      <%-- 비회원 접수: 소개 사이트 도입 문의(WEB-02). 답변은 메일로 나간다. 발송 성공 뒤에만 "답변 완료" --%>
       <div class="page-head"><h1>비회원 접수</h1></div>
-      <div class="type-tabs" id="guestTabs" role="tablist" aria-label="비회원 접수 유형">
-        <button type="button" role="tab" class="type-tab" data-type="INCIDENT" aria-selected="true">장애 접수 <span class="badge" id="guestTabINCIDENT" hidden></span></button>
-        <button type="button" role="tab" class="type-tab" data-type="INQUIRY" aria-selected="false" tabindex="-1">문의 접수 <span class="badge" id="guestTabINQUIRY" hidden></span></button>
-      </div>
       <div class="cards" id="guestFilters">
         <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 (스팸 제외)</small><strong id="gCntAll">0건</strong></button>
         <button type="button" class="card card-filter" data-filter="WAIT" aria-pressed="false"><small>답변 대기</small><strong id="gCntWait">0건</strong></button>

@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  소개 사이트: IEUM 그룹웨어 (GET /, 로그인 없이 연다). 시안 site.html 의 본문을 옮긴 것이다 (시안 탭 제목 "IEUM 그룹웨어").
+  소개 사이트: IEUM 그룹웨어 (GET /, 로그인 없이 연다).
   헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -143,9 +143,9 @@
                 <span class="unit">명</span>
               </div>
               <div class="total"><span>월간</span><strong id="calcTotal">80,000원<small>/ 월</small></strong></div>
-              <%-- 요구분석서 v1.5 WEB-01·3.5: 첫 연간 10% 할인, 연간 연장 20% 할인 --%>
+              <%-- 첫 연간 10% 할인 (WEB-01. 20% 할인 유지는 이번 구현 범위에서 빠짐) --%>
               <div class="total total-sub"><span>연간 <em>첫 해 10% 할인</em></span><strong id="calcAnnual">864,000원<small>/ 년</small></strong></div>
-              <p class="note">체험 중에는 요금이 없습니다. 결제는 그룹웨어 안에서 하고, 결제가 끝나면 바로 반영됩니다. 자동으로 결제되지 않으니 만료 전에 직접 연장하고, 기간이 끝나면 결제할 때까지 읽기 전용입니다. 연간을 이어서 연장하거나 만료 뒤 3개월 안에 다시 사면 20% 할인됩니다. 이용 중에 인원을 늘리면 늘린 인원만 이번 만료일까지 일할로 계산합니다. 부가세는 따로 받지 않습니다.</p>
+              <p class="note">체험 중에는 요금이 없습니다. 결제는 그룹웨어 안에서 하고, 결제가 끝나면 바로 반영됩니다. 자동으로 결제되지 않으니 만료 전에 직접 연장하고, 기간이 끝나면 결제할 때까지 읽기 전용입니다. 부가세는 따로 받지 않습니다.</p>
             </div>
           </div>
         </div>

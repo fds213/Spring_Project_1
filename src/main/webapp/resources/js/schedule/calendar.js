@@ -1,10 +1,10 @@
-// 근무 > 일정 (조각 views/schedule/calendar.html): 개인·부서·전사 일정을 달력으로 본다 (요구분석서 v1.5 3.1 "일정·게시판").
+// 근무 > 일정 (views/schedule/calendar.jsp): 개인·부서·전사 일정을 달력으로 본다 (요구분석서 v1.5 3.1 "일정·게시판").
 // 달력에는 일정 외에 휴일과 본인의 연차(승인된 것만)가 함께 나온다. 다른 직원의 연차·근태는 보이지 않는다.
 // 누가 무엇을 볼 수 있나: 개인 일정은 쓴 본인만, 부서 일정은 같은 부서 직원, 전사 일정은 업체 전체.
 // 누가 쓸 수 있나: 개인은 누구나, 부서는 부서장·업체 관리자(자기 부서), 전사는 인사 담당자·업체 관리자. 지우기는 쓴 본인·업체 관리자.
 // 이 규칙은 서버가 정하고 검사한다. 화면은 서버가 보내 준 구분(scopes)과 canDelete 로 선택지·버튼만 고른다.
 //
-// 서버 API (시안은 demo/schedule.js가 답한다):
+// 서버 API (프론트 제안):
 //   GET    /schedule/api/schedules?month=YYYY-MM  그달 달력에 들어갈 것
 //          → { month, dept, scopes: [쓸 수 있는 구분 PERSONAL|DEPT|COMPANY], holidays: [{ date, name }],
 //              leaves: [{ from, to, kind: FULL|AM|PM }] (본인의 승인된 연차 중 그달에 걸친 것),
@@ -33,7 +33,7 @@ const schState = {
 };
 const schMonthParam = () => `${schState.month.y}-${pad2(schState.month.m + 1)}`;
 
-// 화면을 열 때 (시안은 proto/app.js showView, JSP는 페이지가 열릴 때). "오늘" 버튼도 이것을 부른다
+// 화면을 열 때 (JSP 페이지가 열리면 부른다). "오늘" 버튼도 이것을 부른다
 function openScheduleView() {
   const now = new Date();
   schState.month = { y: now.getFullYear(), m: now.getMonth() };

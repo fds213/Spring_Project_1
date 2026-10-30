@@ -2,8 +2,8 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  공지사항 화면 (/board/notice, /board/notice/view/{id}, /board/notice/write, /board/notice/edit/{id}). 시안 views/board/notice/list.html, views/board/notice/detail.html, views/board/notice/form.html 를 옮긴 것이다 (이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장).
-  화면 JS도 시안 것을 그대로 쓴다: 서버 주소와 주고받는 값은 시안 API.md, 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
+  공지사항 화면 (/board/notice, /board/notice/view/{id}, /board/notice/write, /board/notice/edit/{id}). 이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장.
+  서버 주소와 주고받는 값은 docs/front-screen-api.md(프론트 제안), 감싼 응답({ success, message, data })은 common.js 의 api 가 푼다.
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -15,8 +15,8 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view" id="view-notice-list">
-      <%-- 공지사항·부서 게시판 (board/board.js). 주소: #notice · #notice/view/3 · #notice/write · #notice/edit/3,
-           #board-dept · #board-dept/view/3 · #board-dept/write · #board-dept/edit/3 --%>
+      <%-- 공지사항 (board/board.js). 주소: /board/notice · /board/notice/view/3 · /board/notice/write · /board/notice/edit/3.
+           목록·글 보기·글쓰기가 이 한 페이지에 있고, 주소를 보고 하나를 보인다 --%>
       <%-- 1. 공지 목록 --%>
       <div class="page-head">
         <h1>공지사항</h1>
@@ -107,7 +107,7 @@
           </div>
         </div>
         <%-- 내용: 간단한 에디터 (굵게·기울임·밑줄·크기·글자색·목록). 붙여넣기는 글자만 받는다.
-             실제 프로젝트에서는 서버가 저장 전에 허용한 태그 말고는 모두 지운다 --%>
+             서버는 저장 전에 허용한 태그 말고는 모두 지운다 --%>
         <div class="field">
           <span class="field-label" id="fContentLabel">내용</span>
           <div class="editor">
@@ -121,9 +121,9 @@
             <span class="counter" id="fContentCount">0 / 2000</span>
           </div>
         </div>
-        <%-- 첨부파일: 최대 5개. 시안은 브라우저에 저장해서 파일당 1MB까지만 (실제는 10MB, 서버에 저장) --%>
+        <%-- 첨부파일: 최대 5개, 파일당 10MB --%>
         <div class="field">
-          <span class="field-label">첨부파일 <span class="muted">(최대 5개 · 이미지·문서 · 시안은 파일당 1MB, 실제는 10MB)</span></span>
+          <span class="field-label">첨부파일 <span class="muted">(최대 5개 · 이미지·문서 · 파일당 10MB)</span></span>
           <div class="attach-pick">
             <button type="button" class="btn" id="btnPickFiles">파일 선택</button>
             <input type="file" id="fFiles" multiple hidden
@@ -145,7 +145,7 @@
       </form>
     </section>
 
-    <%-- 공지사항·부서 게시판·익명 게시판이 같이 쓰는 창과 에디터 툴바. JSP에서는 게시판 화면 JSP 끝에 넣는다(공통 jspf로 빼도 된다) --%>
+    <%-- 공지사항·부서 게시판·익명 게시판이 같이 쓰는 창과 에디터 툴바. 게시판 화면 JSP 끝에 둔다(공통 jspf로 빼도 된다) --%>
     <%-- 공지사항·부서 게시판 확인 창 (board/board.js) --%>
     <dialog class="modal" id="deleteDialog">
       <h2>공지를 삭제할까요?</h2>
@@ -176,7 +176,7 @@
       </div>
     </dialog>
 
-    <%-- 에디터 툴바 (공지·부서 게시판·익명 게시판이 같이 쓴다. notice.js가 각 .editor-toolbar에 복사해 넣는다)
+    <%-- 에디터 툴바 (공지·부서 게시판·익명 게시판이 같이 쓴다. board/board.js가 각 .editor-toolbar에 복사해 넣는다)
          글자 크기: 숫자를 넣고 Enter 또는 칸 밖을 누르면 적용 (10~40, 기본 15). 커서 자리의 크기가 늘 보인다
          굵게·기울임·밑줄·목록: 켜져 있으면 눌린 모양 / 글자색: 지금 색에 링 --%>
     <template id="editorToolbarTpl">

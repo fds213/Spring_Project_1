@@ -1,4 +1,4 @@
-// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 날짜 계산, 알림(toast). 시안과 JSP가 같은 파일을 쓴다.
+// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 날짜 계산, 알림(toast).
 // common.js 다음, 각 모듈 JS 앞에 불린다. JSP에서는 layout.tag가 불러오고, 알림을 쓰려면 <div class="toast" id="toast" hidden>이 있어야 한다.
 const DAY_MS = 86400000;
 
@@ -11,20 +11,6 @@ const when = iso => { const d = new Date(iso); return `${pad2(d.getMonth() + 1)}
 const whenFull = iso => { const d = new Date(iso); return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 // 80,000원
 const won = n => `${n.toLocaleString('ko-KR')}원`;
-
-// 그날 0시, 그날 끝, 다음 날 0시
-const dayStart = t => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d; };
-const endOfDay = t => { const d = new Date(t); d.setHours(23, 59, 59, 999); return d; };
-const dayAfter = t => new Date(dayStart(t).getTime() + DAY_MS);
-// n달 뒤. 그 달에 없는 날은 그 달 마지막 날 (1.31 + 1달 = 2.28 또는 2.29, 3.3이 아니다)
-function addMonths(t, n) {
-  const d = new Date(t);
-  const day = d.getDate();
-  d.setDate(1);
-  d.setMonth(d.getMonth() + n);
-  d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
-  return d;
-}
 
 // 화면 아래 알림 한 줄 (4초 뒤 사라진다)
 let toastTimer = null;

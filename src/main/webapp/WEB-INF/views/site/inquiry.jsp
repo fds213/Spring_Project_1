@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  소개 사이트: 도입 문의 (GET /inquiry, 로그인 없이 연다). 시안 inquiry.html 의 본문을 옮긴 것이다 (시안 탭 제목 "도입 문의 - IEUM 그룹웨어").
+  소개 사이트: 도입 문의 (GET /inquiry, 로그인 없이 연다).
   헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
