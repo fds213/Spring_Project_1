@@ -80,7 +80,7 @@
         <c:if test="${param.logout ne null}">
           <p class="login-help" role="status">로그아웃했습니다</p>
         </c:if>
-        <button class="btn btn-primary btn-block" type="submit">로그인</button>
+        <button class="btn btn-primary btn-block" type="submit" id="btnLogin">로그인</button>
         <%-- 직원 계정 생성과 이메일 인증 비밀번호 찾기. 둘 다 로그인 없이 여는 /join/** 아래에 둔다 --%>
         <p class="login-help"><a class="link-btn" href="${ctx}/join">계정 생성</a> / <a class="link-btn" href="${ctx}/join/password">비밀번호 찾기</a></p>
       </form>
@@ -95,8 +95,13 @@
       var form = document.getElementById('loginForm');
       var company = document.getElementById('loginCompany');
       var error = document.getElementById('loginError');
+      var button = document.getElementById('btnLogin');
+      var sending = false;
       try { if (!company.value) company.value = localStorage.getItem('ieum-last-company') || ''; } catch (e) { /* 저장소 막힘 */ }
       form.addEventListener('submit', function (e) {
+        // 두 번 누르거나 Enter와 클릭이 겹쳐도 한 번만 보낸다. 같은 순간 두 번 가면 세션과 CSRF 토큰이
+        // 엇갈려 로그인이 풀리거나 403이 난다
+        if (sending) { e.preventDefault(); return; }
         company.value = company.value.trim().toLowerCase();
         var empty = ['loginCompany', 'loginId', 'loginPw'].some(function (id) { return !document.getElementById(id).value.trim(); });
         if (empty) {
@@ -105,6 +110,13 @@
           return;
         }
         try { localStorage.setItem('ieum-last-company', company.value); } catch (e2) { /* 저장소 막힘 */ }
+        sending = true;
+        button.disabled = true;
+      });
+      // 뒤로 가기로 이 화면이 그대로 다시 보이면(브라우저가 저장해 둔 화면) 다시 누를 수 있게 푼다
+      window.addEventListener('pageshow', function () {
+        sending = false;
+        button.disabled = false;
       });
       // 앱에서만 쓰기: 설치한 앱(runningAsApp, install.js)이 아니고 ?preview 도 없으면 다운로드 안내만
       if (document.body.dataset.appOnly === 'true' && !runningAsApp && !new URLSearchParams(location.search).has('preview')) {
