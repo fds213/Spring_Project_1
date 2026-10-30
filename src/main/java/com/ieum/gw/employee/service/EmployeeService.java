@@ -1,13 +1,26 @@
 package com.ieum.gw.employee.service;
 
+import com.ieum.gw.employee.dao.EmployeeDAO;
+import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.dto.AdminAccountDTO;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * 사원이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
  */
 @Service
 public class EmployeeService {
+  
+  @Autowired
+    private EmployeeDAO dao;
+  
+  // 현재 활성화 상태인 직원 목록 ( excludeEmpId가 NULL이 아니면 해당 사번 제외한 나머지 반환)
+    public List<EmpSummaryDTO> listActiveEmp(Long companyId, Long excludeEmpId) {
+        return dao.listActiveEmp(companyId, excludeEmpId);
+    }
 
     /**
      * 같은 업체의 재직자인지 본다. 재직자는 사원이 재직(ST_SERVING)이고 계정이 사용 중(ACTIVE)인 사람이다.

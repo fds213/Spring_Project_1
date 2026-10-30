@@ -8,6 +8,9 @@ import lombok.ToString;
 @Setter
 @ToString
 public class ChatRoomDTO {
-    private String roomId;
+    private Long chatRoomId;
+    private Long companyId;
+    private String roomType;
     private String roomName;
+    private String displayName;
 }

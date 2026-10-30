@@ -1,7 +1,6 @@
 package com.ieum.gw.chat.service;
 
 import com.ieum.gw.chat.dao.ChatDAO;
-import com.ieum.gw.chat.dto.ChatEmpDto;
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,8 +19,8 @@ public class ChatService {
         System.out.println("hi zz");
     }
 
-    public boolean isMember(long rId, String empnum) {
-        return dao.isMember(rId, empnum) == 1;
+    public boolean isMember(long roomId, Long empNum) {
+        return dao.isMember(roomId, empNum) == 1;
     }
 
     @Transactional
@@ -29,11 +28,8 @@ public class ChatService {
         dao.insertMessage(dto);
     }
 
-    public List<ChatRoomDTO> getRoomList(String empnum) {
-        return dao.getRoomList(empnum);
+    public List<ChatRoomDTO> getRoomList(Long companyId, Long employeeId) {
+        return dao.getRoomList(companyId, employeeId);
     }
-
-    public List<ChatEmpDto> getEmpList(String empnum) {
-        return dao.getEmpList(empnum);
-    }
+    
 }

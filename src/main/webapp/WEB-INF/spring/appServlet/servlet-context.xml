@@ -46,11 +46,4 @@
 			expression="org.springframework.stereotype.Controller" />
 	</context:component-scan>
 
-	<!-- WebSocket -->
-<!--	<websocket:handlers>-->
-<!--		<websocket:mapping path="/chat/ws" handler="chatWebSocketHandler"/>-->
-<!--	</websocket:handlers>-->
-
-<!--	<beans:bean id="chatWebSocketHandler" class="com.ieum.gw.chat.handler.ChatWebSocketHandler"/>-->
-
 </beans:beans>
