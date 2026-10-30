@@ -116,7 +116,7 @@
           <div class="attach-pick">
             <button type="button" class="btn" id="bBtnPickFiles">파일 선택</button>
             <input type="file" id="bFiles" multiple hidden
-                   accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip">
+                   accept=".jpg,.jpeg,.png,.gif,.pdf,.docx,.xlsx,.pptx,.hwpx,.hwp">
             <span class="muted" id="bFilesInfo">선택한 파일 없음</span>
           </div>
           <ul class="attach-list is-edit" id="bFileList"></ul>

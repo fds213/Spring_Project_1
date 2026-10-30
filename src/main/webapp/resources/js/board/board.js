@@ -345,7 +345,7 @@ function showPinFull(scope) {
 // 이미지는 미리보기(누르면 크게), 나머지는 이름·크기·내려받기.
 // 내려받기 주소(url)는 서버가 "이 사람이 이 글을 볼 수 있나"를 확인한 뒤에만 파일을 준다
 // (글은 숨겼는데 파일 주소를 알면 받아지는 일이 없게)
-const isImage = f => /^image\/(png|jpe?g|gif|webp)$/.test(f.type);
+const isImage = f => /^image\/(png|jpe?g|gif)$/.test(f.type);
 const fmtSize = b => (b >= 1048576 ? `${(b / 1048576).toFixed(1)}MB` : `${Math.max(1, Math.round(b / 1024))}KB`);
 
 // 상세 화면의 첨부파일 상자 (공지 · 부서 게시판). ids: { box, count, images, list }
@@ -672,7 +672,9 @@ document.addEventListener('selectionchange', () => editors.forEach(ed => ed.onSe
 // 고른 파일은 data URL로 읽어 두었다가 저장할 때 JSON으로 보낸다. 서버가 파일 받는 방식(FormData·multipart 등)을 정하면 그에 맞춘다
 const FILE_MAX = 5;
 const FILE_SIZE_MAX = 10 * 1024 * 1024;
-const FILE_EXT = /\.(jpe?g|png|gif|webp|pdf|hwpx?|docx?|xlsx?|pptx?|txt|zip)$/i;
+// 첨부할 수 있는 확장자 (팀에서 정한 목록, 서버도 같은 목록으로 막는다):
+// 이미지 jpg·jpeg·png·gif, 문서 pdf, 오피스 docx·xlsx·pptx, 한글 hwpx·hwp
+const FILE_EXT = /\.(jpe?g|png|gif|pdf|docx|xlsx|pptx|hwpx?)$/i;
 const fileSig = files => files.map(f => f.id).join(',');
 
 // 글쓰기 화면의 "파일 선택" 묶음. ids: { pick, input, info, list, error }
