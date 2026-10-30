@@ -2,35 +2,59 @@
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.common.mapper.AuthMapper">
 
-	<select id="getInfo"
-		resultType="com.ieum.gw.common.dto.AuthEmpDTO">
-		SELECT compcode, empnum, pw, name, role, status,
-		CASE
-		WHEN lock_until > SYSDATE
-		THEN 1
-		ELSE 0
-		END AS locked
-		FROM test_emp
-		WHERE compcode = #{compcode} AND empnum =
-		#{empnum}
+	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<!-- 업체 코드 + 사번으로 로그인 계정 1건 -->
+	<select id="getInfo" resultType="com.ieum.gw.common.dto.AuthEmpDTO">
+		SELECT a.user_account_id, a.company_id, a.employee_id,
+		       c.company_code   AS compcode,
+		       e.employee_no    AS empnum,
+		       e.employee_name  AS name,
+		       a.password_hash  AS pw,
+		       a.role_code      AS role,
+		       a.status_code    AS status,
+		       CASE WHEN a.locked_until > <include refid="now"/> THEN 1 ELSE 0 END AS locked
+		FROM user_account a
+		JOIN company  c ON c.company_id  = a.company_id
+		JOIN employee e ON e.employee_id = a.employee_id
+		WHERE c.company_code = #{compcode} AND e.employee_no = #{empnum}
 	</select>
+
+	<!-- 업체 코드 + 사번 → 계정 번호 (아래 UPDATE·SELECT에서 공통 사용) -->
+	<sql id="accountByLogin">
+		SELECT a.user_account_id
+		FROM user_account a
+		JOIN company  c ON c.company_id  = a.company_id
+		JOIN employee e ON e.employee_id = a.employee_id
+		WHERE c.company_code = #{compcode} AND e.employee_no = #{empnum}
+	</sql>
+
+	<!-- 비밀번호 틀림: +1, 5번째면 10분 잠금 후 0 -->
 	<update id="recordFail">
-		UPDATE test_emp
-		SET lock_until = CASE WHEN fail_count + 1 >= 5 THEN SYSDATE + 10/1440
-		ELSE lock_until END,
-		fail_count = CASE WHEN fail_count + 1 >= 5 THEN 0 ELSE fail_count + 1 END
-		WHERE compcode = #{compcode} AND empnum = #{empnum}
+		UPDATE user_account
+		SET locked_until = CASE WHEN failed_login_count + 1 >= 5
+		                        THEN <include refid="now"/> + INTERVAL '10' MINUTE
+		                        ELSE locked_until END,
+		    failed_login_count = CASE WHEN failed_login_count + 1 >= 5 THEN 0
+		                              ELSE failed_login_count + 1 END,
+		    updated_at = <include refid="now"/>
+		WHERE user_account_id = (<include refid="accountByLogin"/>)
 	</update>
 
+	<!-- 로그인 성공: 초기화 + 마지막 로그인 시각 -->
 	<update id="resetFail">
-		UPDATE test_emp
-		SET fail_count = 0, lock_until = null
-		WHERE compcode = #{compcode} AND empnum = #{empnum}
+		UPDATE user_account
+		SET failed_login_count = 0, locked_until = NULL,
+		    last_login_at = <include refid="now"/>,
+		    updated_at    = <include refid="now"/>
+		WHERE user_account_id = (<include refid="accountByLogin"/>)
 	</update>
-	
+
+	<!-- 잠긴 계정의 남은 분 -->
 	<select id="getLockMinutes" resultType="int">
-    SELECT CEIL((lock_until - SYSDATE) * 1440)
-    FROM test_emp
-    WHERE compcode = #{compcode} AND empnum = #{empnum}
-</select>
+		SELECT CEIL((CAST(a.locked_until AS DATE) - CAST(<include refid="now"/> AS DATE)) * 1440)
+		FROM user_account a
+		WHERE a.user_account_id = (<include refid="accountByLogin"/>)
+	</select>
 </mapper>

@@ -22,7 +22,7 @@ public class LoginUser implements UserDetails {
 	public String getName() {
 		return emp.getName();
 	}
-	
+
 	public String getCompcode() {
 		return emp.getCompcode();
 	}
@@ -45,12 +45,24 @@ public class LoginUser implements UserDetails {
 		return emp.getEmpnum();
 	}
 
+	public Long getUserAccountId() {
+		return emp.getUserAccountId();
+	}
+
+	public Long getCompanyId() {
+		return emp.getCompanyId();
+	}
+
+	public Long getEmployeeId() {
+		return emp.getEmployeeId();
+	}
+
 	@Override
 	public boolean isEnabled() {
 		// TODO Auto-generated method stub
 		return "ACTIVE".equals(emp.getStatus());
 	}
-	
+
 	@Override
 	public boolean isAccountNonLocked() {
 		return !emp.isLocked();
