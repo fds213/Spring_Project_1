@@ -17,7 +17,9 @@
   --radius: 8px;
   --radius-card: 12px;
   --header-h: 60px;
-  --sidebar-w: 220px;
+  --rail-w: 76px;      /* 사이드바 왼쪽 아이콘 줄 */
+  --sidebar-w: 208px;  /* 사이드바 오른쪽 메뉴 칸 */
+  --rail-bg: #172231;
   --nav-bg: #1e2a3b;
   --nav-text: #c9d2de;
   --nav-group: #8ea0b6;
@@ -235,12 +237,38 @@ input::-ms-reveal { display: none; }
 
 /* 본문 */
 .app-body { flex: 1; display: flex; min-height: 0; }
-/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색 */
+/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색.
+   두 단이다: 왼쪽 아이콘 줄(.nav-rail)에서 메뉴 묶음을 고르면 오른쪽 칸(.nav-panel)에 그 묶음의 메뉴만 보인다 */
 .sidebar {
-  width: var(--sidebar-w); flex: none;
-  padding: 14px 12px; overflow-y: auto;
+  width: calc(var(--rail-w) + var(--sidebar-w)); flex: none;
+  display: flex;
   background: var(--nav-bg); color: var(--nav-text);
 }
+.nav-rail {
+  width: var(--rail-w); flex: none;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 8px; overflow-y: auto;
+  background: var(--rail-bg);
+}
+.rail-item {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 2px 8px; border: 0; border-radius: var(--radius);
+  background: none; color: var(--nav-group); font: inherit; font-size: 11px; line-height: 1.2;
+  cursor: pointer;
+}
+.rail-item svg { width: 22px; height: 22px; }
+.rail-item:hover { background: var(--nav-hover); color: #fff; }
+.rail-item.on { background: var(--accent); color: #fff; }
+.rail-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
+/* 아이콘 위의 개수: 메뉴 칸의 배지와 같은 이름(data-badge)이라 같이 채워진다 */
+.sidebar .rail-badge {
+  position: absolute; top: 3px; right: 6px;
+  min-width: 18px; padding: 0 5px; line-height: 18px; text-align: center; font-size: 10px;
+  background: #e5484d; color: #fff;
+}
+.nav-panel { flex: 1; min-width: 0; padding: 14px 12px; overflow-y: auto; }
+.nav-title { margin: 4px 12px 10px; font-size: 16px; font-weight: 600; color: #fff; }
 .nav-group { margin: 16px 12px 4px; font-size: 12px; color: var(--nav-group); }
 .nav-item {
   display: flex; align-items: center; justify-content: space-between;

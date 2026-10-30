@@ -47,6 +47,17 @@
     matchMedia('(max-width: 900px)').addEventListener('change', e => { if (!e.matches) setMenu(false); });
   }
 
+  // 사이드바 왼쪽 아이콘 줄: 누르면 오른쪽 칸에 그 묶음의 메뉴만 보인다(페이지는 그대로).
+  // 처음 열린 묶음은 지금 화면이 속한 것으로 서버가 정해 둔다(sidebar.jspf)
+  document.querySelectorAll('.rail-item').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.rail-item').forEach(b => {
+      const on = b === btn;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', on);
+    });
+    document.querySelectorAll('.nav-cat').forEach(cat => { cat.hidden = cat.dataset.cat !== btn.dataset.cat; });
+  }));
+
   // ---------- 4) 배지: 15초마다 요청 한 번으로 모든 [data-badge="<name>"]를 채운다 (가이드 7장 알림과 배지) ----------
   // 업체 직원: { notification, approval, chat, join(가입 승인할 수 있는 사람만) }  /  이음 운영자: { application, inquiryGuest }
   // (메뉴의 data-badge 이름과 같다. 이번 범위에서 뺀 회원 접수·증설 승인 배지는 없다)
