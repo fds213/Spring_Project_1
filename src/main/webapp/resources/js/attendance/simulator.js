@@ -27,11 +27,16 @@ function simStoreKey(key) {
 
 // 서버 요청: 실패하면 { status, message } 를 던진다
 async function simFetch(method, path, body) {
-  const res = await fetch(simCtx + path, {
-    method,
-    headers: Object.assign({ 'X-Device-Key': sim.key }, body ? { 'Content-Type': 'application/json' } : {}),
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(simCtx + path, {
+      method,
+      headers: Object.assign({ 'X-Device-Key': sim.key }, body ? { 'Content-Type': 'application/json' } : {}),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw { status: 0, message: '이음 서버에 연결할 수 없습니다. 잠시 뒤 다시 시도해 주세요' };
+  }
   let data = null;
   try { data = await res.json(); } catch (e) { /* 본문 없음 */ }
   if (!res.ok) throw { status: res.status, message: (data && data.message) || '단말기 요청을 처리하지 못했습니다' };
@@ -59,7 +64,8 @@ async function connect(key) {
     simEl('simConnect').hidden = true;
     simEl('simMain').hidden = false;
   } catch (err) {
-    simStoreKey('');
+    // 키가 틀렸을 때만 저장한 키를 지운다 (서버가 잠깐 꺼진 것이면 키는 그대로 두고 다시 시도하게 한다)
+    if (err.status === 401) simStoreKey('');
     showConnect(err.status === 401 ? '단말기 키가 맞지 않습니다' : err.message);
   }
 }

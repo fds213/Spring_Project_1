@@ -8,6 +8,7 @@ import com.ieum.gw.attendance.dto.AttendanceDTO;
 import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
 import com.ieum.gw.attendance.dto.DevicePersonDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
+import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
 import com.ieum.gw.attendance.mapper.AttendanceMapper;
 
@@ -64,6 +65,14 @@ public class AttendanceDAO {
 
     public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) {
         return mapper.selectMonthHolidays(companyId, month);
+    }
+
+    public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) {
+        return mapper.selectMonthLeaveDays(companyId, employeeId, month);
+    }
+
+    public String selectMyDeviceUserNoInCompany(Long companyId, Long employeeId) {
+        return mapper.selectMyDeviceUserNoInCompany(companyId, employeeId);
     }
 
     public String selectMyDeviceUserNo(Long attendanceDeviceId, Long employeeId) {

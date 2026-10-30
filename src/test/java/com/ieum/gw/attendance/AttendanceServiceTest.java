@@ -18,6 +18,7 @@ import com.ieum.gw.attendance.dto.AttendanceDTO;
 import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
 import com.ieum.gw.attendance.dto.DevicePersonDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
+import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
 import com.ieum.gw.attendance.mapper.AttendanceMapper;
 import com.ieum.gw.attendance.service.AttendanceException;
@@ -183,6 +184,10 @@ class AttendanceServiceTest {
         }
 
         @Override public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) { return List.of(); }
+
+        @Override public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) { return List.of(); }
+
+        @Override public String selectMyDeviceUserNoInCompany(Long companyId, Long employeeId) { return selectMyDeviceUserNo(1L, employeeId); }
 
         @Override public String selectMyDeviceUserNo(Long deviceId, Long employeeId) {
             return links.entrySet().stream().filter(e -> e.getValue().equals(employeeId)).map(Map.Entry::getKey).findFirst().orElse(null);

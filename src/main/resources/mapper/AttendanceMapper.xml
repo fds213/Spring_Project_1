@@ -120,7 +120,28 @@
 		  AND holiday_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
 	</select>
 
+	<!-- 한 달 동안 최종 승인된 휴가 날짜 (전자결재 휴가 신청서). 기록의 비고에 연차·반차로 보여 준다 -->
+	<select id="selectMonthLeaveDays" resultType="com.ieum.gw.attendance.dto.LeaveDayDTO">
+		SELECT TO_CHAR(d.leave_date, 'YYYY-MM-DD') AS leave_date, d.leave_type
+		FROM approval_document ad
+		JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
+		WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
+		  AND ad.document_type = 'DOC_LEAVE' AND ad.status_code = 'APPROVED'
+		  AND d.leave_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
+		  AND d.leave_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+	</select>
+
 	<!-- ===== 본인과 단말기 사용자 번호 연결 ===== -->
+
+	<!-- 근태 화면용: 업체의 쓰는 중인 단말기에 연결된 내 번호 (단말기를 먼저 찾지 않고 한 번에) -->
+	<select id="selectMyDeviceUserNoInCompany" resultType="string">
+		SELECT de.device_user_no
+		FROM device_employee de
+		JOIN attendance_device d ON d.attendance_device_id = de.attendance_device_id AND d.use_yn = 'Y'
+		WHERE de.company_id = #{companyId} AND de.employee_id = #{employeeId} AND de.use_yn = 'Y'
+		ORDER BY de.attendance_device_id
+		FETCH FIRST 1 ROWS ONLY
+	</select>
 
 	<select id="selectMyDeviceUserNo" resultType="string">
 		SELECT device_user_no

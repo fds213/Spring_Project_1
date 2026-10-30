@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.ieum.gw.attendance.service.AttendanceException;
 import com.ieum.gw.attendance.service.AttendanceService;
+import com.ieum.gw.attendance.service.LeaveService;
 import com.ieum.gw.common.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 public class AttendanceController {
 
     private final AttendanceService service;
+    private final LeaveService leaveService;
 
     // ===== 화면 =====
 
@@ -52,6 +54,13 @@ public class AttendanceController {
     @ResponseBody
     public Map<String, Object> records(@AuthenticationPrincipal LoginUser user, @RequestParam String month) {
         return service.records(user.getCompanyId(), user.getEmployeeId(), month);
+    }
+
+    /** 연차 화면: 이번 연차 주기 현황과 휴가 신청 내역 */
+    @GetMapping("/attendance/api/leaves")
+    @ResponseBody
+    public Map<String, Object> leaves(@AuthenticationPrincipal LoginUser user) {
+        return leaveService.leaves(user.getCompanyId(), user.getEmployeeId());
     }
 
     @PostMapping("/attendance/api/device-link")

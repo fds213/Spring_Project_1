@@ -42,6 +42,9 @@ function renderAttRecords(r) {
   attEl('attToday').textContent = !dev ? '단말기 미연결' : !t ? '기록 없음' : t.out ? `${t.in} ~ ${t.out}` : `${t.in} 출근`;
   attEl('attLate').textContent = dev ? `${r.thisMonth.late}회` : '-';
   attEl('attEarly').textContent = dev ? `${r.thisMonth.early}회` : '-';
+  // 헤더의 오늘 출퇴근도 같이 맞춘다 (header.jspf 와 같은 문구). 시뮬레이터에서 찍고 돌아오면 새로고침 없이 바뀐다
+  const head = document.querySelector('.attend-time');
+  if (head) head.textContent = !t ? '출근 기록 없음' : t.out ? `출근 ${t.in} · 퇴근 ${t.out}` : `오늘 출근 ${t.in}`;
 
   renderDeviceLink(dev);
 
@@ -118,3 +121,5 @@ const attMoveMonth = step => {
 };
 attEl('attPrev').addEventListener('click', () => attMoveMonth(-1));
 attEl('attNext').addEventListener('click', () => attMoveMonth(1));
+// 다른 탭(지문 시뮬레이터)에서 찍고 이 탭으로 돌아오면 기록을 다시 받는다 (기능명세서 1.9: 변경 반영)
+document.addEventListener('visibilitychange', () => { if (!document.hidden && attState.month) loadAttRecords(); });

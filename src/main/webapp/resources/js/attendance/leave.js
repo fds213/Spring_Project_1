@@ -21,6 +21,9 @@ function openLeaveView() {
     .fail(xhr => showToast(apiMessage(xhr, '연차 현황을 불러오지 못했습니다')));
 }
 
+// 다른 탭(전자결재)에서 신청·결재하고 돌아오면 다시 받는다
+document.addEventListener('visibilitychange', () => { if (!document.hidden) openLeaveView(); });
+
 // 카드, 연차 현황, 이번 연차 기간의 신청 내역
 function renderLeaveView(r) {
   const sum = r.summary;

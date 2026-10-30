@@ -20,6 +20,7 @@ import com.ieum.gw.attendance.dto.AttendanceDTO;
 import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
 import com.ieum.gw.attendance.dto.DevicePersonDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
+import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
 
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,9 @@ public class AttendanceService {
     // 기본 근무 09:00~18:00 (요구분석서 3.4)
     private static final String WORK_START = "09:00:00";
     private static final String WORK_END = "18:00:00";
+
+    // 휴가 구분 공통 코드 → 화면 값
+    private static final Map<String, String> LEAVE_KIND = Map.of("LV_FULL", "FULL", "LV_AM", "AM", "LV_PM", "PM");
 
     private final AttendanceDAO dao;
 
@@ -140,8 +144,7 @@ public class AttendanceService {
         if (month == null || !month.matches("\\d{4}-(0[1-9]|1[0-2])")) {
             throw new AttendanceException(400, "달은 YYYY-MM 형식으로 보내 주세요");
         }
-        AttendanceDeviceDTO device = dao.selectCompanyDevice(companyId);
-        String deviceNo = device == null ? null : dao.selectMyDeviceUserNo(device.getAttendanceDeviceId(), employeeId);
+        String deviceNo = dao.selectMyDeviceUserNoInCompany(companyId, employeeId);
         String today = dao.selectToday();
 
         Map<String, AttendanceDTO> byDate = new HashMap<>();
@@ -152,10 +155,18 @@ public class AttendanceService {
         for (HolidayDTO h : dao.selectMonthHolidays(companyId, month)) {
             holidays.put(h.getHolidayDate(), h.getHolidayName());
         }
+        // 최종 승인된 휴가: 오전·오후 반차가 같은 날 둘 다 있으면 종일로 본다
+        Map<String, String> leaves = new HashMap<>();
+        for (LeaveDayDTO l : dao.selectMonthLeaveDays(companyId, employeeId, month)) {
+            String kind = LEAVE_KIND.getOrDefault(l.getLeaveType(), "FULL");
+            String before = leaves.get(l.getLeaveDate());
+            leaves.put(l.getLeaveDate(), before == null || before.equals(kind) ? kind : "FULL");
+        }
 
-        // 카드의 "이번 달"은 보고 있는 달이 아니라 오늘이 속한 달이다
+        // 카드의 "이번 달"은 보고 있는 달이 아니라 오늘이 속한 달이다. 보통은 이번 달을 보므로 같은 조회를 다시 하지 않는다
         String thisMonth = today.substring(0, 7);
-        List<AttendanceDTO> thisMonthRows = thisMonth.equals(month) ? new ArrayList<>(byDate.values())
+        boolean viewingThisMonth = thisMonth.equals(month);
+        List<AttendanceDTO> thisMonthRows = viewingThisMonth ? new ArrayList<>(byDate.values())
                 : dao.selectMonthAttendance(companyId, employeeId, thisMonth);
         int late = 0;
         int early = 0;
@@ -173,13 +184,14 @@ public class AttendanceService {
             day.put("weekday", d.getDayOfWeek().getValue() % 7); // 0 = 일요일
             day.put("holiday", holidays.getOrDefault(date, ""));
             day.put("punch", punchView(byDate.get(date)));
-            day.put("leave", null); // 승인된 연차는 전자결재(휴가 신청서)가 생기면 연결한다
+            day.put("leave", leaves.get(date));
             days.add(day);
         }
 
         Map<String, Object> todayView = new LinkedHashMap<>();
         todayView.put("date", today);
-        todayView.put("punch", punchView(dao.selectTodayAttendance(companyId, employeeId)));
+        AttendanceDTO todayRow = viewingThisMonth ? byDate.get(today) : dao.selectTodayAttendance(companyId, employeeId);
+        todayView.put("punch", punchView(todayRow));
         Map<String, Object> counts = new LinkedHashMap<>();
         counts.put("late", late);
         counts.put("early", early);

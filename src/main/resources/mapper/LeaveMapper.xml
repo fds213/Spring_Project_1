@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.attendance.mapper.LeaveMapper">
+
+	<!-- 연차 화면: 본인의 연차 주기·사용·신청 내역. 휴가 신청·결재는 전자결재(approval)가 쓰고, 여기서는 읽기만 한다 -->
+
+	<select id="selectEmployeeCareer" resultType="com.ieum.gw.attendance.dto.EmployeeCareerDTO">
+		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date, prior_career_months
+		FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
+
+	<!-- 오늘이 들어 있는 연차 주기 (입사기념일 부여 작업이 만든 것). 없으면 Service가 계산식(요구분석서 3.9)으로 구한다 -->
+	<select id="selectCurrentCycle" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
+		SELECT TO_CHAR(starts_on, 'YYYY-MM-DD') AS starts_on,
+		       TO_CHAR(ends_on, 'YYYY-MM-DD')   AS ends_on,
+		       career_months, granted_days
+		FROM leave_cycle
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND starts_on &lt;= TO_DATE(#{today}, 'YYYY-MM-DD')
+		  AND ends_on &gt; TO_DATE(#{today}, 'YYYY-MM-DD')
+		ORDER BY starts_on DESC
+		FETCH FIRST 1 ROWS ONLY
+	</select>
+
+	<sql id="myLeaveDays">
+		FROM approval_document ad
+		JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
+		WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
+		  AND ad.document_type = 'DOC_LEAVE'
+	</sql>
+
+	<!-- 주기 안의 휴가 일수: 최종 승인 = 사용, 결재 중 = 승인 대기. 임시저장·반려는 세지 않는다 -->
+	<select id="selectUsage" resultType="com.ieum.gw.attendance.dto.LeaveUsageDTO">
+		SELECT NVL(SUM(CASE WHEN ad.status_code = 'APPROVED'    THEN d.deduct_days END), 0) AS used_days,
+		       NVL(SUM(CASE WHEN ad.status_code = 'IN_PROGRESS' THEN d.deduct_days END), 0) AS pending_days
+		<include refid="myLeaveDays"/>
+		  AND ad.status_code IN ('APPROVED', 'IN_PROGRESS')
+		  AND d.leave_date &gt;= TO_DATE(#{startsOn}, 'YYYY-MM-DD')
+		  AND d.leave_date &lt; TO_DATE(#{endsOn}, 'YYYY-MM-DD')
+	</select>
+
+	<!-- 주기에 걸친 휴가 신청서 (제출한 것만), 시작일 늦은 순 -->
+	<select id="selectRequests" resultType="com.ieum.gw.attendance.dto.LeaveRequestDTO">
+		SELECT ad.approval_document_id,
+		       CASE WHEN COUNT(DISTINCT d.leave_type) = 1 THEN MAX(d.leave_type) ELSE 'LV_FULL' END AS leave_type,
+		       TO_CHAR(MIN(d.leave_date), 'YYYY-MM-DD') AS from_date,
+		       TO_CHAR(MAX(d.leave_date), 'YYYY-MM-DD') AS to_date,
+		       lr.requested_days AS days,
+		       lr.reason,
+		       TO_CHAR(ad.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS submitted_at,
+		       ad.status_code
+		FROM approval_document ad
+		JOIN leave_request lr     ON lr.approval_document_id = ad.approval_document_id AND lr.company_id = ad.company_id
+		JOIN leave_request_day d  ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
+		WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
+		  AND ad.document_type = 'DOC_LEAVE'
+		  AND ad.status_code IN ('IN_PROGRESS', 'APPROVED', 'REJECTED')
+		GROUP BY ad.approval_document_id, lr.requested_days, lr.reason, ad.submitted_at, ad.status_code
+		HAVING MAX(d.leave_date) &gt;= TO_DATE(#{startsOn}, 'YYYY-MM-DD')
+		   AND MIN(d.leave_date) &lt; TO_DATE(#{endsOn}, 'YYYY-MM-DD')
+		ORDER BY MIN(d.leave_date) DESC
+	</select>
+
+	<!-- 결재선: 신청서 여러 건을 한 번에 -->
+	<select id="selectSteps" resultType="com.ieum.gw.attendance.dto.ApprovalStepDTO">
+		SELECT s.approval_document_id, s.step_no, e.employee_name AS approver_name, s.status_code, s.opinion
+		FROM approval_step s
+		JOIN employee e ON e.employee_id = s.approver_employee_id AND e.company_id = s.company_id
+		WHERE s.company_id = #{companyId}
+		  AND s.approval_document_id IN
+		<foreach collection="documentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+		ORDER BY s.approval_document_id, s.step_no
+	</select>
+</mapper>
