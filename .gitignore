@@ -16,6 +16,7 @@ desktop.ini
 .vscode/
 .idea/
 *.iml
+docs/local
 
 # STS 수업 플러그인 기록 파일과 주석 처리기가 만드는 소스 폴더
 .sts3-class-manager-*.xml

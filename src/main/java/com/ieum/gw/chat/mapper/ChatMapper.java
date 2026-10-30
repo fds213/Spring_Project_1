@@ -10,11 +10,11 @@ import java.util.List;
 
 @Mapper
 public interface ChatMapper {
-    int isMember(@Param("roomId") long rId, @Param("empnum") String empnum);
+    int isMember(long roomId, Long employeeId);
 
     void insertMessage(ChatMessageDTO dto);
 
-    List<ChatRoomDTO> getRoomList(String empnum);
+    List<ChatRoomDTO> getRoomList(Long companyId, Long employeeId);
 
-    List<ChatEmpDto> getEmpList(String empnum);
+    List<ChatEmpDto> getEmpList(String empNum);
 }

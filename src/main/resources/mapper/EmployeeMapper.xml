@@ -1,0 +1,15 @@
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.employee.mapper.EmployeeMapper">
+
+    <select id="listActiveEmp" resultType="com.ieum.gw.employee.dto.EmpSummaryDTO">
+        SELECT company_id, employee_id, employee_name, department_id, job_grade_id
+        FROM employee WHERE company_id = #{companyId}
+        <if test="excludeEmpId != null">
+            AND employee_id &lt;&gt; #{excludeEmpId}
+        </if>
+        ORDER BY employee_name
+    </select>
+
+
+</mapper>

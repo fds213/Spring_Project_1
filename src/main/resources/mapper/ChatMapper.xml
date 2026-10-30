@@ -21,12 +21,11 @@
     </insert>
 
     <!-- 본인이 참여중인 대화방 목록 -->
-    <!-- comp_code 조건도 추가해야함 -->
-    <select id="getRoomList" parameterType="String" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
-        SELECT r.room_id, r.room_name
+    <select id="getRoomList" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
+        SELECT r.chat_room_id, r.room_name, r.room_type
         FROM chat_room r
-                 JOIN chat_member m ON r.room_id = m.room_id
-        WHERE m.emp_num = #{_parameter}
+                 JOIN chat_member m ON r.chat_room_id = m.chat_room_id
+        WHERE m.employee_id = #{employeeId}
           AND m.left_at IS NULL
     </select>
 

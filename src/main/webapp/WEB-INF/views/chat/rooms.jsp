@@ -40,8 +40,8 @@
           <ul class="emp-list">
             <c:forEach var="emp" items="${empList}">
               <li><label>
-                <input type="checkbox" name="members" value="${emp.empnum}">
-                <c:out value="${emp.name}"/> (<c:out value="${emp.empnum}"/>)
+                <input type="checkbox" name="members" value="${emp.employeeId}">
+                <c:out value="${emp.employeeName}"/> (<c:out value="${emp.employeeId}"/>)
               </label></li>
             </c:forEach>
             <c:if test="${empty empList}">

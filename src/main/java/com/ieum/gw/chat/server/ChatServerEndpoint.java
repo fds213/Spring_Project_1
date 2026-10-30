@@ -34,41 +34,31 @@ public class ChatServerEndpoint {
     private static final Map<Long, Set<Session>> roomSessions = new ConcurrentHashMap<>();
 
     @OnOpen
-    public void handleOpen(Session session, @PathParam("roomId") String roomId) {
+    public void handleOpen(Session session, @PathParam("roomId") Long roomId) {
 
-        long rId = 0;
-        String empnum =((LoginUser) ((Authentication)session.getUserPrincipal()).getPrincipal()).getEmpnum();
+        Long empNum =((LoginUser) ((Authentication)session.getUserPrincipal()).getPrincipal()).getEmployeeId();
 
-        // roomId 가 양수가 아니거나 해당 방 멤버가 아니면 거절
-        try {
-            rId = Long.parseLong(roomId);
-            if(rId <= 0) throw new NumberFormatException();
-        } catch (NumberFormatException e) {
-            System.err.println("방 번호 찐빠");
-            sessionClose(session);
-            return;
-        }
 
-        if(!cService.isMember(rId, empnum)) {
+        if(!cService.isMember(roomId, empNum)) {
             sessionClose(session);
             System.out.println("개찐빠~!~");
             return;
         }
 
         String name = ((LoginUser) ((Authentication)session.getUserPrincipal()).getPrincipal()).getName();
-        session.getUserProperties().put("roomId", rId);
+        session.getUserProperties().put("roomId", roomId);
         session.getUserProperties().put("name", name);
 
-        roomSessions.computeIfAbsent(rId, k -> Collections.synchronizedSet(new HashSet<>())).add(session);
+        roomSessions.computeIfAbsent(roomId, k -> Collections.synchronizedSet(new HashSet<>())).add(session);
         System.out.println("새 유저 입장 방 ID" + roomId + ", 세션 ID " + session.getId());
 
-        sendMembers(rId);
+        sendMembers(roomId);
     }
 
     // 방 전체에게 JSON 전송. 세션 하나가 실패해도 나머지에게는 보낸다.
     // 같은 세션에 동시 전송하면 예외가 나므로 방 단위로 직렬화한다.
-    private void broadcast(Long rId, Map<String, Object> payload) {
-        Set<Session> sessionsInRoom = roomSessions.get(rId);
+    private void broadcast(Long roomId, Map<String, Object> payload) {
+        Set<Session> sessionsInRoom = roomSessions.get(roomId);
         if (sessionsInRoom == null) return;
         String json = GSON.toJson(payload);
         synchronized (sessionsInRoom) {
@@ -83,8 +73,8 @@ public class ChatServerEndpoint {
     }
 
     // 지금 접속 중인 사람 이름 목록(같은 사람이 탭 여러 개여도 한 번만)
-    private void sendMembers(Long rId) {
-        Set<Session> sessionsInRoom = roomSessions.get(rId);
+    private void sendMembers(Long roomId) {
+        Set<Session> sessionsInRoom = roomSessions.get(roomId);
         if (sessionsInRoom == null) return;
         Set<String> names = new TreeSet<>();
 
@@ -94,25 +84,25 @@ public class ChatServerEndpoint {
         Map<String, Object> payload = new HashMap<>();
         payload.put("type", "MEMBERS");
         payload.put("members", names);
-        broadcast(rId, payload);
+        broadcast(roomId, payload);
     }
 
     @OnMessage
     public void handleMessage(String message, Session senderSession) throws IOException {
         ChatMessageDTO dto = new ChatMessageDTO();
 
-        Long rId = (Long) senderSession.getUserProperties().get("roomId");
-        if (rId == null) return;
+        Long roomId = (Long) senderSession.getUserProperties().get("roomId");
+        if (roomId == null) return;
 
-        String senderEmpNum = ((LoginUser) ((Authentication)senderSession.getUserPrincipal()).getPrincipal()).getEmpnum();
+        Long senderEmployeeNum = ((LoginUser) ((Authentication)senderSession.getUserPrincipal()).getPrincipal()).getEmployeeId();
 
         // isMember 넣어서 검증
 
         // 메시지 DB 저장
 
-        dto.setRoomId(rId);
-        dto.setSenderEmpNum(senderEmpNum);
-        dto.setContent(message);
+        dto.setChatRoomId(roomId);
+        dto.setSenderEmployeeNum(senderEmployeeNum);
+        dto.setMessageText(message);
         dto.setMessageType("MSG_TEXT");
 
         cService.insertMessage(dto);
@@ -122,24 +112,24 @@ public class ChatServerEndpoint {
         payload.put("type", "MSG");
         payload.put("sender", senderSession.getUserProperties().get("name"));
         payload.put("content", message);
-        broadcast(rId, payload);
+        broadcast(roomId, payload);
     }
 
     @OnClose
     public void handleClose(Session session) {
-        Long rId = (Long) session.getUserProperties().get("roomId");
-        if (rId == null) return;
-        Set<Session> sessionsInRoom = roomSessions.get(rId);
+        Long roomId = (Long) session.getUserProperties().get("roomId");
+        if (roomId == null) return;
+        Set<Session> sessionsInRoom = roomSessions.get(roomId);
         if (sessionsInRoom != null) {
             sessionsInRoom.remove(session);
             // 방에 아무도 없으면 메모리 관리를 위해 방을 삭제합니다.
             if (sessionsInRoom.isEmpty()) {
-                roomSessions.remove(rId);
+                roomSessions.remove(roomId);
             } else {
-                sendMembers(rId);
+                sendMembers(roomId);
             }
         }
-        System.out.println("유저 퇴장 - 방 ID: " + rId + ", 세션 ID: " + session.getId());
+        System.out.println("유저 퇴장 - 방 ID: " + roomId + ", 세션 ID: " + session.getId());
     }
 
     @OnError
