@@ -1,4 +1,4 @@
-package com.ieum.gw.chat.handler;
+package com.ieum.gw.chat.server;
 
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.service.ChatService;
