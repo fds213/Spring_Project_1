@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.subscription.mapper.SubscriptionMapper">
+
+    <!-- 이 이메일로 만든 업체 수 (만료·자료 삭제된 업체 포함, ACC-01) -->
+    <select id="countTrialEmail" resultType="int">
+        SELECT COUNT(*)
+        FROM company
+        WHERE trial_email = #{trialEmail}
+    </select>
+
+    <!-- 체험 신청 업체 1행. 번호를 먼저 뽑아 dto.companyId에 넣고 INSERT.
+         업체 코드가 겹치면 고유 제약(UQ_02_01)에 걸린다: Service가 다른 코드로 다시 부른다 -->
+    <insert id="insertCompany" parameterType="com.ieum.gw.subscription.dto.CompanyDTO">
+        <selectKey keyProperty="companyId" resultType="long" order="BEFORE">
+            SELECT SQ_COMPANY.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO company
+            (company_id, company_code, company_name, trial_email,
+             requested_seats, trial_requested_at)
+        VALUES
+            (#{companyId}, #{companyCode}, #{companyName}, #{trialEmail},
+             #{requestedSeats}, #{trialRequestedAt})
+    </insert>
+
+    <!-- 체험 기간 1행 (PD_TRIAL) -->
+    <insert id="insertTrialPeriod" parameterType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
+        <selectKey keyProperty="servicePeriodId" resultType="long" order="BEFORE">
+            SELECT SQ_SERVICE_PERIOD.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO service_period
+            (service_period_id, company_id, period_type,
+             starts_at, ends_at, purchased_seats, billing_anchor_date)
+        VALUES
+            (#{servicePeriodId}, #{companyId}, 'PD_TRIAL',
+             #{startsAt}, #{endsAt}, #{purchasedSeats}, #{billingAnchorDate})
+    </insert>
+
+    <!-- 업체의 이용 기간 전부 (체험·유료, 시작 순). 지금 기간·마지막 기간은 Service가 고른다 -->
+    <select id="listPeriods" resultType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
+        SELECT service_period_id, company_id,
+               CASE WHEN period_type = 'PD_TRIAL' THEN 1 ELSE 0 END AS trial,
+               starts_at, ends_at, purchased_seats, billing_anchor_date
+        FROM service_period
+        WHERE company_id = #{companyId}
+        ORDER BY starts_at, service_period_id
+    </select>
+
+    <!-- 업체 이메일 인증 시각 (비어 있으면 인증 전) -->
+    <select id="getEmailVerifiedAt" resultType="java.time.LocalDateTime">
+        SELECT email_verified_at
+        FROM company
+        WHERE company_id = #{companyId}
+    </select>
+</mapper>
