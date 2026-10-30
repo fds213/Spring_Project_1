@@ -48,6 +48,7 @@ function showConnect(message) {
   simEl('simConnect').hidden = false;
   simEl('simMain').hidden = true;
   simEl('simChangeKey').hidden = true;
+  simEl('simLogOpen').hidden = true;
   simEl('simTitle').textContent = '지문 단말기';
   simEl('simKeyError').textContent = message || '';
   simEl('simKey').value = '';
@@ -62,6 +63,7 @@ async function connect(key) {
     sim.people = info.people;
     simEl('simTitle').textContent = `${info.companyName} 지문 단말기`;
     simEl('simChangeKey').hidden = false;
+    simEl('simLogOpen').hidden = false;
     simEl('simDevice').textContent = `등록된 사람 ${info.people.length}명`;
     renderPeople();
     simEl('simConnect').hidden = true;
@@ -86,17 +88,30 @@ simEl('simChangeKey').addEventListener('click', () => { simStoreKey(''); sim.key
 const SIM_BACK_MS = 5000; // 결과를 보여 준 뒤 처음으로 돌아가기까지
 let simBackTimer = 0;
 
+let simNow = 1; // 지금 단계 (결과 화면은 4). 화면이 들어오는 방향을 정할 때 쓴다
+
 function simGo(step) {
   clearTimeout(simBackTimer);
-  document.querySelectorAll('.sim-step').forEach(s => { s.hidden = s.dataset.step !== String(step); });
-  // 진행 표시: 지금 단계는 강조, 지난 단계는 완료 표시 (결과 화면에서는 셋 다 완료)
   const now = step === 'done' ? 4 : Number(step);
+  const dir = now > simNow ? 'in-next' : now < simNow ? 'in-back' : '';
+  simNow = now;
+  document.querySelectorAll('.sim-step').forEach(s => {
+    s.hidden = s.dataset.step !== String(step);
+    s.classList.remove('in-next', 'in-back');
+    if (!s.hidden && dir) { void s.offsetWidth; s.classList.add(dir); } // 같은 방향이 이어져도 다시 움직이게
+  });
+  // 진행 표시: 지금 단계를 가리키는 칸이 옆으로 미끄러진다(--step). 지난 단계는 완료 표시이고 눌러서 돌아갈 수 있다
+  const steps = simEl('simSteps');
+  steps.style.setProperty('--step', Math.min(now, 3) - 1);
+  steps.classList.toggle('all-done', now === 4);
   document.querySelectorAll('#simSteps li').forEach(li => {
     const n = Number(li.dataset.step);
+    const btn = li.querySelector('button');
     li.classList.toggle('on', n === now);
     li.classList.toggle('done', n < now);
+    btn.disabled = n >= now;
+    if (n === now) btn.setAttribute('aria-current', 'step'); else btn.removeAttribute('aria-current');
   });
-  document.querySelector('.sim-first-only').hidden = step !== 1 && step !== '1';
   if (String(step) === '1') {
     // 처음 화면: 검색어를 비우고 검색 칸에 바로 입력할 수 있게
     sim.selected = null;
@@ -121,7 +136,8 @@ function simGo(step) {
   }
 }
 const simWho = p => (p ? (p.unregistered ? p.name : `${p.name} (${p.userNo}번)`) : '');
-document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => simGo(b.dataset.go)));
+// 단계 이동 버튼 (진행 표시의 지난 단계, 결과의 처음으로). 지문을 읽는 동안은 움직이지 않는다
+document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => { if (!sim.scanning) simGo(b.dataset.go); }));
 
 // ---------- 1) 사람 고르기 (검색 + 한 줄에 한 사람) → 2) 출근·퇴근 고르기 ----------
 const SIM_UNREGISTERED = { name: '등록 안 된 사람', unregistered: true };
@@ -170,7 +186,7 @@ function simRenderPager(pages) {
   const btn = (label, page, opts = {}) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'sim-page';
+    b.className = 'sim-page-no';
     b.textContent = label;
     if (opts.aria) b.setAttribute('aria-label', opts.aria);
     if (opts.current) b.setAttribute('aria-current', 'page');
@@ -240,9 +256,17 @@ function scan() {
 }
 simEl('simFinger').addEventListener('click', scan);
 
+// 기록 보기 창: x 버튼이나 바깥(어두운 곳)을 누르면 닫힌다
+const simLogDialog = simEl('simLogDialog');
+simEl('simLogOpen').addEventListener('click', () => simLogDialog.showModal());
+simEl('simLogClose').addEventListener('click', () => simLogDialog.close());
+simLogDialog.addEventListener('click', e => { if (e.target === simLogDialog) simLogDialog.close(); });
+
 function renderLog() {
   const ul = simEl('simLog');
   if (!sim.log.length) return;
+  simEl('simLogEmpty').hidden = true;
+  ul.hidden = false;
   ul.replaceChildren(...sim.log.slice(0, 10).map(t => {
     const li = document.createElement('li');
     li.textContent = t;

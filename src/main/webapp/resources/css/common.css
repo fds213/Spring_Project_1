@@ -748,12 +748,31 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 
 /* ---------- 근태 단말기 관리 (attendance/admin/device.jsp) ---------- */
 .dev-body { padding: 14px 18px 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-.dev-status { margin: 0; line-height: 1.6; color: var(--text-sub); }
+.info-card-head .dev-issue { margin-left: auto; flex: none; }
+/* 근태 단말기 카드: 머리줄만 보이다가(옆 카드 높이로 늘이지 않는다) 버튼을 누르면 아래로 펼쳐진다 */
+.dev-card { align-self: start; overflow: visible; } /* 펼친 칸의 드롭다운 목록이 카드 밖으로 나올 수 있게 */
+.dev-card .info-card-head { border-bottom: 0; }
+.dev-fold { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .28s ease, opacity .2s ease; }
+.dev-fold.open { grid-template-rows: 1fr; opacity: 1; }
+.dev-fold-inner { min-height: 0; overflow: hidden; }
+/* 다 펼쳐진 뒤에는 잘라 내지 않는다 (드롭다운 목록이 칸 아래로 펼쳐지도록). 접을 때는 바로 다시 자른다 */
+.dev-fold.open .dev-fold-inner { animation: dev-unclip 0s .28s forwards; }
+@keyframes dev-unclip { to { overflow: visible; } }
+.dev-fold .dev-body { border-top: 1px solid var(--line); }
+/* 펼쳐진 동안은 머리줄 버튼 대신 ^ 접기 버튼 (탭처럼). 나타날 때 v 에서 ^ 로 돈다 */
+.dev-collapse { margin-left: auto; flex: none; width: 32px; height: 32px; justify-content: center; border-radius: var(--radius); }
+.dev-collapse:hover { background: var(--accent-bg); color: var(--accent); }
+.dev-card:has(.dev-fold.open) .dev-issue,
+.dev-card:not(:has(.dev-fold.open)) .dev-collapse { display: none; }
+.dev-card:has(.dev-fold.open) .dev-collapse svg { animation: dev-chev .28s ease; }
+@keyframes dev-chev { from { transform: rotate(180deg); } }
+@media (prefers-reduced-motion: reduce) { .dev-fold { transition: none; } .dev-card .dev-collapse svg { animation: none; } }
 .dev-key { width: 100%; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-bg); }
 .dev-key-label { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent-hover); }
 .dev-key .input { font-family: Consolas, "Courier New", monospace; letter-spacing: 0.5px; }
 .dev-body .org-add { max-width: none; width: 100%; }
-.dev-body .dev-employee { flex: 1 1 200px; }
+.dev-body .form-error:empty { display: none; } /* 오류가 없을 때 아래 빈 줄을 남기지 않는다 */
+.dev-body .org-add .select { flex: 1 1 200px; min-width: 0; } /* 꾸민 드롭다운(select.js)이 감싼 직원 고르기 */
 .dev-body .dev-no { flex: 0 0 120px; }
 
 /* ---------- 지문 단말기 시뮬레이터 (attendance/simulator.jsp) ---------- */
@@ -762,7 +781,8 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-head { display: flex; align-items: center; gap: 10px; }
 .sim-head img { height: 26px; }
 .sim-head strong { font-weight: 600; }
-.sim-reset { margin-left: auto; height: 30px; font-size: 12px; white-space: nowrap; }
+.sim-head-actions { margin-left: auto; display: flex; gap: 6px; }
+.sim-reset { height: 30px; font-size: 12px; white-space: nowrap; }
 .sim-panel { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 18px; margin-top: 14px; }
 .sim-title { font-size: 13px; color: var(--text-sub); margin: 0 0 10px; }
 .sim-help { margin: 0 0 10px; font-size: 13px; color: var(--text-sub); line-height: 1.6; }
@@ -788,13 +808,13 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-person.is-unregistered .sim-name { font-weight: 400; color: var(--text-sub); }
 .sim-empty { margin: 12px 0 0; text-align: center; }
 .sim-pager { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
-.sim-page {
+.sim-page-no {
   min-width: 34px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius);
   background: var(--bg); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
 }
-.sim-page:hover:not(:disabled) { background: var(--bg-sub); }
-.sim-page[aria-current="page"] { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
-.sim-page:disabled { color: var(--text-muted); cursor: default; }
+.sim-page-no:hover:not(:disabled):not([aria-current="page"]) { background: var(--bg-sub); } /* 지금 페이지는 올려도 파란 칠을 유지 */
+.sim-page-no[aria-current="page"] { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.sim-page-no:disabled { color: var(--text-muted); cursor: default; }
 .sim-type {
   border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: inherit; color: var(--text); cursor: pointer;
 }
@@ -815,27 +835,54 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-result { text-align: center; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; }
 .sim-result .btn { margin-top: 10px; }
 .sim-result .sim-hint { font-size: 12px; color: var(--text-muted); }
-/* 진행 단계 표시: 1 사람 · 2 출근·퇴근 · 3 지문 */
-.sim-steps { list-style: none; display: flex; gap: 6px; margin: 14px 0 0; padding: 0; counter-reset: simstep; }
-.sim-steps li {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 8px 4px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line);
-  font-size: 13px; color: var(--text-muted);
+/* 진행 단계 표시: 1 사람 · 2 출근·퇴근 · 3 지문. 한 틀에 묶고, 지금 단계를 가리키는 칸(::after)이
+   --step 값(0·1·2)을 따라 옆으로 미끄러진다. 결과 화면(.all-done)에서는 칸이 사라진다 */
+.sim-steps {
+  position: relative; list-style: none; display: flex; margin: 14px 0 0; padding: 4px; counter-reset: simstep;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; --step: 0;
 }
-.sim-steps li::before {
+.sim-steps::after {
+  content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3);
+  border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-bg);
+  transform: translateX(calc(var(--step) * 100%));
+  transition: transform .35s cubic-bezier(.3, .8, .25, 1), opacity .2s;
+}
+.sim-steps.all-done::after { opacity: 0; }
+.sim-steps li { position: relative; z-index: 1; flex: 1; display: flex; }
+.sim-steps button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 4px; border: 0; border-radius: 999px; background: none;
+  font: inherit; font-size: 13px; color: var(--text-muted); transition: color .25s;
+}
+.sim-steps button:disabled { cursor: default; }
+.sim-steps li.done button { cursor: pointer; }
+.sim-steps li.done button:hover { color: var(--accent); }
+.sim-steps button::before {
   counter-increment: simstep; content: counter(simstep);
   width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--bg-sub); font-size: 11px; font-weight: 600;
+  background: var(--bg-sub); font-size: 11px; font-weight: 600; transition: background-color .25s, color .25s;
 }
-.sim-steps li.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
-.sim-steps li.on::before { background: var(--accent); color: #fff; }
-.sim-steps li.done { color: var(--text-sub); }
-.sim-steps li.done::before { content: "✓"; background: var(--accent-bg); color: var(--accent); }
+.sim-steps li.on button { color: var(--accent); font-weight: 600; }
+.sim-steps li.on button::before { background: var(--accent); color: #fff; }
+.sim-steps li.done button { color: var(--text-sub); }
+.sim-steps li.done button::before { content: "✓"; background: var(--accent-bg); color: var(--accent); }
+/* 단계 화면은 나아갈 때 오른쪽에서, 돌아갈 때 왼쪽에서 들어온다 (simulator.js 의 simGo) */
+.sim-step.in-next { animation: sim-in-next .3s ease; }
+.sim-step.in-back { animation: sim-in-back .3s ease; }
+@keyframes sim-in-next { from { opacity: 0; transform: translateX(24px); } }
+@keyframes sim-in-back { from { opacity: 0; transform: translateX(-24px); } }
+@media (prefers-reduced-motion: reduce) {
+  .sim-steps::after, .sim-steps button, .sim-steps button::before { transition: none; }
+  .sim-step.in-next, .sim-step.in-back { animation: none; }
+}
 /* 한 단계 화면 */
-.sim-step { min-height: 260px; }
 .sim-chosen { margin: -2px 0 14px; font-size: 16px; font-weight: 600; }
-.sim-step-actions { display: flex; justify-content: flex-start; width: 100%; margin-top: 16px; }
 .sim-types .sim-type { height: 72px; font-size: 18px; }
+/* 출근은 파란 테두리, 퇴근은 붉은 테두리. 올리면 같은 색으로 옅게 칠한다 */
+.sim-types .sim-type[data-type="IN"] { border-color: var(--accent); }
+.sim-types .sim-type[data-type="IN"]:hover { background: var(--accent-bg); }
+.sim-types .sim-type[data-type="OUT"] { border-color: var(--danger); }
+.sim-types .sim-type[data-type="OUT"]:hover { background: var(--danger-bg); }
 .sim-big { font-size: 20px; font-weight: 600; }
 .sim-result.ok { color: #0f6e56; }
 .sim-result.warn { color: #854f0b; }
@@ -844,3 +891,16 @@ body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
 .sim-log { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .sim-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
 .sim-log li:last-child { border-bottom: 0; }
+.sim-log-dialog { width: min(420px, calc(100% - 32px)); }
+.sim-log-dialog .sim-log { max-height: 50vh; overflow-y: auto; }
+.sim-log-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.sim-log-head h2 { margin: 0; }
+.sim-log-x { width: 32px; height: 32px; margin-right: -6px; justify-content: center; border-radius: var(--radius); }
+.sim-log-x:hover { background: var(--bg-sub); color: var(--text); }
+/* 기록이 없을 때: 빈 카드 가운데에 안내 */
+.sim-log-dialog .sim-log-empty {
+  margin: 0; min-height: 120px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sub);
+  font-size: 13px; color: var(--text-muted);
+}
+.sim-log-dialog .sim-log-empty[hidden] { display: none; }

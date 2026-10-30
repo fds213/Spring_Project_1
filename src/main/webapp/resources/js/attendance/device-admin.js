@@ -12,6 +12,15 @@ const devEl = id => document.getElementById(id);
 const devNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
 const devState = { data: null };
 
+// 카드 아래 칸 펼치기·접기 (애니메이션은 common.css 의 .dev-fold). 접힌 칸은 inert 라 Tab 이 들어가지 않는다.
+// 펼쳐진 동안 머리줄 버튼 대신 ^ 접기 버튼이 보이는 것도 CSS 가 한다
+function devFold(id, open) {
+  const box = devEl(id);
+  box.classList.toggle('open', open);
+  box.inert = !open;
+  devEl(id === 'devKeyBox' ? 'btnIssueKey' : 'btnLinkOpen').setAttribute('aria-expanded', open);
+}
+
 // 화면을 열 때 (JSP 페이지가 열리면 부른다)
 function openDeviceAdmin() {
   api.get('/attendance/admin/api/device')
@@ -21,12 +30,7 @@ function openDeviceAdmin() {
 
 function renderDeviceAdmin(d) {
   devState.data = d;
-  const status = devEl('devStatus');
   const issue = devEl('btnIssueKey');
-  status.textContent = d.device
-    ? `등록된 단말기: ${d.device.name}. 키를 잃어버렸거나 바꾸려면 다시 발급하세요. 다시 발급하면 예전 키를 넣어 둔 시뮬레이터는 새 키를 다시 입력해야 합니다.`
-    : '아직 등록된 단말기가 없습니다. 키를 발급하면 단말기가 함께 등록됩니다.';
-  issue.textContent = d.device ? '키 다시 발급' : '키 발급';
   issue.hidden = false;
   issue.disabled = d.readOnly;
 
@@ -39,8 +43,11 @@ function renderDeviceAdmin(d) {
       return o;
     }));
   sel.firstChild.value = '';
-  devEl('devLinkForm').querySelectorAll('select, input, button').forEach(x => { x.disabled = d.readOnly || !d.device; });
-  devEl('devLinkError').textContent = !d.device ? '먼저 단말기 키를 발급해 단말기를 등록하세요' : '';
+  const linkOpen = devEl('btnLinkOpen');
+  linkOpen.disabled = d.readOnly || !d.device;
+  linkOpen.title = !d.device ? '먼저 단말기 키를 발급해 단말기를 등록하세요' : '';
+  if (linkOpen.disabled) setLinkOpen(false);
+  devEl('btnLink').disabled = d.readOnly || !d.device;
 
   // 연결된 사람
   const rows = d.people.map(p => {
@@ -75,7 +82,7 @@ function issueKey() {
     api.post('/attendance/admin/api/device/key')
       .done(r => {
         devEl('devKey').value = r.key;
-        devEl('devKeyBox').hidden = false;
+        devFold('devKeyBox', true);
         showToast(r.created ? '단말기를 등록하고 키를 발급했습니다' : '키를 다시 발급했습니다');
         openDeviceAdmin();
       })
@@ -86,6 +93,13 @@ function issueKey() {
 }
 devEl('btnIssueKey').addEventListener('click', issueKey);
 
+// 접으면 애니메이션이 끝난 뒤 키 값도 지운다
+devEl('btnKeyFold').addEventListener('click', () => {
+  devFold('devKeyBox', false);
+  setTimeout(() => { if (!devEl('devKeyBox').classList.contains('open')) devEl('devKey').value = ''; }, 300);
+  devEl('btnIssueKey').focus();
+});
+
 devEl('btnCopyKey').addEventListener('click', () => {
   const input = devEl('devKey');
   const done = () => showToast('키를 복사했습니다. 시뮬레이터의 단말기 키 칸에 붙여 넣으세요');
@@ -93,7 +107,20 @@ devEl('btnCopyKey').addEventListener('click', () => {
   else { input.select(); }
 });
 
-// 직원 연결
+// 직원 연결: 머리줄 연결 버튼이 칸을 펼치고, ^ 버튼이 접는다
+function setLinkOpen(open) {
+  devFold('devLinkBox', open);
+  if (!open) { devEl('devUserNo').value = ''; devEl('devLinkError').textContent = ''; }
+}
+devEl('btnLinkOpen').addEventListener('click', () => {
+  setLinkOpen(true);
+  (devEl('devEmployeeBtn') || devEl('devEmployee')).focus({ preventScroll: true }); // 꾸민 드롭다운(select.js)의 버튼
+});
+devEl('btnLinkFold').addEventListener('click', () => {
+  setLinkOpen(false);
+  devEl('btnLinkOpen').focus();
+});
+
 devEl('devLinkForm').addEventListener('submit', e => {
   e.preventDefault();
   const error = devEl('devLinkError');
@@ -101,13 +128,12 @@ devEl('devLinkForm').addEventListener('submit', e => {
   const userNo = devEl('devUserNo').value.trim();
   if (!employeeId) { error.textContent = '연결할 직원을 고르세요'; return; }
   if (!/^\d{4}$/.test(userNo)) { error.textContent = '단말기 사용자 번호는 숫자 4자리입니다'; devEl('devUserNo').focus(); return; }
-  const btn = e.target.querySelector('button[type="submit"]');
+  const btn = devEl('btnLink');
   btn.disabled = true;
   api.post('/attendance/admin/api/device/links', { employeeId: Number(employeeId), userNo })
     .done(() => {
       showToast(`사용자 번호 ${userNo}번과 연결했습니다`);
-      devEl('devUserNo').value = '';
-      error.textContent = '';
+      setLinkOpen(false);
       openDeviceAdmin();
     })
     .fail(xhr => { error.textContent = apiMessage(xhr); btn.disabled = false; });

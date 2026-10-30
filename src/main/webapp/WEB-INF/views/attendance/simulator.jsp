@@ -25,8 +25,11 @@
     <div class="sim-head">
       <img src="${ctx}/resources/img/logo-mark.svg" alt="">
       <strong id="simTitle">지문 단말기</strong>
-      <%-- 단말기 키 재설정: 연결된 뒤에만 보인다. 누르면 저장한 키를 지우고 키 입력 칸으로 --%>
-      <button type="button" class="btn sim-reset" id="simChangeKey" hidden>단말기 키 재설정</button>
+      <%-- 연결된 뒤에만 보인다. 기록 보기: 이번에 찍은 기록 창 / 단말기 키 재설정: 저장한 키를 지우고 키 입력 칸으로 --%>
+      <div class="sim-head-actions">
+        <button type="button" class="btn sim-reset" id="simLogOpen" aria-haspopup="dialog" hidden>기록 보기</button>
+        <button type="button" class="btn sim-reset" id="simChangeKey" hidden>단말기 키 재설정</button>
+      </div>
     </div>
 
     <%-- 1) 단말기 키: 업체마다 발급한 키. 없거나 틀리면 이 칸만 보인다 --%>
@@ -47,11 +50,12 @@
         <div class="sim-device" id="simDevice"></div>
       </section>
 
-      <%-- 한 화면에 한 단계: 사람 → 출근·퇴근 → 지문 → 결과(몇 초 뒤 처음으로). simulator.js 의 simGo 가 바꾼다 --%>
+      <%-- 한 화면에 한 단계: 사람 → 출근·퇴근 → 지문 → 결과(몇 초 뒤 처음으로). simulator.js 의 simGo 가 바꾼다.
+           지난 단계(✓)를 누르면 그 단계로 돌아간다 --%>
       <ol class="sim-steps" id="simSteps" aria-label="진행 단계">
-        <li data-step="1">사람</li>
-        <li data-step="2">출근·퇴근</li>
-        <li data-step="3">지문</li>
+        <li data-step="1"><button type="button" data-go="1">사람</button></li>
+        <li data-step="2"><button type="button" data-go="2">출근·퇴근</button></li>
+        <li data-step="3"><button type="button" data-go="3">지문</button></li>
       </ol>
 
       <section class="sim-panel sim-step" data-step="1">
@@ -72,7 +76,6 @@
           <button type="button" class="sim-type" data-type="IN">출근</button>
           <button type="button" class="sim-type" data-type="OUT">퇴근</button>
         </div>
-        <div class="sim-step-actions"><button type="button" class="btn" data-go="1">이전</button></div>
       </section>
 
       <section class="sim-panel sim-step sim-scan" data-step="3" hidden>
@@ -88,7 +91,6 @@
           </svg>
         </button>
         <span class="sim-hint" id="simHint">지문 버튼을 누르세요</span>
-        <div class="sim-step-actions"><button type="button" class="btn" data-go="2">이전</button></div>
       </section>
 
       <section class="sim-panel sim-step sim-result idle" data-step="done" id="simResult" aria-live="polite" hidden>
@@ -97,16 +99,21 @@
         <button type="button" class="btn btn-primary" data-go="1">처음으로</button>
         <small class="sim-hint" id="simBackHint"></small>
       </section>
-
-      <%-- 첫 단계에서만: 이번에 찍은 기록 --%>
-      <div class="sim-first-only">
-        <section class="sim-panel">
-          <p class="sim-title">이번에 찍은 기록</p>
-          <ul class="sim-log" id="simLog"><li class="muted">기록이 없습니다</li></ul>
-        </section>
-      </div>
     </div>
   </div>
+
+  <%-- 근태 기록: 이 화면을 연 뒤 찍은 것만, 최근 10건. 머리줄의 기록 보기로 연다 --%>
+  <dialog class="modal sim-log-dialog" id="simLogDialog" aria-labelledby="simLogTitle">
+    <div class="sim-log-head">
+      <h2 id="simLogTitle">근태 기록</h2>
+      <button type="button" class="icon-btn sim-log-x" id="simLogClose" aria-label="닫기">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <%-- 찍은 기록이 없을 때는 빈 카드 가운데에 안내만 --%>
+    <p class="sim-log-empty" id="simLogEmpty">기록이 없습니다</p>
+    <ul class="sim-log" id="simLog" hidden></ul>
+  </dialog>
   <script src="${ctx}/resources/js/attendance/simulator.js"></script>
 </body>
 </html>
