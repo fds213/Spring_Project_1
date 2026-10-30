@@ -8,7 +8,9 @@ import lombok.ToString;
 @Setter
 @ToString
 public class ChatMessageDTO {
-    private String name;
+    private Long msgId;
+    private Long roomId;
+    private String sender;
+    private String msg_type;
     private String content;
-    private String date;
 }
