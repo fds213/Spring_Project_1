@@ -14,6 +14,8 @@
     <script>routeNoticeBoard('notice' + location.pathname.slice((document.body.dataset.ctx + '/board/notice').length));</script>
   </jsp:attribute>
   <jsp:body>
+      <%-- 게시판 전용 스타일 (공통 레이아웃에 화면별 CSS 칸이 없어서 본문 맨 앞에서 불러온다) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/board/board.css">
     <section class="view" id="view-notice-list">
       <%-- 공지사항 (board/board.js). 주소: /board/notice · /board/notice/view/3 · /board/notice/write · /board/notice/edit/3.
            목록·글 보기·글쓰기가 이 한 페이지에 있고, 주소를 보고 하나를 보인다 --%>

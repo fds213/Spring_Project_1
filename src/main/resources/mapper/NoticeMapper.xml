@@ -46,5 +46,28 @@
 		SELECT COUNT(*)
 		<include refid="noticeWhere"/>
 	</select>
+	<!-- ========== 글쓰기 ========== -->
 
+	<!-- 우리 업체의 공지 게시판 번호.
+	     줄이 없으면 MIN이 NULL을 돌려줘서 Java에서는 null이 된다 -->
+	<select id="selectNoticeBoardId" resultType="long">
+		SELECT MIN(board_id)
+		  FROM board
+		 WHERE company_id = #{companyId}
+		   AND board_type = 'BOARD_NOTICE'
+		   AND use_yn = 'Y'
+	</select>
+
+	<!-- 새 게시글 번호 하나 뽑기 -->
+	<select id="selectNextPostId" resultType="long">
+		SELECT sq_post.NEXTVAL FROM dual
+	</select>
+
+	<!-- 공지 저장. 보이기(VISIBLE_YN)·작성일·수정일은 DB 기본값을 쓴다.
+	     내용은 서식 글이라 길 수 있어서 CLOB으로 보낸다 -->
+	<insert id="insertNotice">
+		INSERT INTO post (post_id, company_id, board_id, author_employee_id, title, content, status_code)
+		VALUES (#{postId}, #{companyId}, #{boardId}, #{authorId}, #{title},
+		        #{content, jdbcType=CLOB}, 'POST_PUBLISHED')
+	</insert>
 </mapper>

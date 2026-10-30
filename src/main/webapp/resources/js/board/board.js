@@ -475,7 +475,7 @@ byId('btnDelete')?.addEventListener('click', async () => {
 const SIZE_MIN = 10;
 const SIZE_MAX = 40;
 const SIZE_BASE = 15;
-const ZWSP = '​'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
+const ZWSP = '\u200B'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
 const SWATCH_RGB = new Map(['#1f1f1d', '#a32d2d', '#185fa5', '#2b6a2f', '#8a4b08'].map(c => {
   const h = c.slice(1);
   return [c, `rgb(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)})`];
@@ -651,7 +651,7 @@ function makeEditor(areaId) {
   area.addEventListener('drop', e => e.preventDefault());
 
   // 바깥에서 쓰는 것
-  ed.html = () => sanitizeHtml(area.innerHTML.replace(/​/g, '')); // 저장할 서식 글 (걸러진 것)
+  ed.html = () => sanitizeHtml(area.innerHTML.replace(/\u200B/g, '')); // 저장할 서식 글 (걸러진 것)
   ed.text = () => textOf(ed.html());                                    // 서식을 뺀 글자 (글자 수·빈칸 검사)
   ed.set = html => {
     area.innerHTML = html ? sanitizeHtml(html) : '';
@@ -737,7 +737,7 @@ const filesToSend = files => files.map(f => (f.data ? { name: f.name, size: f.si
 // 작성 화면 공통 도구
 function updateCount(input, counter, max) {
   // 에디터(서식 글)는 서식을 뺀 글자 수를 센다
-  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/​/g, '')).length : byId(input).value.length;
+  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/\u200B/g, '')).length : byId(input).value.length;
   byId(counter).textContent = `${len} / ${max}`;
   byId(counter).classList.toggle('is-full', len >= max);
 }
@@ -799,7 +799,7 @@ function fillForm(res) {
   formState.id = n ? n.id : null;
   formState.saving = false;
   byId('formTitle').textContent = n ? '공지 수정' : '공지 쓰기';
-  byId('formCrumb').textContent = n ? '수정' : '글쓰기';
+  if (byId('formCrumb')) byId('formCrumb').textContent = n ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('fScope').value = n ? n.scope : res.scopes[0];
   byId('fTitle').value = n ? n.title : '';
   noticeEditor.set(n ? n.content : '');
@@ -1011,7 +1011,7 @@ function fillBoardForm(res) {
   boardFormState.id = p ? p.id : null;
   boardFormState.saving = false;
   byId('bFormTitle').textContent = p ? '글 수정' : '글쓰기';
-  byId('bFormCrumb').textContent = p ? '수정' : '글쓰기';
+  if (byId('bFormCrumb')) byId('bFormCrumb').textContent = p ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('bFormSub').textContent = `${res.dept} 게시판에 올라갑니다. ${res.dept} 사람만 볼 수 있어요.`;
   byId('bTitle').value = p ? p.title : '';
   boardEditor.set(p ? p.content : '');

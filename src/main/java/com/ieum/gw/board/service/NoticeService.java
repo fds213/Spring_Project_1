@@ -6,7 +6,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.board.dao.NoticeDAO;
 import com.ieum.gw.board.dto.NoticeDTO;
@@ -21,6 +24,9 @@ import lombok.RequiredArgsConstructor;
 public class NoticeService {
 
     private static final int PAGE_SIZE = 10; // 한 페이지에 10개
+    private static final int TITLE_MAX = 100;    // 제목 글자 수 (board.js와 같게)
+    private static final int CONTENT_MAX = 2000; // 내용 글자 수: 서식을 뺀 글자 기준 (board.js와 같게)
+    private static final int CONTENT_HTML_MAX = 100000; // 서식까지 포함한 길이 상한 (터무니없이 큰 요청 막기)
 
     private final NoticeDAO dao;
 
@@ -57,6 +63,81 @@ public class NoticeService {
         result.put("myDept", "부서");                       // 부서 공지가 생기면 실제 부서 이름으로
         result.put("perms", perms);
         return result;
+    }
+
+    // ---------- 글쓰기 ----------
+
+    // 공지 쓰기 화면을 열 때 보낼 값 (board.js fillForm이 읽는 모양)
+    public Map<String, Object> getNoticeForm(LoginUser user) {
+        checkManager(user); // 관리자·인사 담당이 아니면 여기서 403으로 멈춘다
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("notice", null);            // 새 글이라 채울 값이 없다 (수정 단계에서 채운다)
+        result.put("scopes", List.of("ALL"));  // 고를 수 있는 범위: 부서 공지가 보류라 전사 공지만
+        result.put("scopeLocked", false);      // 범위 선택 상자를 잠글지 (부서장용, 지금은 안 씀)
+        result.put("myDept", "부서");           // 부서 공지가 생기면 실제 부서 이름으로
+        return result;
+    }
+
+    // 공지 저장. 성공하면 새 글 번호를 돌려준다 → 화면이 그 글 보기로 이동
+    @Transactional
+    public Map<String, Object> createNotice(LoginUser user, String title, String content) {
+        checkManager(user);
+
+        // 1. 값 검사 (화면도 검사하지만, 주소로 직접 보내는 요청도 있으니 서버가 다시 본다)
+        title = (title == null) ? "" : title.trim();
+        content = (content == null) ? "" : content;
+        validate(title, content);
+
+        // 2. 우리 업체의 공지 게시판 번호
+        Long companyId = user.getCompanyId();
+        Long boardId = dao.selectNoticeBoardId(companyId);
+        if (boardId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                    "공지 게시판이 아직 준비되지 않았습니다. 업체 관리자에게 알려 주세요");
+        }
+
+        // 3. 번호를 먼저 뽑고 저장 (업체·작성자는 로그인 정보에서만 꺼낸다)
+        Long postId = dao.selectNextPostId();
+        dao.insertNotice(postId, companyId, boardId, user.getEmployeeId(), title, content);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("id", postId);
+        return result;
+    }
+
+    // 관리자·인사 담당이 아니면 403
+    private void checkManager(LoginUser user) {
+        if (!isManager(user)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "공지를 쓸 권한이 없습니다");
+        }
+    }
+
+    // 제목·내용 검사. 틀리면 400과 안내 문구
+    private void validate(String title, String content) {
+        String text = textOf(content);
+        String message = null;
+        if (title.isEmpty())                          message = "제목을 입력해 주세요";
+        else if (title.length() > TITLE_MAX)          message = "제목은 " + TITLE_MAX + "자까지 쓸 수 있습니다";
+        else if (text.isEmpty())                      message = "내용을 입력해 주세요";
+        else if (text.length() > CONTENT_MAX)         message = "내용은 " + CONTENT_MAX + "자까지 쓸 수 있습니다";
+        else if (content.length() > CONTENT_HTML_MAX) message = "내용이 너무 깁니다";
+        if (message != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, message);
+        }
+    }
+
+    // 서식(HTML 태그)을 뺀 글자만 남긴다 (board.js textOf와 같은 기준으로 센다)
+    private String textOf(String html) {
+        return html
+                .replaceAll("(?i)<br\\s*/?>", "\n")           // 줄바꿈
+                .replaceAll("(?i)</(p|div|li)>", "\n")         // 문단·목록 끝도 줄바꿈
+                .replaceAll("<[^>]*>", "")                     // 나머지 태그는 지운다
+                .replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">")
+                .replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+                .replace("\u200B", "")                         // 에디터가 넣는 보이지 않는 글자
+                .replaceAll("\n{3,}", "\n\n")
+                .trim();
     }
 
     // 검색어를 띄어쓰기로 나눈다. 비어 있으면 null (= 검색 안 함)

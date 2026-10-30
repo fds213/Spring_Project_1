@@ -26,4 +26,20 @@ public class NoticeDAO {
     public int countNotices(Long companyId, List<String> words) {
         return mapper.countNotices(companyId, words);
     }
+    // ---------- 글쓰기 ----------
+
+    // 우리 업체의 공지 게시판 번호 (없으면 null)
+    public Long selectNoticeBoardId(Long companyId) {
+        return mapper.selectNoticeBoardId(companyId);
+    }
+
+    // 새 게시글 번호 하나 뽑기
+    public Long selectNextPostId() {
+        return mapper.selectNextPostId();
+    }
+
+    // 공지 저장 (성공하면 1)
+    public int insertNotice(Long postId, Long companyId, Long boardId, Long authorId, String title, String content) {
+        return mapper.insertNotice(postId, companyId, boardId, authorId, title, content);
+    }    
 }
