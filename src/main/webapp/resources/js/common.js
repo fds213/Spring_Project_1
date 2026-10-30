@@ -1,6 +1,7 @@
 // 공통 스크립트: layout.tag·site.tag 가 jQuery 다음에 불러온다. 프론트 공통 담당만 고친다.
 // 1) GET 이외의 모든 AJAX에 CSRF 토큰 헤더 (가이드 7장)   2) 401·403 응답 처리
 // 3) 좁은 화면 메뉴 서랍   4) 배지 숫자 15초 조회 (GET /badges)   5) 읽기 전용 업체의 쓰기 동작 막기   6) 토스트
+// 7) 헤더의 본인 비밀번호 변경 창   8) 화면 JS(시안 resources/js/<모듈>/*.js)가 쓰는 api·pageHref 등 전역 함수
 // 화면별 JS는 주소를 IEUM.url('/approval/list') 로 만들고, 결과는 { success, message, data } 로 받는다.
 (function ($) {
   'use strict';
@@ -33,12 +34,14 @@
 
   // ---------- 3) narrow screens: the hamburger opens the sidebar as a drawer ----------
   const btnMenu = document.getElementById('btnMenu');
+  window.setMenu = () => {}; // 화면 JS가 부른다 (메뉴 버튼이 없는 틀에서는 아무 일도 하지 않는다)
   if (btnMenu) {
     const setMenu = open => {
       document.body.classList.toggle('menu-open', open);
       btnMenu.setAttribute('aria-expanded', open);
       btnMenu.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
     };
+    window.setMenu = setMenu;
     btnMenu.addEventListener('click', () => setMenu(!document.body.classList.contains('menu-open')));
     document.getElementById('backdrop').addEventListener('click', () => setMenu(false));
     document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenu(false); });
@@ -47,7 +50,8 @@
   }
 
   // ---------- 4) badges: one request every 15 s fills every [data-badge="<name>"] (가이드 7장 알림과 배지) ----------
-  // 업체 직원: { notification, approval, chat }  /  이음 운영자: { application, inquiryGuest, inquiryCompany } (백엔드와 확정)
+  // 업체 직원: { notification, approval, chat, join(가입 승인할 수 있는 사람만) }  /  이음 운영자: { application, inquiryGuest }
+  // (메뉴의 data-badge 이름과 같다. 이번 범위에서 뺀 회원 접수·증설 승인 배지는 없다)
   const BADGE_MS = 15000;
   let badgeTimer = null;
   function refreshBadges() {
@@ -83,6 +87,82 @@
       ? '체험이 끝나 읽기 전용입니다. 이용 결제에서 결제하면 바로 이어서 쓸 수 있습니다.'
       : '체험이 끝나 읽기 전용입니다. 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.');
   }, true);
+
+  // ---------- 7) password change (header button, dialog in layout.tag; 요구분석서 v1.7 ACC-07) ----------
+  // 현재 비밀번호가 맞아야 하고 새 비밀번호는 8자 이상을 두 번 같게. 읽기 전용이어도 된다(계정 보안). 맞는지는 서버가 본다.
+  // 서버 API (제안, 시안과 같은 주소): POST /employee/api/password { current, password } → { success, message }
+  const pwDialog = document.getElementById('pwChangeDialog');
+  if (pwDialog) {
+    const $id = id => document.getElementById(id);
+    const pwError = $id('pwChgError');
+    const pwOk = $id('btnPwChangeOk');
+    const syncPw = () => {
+      const n = $id('pwChgNew').value;
+      pwOk.disabled = !($id('pwCur').value && n.length >= 8 && n === $id('pwChgNew2').value);
+    };
+    $id('btnPwChange').addEventListener('click', () => {
+      ['pwCur', 'pwChgNew', 'pwChgNew2'].forEach(id => { $id(id).value = ''; });
+      pwError.textContent = '';
+      syncPw();
+      if (!pwDialog.open) pwDialog.showModal();
+      $id('pwCur').focus();
+    });
+    ['pwCur', 'pwChgNew', 'pwChgNew2'].forEach(id => $id(id).addEventListener('input', () => { pwError.textContent = ''; syncPw(); }));
+    pwDialog.querySelector('[value="cancel"]').addEventListener('click', () => pwDialog.close());
+    $id('pwChangeForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const cur = $id('pwCur').value;
+      const n = $id('pwChgNew').value;
+      pwError.textContent = !cur ? '현재 비밀번호를 입력해 주세요.' : n.length < 8 ? '새 비밀번호는 8자 이상으로 정해 주세요.'
+        : n !== $id('pwChgNew2').value ? '새 비밀번호 확인이 맞지 않습니다.' : n === cur ? '지금 쓰는 비밀번호와 다르게 정해 주세요.' : '';
+      if (pwError.textContent) return;
+      pwOk.disabled = true;
+      $.ajax({ url: ctx + '/employee/api/password', method: 'POST', contentType: 'application/json', dataType: 'json',
+        data: JSON.stringify({ current: cur, password: n }) })
+        .done(res => {
+          if (res && res.success) {
+            pwDialog.close();
+            toast('비밀번호를 바꿨습니다. 다음 로그인부터 새 비밀번호를 쓰세요');
+          } else {
+            pwError.textContent = (res && res.message) || '비밀번호를 바꾸지 못했습니다. 잠시 뒤 다시 해 주세요';
+          }
+        })
+        .fail(xhr => {
+          if (xhr.status === 401 || xhr.status === 403) return; // 2) 에서 처리
+          pwError.textContent = (xhr.responseJSON && xhr.responseJSON.message) || '비밀번호를 바꾸지 못했습니다. 잠시 뒤 다시 해 주세요';
+        })
+        .always(syncPw);
+    });
+  }
+
+  // ---------- 8) what the screen JS (resources/js/<모듈>/*.js) calls ----------
+  // 화면 JS는 서버를 api.get('/approval/api/docs') 처럼 부르고, 성공하면 데이터 자체를, 실패하면 xhr 에서
+  // apiMessage(xhr)로 안내 문구를 꺼낸다. 서버가 { success, message, data } 로 감싸 보내면 여기서 풀어 준다:
+  //   success true → data 를 넘긴다 / success false → 실패로 바꾸고 message 를 안내 문구로 쓴다.
+  // 감싸지 않은 JSON 을 보내도 그대로 넘긴다. 주소 목록은 docs/front-screen-api.md.
+  const unwrap = req => req.then(res => {
+    if (res && typeof res === 'object' && !Array.isArray(res) && 'success' in res) {
+      return res.success ? res.data : $.Deferred().reject({ status: 200, responseJSON: { message: res.message } }).promise();
+    }
+    return res;
+  });
+  window.apiUrl = path => ctx + path;
+  window.apiMessage = (xhr, fallback) =>
+    (xhr && xhr.responseJSON && xhr.responseJSON.message) || fallback || '처리하지 못했습니다. 잠시 뒤 다시 해 주세요';
+  // 데이터를 바꾸는 요청은 모두 POST다(AGENTS.md). 고치기는 같은 주소, 지우기는 주소 끝에 /delete 를 붙여 POST 한다
+  window.api = {
+    get: (path, query) => unwrap($.ajax({ url: ctx + path, method: 'GET', data: query, dataType: 'json' })),
+    post: (path, body) => unwrap($.ajax({
+      url: ctx + path, method: 'POST', dataType: 'json', contentType: 'application/json',
+      data: body === undefined ? undefined : JSON.stringify(body),
+    })),
+  };
+  // 화면 주소: 다른 화면으로 갈 때 쓴다 (location.href = pageHref('/approval/list'))
+  window.pageHref = path => ctx + path;
+  window.isPage = path => location.pathname === ctx + path;
+  // 화면 JS가 보는 값: 체험이 끝난 업체인지(layout.tag 의 is-readonly), 헤더 출근 시각 다시 그리기(JSP는 서버가 그린다)
+  window.readOnly = document.body.classList.contains('is-readonly');
+  window.renderAttendance = () => {};
 
   // what screen scripts use
   window.IEUM = {

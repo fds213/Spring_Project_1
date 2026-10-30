@@ -1,0 +1,168 @@
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" trimDirectiveWhitespaces="true" %>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
+<%--
+  소개 사이트: IEUM 그룹웨어 (GET /, 로그인 없이 연다). 시안 site.html 의 본문을 옮긴 것이다 (시안 탭 제목 "IEUM 그룹웨어").
+  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
+--%>
+<c:set var="ctx" value="${pageContext.request.contextPath}" />
+<ui:site title="서비스 소개" fab="true">
+  <jsp:body>
+      <%-- 소개 --%>
+      <section class="hero" id="intro">
+        <div class="wrap">
+          <div>
+            <h1>결재부터 장애 접수까지,<br>회사 업무를 <em>한곳에서</em></h1>
+            <p class="lead">전자결재, 근태, IT 장애 접수와 자산 관리, 일정, 채팅을 하나로 묶은 그룹웨어입니다. 신청하면 바로 우리 회사 전용 공간이 열리고, 2주 동안 무료로 써 볼 수 있습니다.</p>
+            <ul class="hero-points">
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><span>관리자나 부서장이 가입을 열어 둔 동안 직원이 계정 생성으로 요청하고, 승인하면 바로 계정이 생김</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><span>PC와 휴대폰에서 앱처럼 설치해 사용</span></li>
+              <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><span>회사별로 완전히 분리된 자료와 권한</span></li>
+            </ul>
+            <div class="hero-actions">
+              <a class="btn btn-primary btn-lg btn-arrow" href="${ctx}/trial">2주 무료 체험 시작하기</a>
+              <a class="btn btn-lg" href="${ctx}/inquiry">도입 문의</a>
+              <span class="hero-note">2주 무료 · 이후 1인 월 4,000원 · 모든 기능 포함</span>
+            </div>
+          </div>
+          <div class="device-wrap">
+            <div class="device" aria-hidden="true">
+              <img src="${ctx}/resources/img/hero-app.png" alt="" width="1600" height="1075">
+            </div>
+            <div class="float-card" aria-hidden="true">
+              <div class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></div>
+              <div><b>휴가 신청서 최종 승인</b><small>연차 차감 · 일정 등록 완료</small></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="stats" aria-label="요약">
+        <div class="wrap">
+          <div class="stat"><strong>6개 업무 영역</strong><span>결재 · 근태 · IT 지원 · 자산 · 일정 · 채팅</span></div>
+          <div class="stat"><strong>2주 무료 체험</strong><span>이후 1인 월 4,000원, 모든 기능 포함</span></div>
+          <div class="stat"><strong>PC · 휴대폰</strong><span>웹앱으로 설치해 어디서나</span></div>
+        </div>
+      </div>
+
+      <%-- 기능 --%>
+      <section class="section alt" id="features">
+        <div class="wrap">
+          <div class="section-head center">
+            <h2>회사에 필요한 기능을 한 번에</h2>
+            <p class="lead">따로 쓰던 결재, 근태, IT 지원 도구를 하나로 합쳐 직원은 한곳에서 일하고, 관리자는 한곳에서 관리합니다.</p>
+          </div>
+          <div class="features">
+            <div class="feature">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 15 2 2 4-4"/></svg></div>
+              <span class="tag">전자결재</span>
+              <h3>휴가·장비 신청을 순서대로 결재</h3>
+              <p>결재자를 최대 2단계까지 지정해 차례로 승인·반려하고, 휴가가 최종 승인되면 연차와 일정에 자동으로 반영됩니다.</p>
+            </div>
+            <div class="feature tint-green">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 19.5c-1.2-2-1.8-4.4-1.8-7a6.8 6.8 0 0 1 13.6 0"/><path d="M9.6 20.5c-.9-2.2-1.4-4.8-1.4-8a3.8 3.8 0 0 1 7.6 0c0 1.4-.1 2.7-.3 4"/><path d="M12 12.5c0 3.2.5 5.9 1.6 8.3"/><path d="M4.6 8.5A8.8 8.8 0 0 1 12 3.7c2.4 0 4.6.9 6.2 2.5"/></svg></div>
+              <span class="tag">근태·연차</span>
+              <h3>지문 단말기로 출퇴근 자동 기록</h3>
+              <p>출입 지문 단말기의 기록을 받아 출근·퇴근, 지각·조퇴를 보여주고, 연차는 경력에 맞춰 자동으로 계산합니다. 지문 정보는 이음에 저장하지 않습니다.</p>
+            </div>
+            <div class="feature tint-orange">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6z"/></svg></div>
+              <span class="tag">IT 지원</span>
+              <h3>장애 접수부터 처리까지</h3>
+              <p>직원이 장애·문의를 접수하면 IT 담당자에게 배정되고, 처리 상태와 이력이 남습니다.</p>
+            </div>
+            <div class="feature tint-purple">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg></div>
+              <span class="tag">자산 관리</span>
+              <h3>장비 지급·회수와 고장 이력</h3>
+              <p>누구에게 어떤 장비가 지급됐는지, 어떤 장비가 자주 고장 나는지 한눈에 확인합니다.</p>
+            </div>
+            <div class="feature tint-pink">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+              <span class="tag">일정·게시판</span>
+              <h3>공지와 부서 소식, 일정 공유</h3>
+              <p>공지·부서 게시판과 개인·부서·전사 일정을 권한에 맞게 함께 씁니다.</p>
+            </div>
+            <div class="feature tint-teal">
+              <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"/></svg></div>
+              <span class="tag">채팅</span>
+              <h3>1:1·그룹 채팅</h3>
+              <p>업무 대화를 사내에서 바로 나누고, 읽음 표시와 이전 대화도 확인합니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <%-- 도입 절차 --%>
+      <section class="section" id="process">
+        <div class="wrap">
+          <div class="section-head center">
+            <h2>신청하면 바로 체험이 시작됩니다</h2>
+            <p class="lead">신청하고 이메일을 인증하면 우리 회사 그룹웨어가 열립니다. 직원 계정은 관리자나 부서장이 가입을 열어 둔 동안 요청을 받아 승인하면 바로 만들어집니다.</p>
+          </div>
+          <ol class="flow">
+            <li class="hl"><strong>무료 체험 신청</strong><span>업체 정보와 관리자 정보를 입력합니다. 결제는 없고, 관리자 포함 10명까지 써 볼 수 있습니다.</span></li>
+            <li><strong>업체 개설</strong><span>업체 코드와 관리자 계정이 바로 만들어지고, 이메일 인증을 마치면 로그인할 수 있습니다. 2주 체험은 신청한 날부터예요.</span></li>
+            <li><strong>직원 계정 만들기</strong><span>관리자가 가입을 열면 직원이 업체 코드로 계정 생성을 요청하고, 1시간 안에 승인하면 사번이 붙어 바로 로그인합니다.</span></li>
+            <li><strong>2주 체험</strong><span>모든 직원이 모든 기능을 그대로 써 봅니다. 결제는 체험 중 언제든 할 수 있습니다.</span></li>
+            <li><strong>결제하고 계속 이용</strong><span>그룹웨어 안에서 결제하면 그날부터 바로 유료로, 계정과 데이터 그대로 이어서 씁니다.</span></li>
+          </ol>
+          <div class="flow-note">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+            <span>가입은 관리자가 고른 부서(부서장은 자기 부서)만, 정한 시간(10분~하루) 동안 열립니다. 닫혀 있으면 업체 코드를 알아도 요청할 수 없습니다. 비밀번호를 잊으면 로그인 화면의 비밀번호 찾기에서 이메일 인증 뒤 다시 정합니다.</span>
+          </div>
+        </div>
+      </section>
+
+      <%-- 가격 --%>
+      <section class="section alt" id="pricing">
+        <div class="wrap">
+          <div class="section-head center">
+            <h2>하나의 상품, 사용하는 인원만큼</h2>
+            <p class="lead">모든 기능을 1인당 같은 가격으로 쓰고, 월간이나 연간으로 결제합니다.</p>
+          </div>
+          <div class="pricing">
+            <div class="plan">
+              <span class="plan-badge">모든 기능 포함</span>
+              <div class="plan-name">IEUM 그룹웨어</div>
+              <div class="price">4,000원<small>/ 1인 · 월</small></div>
+              <ul>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>전자결재, 근태·연차, IT 지원, 자산 관리</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>일정, 공지·부서 게시판, 1:1·그룹 채팅</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>PC와 휴대폰에서 앱처럼 설치해 사용</li>
+                <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>우리 회사 전용 공간, 다른 회사와 자료 분리</li>
+              </ul>
+              <a class="btn btn-lg btn-arrow" href="${ctx}/trial">2주 무료 체험 시작</a>
+            </div>
+            <div class="calc">
+              <h3>이용료 계산</h3>
+              <p class="sub">이용 인원을 움직여 보세요.</p>
+              <div class="calc-row">
+                <input type="range" id="calcRange" min="1" max="200" value="20" aria-label="이용 인원">
+                <input class="input" type="number" id="calcUsers" min="1" max="500" value="20" inputmode="numeric" aria-label="이용 인원 입력">
+                <span class="unit">명</span>
+              </div>
+              <div class="total"><span>월간</span><strong id="calcTotal">80,000원<small>/ 월</small></strong></div>
+              <%-- 요구분석서 v1.5 WEB-01·3.5: 첫 연간 10% 할인, 연간 연장 20% 할인 --%>
+              <div class="total total-sub"><span>연간 <em>첫 해 10% 할인</em></span><strong id="calcAnnual">864,000원<small>/ 년</small></strong></div>
+              <p class="note">체험 중에는 요금이 없습니다. 결제는 그룹웨어 안에서 하고, 결제가 끝나면 바로 반영됩니다. 자동으로 결제되지 않으니 만료 전에 직접 연장하고, 기간이 끝나면 결제할 때까지 읽기 전용입니다. 연간을 이어서 연장하거나 만료 뒤 3개월 안에 다시 사면 20% 할인됩니다. 이용 중에 인원을 늘리면 늘린 인원만 이번 만료일까지 일할로 계산합니다. 부가세는 따로 받지 않습니다.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <%-- 마무리 CTA --%>
+      <section class="cta" aria-label="무료 체험 안내">
+        <div class="wrap">
+          <div>
+            <h2>지금 신청하면 2주 동안 무료입니다</h2>
+            <p>업체 정보와 관리자 계정을 입력하고 이메일만 인증하면 결제 없이 우리 회사 그룹웨어가 열립니다.</p>
+            <div class="cta-actions">
+              <a class="btn btn-primary btn-lg btn-arrow" href="${ctx}/trial">2주 무료 체험 시작하기</a>
+              <a class="btn btn-lg btn-outline-light" href="${ctx}/inquiry">도입 문의</a>
+            </div>
+          </div>
+        </div>
+      </section>
+  </jsp:body>
+</ui:site>

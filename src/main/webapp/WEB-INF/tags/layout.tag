@@ -45,6 +45,10 @@
   <link rel="manifest" href="${ctx}/manifest.json">
   <link rel="icon" href="${ctx}/resources/icons/favicon.png" type="image/png">
   <link rel="apple-touch-icon" href="${ctx}/resources/icons/apple-touch-icon.png">
+  <%-- 디자인 2안 글꼴 (IBM Plex Sans KR). 오프라인이면 시스템 글꼴로 보인다 --%>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
 </head>
 <%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 체험이 끝나 결제하지 않은 업체(쓰기 동작을 흐리게) --%>
@@ -66,9 +70,34 @@
 
   <div class="toast" id="toast" role="status" hidden></div>
 
+  <%-- 헤더의 "비밀번호 변경" 창. 현재 비밀번호가 맞아야 새 비밀번호(8자 이상, 두 번 같게)로 바꾼다 (common.js 7) --%>
+  <c:if test="${not isOps}">
+    <dialog class="modal" id="pwChangeDialog">
+      <form id="pwChangeForm" novalidate>
+        <h2>비밀번호 변경</h2>
+        <div class="field">
+          <label for="pwCur">현재 비밀번호</label>
+          <input class="input" id="pwCur" type="password" autocomplete="current-password">
+        </div>
+        <div class="field">
+          <label for="pwChgNew">새 비밀번호</label>
+          <input class="input" id="pwChgNew" type="password" autocomplete="new-password" placeholder="8자 이상">
+        </div>
+        <div class="field">
+          <label for="pwChgNew2">새 비밀번호 확인</label>
+          <input class="input" id="pwChgNew2" type="password" autocomplete="new-password">
+        </div>
+        <p class="login-error" id="pwChgError" role="alert"></p>
+        <div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="submit" class="btn btn-primary" id="btnPwChangeOk" disabled>바꾸기</button></div>
+      </form>
+    </dialog>
+  </c:if>
+
   <script src="${ctx}/resources/lib/jquery-3.7.1.min.js"></script>
   <script src="${ctx}/resources/js/common.js"></script>
   <script src="${ctx}/resources/js/password-toggle.js"></script>
+  <%-- 선택 상자 부품: <select data-ui="select"> 를 시안과 같은 모양으로 바꾼다 --%>
+  <script src="${ctx}/resources/js/select.js"></script>
   <script src="${ctx}/resources/js/install.js"></script>
   <jsp:invoke fragment="scripts" />
 </body>

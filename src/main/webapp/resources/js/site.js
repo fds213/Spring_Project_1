@@ -38,12 +38,17 @@ if (btnSiteMenu) {
 const calcUsers = document.getElementById('calcUsers');
 const calcRange = document.getElementById('calcRange');
 if (calcUsers) {
-  const render = n => {
-    const total = document.getElementById('calcTotal');
-    total.replaceChildren(document.createTextNode(won(n * PRICE_PER_USER)));
+  const show = (id, amount, per) => {
+    const el = document.getElementById(id);
+    el.replaceChildren(document.createTextNode(won(amount)));
     const unit = document.createElement('small');
-    unit.textContent = '/ 월';
-    total.append(unit);
+    unit.textContent = per;
+    el.append(unit);
+  };
+  // monthly, and the first annual purchase (12 months, 10% off)
+  const render = n => {
+    show('calcTotal', n * PRICE_PER_USER, '/ 월');
+    show('calcAnnual', Math.floor(n * PRICE_PER_USER * 12 * 90 / 100), '/ 년');
   };
   const fromBox = () => {
     const n = Math.max(0, Math.floor(Number(calcUsers.value) || 0));
@@ -138,6 +143,31 @@ if (heroDevice && heroCard) {
     apply();
     aim(REST.x, REST.y);
   }
+}
+
+// 도입 절차: each circle's border light (css/site.css .flow li::after) starts when the running streak's bright
+// tip reaches the circle. Both animations run on the same clock (--flow-time, linear), so the delay is worked out
+// from where the circle really is: the streak is a quarter of the line wide and its tip goes from the line start
+// (0) to 1.25 × the line length during the first 85% of the cycle.
+const flowList = document.querySelector('.flow');
+function syncFlowRings() {
+  if (!flowList) return;
+  const time = parseFloat(getComputedStyle(flowList).getPropertyValue('--flow-time')) || 4;
+  const box = flowList.getBoundingClientRect();
+  const line = box.width * 0.84; // .flow::before runs from 8% to 92%
+  if (line <= 0) return;
+  const lineLeft = box.left + box.width * 0.08;
+  flowList.querySelectorAll('li').forEach(li => {
+    const r = li.getBoundingClientRect();
+    const x = r.left + r.width / 2 - 26 - lineLeft; // the ring's left edge, measured from the line start
+    li.style.setProperty('--ring-delay', `${(0.85 * time * x / (1.25 * line)).toFixed(3)}s`);
+  });
+}
+syncFlowRings();
+window.addEventListener('resize', syncFlowRings);
+// the light only runs while the section is on screen (five conic gradients re-drawn every frame otherwise)
+if (flowList && 'IntersectionObserver' in window) {
+  new IntersectionObserver(([entry]) => flowList.classList.toggle('is-paused', !entry.isIntersecting)).observe(flowList);
 }
 
 // floating 도입 문의 button: hide it while the footer is on screen so it never covers the footer

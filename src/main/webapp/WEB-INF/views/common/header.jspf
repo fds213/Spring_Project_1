@@ -45,6 +45,10 @@
         <small><c:choose><c:when test="${isOps}">이음 운영팀</c:when><c:when test="${not empty loginInfo.deptName}"><c:out value="${loginInfo.deptName}" /> · <c:out value="${loginInfo.rankName}" /></c:when><c:otherwise>사번 <c:out value="${loginUser.empnum}" /></c:otherwise></c:choose></small>
       </span>
     </div>
+    <%-- 본인 비밀번호 변경 (요구분석서 v1.7 ACC-07, 읽기 전용 중에도 됨). 창은 layout.tag, 동작은 common.js. 운영자에게는 없다 --%>
+    <c:if test="${not isOps}">
+      <button class="btn btn-ghost" type="button" id="btnPwChange">비밀번호 변경</button>
+    </c:if>
     <%-- 로그아웃은 CSRF 토큰을 실은 POST (Spring Security 기본 /logout) --%>
     <form class="logout-form" action="${ctx}/logout" method="post">
       <sec:csrfInput />
@@ -74,7 +78,7 @@
       </c:choose>
     </span>
     <c:if test="${isAdmin}">
-      <a class="btn btn-primary" href="${ctx}/company/admin/billing">결제하기</a>
+      <a class="btn btn-primary" href="${ctx}/subscription/billing">결제하기</a>
     </c:if>
   </div>
 </c:if>
