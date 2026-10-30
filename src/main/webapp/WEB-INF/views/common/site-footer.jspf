@@ -3,7 +3,7 @@
 <%-- 홈페이지형 푸터. site.tag 가 include 한다 --%>
 <footer class="site-footer">
   <div class="wrap">
-    <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word"></a>
+    <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word"></a>
     <nav><a href="${ctx}/#features">기능</a><a href="${ctx}/#pricing">가격</a><a href="${ctx}/inquiry">문의</a></nav>
     <span>© IEUM · 부트캠프 팀 프로젝트 시연용 서비스입니다. 실제 결제는 이루어지지 않습니다.</span>
   </div>

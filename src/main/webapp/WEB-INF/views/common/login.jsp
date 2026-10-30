@@ -36,8 +36,8 @@
   <section class="login-screen" id="appOnlyScreen" hidden>
     <div class="login-box app-only">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <h1>IEUM 그룹웨어는 앱에서 사용합니다</h1>
       <p>앱을 설치하면 바탕화면이나 홈 화면의 IEUM 앱에서 바로 로그인할 수 있습니다.</p>
@@ -48,8 +48,8 @@
   <section class="login-screen" id="loginScreen">
     <div class="login-box">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <form id="loginForm" action="${ctx}/login" method="post" novalidate>
         <sec:csrfInput />

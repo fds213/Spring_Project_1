@@ -25,8 +25,8 @@
   <section class="login-screen">
     <div class="login-box">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <%-- 비밀번호 찾기: 업체 코드·사번 → 가입할 때 쓴 이메일로 인증 코드 → 코드가 맞으면 새 비밀번호·확인으로 재설정 (employee/employee.js).
            서버는 비밀번호를 BCrypt로만 저장하므로 지금 비밀번호를 보여주지 않고 새로 정하게 한다 --%>

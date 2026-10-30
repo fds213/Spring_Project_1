@@ -91,7 +91,7 @@
 
       <%-- 접수 완료: 위의 안내와 폼을 숨기고 이 화면만 보여준다 (같은 페이지, AJAX 성공 후) --%>
       <div class="wrap inq-done" id="inqDone" hidden tabindex="-1">
-        <img class="done-mark" src="${ctx}/resources/img/logo-mark.png" alt="">
+        <img class="done-mark" src="${ctx}/resources/img/logo-mark.svg" alt="">
         <h2>문의가 접수되었습니다</h2>
         <p>입력하신 이메일로 접수 내용을 보내 드렸고, 답변도 같은 주소로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
         <p class="done-no">접수번호 <strong id="doneNo"></strong></p>

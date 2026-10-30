@@ -52,7 +52,7 @@
   <c:if test="${fab}">
     <%-- 떠 있는 도입 문의 버튼: 소개 페이지에만. 푸터가 보이면 숨는다 (site.js) --%>
     <a class="fab-inquiry" id="fabInquiry" href="${ctx}/inquiry" aria-label="이음 도입 문의">
-      <span class="fab-mark" aria-hidden="true"><img src="${ctx}/resources/img/logo-mark.png" alt=""></span>
+      <span class="fab-mark" aria-hidden="true"><img src="${ctx}/resources/img/logo-mark.svg" alt=""></span>
       <span class="fab-text" aria-hidden="true"><small>이음</small><strong>도입 문의</strong></span>
     </a>
   </c:if>

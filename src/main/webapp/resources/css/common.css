@@ -262,7 +262,7 @@ input::-ms-reveal { display: none; }
 .rail-item.on { background: var(--accent); color: #fff; }
 .rail-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
 /* 아이콘 위의 개수: 메뉴 칸의 배지와 같은 이름(data-badge)이라 같이 채워진다 */
-.sidebar .rail-badge {
+.sidebar .badge.rail-badge {
   position: absolute; top: 3px; right: 6px;
   min-width: 18px; padding: 0 5px; line-height: 18px; text-align: center; font-size: 10px;
   background: #e5484d; color: #fff;
