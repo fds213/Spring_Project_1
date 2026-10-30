@@ -20,4 +20,9 @@ public class LoginFailService {
     public void resetFail(String compcode, String empnum) {
         dao.resetFail(compcode, empnum);
     }
+    
+    public int getLockMinutes(String compcode, String empnum) {
+        Integer minutes = dao.getLockMinutes(compcode, empnum);
+        return (minutes == null || minutes < 1) ? 1 : minutes;
+    }
 }

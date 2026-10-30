@@ -27,4 +27,10 @@
 		SET fail_count = 0, lock_until = null
 		WHERE compcode = #{compcode} AND empnum = #{empnum}
 	</update>
+	
+	<select id="getLockMinutes" resultType="int">
+    SELECT CEIL((lock_until - SYSDATE) * 1440)
+    FROM test_emp
+    WHERE compcode = #{compcode} AND empnum = #{empnum}
+</select>
 </mapper>
