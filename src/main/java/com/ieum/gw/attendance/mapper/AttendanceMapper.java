@@ -55,7 +55,6 @@ public interface AttendanceMapper {
     // 본인과 단말기 사용자 번호 연결
     String selectMyDeviceUserNoInCompany(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
-    String selectMyDeviceUserNo(@Param("attendanceDeviceId") Long attendanceDeviceId, @Param("employeeId") Long employeeId);
 
     int countDeviceUserNoOfOthers(@Param("attendanceDeviceId") Long attendanceDeviceId, @Param("deviceUserNo") String deviceUserNo, @Param("employeeId") Long employeeId);
 

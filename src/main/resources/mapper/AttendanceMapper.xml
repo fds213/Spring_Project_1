@@ -172,12 +172,6 @@
 		FETCH FIRST 1 ROWS ONLY
 	</select>
 
-	<select id="selectMyDeviceUserNo" resultType="string">
-		SELECT device_user_no
-		FROM device_employee
-		WHERE attendance_device_id = #{attendanceDeviceId} AND employee_id = #{employeeId} AND use_yn = 'Y'
-	</select>
-
 	<select id="countDeviceUserNoOfOthers" resultType="int">
 		SELECT COUNT(*)
 		FROM device_employee

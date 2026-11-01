@@ -88,19 +88,21 @@ function showInstallGuide(kind) {
 
 async function startDownload() {
   if (installPrompt) {
-    installPrompt.prompt();
-    await installPrompt.userChoice; // "설치됨" 안내는 appinstalled 이벤트에서 보여 준다
-    installPrompt = null;
-    return;
+    const p = installPrompt;
+    installPrompt = null; // prompt() 는 한 번만 부를 수 있다
+    try {
+      await p.prompt();
+      await p.userChoice; // "설치됨" 안내는 appinstalled 이벤트에서 보여 준다
+      return;
+    } catch (e) { /* 사용자 동작 밖에서 불렸거나 이미 쓴 prompt: 아래 안내로 */ }
   }
   showInstallGuide(guideKind());
 }
 
 document.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', startDownload));
 
-// 서비스 워커는 /resources/ 가 아니라 사이트 맨 위(/<context>/service-worker.js)에서 받아야
-// 앱의 페이지를 맡을 수 있다. 어디서 내려 줄지는 아직 정하지 않았다(가이드 6장).
-// 그때까지는 등록이 조용히 실패한다.
+// 서비스 워커는 /resources/ 가 아니라 사이트 맨 위(/<context>/service-worker.js)에서 받아야 앱의 페이지를 맡을 수 있다.
+// servlet-context.xml 이 그 주소를 resources/js/service-worker.js 로 내려주고, security-context.xml 이 로그인 없이 허용한다.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register((document.body.dataset.ctx || '') + '/service-worker.js').catch(() => {});
 }

@@ -2,7 +2,6 @@ package com.ieum.gw.attendance.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,7 +31,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class LeaveService {
 
-    private static final Map<String, String> LEAVE_KIND = Map.of("LV_FULL", "FULL", "LV_AM", "AM", "LV_PM", "PM");
     private static final Map<String, String> REQUEST_STATUS = Map.of("IN_PROGRESS", "REQUESTED", "APPROVED", "APPROVED", "REJECTED", "REJECTED");
 
     private final LeaveDAO dao;
@@ -45,6 +43,7 @@ public class LeaveService {
         EmployeeCareerDTO career = dao.selectEmployeeCareer(companyId, employeeId);
         if (career == null || career.getHireDate() == null) {
             res.put("summary", null);
+            res.put("reason", career == null ? "NO_EMPLOYEE" : "NO_HIRE_DATE"); // 화면 안내 문구를 가른다
             res.put("items", List.of());
             return res;
         }
@@ -68,7 +67,7 @@ public class LeaveService {
         Map<String, Object> sum = new LinkedHashMap<>();
         sum.put("start", cycle.start + "T00:00:00");
         sum.put("end", cycle.end + "T00:00:00");
-        sum.put("years", (int) ChronoUnit.MONTHS.between(hire, cycle.start.isBefore(hire) ? hire : cycle.start) / 12);
+        sum.put("years", Math.max(0, cycle.start.getYear() - hire.getYear()));
         sum.put("prev", prior / 12);
         sum.put("career", cycle.careerMonths / 12);
         sum.put("grant", cycle.grant);
@@ -100,7 +99,7 @@ public class LeaveService {
             }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", r.getApprovalDocumentId());
-            m.put("kind", LEAVE_KIND.getOrDefault(r.getLeaveType(), "FULL"));
+            m.put("kind", AttendanceService.LEAVE_KIND.getOrDefault(r.getLeaveType(), "FULL"));
             m.put("from", r.getFromDate());
             m.put("to", r.getToDate());
             m.put("days", r.getDays());
@@ -125,7 +124,8 @@ public class LeaveService {
             if (start.isAfter(today)) start = anniversary(hire, today.getYear() - 1);
         }
         LocalDate end = anniversary(hire, start.getYear() + 1);
-        int careerMonths = priorCareerMonths + (int) ChronoUnit.MONTHS.between(hire, start);
+        // 시작일은 입사기념일이라 해 수로 센다. MONTHS.between 은 2월 29일 입사자의 평년 기념일(28일)을 한 달 모자라게 본다
+        int careerMonths = priorCareerMonths + 12 * (start.getYear() - hire.getYear());
         return new Cycle(start, end, careerMonths, grantFor(careerMonths));
     }
 

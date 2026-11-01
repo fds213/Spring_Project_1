@@ -25,7 +25,7 @@
     <div class="sim-head">
       <img src="${ctx}/resources/img/logo-mark.svg" alt="">
       <strong id="simTitle">지문 단말기</strong>
-      <%-- 연결된 뒤에만 보인다. 기록 보기: 이번에 찍은 기록 창 / 단말기 키 재설정: 저장한 키를 지우고 키 입력 칸으로 --%>
+      <%-- 연결된 뒤에만 보인다. 기록 보기: 근태 기록 창 / 단말기 키 재설정: 저장한 키를 지우고 키 입력 칸으로 --%>
       <div class="sim-head-actions">
         <button type="button" class="btn sim-reset" id="simLogOpen" aria-haspopup="dialog" hidden>기록 보기</button>
         <button type="button" class="btn sim-reset" id="simChangeKey" hidden>단말기 키 재설정</button>

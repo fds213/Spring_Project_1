@@ -11,14 +11,14 @@
 //     사람은 인사 담당 메뉴를 다음 화면부터 받는다. 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
 //   - 읽기 전용 업체(이용 기간 끝남): 여기 버튼은 모두 쓰기라 흐리게 보이고(data-write) 서버가 403으로 거절한다.
 // 서버 API ({kind} = depts | ranks, {name}은 서버가 정하는 부서·직급 식별값(이름 또는 id)):
-//   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { all, inUse, retired, requests },
+//   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { inUse, retired, requests },
 //                                                      type, head (부서만: 부서 형태, 부서장 이름 | null), careerYears (직급만) }] }
 //   POST   /employee/admin/api/{kind}               { name } → { name }                 409: 이미 있음, 개수 초과
 //   POST   /employee/admin/api/{kind}/{name}        { name } → { from, to, mySub }      mySub: 바뀐 내 헤더 표시("부서 · 직급") | null
 //   POST   /employee/admin/api/{kind}/{name}/delete → { name }                          409: 사용 중 계정·가입 요청이 있음, 마지막 하나
 //   POST   /employee/admin/api/{kind}/{name}/move   { dir: -1 | 1 } → { ok }
 //   POST   /employee/admin/api/depts/{name}/type    { type: DEPT_IT | DEPT_HR | DEPT_OPS | '' } → { name, type }
-// 같은 모듈의 employee/employee.js에서 cellOf, writeButton, askConfirm, DEPT_TYPE, deptTypeLabel, viewShown, readOnlyUi를 쓴다.
+// 같은 모듈의 employee/employee.js에서 cellOf, writeButton, askConfirm, DEPT_TYPE, deptTypeLabel, readOnlyUi를 쓴다.
 (() => {
   const ORG = {
     dept: { path: 'depts', word: '부서', topic: '부서는', obj: '부서를', prefix: 'dept' },

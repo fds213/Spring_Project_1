@@ -152,9 +152,11 @@ function renderPayPreview() {
       fillDetail('payPreview', [['결제 금액', '-'], ['안내', apiMessage(xhr, '금액을 계산하지 못했습니다')]]);
     });
 }
+let billQuoteDelay = 0; // 타자 치는 동안은 모았다가 250ms 멈추면 견적을 받는다
 document.getElementById('payUsers')?.addEventListener('input', () => {
   document.getElementById('payUsersError').textContent = '';
-  if (billState) renderPayPreview();
+  clearTimeout(billQuoteDelay);
+  billQuoteDelay = setTimeout(() => { if (billState) renderPayPreview(); }, 250);
 });
 document.querySelectorAll('input[name="payPlan"]').forEach(r => r.addEventListener('change', () => {
   if (billState) renderPayPreview();

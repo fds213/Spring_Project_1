@@ -77,6 +77,65 @@ class AttendanceServiceTest {
     }
 
     @Test
+    @DisplayName("09:00:00 정각 출근과 18:00:00 정각 퇴근은 정상, 1초만 지나거나 모자라면 지각·조퇴")
+    void boundaryTimes() {
+        mapper.clock = "09:00:00";
+        assertEquals("NORMAL", service.punch(KEY, "0002", "IN").get("status"));
+        mapper.clock = "18:00:00";
+        assertEquals("NORMAL", service.punch(KEY, "0002", "OUT").get("status"));
+
+        mapper.today.clear();
+        mapper.clock = "09:00:01";
+        assertEquals("LATE", service.punch(KEY, "0002", "IN").get("status"));
+        mapper.clock = "17:59:59";
+        assertEquals("EARLY_LEAVE", service.punch(KEY, "0002", "OUT").get("status"));
+    }
+
+    @Test
+    @DisplayName("출근·퇴근이 아닌 종류와 빈 사용자 번호는 400, 키 앞뒤 공백은 지우고 본다")
+    void punchInput() {
+        assertEquals(400, assertThrows(AttendanceException.class, () -> service.punch(KEY, "0002", "SLEEP")).getStatus());
+        assertEquals(400, assertThrows(AttendanceException.class, () -> service.punch(KEY, "  ", "IN")).getStatus());
+        assertEquals(0, mapper.events.size());
+        assertEquals("IN", service.punch("  " + KEY + " ", "0002", "IN").get("type"));
+    }
+
+    @Test
+    @DisplayName("월별 기록: 달 형식이 틀리면 400, 2월은 28일, 찍은 날은 기록과 지각 수가 채워진다")
+    void records() {
+        assertEquals(400, assertThrows(AttendanceException.class, () -> service.records(10L, 102L, "2026-13")).getStatus());
+        assertEquals(400, assertThrows(AttendanceException.class, () -> service.records(10L, 102L, "202610")).getStatus());
+
+        Map<String, Object> feb = service.records(10L, 102L, "2026-02");
+        assertEquals(28, ((List<?>) feb.get("days")).size());
+
+        mapper.clock = "09:10:00";
+        service.punch(KEY, "0002", "IN");
+        Map<String, Object> r = service.records(10L, 102L, "2026-10");
+        assertEquals("0002", r.get("deviceId"));
+        assertEquals(31, ((List<?>) r.get("days")).size());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> today = (Map<String, Object>) r.get("today");
+        @SuppressWarnings("unchecked")
+        Map<String, String> punch = (Map<String, String>) today.get("punch");
+        assertEquals("09:10", punch.get("in"));
+        assertEquals("LATE", punch.get("inStatus"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> counts = (Map<String, Object>) r.get("thisMonth");
+        assertEquals(1, counts.get("late"));
+        assertEquals(0, counts.get("early"));
+    }
+
+    @Test
+    @DisplayName("연결을 끊으면 번호가 비고, 단말기가 없는 업체의 연결은 409")
+    void unlinkAndNoDevice() {
+        assertEquals("", service.unlinkDevice(10L, 102L).get("deviceId"));
+        assertEquals("", service.records(10L, 102L, "2026-10").get("deviceId"));
+        mapper.hasDevice = false;
+        assertEquals(409, assertThrows(AttendanceException.class, () -> service.linkDevice(10L, 103L, "0009")).getStatus());
+    }
+
+    @Test
     @DisplayName("이용 기간이 끝난 업체의 단말기 체크는 403으로 거절한다 (읽기 전용 우회 막기)")
     void expiredCompany() {
         mapper.expired = true;
@@ -229,7 +288,7 @@ class AttendanceServiceTest {
 
         @Override public String selectMyDeviceUserNoInCompany(Long companyId, Long employeeId) { return selectMyDeviceUserNo(1L, employeeId); }
 
-        @Override public String selectMyDeviceUserNo(Long deviceId, Long employeeId) {
+        String selectMyDeviceUserNo(Long deviceId, Long employeeId) { // 가짜 안에서만 쓰는 도우미
             return links.entrySet().stream().filter(e -> e.getValue().equals(employeeId)).map(Map.Entry::getKey).findFirst().orElse(null);
         }
 

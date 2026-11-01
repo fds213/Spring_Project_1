@@ -773,7 +773,7 @@ const noticeFiles = makeFilePicker({ pick: 'btnPickFiles', input: 'fFiles', info
 const editorHtml = () => noticeEditor.html();
 
 const formState = { id: null, initial: { title: '', content: '', pinned: false, scope: '', files: '' }, saving: false, leaving: false };
-const formOpen = () => byId('view-notice-form').classList.contains('on');
+const formOpen = () => !!byId('view-notice-form')?.classList.contains('on'); // 부서 게시판 페이지에는 이 화면이 없다
 const formDirty = () => formOpen() && !formState.leaving && !formState.saving &&
   (byId('fTitle').value !== formState.initial.title || editorHtml() !== formState.initial.content ||
    byId('fPinned').checked !== formState.initial.pinned || byId('fScope').value !== formState.initial.scope ||
@@ -799,7 +799,6 @@ function fillForm(res) {
   formState.id = n ? n.id : null;
   formState.saving = false;
   byId('formTitle').textContent = n ? '공지 수정' : '공지 쓰기';
-  byId('formCrumb').textContent = n ? '수정' : '글쓰기';
   byId('fScope').value = n ? n.scope : res.scopes[0];
   byId('fTitle').value = n ? n.title : '';
   noticeEditor.set(n ? n.content : '');
@@ -994,7 +993,7 @@ byId('bBtnDelete')?.addEventListener('click', async () => {
 const boardEditor = makeEditor('bContent');
 const boardFiles = makeFilePicker({ pick: 'bBtnPickFiles', input: 'bFiles', info: 'bFilesInfo', list: 'bFileList', error: 'bFilesError' });
 const boardFormState = { id: null, initial: { title: '', content: '', files: '' }, saving: false, leaving: false };
-const boardFormOpen = () => byId('view-board-form').classList.contains('on');
+const boardFormOpen = () => !!byId('view-board-form')?.classList.contains('on'); // 공지 페이지에는 이 화면이 없다
 const boardFormDirty = () => boardFormOpen() && !boardFormState.leaving && !boardFormState.saving &&
   (byId('bTitle').value !== boardFormState.initial.title || boardEditor.html() !== boardFormState.initial.content ||
    fileSig(boardFiles.files) !== boardFormState.initial.files);
@@ -1011,7 +1010,6 @@ function fillBoardForm(res) {
   boardFormState.id = p ? p.id : null;
   boardFormState.saving = false;
   byId('bFormTitle').textContent = p ? '글 수정' : '글쓰기';
-  byId('bFormCrumb').textContent = p ? '수정' : '글쓰기';
   byId('bFormSub').textContent = `${res.dept} 게시판에 올라갑니다. ${res.dept} 사람만 볼 수 있어요.`;
   byId('bTitle').value = p ? p.title : '';
   boardEditor.set(p ? p.content : '');

@@ -181,8 +181,6 @@ eaEl('eaForm')?.addEventListener('submit', e => {
     .done(() => {
       eaState.draftId = null;
       err.textContent = '';
-      eaState.tab = 'PROGRESS';
-      eaState.open = null;
       showToast(`${EA_FORMS[c.form]}를 제출했습니다. 첫 결재자에게 넘어갔습니다`);
       location.href = pageHref('/approval/list');
     })

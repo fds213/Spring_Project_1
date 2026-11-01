@@ -49,5 +49,24 @@ class LeaveCycleTest {
         Cycle c = LeaveService.cycleFor(LocalDate.of(2024, 2, 29), 0, LocalDate.of(2026, 10, 30));
         assertEquals(LocalDate.of(2026, 2, 28), c.start);
         assertEquals(LocalDate.of(2027, 2, 28), c.end);
+        assertEquals(24, c.careerMonths);
+    }
+
+    @Test
+    @DisplayName("2월 29일 입사자도 3년째 기념일(2월 28일)부터 16일이다 (경력을 한 달 모자라게 세지 않는다)")
+    void leapDayHireThirdYear() {
+        Cycle c = LeaveService.cycleFor(LocalDate.of(2024, 2, 29), 0, LocalDate.of(2027, 6, 1));
+        assertEquals(LocalDate.of(2027, 2, 28), c.start);
+        assertEquals(36, c.careerMonths);
+        assertEquals(BigDecimal.valueOf(16), c.grant);
+    }
+
+    @Test
+    @DisplayName("입사일이 아직 오지 않았으면 입사일부터가 첫 주기이고 경력은 이전 경력뿐이다")
+    void beforeHire() {
+        Cycle c = LeaveService.cycleFor(LocalDate.of(2026, 12, 1), 6, LocalDate.of(2026, 10, 30));
+        assertEquals(LocalDate.of(2026, 12, 1), c.start);
+        assertEquals(LocalDate.of(2027, 12, 1), c.end);
+        assertEquals(6, c.careerMonths);
     }
 }

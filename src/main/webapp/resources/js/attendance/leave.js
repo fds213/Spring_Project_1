@@ -3,12 +3,12 @@
 //
 // 연차: 15일 + 내림(총 완료 경력 연수 ÷ 3). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
 // 연차를 쓰는 것(휴가)은 전자결재의 휴가 신청서로 신청한다(요구분석서 3장 범위). 최종 승인 때 연차가 차감되고 여기 내역에 들어온다.
-// 이 화면은 연차 현황·내역만 보여 주고, 신청·회수는 전자결재(기안 작성·결재함)에서 한다.
+// 이 화면은 연차 현황·내역만 보여 주고, 신청은 전자결재(기안 작성)에서 한다.
 
 // 연차 구분·신청 상태 이름
 const LEAVE_LABEL = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
-const LEAVE_STATUS = { REQUESTED: '승인 대기', APPROVED: '승인', REJECTED: '반려', CANCELED: '회수' };
-const LEAVE_STATUS_CLASS = { REQUESTED: 'waiting', APPROVED: 'paid', REJECTED: 'failed', CANCELED: 'expired' };
+const LEAVE_STATUS = { REQUESTED: '승인 대기', APPROVED: '승인', REJECTED: '반려' };
+const LEAVE_STATUS_CLASS = { REQUESTED: 'waiting', APPROVED: 'paid', REJECTED: 'failed' };
 const dayText = n => `${Number.isInteger(n) ? n : n.toFixed(1)}일`;
 
 const leaveEl = id => document.getElementById(id);
@@ -34,7 +34,8 @@ function renderLeaveView(r) {
   leaveEl('leaveUsed').textContent = sum ? dayText(sum.usedDays) : '-';
   leaveEl('leavePending').textContent = sum ? dayText(sum.pendingDays) : '-';
   if (!sum) {
-    dl.replaceChildren(leaveNode('dt', '', '안내'), leaveNode('dd', '', '직원 정보를 찾을 수 없어 연차를 계산할 수 없습니다'));
+    dl.replaceChildren(leaveNode('dt', '', '안내'), leaveNode('dd', '', r.reason === 'NO_HIRE_DATE'
+      ? '입사일이 등록되지 않아 연차를 계산할 수 없습니다. 인사 담당에게 문의하세요' : '직원 정보를 찾을 수 없어 연차를 계산할 수 없습니다'));
     hist.replaceChildren();
     return;
   }
@@ -48,7 +49,7 @@ function renderLeaveView(r) {
     ...row('남은 연차', dayText(sum.left)),
     ...row('다음 부여', `${ymd(sum.end)} 입사기념일 (남은 연차는 이월되지 않습니다)`));
 
-  // 신청 내역: 상태와, 대기 중이면 지금 결재할 사람, 반려면 사유 (회수는 결재함에서)
+  // 신청 내역: 상태와, 대기 중이면 지금 결재할 사람, 반려면 사유
   hist.replaceChildren(...(r.items.length ? r.items.map(l => {
     const range = `${l.from}${l.to !== l.from ? ` ~ ${l.to}` : ''} · ${LEAVE_LABEL[l.kind]} · ${dayText(l.days)}`;
     const now = l.line[l.step];

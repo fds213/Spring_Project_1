@@ -3,13 +3,6 @@ const PRICE_PER_USER = 4000;
 const won = n => `${n.toLocaleString('ko-KR')}원`;
 
 
-// 칸을 틀린 것으로 표시하고 아래에 문구를 보인다. 문구가 비면 표시를 지운다.
-function setError(input, message) {
-  input.setAttribute('aria-invalid', message ? 'true' : 'false');
-  const box = input.closest('.form-row').querySelector('.field-error');
-  if (box) box.textContent = message;
-}
-
 // 모바일 메뉴
 const siteHeader = document.getElementById('siteHeader');
 const btnSiteMenu = document.getElementById('btnSiteMenu');

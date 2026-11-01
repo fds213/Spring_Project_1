@@ -59,7 +59,7 @@
             <div class="dev-fold-inner">
               <div class="dev-body">
                 <form class="org-add" id="devLinkForm" novalidate>
-                  <select class="input dev-employee" id="devEmployee" data-ui="select" aria-label="연결할 직원"></select>
+                  <select class="input" id="devEmployee" data-ui="select" aria-label="연결할 직원"></select>
                   <input class="input dev-no" id="devUserNo" inputmode="numeric" maxlength="4" placeholder="번호 예: 0006" aria-label="단말기 사용자 번호(숫자 4자리)" aria-describedby="devLinkError">
                   <button type="submit" class="btn btn-primary" id="btnLink" data-write>연결</button>
                 </form>

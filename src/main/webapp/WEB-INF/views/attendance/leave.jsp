@@ -41,7 +41,7 @@
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span>
             <div><h2>휴가 신청 내역</h2><p>이번 연차 기간에 전자결재로 신청한 휴가입니다</p></div>
           </header>
-          <p class="bill-note">연차·휴가는 전자결재의 휴가 신청서로 신청합니다. 최종 승인되면 연차가 차감됩니다. 회수는 결재함에서 합니다.</p>
+          <p class="bill-note">연차·휴가는 전자결재의 휴가 신청서로 신청합니다. 최종 승인되면 연차가 차감됩니다.</p>
           <ul class="bill-history" id="leaveHistory"></ul>
         </section>
       </div>

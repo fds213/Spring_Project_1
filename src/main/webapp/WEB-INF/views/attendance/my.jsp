@@ -24,12 +24,9 @@
         <div class="card"><small>이번 달 조퇴</small><strong id="attEarly">-</strong></div>
       </div>
       <div class="att-link table-gap" id="attLink"></div>
-      <section class="info-card table-gap">
-        <header class="info-card-head">
-          <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
-          <div><h2>월별 근태 기록</h2><p>지문 단말기에서 받은 출퇴근 기록입니다 (기본 근무 09:00~18:00)</p></div>
-        </header>
-        <div class="att-month">
+      <%-- 월별 근태 기록: 머리줄 없이 달 이동부터 (이름은 화면 낭독기용 aria-label 로만) --%>
+      <section class="info-card table-gap" aria-label="월별 근태 기록">
+        <div class="att-month att-month-center">
           <button type="button" class="btn" id="attPrev" aria-label="이전 달">&lt;</button>
           <strong id="attMonthLabel"></strong>
           <button type="button" class="btn" id="attNext" aria-label="다음 달">&gt;</button>

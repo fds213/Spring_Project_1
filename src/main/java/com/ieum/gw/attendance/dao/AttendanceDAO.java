@@ -91,10 +91,6 @@ public class AttendanceDAO {
         return mapper.selectMyDeviceUserNoInCompany(companyId, employeeId);
     }
 
-    public String selectMyDeviceUserNo(Long attendanceDeviceId, Long employeeId) {
-        return mapper.selectMyDeviceUserNo(attendanceDeviceId, employeeId);
-    }
-
     public int countDeviceUserNoOfOthers(Long attendanceDeviceId, String deviceUserNo, Long employeeId) {
         return mapper.countDeviceUserNoOfOthers(attendanceDeviceId, deviceUserNo, employeeId);
     }

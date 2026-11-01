@@ -12,7 +12,7 @@ const ATT_LEAVE_NOTE = { FULL: '연차', AM: '오전 반차', PM: '오후 반차
 
 const attEl = id => document.getElementById(id);
 const attNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
-const attState = { month: null }; // month = { y, m } 보고 있는 달
+const attState = { month: null, placed: '' }; // month = { y, m } 보고 있는 달, placed = 목록 위치를 맞춘 달
 
 // 화면을 열 때 (JSP 페이지가 열리면 부른다)
 function openAttendanceView() {
@@ -39,9 +39,10 @@ function renderAttRecords(r) {
   const dev = r.deviceId;
   // 카드: 오늘 / 이번 달 지각·조퇴 (카드의 "이번 달"은 오늘이 속한 달이다)
   const t = r.today.punch;
-  attEl('attToday').textContent = !dev ? '단말기 미연결' : !t ? '기록 없음' : t.out ? `${t.in} ~ ${t.out}` : `${t.in} 출근`;
-  attEl('attLate').textContent = dev ? `${r.thisMonth.late}회` : '-';
-  attEl('attEarly').textContent = dev ? `${r.thisMonth.early}회` : '-';
+  // 기록이 있으면 연결을 끊었어도 기록을 보여 준다(표·헤더와 같은 말). 없을 때만 미연결 안내
+  attEl('attToday').textContent = t ? (t.out ? `${t.in} ~ ${t.out}` : `${t.in} 출근`) : dev ? '기록 없음' : '단말기 미연결';
+  attEl('attLate').textContent = `${r.thisMonth.late}회`;
+  attEl('attEarly').textContent = `${r.thisMonth.early}회`;
   // 헤더의 오늘 출퇴근도 같이 맞춘다 (header.jspf 와 같은 문구). 시뮬레이터에서 찍고 돌아오면 새로고침 없이 바뀐다
   const head = document.querySelector('.attend-time');
   if (head) head.textContent = !t ? '출근 기록 없음' : t.out ? `출근 ${t.in} · 퇴근 ${t.out}` : `오늘 출근 ${t.in}`;
@@ -67,6 +68,20 @@ function renderAttRecords(r) {
     return tr;
   });
   attEl('attList').replaceChildren(...rows);
+  placeAttList();
+}
+
+// 목록 위치: 달을 새로 열 때만 맞춘다(탭으로 돌아와 다시 받을 때는 보던 자리 그대로).
+// 오늘이 있는 달이면 오늘 줄이 표 머리줄 바로 아래에 오게, 다른 달이면 1일부터
+function placeAttList() {
+  const key = attMonthParam();
+  if (attState.placed === key) return;
+  attState.placed = key;
+  const wrap = document.querySelector('.att-table');
+  const today = attEl('attList').querySelector('.att-today');
+  if (!today) { wrap.scrollTop = 0; return; }
+  const head = wrap.querySelector('thead');
+  wrap.scrollTop += today.getBoundingClientRect().top - wrap.getBoundingClientRect().top - (head ? head.offsetHeight : 0);
 }
 
 // 단말기 연결 상자: 연결돼 있으면 해제 버튼, 없으면 번호 입력

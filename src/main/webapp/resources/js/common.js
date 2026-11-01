@@ -72,7 +72,7 @@
         el.textContent = n > 99 ? '99+' : n;
         el.hidden = n === 0;
       });
-    });
+    }).fail(xhr => { if (xhr.status === 404) clearInterval(badgeTimer); }); // 아직 없는 주소면 더 묻지 않는다
   }
   function startBadges() {
     clearInterval(badgeTimer);

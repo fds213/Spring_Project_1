@@ -71,7 +71,7 @@
             <div class="inq-agree form-row">
               <div class="agree-line">
                 <label class="check"><input type="checkbox" id="agree" name="agree" required> <span>[필수] 개인정보 수집 및 이용에 동의합니다.</span></label>
-                <button type="button" class="link-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
+                <button type="button" class="terms-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
               </div>
               <table class="terms" id="terms" hidden>
                 <tr><th>수집 항목</th><td>회사명, 이름, 이메일, 휴대전화</td></tr>

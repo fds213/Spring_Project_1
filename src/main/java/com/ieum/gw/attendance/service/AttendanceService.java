@@ -48,8 +48,8 @@ public class AttendanceService {
     private static final String WORK_START = "09:00:00";
     private static final String WORK_END = "18:00:00";
 
-    // 휴가 구분 공통 코드 → 화면 값
-    private static final Map<String, String> LEAVE_KIND = Map.of("LV_FULL", "FULL", "LV_AM", "AM", "LV_PM", "PM");
+    // 휴가 구분 공통 코드 → 화면 값 (LeaveService 도 같이 쓴다)
+    static final Map<String, String> LEAVE_KIND = Map.of("LV_FULL", "FULL", "LV_AM", "AM", "LV_PM", "PM");
 
     private final AttendanceDAO dao;
 
