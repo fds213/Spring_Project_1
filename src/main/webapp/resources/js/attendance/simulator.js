@@ -61,6 +61,8 @@ async function connect(key) {
     const info = await simFetch('GET', '/api/attendance/device');
     simStoreKey(key);
     sim.people = info.people;
+    sim.log = []; // 다른 업체 단말기로 바뀌어도 이전 업체 직원의 기록이 남지 않게
+    renderLog();
     simEl('simTitle').textContent = `${info.companyName} 지문 단말기`;
     simEl('simChangeKey').hidden = false;
     simEl('simLogOpen').hidden = false;
@@ -264,9 +266,8 @@ simLogDialog.addEventListener('click', e => { if (e.target === simLogDialog) sim
 
 function renderLog() {
   const ul = simEl('simLog');
-  if (!sim.log.length) return;
-  simEl('simLogEmpty').hidden = true;
-  ul.hidden = false;
+  simEl('simLogEmpty').hidden = sim.log.length > 0;
+  ul.hidden = sim.log.length === 0;
   ul.replaceChildren(...sim.log.slice(0, 10).map(t => {
     const li = document.createElement('li');
     li.textContent = t;
