@@ -20,6 +20,18 @@
     <constructor-arg value="/login" />
 </bean>
 
+	<!-- 근태 단말기(지문 시뮬레이터) 전용 /api/** 체인 (AGENTS.md URL 규칙). 로그인 세션·CSRF 없이 받고,
+	     X-Device-Key 단말기 키로 업체를 확인하는 일은 근태 Service 가 요청마다 한다(키가 없거나 틀리면 401).
+	     이 체인이 아래 기본 체인보다 먼저 맞아야 하므로 위에 둔다. -->
+	<bean id="deviceApiEntryPoint" class="org.springframework.security.web.authentication.HttpStatusEntryPoint">
+		<constructor-arg value="UNAUTHORIZED" />
+	</bean>
+	<security:http pattern="/api/**" use-expressions="true" create-session="stateless"
+		entry-point-ref="deviceApiEntryPoint">
+		<security:intercept-url pattern="/**" access="permitAll" />
+		<security:csrf disabled="true" />
+	</security:http>
+
 	<security:http use-expressions="true" create-session="ifRequired"
     entry-point-ref="ajaxAwareEntryPoint">
 
@@ -34,6 +46,8 @@
 		<security:intercept-url pattern="/resources/**"      access="permitAll" />
 		<security:intercept-url pattern="/manifest.json"     access="permitAll" />
 		<security:intercept-url pattern="/service-worker.js" access="permitAll" />
+		<!-- 지문 시뮬레이터 화면: 단말기 역할이라 로그인 없이 연다. 기록은 단말기 키로 /api/** 에 보낸다 -->
+		<security:intercept-url pattern="/attendance/simulator" access="permitAll" />
 
 		<!-- 2. 이음 운영자 화면 -->
 		<security:intercept-url pattern="/ops/**"            access="hasRole('OPS')" />
