@@ -90,6 +90,9 @@ public interface NoticeMapper {
     // 우리 업체의 공지 게시판 번호 (BOARD 표에 공지 게시판 줄이 없으면 null)
     Long selectNoticeBoardId(@Param("companyId") Long companyId);
 
+    // 우리 업체의 공지 게시판 줄 만들기 (첫 글을 쓸 때)
+    int insertNoticeBoard(@Param("companyId") Long companyId);
+
     // 새 게시글 번호 하나 뽑기 (시퀀스 SQ_POST). 저장 뒤 화면을 그 글로 보내려고 먼저 뽑는다
     Long selectNextPostId();
 

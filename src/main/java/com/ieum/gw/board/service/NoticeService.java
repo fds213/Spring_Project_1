@@ -124,9 +124,9 @@ public class NoticeService {
         // 2. 우리 업체의 공지 게시판 번호
         Long companyId = user.getCompanyId();
         Long boardId = dao.selectNoticeBoardId(companyId);
-        if (boardId == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,
-                    "공지 게시판이 아직 준비되지 않았습니다. 업체 관리자에게 알려 주세요");
+        if (boardId == null) { // 새 업체는 첫 글을 쓸 때 공지 게시판 줄을 만든다 (같은 트랜잭션)
+            dao.insertNoticeBoard(companyId);
+            boardId = dao.selectNoticeBoardId(companyId);
         }
 
         // 3. 번호를 먼저 뽑고 저장 (업체·작성자는 로그인 정보에서만 꺼낸다)

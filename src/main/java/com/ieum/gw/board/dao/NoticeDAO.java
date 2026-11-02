@@ -102,6 +102,11 @@ public class NoticeDAO {
         return mapper.selectNoticeBoardId(companyId);
     }
 
+    // 우리 업체의 공지 게시판 줄 만들기
+    public int insertNoticeBoard(Long companyId) {
+        return mapper.insertNoticeBoard(companyId);
+    }
+
     // 새 게시글 번호 하나 뽑기
     public Long selectNextPostId() {
         return mapper.selectNextPostId();
