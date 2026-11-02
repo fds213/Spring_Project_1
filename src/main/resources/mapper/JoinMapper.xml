@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.employee.mapper.JoinMapper">
+
+    <!-- 서울 시각 -->
+    <sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+    <!-- ❶ 업체 코드 -->
+    <select id="getCompanyCode" resultType="string">
+        SELECT company_code FROM company WHERE company_id = #{companyId}
+    </select>
+
+    <!-- ❷ 내가 부서장인 부서 이름 (아니면 null) -->
+    <select id="getHeadDeptName" resultType="string">
+        SELECT department_name FROM department
+        WHERE company_id = #{companyId}
+          AND head_employee_id = #{employeeId}
+          AND use_yn = 'Y'
+          AND ROWNUM = 1
+    </select>
+
+    <!-- ❸ 부서 목록 (사용 중인 것만, 정렬 순서대로) -->
+    <select id="listDeptNames" resultType="string">
+        SELECT department_name FROM department
+        WHERE company_id = #{companyId} AND use_yn = 'Y'
+        ORDER BY sort_order, department_id
+    </select>
+
+    <!-- ❹ 지금 가입이 열린 부서 (끝나는 시각이 지금보다 뒤) -->
+    <select id="listOpenings" resultType="com.ieum.gw.employee.dto.JoinOpeningDTO">
+        SELECT d.department_name, d.join_open_until, d.join_opened_by,
+               e.employee_name AS opened_by_name
+        FROM department d
+        LEFT JOIN user_account a ON a.user_account_id = d.join_opened_by
+        LEFT JOIN employee e     ON e.employee_id = a.employee_id
+        WHERE d.company_id = #{companyId}
+          AND d.use_yn = 'Y'
+          AND d.join_open_until > <include refid="now"/>
+        ORDER BY d.sort_order, d.department_id
+    </select>
+
+    <!-- ❺ 사용 중 계정 수 (관리자 포함) -->
+    <select id="countActiveAccounts" resultType="int">
+        SELECT COUNT(*) FROM user_account
+        WHERE company_id = #{companyId} AND status_code = 'ACTIVE'
+    </select>
+
+    <!-- ❻ 번호표 기계의 마지막 번호 (보기만, 잠그지 않음) -->
+    <select id="peekLastSerial" resultType="java.lang.Integer">
+        SELECT last_serial FROM employee_no_counter WHERE company_id = #{companyId}
+    </select>
+    
+        <!-- 가입 열기: 이 부서 줄에 "언제까지, 누가" 적기 -->
+    <update id="openDept">
+        UPDATE department
+        SET join_open_until = #{until},
+            join_opened_by  = #{openedBy},
+            updated_at      = <include refid="now"/>
+        WHERE company_id = #{companyId}
+          AND department_name = #{deptName}
+          AND use_yn = 'Y'
+    </update>
+
+    <!-- 한 부서 끄기: 시각 지우기 -->
+    <update id="closeDept">
+        UPDATE department
+        SET join_open_until = NULL,
+            join_opened_by  = NULL,
+            updated_at      = <include refid="now"/>
+        WHERE company_id = #{companyId}
+          AND department_name = #{deptName}
+    </update>
+
+    <!-- 모두 끄기: 이 업체에서 열려 있던 부서 전부 -->
+    <update id="closeAll">
+        UPDATE department
+        SET join_open_until = NULL,
+            join_opened_by  = NULL,
+            updated_at      = <include refid="now"/>
+        WHERE company_id = #{companyId}
+          AND join_open_until IS NOT NULL
+    </update>
+
+</mapper>
