@@ -56,6 +56,10 @@ public class LoginUser implements UserDetails {
 	public Long getEmployeeId() {
 		return emp.getEmployeeId();
 	}
+	
+	public String getRole() {
+		return emp.getRole();
+	}
 
 	@Override
 	public boolean isEnabled() {
