@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.schedule.mapper.ScheduleMapper">
+
+	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<!-- 기간 안의 일정: 개인 일정은 본인 것만, 전사 일정은 업체 전체. 휴가 일정(EV_LEAVE)은 '내 연차'로 따로 읽는다.
+	     DATE는 Oracle 예약어라 별칭을 따옴표로 감싼다 -->
+	<select id="selectEvents" resultType="com.ieum.gw.schedule.dto.ScheduleDTO">
+		SELECT e.calendar_event_id AS id,
+		       CASE e.scope_code WHEN 'SCOPE_PERSONAL' THEN 'PERSONAL'
+		                         WHEN 'SCOPE_COMPANY'  THEN 'COMPANY'
+		                         ELSE 'DEPT' END AS scope,
+		       TO_CHAR(e.starts_at, 'YYYY-MM-DD') AS "date",
+		       e.title             AS title,
+		       e.content           AS memo,
+		       e.owner_employee_id AS ownerId,
+		       e.event_type        AS eventType
+		  FROM calendar_event e
+		 WHERE e.company_id = #{companyId}
+		   AND e.starts_at &gt;= #{from}
+		   AND e.starts_at &lt; #{to}
+		   AND (e.event_type IS NULL OR e.event_type != 'EV_LEAVE')
+		   AND (   (e.scope_code = 'SCOPE_PERSONAL' AND e.owner_employee_id = #{employeeId})
+		        OR  e.scope_code = 'SCOPE_COMPANY')
+		 ORDER BY e.starts_at, e.calendar_event_id
+	</select>
+
+	<!-- 내 휴가 일정: 휴가 신청 일자(LEAVE_REQUEST_DAY)의 종류로 연차·오전 반차·오후 반차를 나눈다.
+	     FROM·TO도 예약어라 따옴표로 감싼다 -->
+	<select id="selectLeaveEvents" resultType="com.ieum.gw.schedule.dto.ScheduleLeaveDTO">
+		SELECT TO_CHAR(d.leave_date, 'YYYY-MM-DD') AS "from",
+		       TO_CHAR(d.leave_date, 'YYYY-MM-DD') AS "to",
+		       CASE d.leave_type WHEN 'LV_FULL' THEN 'FULL'
+		                         WHEN 'LV_AM'   THEN 'AM'
+		                         ELSE 'PM' END AS kind
+		  FROM calendar_event e
+		  JOIN leave_request_day d ON d.company_id = e.company_id AND d.leave_request_day_id = e.leave_request_day_id
+		 WHERE e.company_id = #{companyId}
+		   AND e.owner_employee_id = #{employeeId}
+		   AND e.event_type = 'EV_LEAVE'
+		   AND e.starts_at &gt;= #{from}
+		   AND e.starts_at &lt; #{to}
+		 ORDER BY d.leave_date
+	</select>
+
+	<!-- 일정 한 건 (삭제 권한 확인용) -->
+	<select id="selectEvent" resultType="com.ieum.gw.schedule.dto.ScheduleDTO">
+		SELECT calendar_event_id AS id,
+		       owner_employee_id AS ownerId,
+		       event_type        AS eventType
+		  FROM calendar_event
+		 WHERE company_id = #{companyId}
+		   AND calendar_event_id = #{eventId}
+	</select>
+
+	<!-- 일정 저장: 화면의 일정은 하루짜리 종일 일정이다 (시작 그날 0시, 끝 다음 날 0시) -->
+	<insert id="insertEvent">
+		INSERT INTO calendar_event
+			(company_id, owner_employee_id, scope_code, title, content, starts_at, ends_at, all_day_yn)
+		VALUES
+			(#{companyId}, #{ownerId}, #{scopeCode}, #{title}, #{content, jdbcType=CLOB},
+			 #{startsAt}, #{endsAt}, 'Y')
+	</insert>
+
+	<!-- 일정 지우기: 결재에서 온 휴가 일정은 조건에서 빠져 지워지지 않는다 -->
+	<delete id="deleteEvent">
+		DELETE FROM calendar_event
+		 WHERE company_id = #{companyId}
+		   AND calendar_event_id = #{eventId}
+		   AND (event_type IS NULL OR event_type != 'EV_LEAVE')
+	</delete>
+
+	<!-- 휴가 일정 저장: 같은 휴가 일자로 만든 일정이 이미 있으면 넣지 않는다 (0줄).
+	     LEAVE_REQUEST_DAY_ID 고유 제약(UQ_49_01)이 마지막으로 한 번 더 막는다 -->
+	<insert id="insertLeaveEvent">
+		INSERT INTO calendar_event
+			(company_id, owner_employee_id, scope_code, event_type, title, starts_at, ends_at, all_day_yn, leave_request_day_id)
+		SELECT #{companyId}, #{ownerId}, 'SCOPE_PERSONAL', 'EV_LEAVE', #{title},
+		       #{startsAt}, #{endsAt}, #{allDayYn}, #{leaveRequestDayId}
+		  FROM dual
+		 WHERE NOT EXISTS (SELECT 1 FROM calendar_event WHERE leave_request_day_id = #{leaveRequestDayId})
+	</insert>
+
+</mapper>
