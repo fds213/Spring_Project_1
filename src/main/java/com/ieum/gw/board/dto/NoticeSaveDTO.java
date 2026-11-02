@@ -1,5 +1,8 @@
 package com.ieum.gw.board.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import lombok.Getter;
@@ -12,11 +15,12 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-@JsonIgnoreProperties(ignoreUnknown = true) // files처럼 아직 안 쓰는 값이 와도 오류 내지 않고 무시
+@JsonIgnoreProperties(ignoreUnknown = true) // 모르는 값이 와도 오류 내지 않고 무시
 public class NoticeSaveDTO {
 
     private String scope;    // 공지 범위: 지금은 "ALL"만 (부서 공지 보류)
     private String title;    // 제목
     private String content;  // 내용 (에디터 서식 글)
     private boolean pinned;  // 맨 위 고정: DB에 칸이 없어서 받기만 하고 저장하지 않는다 (보류)
+    private List<NoticeFileDTO> files = new ArrayList<>(); // 붙일 첨부파일 (먼저 올려 받은 번호 id만 쓴다)
 }

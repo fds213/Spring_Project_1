@@ -1,21 +1,37 @@
 package com.ieum.gw.board.controller;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.ieum.gw.board.dto.NoticeCommentDTO;
+import com.ieum.gw.board.dto.NoticeDTO;
+import com.ieum.gw.board.dto.NoticeFileDTO;
+import com.ieum.gw.board.dto.NoticeCommentSaveDTO;
 import com.ieum.gw.board.dto.NoticeSaveDTO;
 import com.ieum.gw.board.service.NoticeService;
+import com.ieum.gw.common.dto.AttachmentDTO;
 import com.ieum.gw.common.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
@@ -54,12 +70,22 @@ public class BoardController {
         return noticeService.getNoticeList(loginUser, q, page);
     }
 
-    // 공지 쓰기 화면을 열 때: GET /board/api/notices/form
-    // 쓸 권한이 없으면 403 → 화면이 안내하고 목록으로 돌아간다
+    // 공지 쓰기·수정 화면을 열 때: GET /board/api/notices/form (수정이면 ?id=3)
+    // 쓸 권한이 없으면 403 → 화면이 안내하고 목록(수정이면 그 글)으로 돌아간다
     @GetMapping("/api/notices/form")
     @ResponseBody
-    public Map<String, Object> noticeForm(@AuthenticationPrincipal LoginUser loginUser) {
-        return noticeService.getNoticeForm(loginUser);
+    public Map<String, Object> noticeForm(@AuthenticationPrincipal LoginUser loginUser,
+                                          @RequestParam(required = false) Long id) {
+        return noticeService.getNoticeForm(loginUser, id);
+    }
+
+    // 공지 글 보기: GET /board/api/notices/3
+    // 없거나 볼 수 없는 공지면 404 → 화면이 안내하고 목록으로 돌아간다
+    @GetMapping("/api/notices/{id}")
+    @ResponseBody
+    public NoticeDTO noticeDetail(@AuthenticationPrincipal LoginUser loginUser,
+                                  @PathVariable Long id) {
+        return noticeService.getNotice(loginUser, id);
     }
 
     // 공지 저장: POST /board/api/notices  (본문 JSON: { scope, title, content, pinned, files })
@@ -68,7 +94,73 @@ public class BoardController {
     @ResponseBody
     public Map<String, Object> noticeCreate(@AuthenticationPrincipal LoginUser loginUser,
                                             @RequestBody NoticeSaveDTO form) {
-        return noticeService.createNotice(loginUser, form.getTitle(), form.getContent());
+        return noticeService.createNotice(loginUser, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 공지 수정: POST /board/api/notices/3  (본문은 저장과 같은 모양)
+    @PostMapping("/api/notices/{id}")
+    @ResponseBody
+    public Map<String, Object> noticeUpdate(@AuthenticationPrincipal LoginUser loginUser,
+                                            @PathVariable Long id,
+                                            @RequestBody NoticeSaveDTO form) {
+        return noticeService.updateNotice(loginUser, id, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 공지 삭제: POST /board/api/notices/3/delete  (지우기는 주소 끝에 /delete를 붙여 POST, front-screen-api.md 2장)
+    @PostMapping("/api/notices/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> noticeDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                            @PathVariable Long id) {
+        return noticeService.deleteNotice(loginUser, id);
+    }
+
+    // 공지 댓글 등록: POST /board/api/notices/3/comments  (본문 JSON: { text })
+    // 성공하면 그 공지의 댓글 목록 전체 → 화면이 다시 그린다
+    @PostMapping("/api/notices/{id}/comments")
+    @ResponseBody
+    public List<NoticeCommentDTO> noticeCommentAdd(@AuthenticationPrincipal LoginUser loginUser,
+                                                   @PathVariable Long id,
+                                                   @RequestBody NoticeCommentSaveDTO form) {
+        return noticeService.addComment(loginUser, id, form.getText());
+    }
+
+    // 공지 댓글 삭제: POST /board/api/notices/3/comments/7/delete
+    // 성공하면 남은 댓글 목록 전체
+    @PostMapping("/api/notices/{id}/comments/{commentId}/delete")
+    @ResponseBody
+    public List<NoticeCommentDTO> noticeCommentDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                                      @PathVariable Long id,
+                                                      @PathVariable Long commentId) {
+        return noticeService.deleteComment(loginUser, id, commentId);
+    }
+
+    // 첨부파일 올리기: POST /board/api/files  (multipart, 이름 "files"로 여러 개)
+    // 성공하면 [{ id, name, size, type }] → 화면이 번호를 들고 있다가 공지 저장 때 보낸다
+    @PostMapping("/api/files")
+    @ResponseBody
+    public List<NoticeFileDTO> fileUpload(@AuthenticationPrincipal LoginUser loginUser,
+                                          @RequestPart("files") List<MultipartFile> files) throws IOException {
+        return noticeService.uploadFiles(loginUser, files);
+    }
+
+    // 공지 첨부 내려받기: GET /board/api/notices/3/files/12
+    // 이미지는 화면에 바로 보이게(inline), 나머지는 내려받게(attachment)
+    @GetMapping("/api/notices/{id}/files/{fileId}")
+    public ResponseEntity<Resource> fileDownload(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @PathVariable Long id,
+                                                 @PathVariable Long fileId) throws IOException {
+        AttachmentDTO file = noticeService.getFile(loginUser, id, fileId);
+        Resource body = noticeService.loadFile(file);
+
+        // 한글 파일 이름이 깨지지 않게 UTF-8로 적는다
+        String encoded = URLEncoder.encode(file.getOriginalName(), StandardCharsets.UTF_8).replace("+", "%20");
+        String disposition = (file.getMimeType().startsWith("image/") ? "inline" : "attachment")
+                + "; filename*=UTF-8''" + encoded;
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(file.getMimeType()))
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition)
+                .body(body);
     }
 
     // ---------- 오류 응답 ----------
@@ -80,5 +172,21 @@ public class BoardController {
     public ResponseEntity<Map<String, Object>> handleStatus(ResponseStatusException e) {
         String message = (e.getReason() != null) ? e.getReason() : "요청을 처리하지 못했습니다";
         return ResponseEntity.status(e.getStatus()).body(Map.of("message", message));
+    }
+
+    // 공통 파일 기능이 던지는 안내(형식이 틀림·빈 파일·없는 파일 등) → 400 { message }
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> handleBadFile(RuntimeException e) {
+        String message = (e.getMessage() != null) ? e.getMessage() : "파일을 처리하지 못했습니다";
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
+    }
+
+    // 파일을 디스크에 쓰거나 읽지 못함(저장 공간 부족 등) → 500 { message }
+    @ExceptionHandler(IOException.class)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> handleFileIo(IOException e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "파일을 저장하거나 읽지 못했습니다. 잠시 뒤 다시 해 주세요"));
     }
 }

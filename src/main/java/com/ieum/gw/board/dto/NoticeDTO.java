@@ -1,5 +1,8 @@
 package com.ieum.gw.board.dto;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -23,4 +26,9 @@ public class NoticeDTO {
     private int commentCount;   // 댓글 수 → 제목 옆 [3]
     private int fileCount;      // 첨부 수 → 제목 옆 "첨부"
     private boolean pinned;     // 맨 위 고정 여부 (DB에 칸이 생기기 전까지 항상 false)
+
+    // ---------- 글 보기 화면에서만 쓰는 칸 (Service가 채운다) ----------
+    private boolean canEdit;                        // 수정·삭제 버튼을 보일지 (업체 관리자·인사 담당)
+    private List<NoticeFileDTO> files = new ArrayList<>();       // 첨부파일 목록 (글 보기에서 Service가 채운다)
+    private List<NoticeCommentDTO> comments = new ArrayList<>(); // 댓글 목록 (글 보기에서 Service가 채운다)
 }

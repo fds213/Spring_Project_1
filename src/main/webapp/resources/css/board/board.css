@@ -85,7 +85,8 @@ textarea.input { height: auto; min-height: 320px; padding: 12px; line-height: 1.
 .scope-tag.is-dept { background: #eaf3eb; color: #2b6a2f; }
 .scope-cell { color: var(--text-sub); font-size: 13px; }
 .scope-cell.is-dept { color: #2b6a2f; }
-.file-tag { margin-left: 6px; font-size: 11px; color: var(--text-muted); }
+.file-tag { display: inline-block; width: 14px; height: 14px; margin-left: 6px; vertical-align: -2px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8f98' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48'/%3E%3C/svg%3E") no-repeat center / contain; } /* 회색 클립 아이콘 */
 .page-head-actions { display: flex; gap: 8px; }
 .field-label { font-size: 13px; font-weight: 500; color: var(--text-sub); }
 .field-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
@@ -131,6 +132,11 @@ textarea.input { height: auto; min-height: 320px; padding: 12px; line-height: 1.
 .attach-list.is-edit li { padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; }
 .attach-list .link-btn { margin-left: auto; font-size: 12px; }
 .attach-name { overflow-wrap: anywhere; }
+/* 첨부 이름을 누르면 다운로드: 평소엔 검은 글자, 마우스를 올리면 파란 밑줄 */
+.attach-link { display: inline-flex; align-items: center; gap: 6px; color: var(--text); text-decoration: none; cursor: pointer; }
+.attach-link:hover .attach-name, .attach-link:focus-visible .attach-name { color: var(--accent); text-decoration: underline; }
+.attach-icon { flex: none; width: 16px; height: 16px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a8f98' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'/%3E%3Cpolyline points='14 2 14 8 20 8'/%3E%3C/svg%3E") no-repeat center / contain; } /* 회색 문서 아이콘 */
 .attach-mini { width: 32px; height: 32px; object-fit: cover; border-radius: 4px; }
 .modal-image { max-width: min(92vw, 900px); }
 .modal-image img { display: block; max-width: 100%; max-height: 70vh; margin: 0 auto 12px; border-radius: 6px; }

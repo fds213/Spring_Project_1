@@ -14,7 +14,7 @@
     <script>routeNoticeBoard('board-dept' + location.pathname.slice((document.body.dataset.ctx + '/board/dept').length));</script>
   </jsp:attribute>
   <jsp:body>
-      <%-- 게시판 전용 스타일 (공통 레이아웃에 화면별 CSS 칸이 없어서 본문 맨 앞에서 불러온다) --%>
+    <%-- 게시판 전용 스타일 (공통 레이아웃에 화면별 CSS 칸이 없어서 본문 맨 앞에서 불러온다) --%>
     <link rel="stylesheet" href="${ctx}/resources/css/board/board.css">
     <section class="view" id="view-board-list">
       <%-- ===== 부서 게시판 (board.js) ===== --%>
@@ -183,7 +183,7 @@
     <dialog class="modal modal-image" id="imageDialog" aria-label="이미지 크게 보기">
       <img id="imageDialogImg" alt="">
       <div class="modal-actions">
-        <a class="btn" id="imageDialogDownload" download>내려받기</a>
+        <a class="btn" id="imageDialogDownload" download>다운로드</a>
         <button type="button" class="btn btn-primary" value="ok">닫기</button>
         <button type="button" class="btn" value="cancel" hidden>닫기</button>
       </div>

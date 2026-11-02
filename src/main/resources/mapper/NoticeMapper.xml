@@ -46,6 +46,151 @@
 		SELECT COUNT(*)
 		<include refid="noticeWhere"/>
 	</select>
+
+	<!-- ========== 글 보기 ========== -->
+
+	<!-- 공지 한 건: 목록과 같은 조건(우리 업체·공지 게시판·지우지 않음·보임)에 글 번호를 더한다.
+	     다른 업체 글이나 지운 글이면 아무것도 안 나와서 Java에서는 null이 된다 -->
+	<select id="selectNotice" resultType="com.ieum.gw.board.dto.NoticeDTO">
+		SELECT p.post_id        AS id,
+		       'ALL'            AS scope,
+		       p.title          AS title,
+		       p.content        AS content,
+		       e.employee_name  AS writerName,
+		       d.department_name AS writerDept,
+		       TO_CHAR(p.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS createdAt,
+		       CASE WHEN p.updated_at > p.created_at + INTERVAL '1' SECOND
+		            THEN TO_CHAR(p.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') END AS updatedAt
+		  FROM post p
+		  JOIN board b    ON b.company_id = p.company_id AND b.board_id = p.board_id
+		  JOIN employee e ON e.company_id = p.company_id AND e.employee_id = p.author_employee_id
+		  LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+		 WHERE p.company_id = #{companyId}
+		   AND p.post_id = #{postId}
+		   AND b.board_type = 'BOARD_NOTICE'
+		   AND p.deleted_at IS NULL
+		   AND p.visible_yn = 'Y'
+	</select>
+
+	<!-- ========== 수정 · 삭제 ========== -->
+
+	<!-- 수정·삭제가 같이 쓰는 조건: 우리 업체의 공지 게시판 글이고, 아직 지우지 않은 글 -->
+	<sql id="noticeTarget">
+		WHERE company_id = #{companyId}
+		  AND post_id = #{postId}
+		  AND deleted_at IS NULL
+		  AND board_id IN (SELECT board_id FROM board
+		                    WHERE company_id = #{companyId} AND board_type = 'BOARD_NOTICE')
+	</sql>
+
+	<!-- 공지 고치기: 제목·내용과 수정일을 바꾼다 -->
+	<update id="updateNotice">
+		UPDATE post
+		   SET title = #{title},
+		       content = #{content, jdbcType=CLOB},
+		       updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+		<include refid="noticeTarget"/>
+	</update>
+
+	<!-- 공지 지우기: 줄은 남기고 삭제 처리일시와 '삭제 처리' 상태만 넣는다.
+	     목록·글 보기 SQL이 deleted_at IS NULL 인 글만 찾으므로 화면에서 사라진다 -->
+	<update id="deleteNotice">
+		UPDATE post
+		   SET deleted_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+		       status_code = 'POST_REMOVED'
+		<include refid="noticeTarget"/>
+	</update>
+
+	<!-- ========== 댓글 ========== -->
+
+	<!-- 댓글 목록: 지우지 않은 댓글을 오래된 순으로 -->
+	<select id="selectComments" resultType="com.ieum.gw.board.dto.NoticeCommentDTO">
+		SELECT c.post_comment_id   AS id,
+		       c.content           AS text,
+		       c.author_employee_id AS authorId,
+		       e.employee_name     AS writerName,
+		       d.department_name   AS writerDept,
+		       TO_CHAR(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS createdAt
+		  FROM post_comment c
+		  JOIN employee e ON e.company_id = c.company_id AND e.employee_id = c.author_employee_id
+		  LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+		 WHERE c.company_id = #{companyId}
+		   AND c.post_id = #{postId}
+		   AND c.deleted_at IS NULL
+		 ORDER BY c.created_at, c.post_comment_id
+	</select>
+
+	<!-- 댓글 쓴 사람: 우리 업체·그 공지의 지우지 않은 댓글일 때만 나온다 -->
+	<select id="selectCommentAuthor" resultType="long">
+		SELECT author_employee_id
+		  FROM post_comment
+		 WHERE company_id = #{companyId}
+		   AND post_id = #{postId}
+		   AND post_comment_id = #{commentId}
+		   AND deleted_at IS NULL
+	</select>
+
+	<!-- 댓글 저장. 번호·작성일·수정일은 DB 기본값(SQ_POST_COMMENT 등)을 쓴다 -->
+	<insert id="insertComment">
+		INSERT INTO post_comment (company_id, post_id, author_employee_id, content)
+		VALUES (#{companyId}, #{postId}, #{authorId}, #{content, jdbcType=CLOB})
+	</insert>
+
+	<!-- 댓글 하나 지우기: 줄은 남기고 삭제 처리일시만 넣는다 -->
+	<update id="deleteComment">
+		UPDATE post_comment
+		   SET deleted_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+		 WHERE company_id = #{companyId}
+		   AND post_id = #{postId}
+		   AND post_comment_id = #{commentId}
+		   AND deleted_at IS NULL
+	</update>
+
+	<!-- 공지를 지울 때 그 공지의 댓글도 모두 삭제 표시 -->
+	<update id="deleteCommentsOfPost">
+		UPDATE post_comment
+		   SET deleted_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+		 WHERE company_id = #{companyId}
+		   AND post_id = #{postId}
+		   AND deleted_at IS NULL
+	</update>
+	<!-- ========== 첨부파일 ========== -->
+
+	<!-- 첨부 목록: 공지와 파일을 잇는 POST_FILE + 파일 정보 ATTACHMENT (지운 파일은 빼고, 붙인 순서대로) -->
+	<select id="selectFiles" resultType="com.ieum.gw.board.dto.NoticeFileDTO">
+		SELECT a.attachment_id AS id,
+		       a.original_name AS name,
+		       a.byte_size     AS "size",
+		       a.mime_type     AS "type"   -- SIZE·TYPE는 Oracle 예약어라 따옴표로 감싼다
+		  FROM post_file f
+		  JOIN attachment a ON a.company_id = f.company_id AND a.attachment_id = f.attachment_id
+		 WHERE f.company_id = #{companyId}
+		   AND f.post_id = #{postId}
+		   AND a.status_code != 'FILE_REMOVED'
+		 ORDER BY f.created_at, a.attachment_id
+	</select>
+
+	<!-- 공지에 붙은 파일 번호들 -->
+	<select id="selectFileIds" resultType="long">
+		SELECT attachment_id
+		  FROM post_file
+		 WHERE company_id = #{companyId}
+		   AND post_id = #{postId}
+	</select>
+
+	<!-- 공지에 파일 붙이기 -->
+	<insert id="insertPostFile">
+		INSERT INTO post_file (company_id, post_id, attachment_id)
+		VALUES (#{companyId}, #{postId}, #{attachmentId})
+	</insert>
+
+	<!-- 공지에서 파일 떼기: 이음 줄만 지운다 (파일 정보 ATTACHMENT는 남는다) -->
+	<delete id="deletePostFile">
+		DELETE FROM post_file
+		 WHERE company_id = #{companyId}
+		   AND post_id = #{postId}
+		   AND attachment_id = #{attachmentId}
+	</delete>
 	<!-- ========== 글쓰기 ========== -->
 
 	<!-- 우리 업체의 공지 게시판 번호.
@@ -70,4 +215,5 @@
 		VALUES (#{postId}, #{companyId}, #{boardId}, #{authorId}, #{title},
 		        #{content, jdbcType=CLOB}, 'POST_PUBLISHED')
 	</insert>
+
 </mapper>
