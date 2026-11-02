@@ -171,3 +171,17 @@ const siteFooter = document.querySelector('.site-footer');
 if (fab && siteFooter && 'IntersectionObserver' in window) {
   new IntersectionObserver(([entry]) => fab.classList.toggle('is-hidden', entry.isIntersecting)).observe(siteFooter);
 }
+
+// 이용약관·개인정보처리방침 창 (site-footer.jspf). 버튼의 data-legal 값과 창의 id(legal-<값>)가 짝이다.
+// 닫기 버튼, 창 바깥(어두운 곳), Esc 로 닫고, 닫으면 연 버튼으로 초점을 돌린다
+document.querySelectorAll('[data-legal]').forEach(btn => btn.addEventListener('click', () => {
+  const dialog = document.getElementById(`legal-${btn.dataset.legal}`);
+  if (!dialog || dialog.open) return;
+  dialog.showModal();
+  dialog.querySelector('.legal-body').scrollTop = 0;
+  dialog.addEventListener('close', () => btn.focus(), { once: true });
+}));
+document.querySelectorAll('.legal-dialog').forEach(dialog => {
+  dialog.querySelectorAll('[data-legal-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+});
