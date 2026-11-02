@@ -26,8 +26,8 @@
              data-write: 읽기 전용 업체에서는 흐리게 막는다 --%>
         <a href="${ctx}/board/notice/write" class="btn btn-primary" id="btnWrite" data-write hidden>글쓰기</a>
       </div>
-      <%-- 공지 구분: 전사 공지(전 직원) / 부서 공지(그 부서만. 업체 관리자·인사 담당은 모든 부서) --%>
-      <div class="type-tabs" id="noticeTabs" role="tablist" aria-label="공지 구분">
+      <%-- 공지 구분: 전사 공지(전 직원) / 부서 공지(그 부서만. 업체 관리자·인사 담당은 모든 부서) (부서 공지는 보류라 탭을 숨김. 부서 공지가 생기면 hidden을 지운다) --%>
+      <div class="type-tabs" id="noticeTabs" hidden role="tablist" aria-label="공지 구분">
         <button type="button" role="tab" class="type-tab" data-tab="all" aria-selected="true">전체</button>
         <button type="button" role="tab" class="type-tab" data-tab="DEPT" aria-selected="false" tabindex="-1" id="noticeTabDept">부서 공지</button>
       </div>
