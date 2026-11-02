@@ -83,6 +83,7 @@ function drawSchedule() {
     items.slice(0, SCH_SHOW_MAX).forEach(it => cell.append(schNode('span', `sch-chip chip-${it.type.toLowerCase()}`, it.title)));
     if (items.length > SCH_SHOW_MAX) cell.append(schNode('span', 'sch-more', `+${items.length - SCH_SHOW_MAX}`));
     cell.addEventListener('click', () => { schState.selected = key; drawSchedule(); });
+    cell.addEventListener('dblclick', () => { schState.selected = key; drawSchedule(); openAddDialog(key); }); // 두 번 누르면 그 날짜로 추가 팝업
     cells.push(cell);
   }
   schEl('schGrid').replaceChildren(...cells);
@@ -90,7 +91,7 @@ function drawSchedule() {
   renderDayPanel();
 }
 
-// 선택한 날짜의 목록과 추가 폼
+// 선택한 날짜의 목록 (추가는 팝업에서 한다)
 function renderDayPanel() {
   const r = schState.data;
   const d = schFromKey(schState.selected);
@@ -118,8 +119,22 @@ function renderDayPanel() {
     return o;
   }));
   if ([...scope.options].some(o => o.value === keep)) scope.value = keep;
-  schEl('schDate').value = schState.selected;
 }
+
+// 일정 추가 팝업 열기: 날짜를 채우고, 제목·메모·안내는 비운다
+function openAddDialog(dateKey) {
+  if (!schState.data) return;
+  schEl('schDate').value = dateKey || schState.selected;
+  schEl('schTitle').value = '';
+  schEl('schMemo').value = '';
+  schEl('schError').textContent = '';
+  const dlg = schEl('schDialog');
+  if (!dlg.open) dlg.showModal();
+  schEl('schTitle').focus();
+}
+schEl('schAdd').addEventListener('click', () => openAddDialog(schState.selected));
+schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
+schEl('schCancel').addEventListener('click', () => schEl('schDialog').close());
 
 function deleteSchedule(id, btn) {
   btn.disabled = true;
@@ -169,6 +184,7 @@ schEl('schForm').addEventListener('submit', e => {
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
   api.post('/schedule/api/schedules', { scope, date, title, memo })
     .done(s => {
+      schEl('schDialog').close(); // 팝업 닫기
       schEl('schTitle').value = '';
       schEl('schMemo').value = '';
       err.textContent = '';
