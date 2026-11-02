@@ -12,7 +12,7 @@
       <section class="hero" id="intro">
         <div class="wrap">
           <div>
-            <h1>결재부터 장애 접수까지,<br>회사 업무를 <em>한곳에서</em></h1>
+            <h1>결재부터 장애&nbsp;접수까지,<br>회사 업무를 <em>한곳에서</em></h1>
             <p class="lead">전자결재, 근태, IT 장애 접수와 자산 관리, 일정, 채팅을 하나로 묶은 그룹웨어입니다. 신청하면 바로 우리 회사 전용 공간이 열리고, 2주 동안 무료로 써 볼 수 있습니다.</p>
             <ul class="hero-points">
               <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg><span>관리자나 부서장이 가입을 열어 둔 동안 직원이 계정 생성으로 요청하고, 승인하면 바로 계정이 생김</span></li>
@@ -98,18 +98,18 @@
         <div class="wrap">
           <div class="section-head center">
             <h2>신청하면 바로 체험이 시작됩니다</h2>
-            <p class="lead">신청하고 이메일을 인증하면 우리 회사 그룹웨어가 열립니다. 직원 계정은 관리자나 부서장이 가입을 열어 둔 동안 요청을 받아 승인하면 바로 만들어집니다.</p>
+            <p class="lead">신청하면 바로 우리 회사 그룹웨어가 열립니다. 직원 계정은 관리자나 부서장이 가입을 열어 둔 동안 요청을 받아 승인하면 바로 만들어집니다.</p>
           </div>
           <ol class="flow">
             <li class="hl"><strong>무료 체험 신청</strong><span>업체 정보와 관리자 정보를 입력합니다. 결제는 없고, 관리자 포함 10명까지 써 볼 수 있습니다.</span></li>
-            <li><strong>업체 개설</strong><span>업체 코드와 관리자 계정이 바로 만들어지고, 이메일 인증을 마치면 로그인할 수 있습니다. 2주 체험은 신청한 날부터예요.</span></li>
-            <li><strong>직원 계정 만들기</strong><span>관리자가 가입을 열면 직원이 업체 코드로 계정 생성을 요청하고, 1시간 안에 승인하면 사번이 붙어 바로 로그인합니다.</span></li>
+            <li><strong>업체 개설</strong><span>업체 코드와 관리자 계정이 바로 만들어지고, IEUM 앱을 설치해 곧바로 로그인할 수 있습니다. 2주 체험은 신청한 날부터예요.</span></li>
+            <li><strong>직원 계정 만들기</strong><span>관리자가 가입을 열면 직원이 업체 코드로 계정 생성을 요청하고, 승인하면 사번이 붙어 바로 로그인합니다.</span></li>
             <li><strong>2주 체험</strong><span>모든 직원이 모든 기능을 그대로 써 봅니다. 결제는 체험 중 언제든 할 수 있습니다.</span></li>
             <li><strong>결제하고 계속 이용</strong><span>그룹웨어 안에서 결제하면 그날부터 바로 유료로, 계정과 데이터 그대로 이어서 씁니다.</span></li>
           </ol>
           <div class="flow-note">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
-            <span>가입은 관리자가 고른 부서(부서장은 자기 부서)만, 정한 시간(10분~하루) 동안 열립니다. 닫혀 있으면 업체 코드를 알아도 요청할 수 없습니다. 비밀번호를 잊으면 로그인 화면의 비밀번호 찾기에서 이메일 인증 뒤 다시 정합니다.</span>
+            <span>가입은 관리자가 고른 부서(부서장은 자기 부서)만, 정한 시간(10분~하루) 동안 열립니다. 닫혀 있으면 업체 코드를 알아도 요청할 수 없습니다. 비밀번호를 잊으면 로그인 화면의 비밀번호 찾기를 이용합니다.</span>
           </div>
         </div>
       </section>
@@ -156,7 +156,7 @@
         <div class="wrap">
           <div>
             <h2>지금 신청하면 2주 동안 무료입니다</h2>
-            <p>업체 정보와 관리자 계정을 입력하고 이메일만 인증하면 결제 없이 우리 회사 그룹웨어가 열립니다.</p>
+            <p>업체 정보와 관리자 계정만 입력하면 결제 없이 우리 회사 그룹웨어가 열립니다.</p>
             <div class="cta-actions">
               <a class="btn btn-primary btn-lg btn-arrow" href="${ctx}/trial">2주 무료 체험 시작하기</a>
               <a class="btn btn-lg btn-outline-light" href="${ctx}/inquiry">도입 문의</a>

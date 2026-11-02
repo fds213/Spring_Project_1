@@ -1,0 +1,5 @@
+# 이 파일을 복사해 toss.properties로 이름을 바꾸고 키를 채우세요. toss.properties는 .gitignore에 있어 저장소에 올라가지 않습니다.
+# 토스페이먼츠 개발자센터(https://developers.tosspayments.com/my/api-keys)의 'API 개별 연동 키' 중 테스트 키를 씁니다.
+# 테스트 키(test_로 시작)만 받습니다. 키가 없어도 서버는 뜨고, 결제할 때만 안내가 나옵니다.
+toss.client-key=
+toss.secret-key=

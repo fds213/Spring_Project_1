@@ -3,18 +3,61 @@ const PRICE_PER_USER = 4000;
 const won = n => `${n.toLocaleString('ko-KR')}원`;
 
 
-// 모바일 메뉴
+// 칸을 틀린 것으로 표시하고 아래에 문구를 보인다. 문구가 비면 표시를 지운다.
+function setError(input, message) {
+  input.setAttribute('aria-invalid', message ? 'true' : 'false');
+  const box = input.closest('.form-row').querySelector('.field-error');
+  if (box) box.textContent = message;
+}
+
+// 좁은 화면 메뉴: 버튼으로 여닫고, 메뉴를 고르거나 Esc·바깥을 누르거나 화면이 넓어지면 닫는다.
+// 열린 동안 버튼은 ✕, 뒤 화면은 옅게 가린다(body.site-menu-open)
 const siteHeader = document.getElementById('siteHeader');
 const btnSiteMenu = document.getElementById('btnSiteMenu');
+function setSiteMenu(open) {
+  siteHeader.classList.toggle('open', open);
+  document.body.classList.toggle('site-menu-open', open);
+  btnSiteMenu.setAttribute('aria-expanded', open);
+  btnSiteMenu.setAttribute('aria-label', open ? '메뉴 닫기' : '메뉴 열기');
+}
 if (btnSiteMenu) {
-  btnSiteMenu.addEventListener('click', () => {
-    const open = siteHeader.classList.toggle('open');
-    btnSiteMenu.setAttribute('aria-expanded', open);
+  btnSiteMenu.addEventListener('click', () => setSiteMenu(!siteHeader.classList.contains('open')));
+  document.querySelectorAll('.site-nav a').forEach(a => a.addEventListener('click', () => setSiteMenu(false)));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && siteHeader.classList.contains('open')) { setSiteMenu(false); btnSiteMenu.focus(); }
   });
-  document.querySelectorAll('.site-nav a').forEach(a => a.addEventListener('click', () => {
-    siteHeader.classList.remove('open');
-    btnSiteMenu.setAttribute('aria-expanded', 'false');
-  }));
+  document.addEventListener('click', e => {
+    if (siteHeader.classList.contains('open') && !siteHeader.contains(e.target)) setSiteMenu(false);
+  });
+  window.matchMedia('(min-width: 901px)').addEventListener('change', e => { if (e.matches) setSiteMenu(false); });
+}
+
+// 헤더: 내려가면 그림자로 본문과 나눈다
+if (siteHeader) {
+  const onScroll = () => siteHeader.classList.toggle('is-scrolled', window.scrollY > 4);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+}
+
+// 소개 페이지: 보고 있는 구역(서비스 소개·기능·도입 절차·가격)의 메뉴를 강조한다. 다른 페이지에는 그 구역이 없다
+const spyLinks = [...document.querySelectorAll('.site-nav a[href*="#"]')]
+  .map(a => ({ a, section: document.getElementById(a.hash.slice(1)) })).filter(x => x.section);
+if (spyLinks.length && 'IntersectionObserver' in window) {
+  const visible = new Map();
+  const mark = () => {
+    // 화면 위쪽 띠에 걸친 구역 중 가장 아래 것 = 지금 읽는 구역
+    let current = null;
+    spyLinks.forEach(x => { if (visible.get(x.section)) current = x; });
+    spyLinks.forEach(x => {
+      x.a.classList.toggle('is-active', x === current);
+      if (x === current) x.a.setAttribute('aria-current', 'location'); else x.a.removeAttribute('aria-current');
+    });
+  };
+  const spy = new IntersectionObserver(entries => {
+    entries.forEach(en => visible.set(en.target, en.isIntersecting));
+    mark();
+  }, { rootMargin: '-80px 0px -55% 0px' });
+  spyLinks.forEach(x => spy.observe(x.section));
 }
 
 // 가격 계산기: 슬라이더와 숫자 칸을 서로 맞춘다. 숫자 칸은 슬라이더 최대값보다 크게 넣을 수 있다
@@ -164,3 +207,17 @@ const siteFooter = document.querySelector('.site-footer');
 if (fab && siteFooter && 'IntersectionObserver' in window) {
   new IntersectionObserver(([entry]) => fab.classList.toggle('is-hidden', entry.isIntersecting)).observe(siteFooter);
 }
+
+// 이용약관·개인정보처리방침 창 (site-footer.jspf). 버튼의 data-legal 값과 창의 id(legal-<값>)가 짝이다.
+// 닫기 버튼, 창 바깥(어두운 곳), Esc 로 닫고, 닫으면 연 버튼으로 초점을 돌린다
+document.querySelectorAll('[data-legal]').forEach(btn => btn.addEventListener('click', () => {
+  const dialog = document.getElementById(`legal-${btn.dataset.legal}`);
+  if (!dialog || dialog.open) return;
+  dialog.showModal();
+  dialog.querySelector('.legal-body').scrollTop = 0;
+  dialog.addEventListener('close', () => btn.focus(), { once: true });
+}));
+document.querySelectorAll('.legal-dialog').forEach(dialog => {
+  dialog.querySelectorAll('[data-legal-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
+  dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+});
