@@ -354,7 +354,7 @@ public class AttendanceService {
     public Map<String, Object> overview(Long companyId, String month) {
         requireMonth(month);
         LocalDate today = LocalDate.parse(dao.selectToday());
-        Map<Long, LeaveCycleDTO> cycles = leaveService.cyclesOn(companyId, today);
+        Map<Long, LeaveCycleDTO> grants = leaveService.grantsOn(companyId, today);
         List<Map<String, Object>> items = new ArrayList<>();
         int serving = 0;
         int punched = 0;
@@ -380,7 +380,7 @@ public class AttendanceService {
             m.put("late", a.getLateDays());
             m.put("early", a.getEarlyDays());
             // 남은 연차는 재직 중인 사람만 (퇴사자에게는 의미가 없다)
-            m.put("leaveLeft", isServing ? LeaveService.remainingOf(cycles.get(a.getEmployeeId()), a.getHireDate()) : null);
+            m.put("leaveLeft", isServing ? LeaveService.remainingOf(grants.get(a.getEmployeeId()), a.getHireDate()) : null);
             items.add(m);
         }
         Map<String, Object> counts = new LinkedHashMap<>();

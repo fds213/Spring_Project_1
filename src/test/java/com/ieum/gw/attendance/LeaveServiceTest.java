@@ -185,16 +185,18 @@ class LeaveServiceTest {
     }
 
     @Test
-    @DisplayName("최초 부여: 입사일부터 15일 하나(끝나는 날 없음). 두 번 불러도 하나만")
+    @DisplayName("최초 부여: 입사일부터 15일 하나(끝나는 날 없음). 두 번 불러도, 나중에 차감해도 하나만")
     void grantInitialLeave() {
         leaveMapper.career.put(200L, career("2026-11-02"));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
+        leave.useLeave(CO, 200L, ACTOR, List.of(day("2027-05-03", "LV_FULL", 1)));
         List<LeaveCycleDTO> rows = leaveMapper.cycles.stream().filter(c -> c.getEmployeeId() == 200L).collect(Collectors.toList());
         assertEquals(1, rows.size());
         assertEquals("2026-11-02", rows.get(0).getStartsOn());
         assertEquals("9999-12-31", rows.get(0).getEndsOn());
         assertEquals(BigDecimal.valueOf(15), rows.get(0).getGrantedDays());
+        assertEquals(BigDecimal.valueOf(14), leave.getRemainingLeaveDays(CO, 200L));
     }
 
     @Test

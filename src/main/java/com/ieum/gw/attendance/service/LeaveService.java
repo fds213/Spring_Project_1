@@ -43,9 +43,9 @@ import lombok.RequiredArgsConstructor;
 public class LeaveService {
 
     /** 모든 직원의 연차 일수 */
-    public static final BigDecimal GRANT_DAYS = BigDecimal.valueOf(15);
+    private static final BigDecimal GRANT_DAYS = BigDecimal.valueOf(15);
     /** 부여 행의 끝나는 날: 자동 부여가 없어 한 번 준 연차가 계속 이어진다 */
-    static final LocalDate OPEN_END = LocalDate.of(9999, 12, 31);
+    private static final LocalDate OPEN_END = LocalDate.of(9999, 12, 31);
 
     private static final Map<String, String> REQUEST_STATUS = Map.of("IN_PROGRESS", "REQUESTED", "APPROVED", "APPROVED", "REJECTED", "REJECTED");
     private static final BigDecimal HALF_DAY = new BigDecimal("0.5");
@@ -247,7 +247,7 @@ public class LeaveService {
     }
 
     /** 업체 직원들의 부여 행(사용 합 포함)을 직원 번호로. 행이 없는 직원은 빠진다 */
-    public Map<Long, LeaveCycleDTO> cyclesOn(Long companyId, LocalDate day) {
+    public Map<Long, LeaveCycleDTO> grantsOn(Long companyId, LocalDate day) {
         Map<Long, LeaveCycleDTO> map = new HashMap<>();
         for (LeaveCycleDTO c : dao.selectCompanyCyclesOn(companyId, day.toString())) map.put(c.getEmployeeId(), c);
         return map;
@@ -275,14 +275,13 @@ public class LeaveService {
         return row;
     }
 
-    /** 입사일부터 끝없이 15일. 경력 칸(career_months)은 쓰지 않아 0 */
-    static LeaveCycleDTO newGrantRow(Long companyId, Long employeeId, LocalDate hire) {
+    /** 입사일부터 끝없이 15일 */
+    private static LeaveCycleDTO newGrantRow(Long companyId, Long employeeId, LocalDate hire) {
         LeaveCycleDTO row = new LeaveCycleDTO();
         row.setCompanyId(companyId);
         row.setEmployeeId(employeeId);
         row.setStartsOn(hire.toString());
         row.setEndsOn(OPEN_END.toString());
-        row.setCareerMonths(0);
         row.setGrantedDays(GRANT_DAYS);
         return row;
     }

@@ -60,7 +60,7 @@ public class AttendanceController {
         return service.records(user.getCompanyId(), user.getEmployeeId(), month);
     }
 
-    /** 연차 화면: 이번 연차 주기 현황과 휴가 신청 내역 */
+    /** 연차 화면: 연차 현황(15일 기준)과 휴가 신청 내역 */
     @GetMapping("/attendance/api/leaves")
     @ResponseBody
     public Map<String, Object> leaves(@AuthenticationPrincipal LoginUser user) {

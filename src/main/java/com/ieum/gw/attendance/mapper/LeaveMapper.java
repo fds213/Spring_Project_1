@@ -17,7 +17,7 @@ public interface LeaveMapper {
 
     EmployeeCareerDTO selectEmployeeCareer(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
-    // 연차 주기
+    // 연차 부여 행 (직원마다 입사일부터 하나)
     LeaveCycleDTO selectCycleOn(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("day") String day);
 
     LeaveCycleDTO selectCycleOnForUpdate(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("day") String day);

@@ -3,7 +3,7 @@
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.attendance.mapper.LeaveMapper">
 
-	<!-- 연차: 주기·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
+	<!-- 연차: 부여 행·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
 
 	<select id="selectEmployeeCareer" resultType="com.ieum.gw.attendance.dto.EmployeeCareerDTO">
 		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date
@@ -11,16 +11,16 @@
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
 	</select>
 
-	<!-- ===== 연차 주기·사용 기록 (근태가 쓴다. 결재는 근태의 연동 메서드로만 부른다) ===== -->
+	<!-- ===== 연차 부여 행·사용 기록 (근태가 쓴다. 결재는 근태의 연동 메서드로만 부른다) ===== -->
 
 	<sql id="cycleColumns">
 		leave_cycle_id, company_id, employee_id,
 		TO_CHAR(starts_on, 'YYYY-MM-DD') AS starts_on,
 		TO_CHAR(ends_on, 'YYYY-MM-DD')   AS ends_on,
-		career_months, granted_days
+		granted_days
 	</sql>
 
-	<!-- 그 날이 들어 있는 연차 주기. 주기는 겹치지 않으니(입사기념일 ~ 다음 기념일 전날) 많아야 한 줄이다 -->
+	<!-- 그 날이 들어 있는 부여 행. 직원마다 입사일부터 끝없이(9999-12-31) 하나라 많아야 한 줄이다 -->
 	<select id="selectCycleOn" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
 		SELECT <include refid="cycleColumns"/>
 		FROM leave_cycle
@@ -29,7 +29,7 @@
 		  AND ends_on &gt; TO_DATE(#{day}, 'YYYY-MM-DD')
 	</select>
 
-	<!-- 연차 차감 때: 같은 주기를 동시에 차감하지 못하게 행을 잠근다 (결재 최종 승인 트랜잭션이 끝나면 풀린다) -->
+	<!-- 연차 차감 때: 같은 직원을 동시에 차감하지 못하게 부여 행을 잠근다 (결재 최종 승인 트랜잭션이 끝나면 풀린다) -->
 	<select id="selectCycleOnForUpdate" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
 		SELECT <include refid="cycleColumns"/>
 		FROM leave_cycle
@@ -39,29 +39,30 @@
 		FOR UPDATE
 	</select>
 
-	<!-- 주기 부여 (최초 부여, 또는 저장된 주기가 없는 날의 차감 때). 같은 시작일이면 UQ_32_01 로 막힌다 -->
+	<!-- 15일 부여 (최초 부여, 또는 부여 행이 없는 직원의 첫 차감 때). 같은 시작일이면 UQ_32_01 로 막힌다.
+	     career_months 는 쓰지 않아 0 (연차는 경력과 상관없이 15일) -->
 	<insert id="insertCycle" parameterType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
 		<selectKey keyProperty="leaveCycleId" resultType="long" order="BEFORE">
 			SELECT sq_leave_cycle.NEXTVAL FROM dual
 		</selectKey>
 		INSERT INTO leave_cycle (leave_cycle_id, company_id, employee_id, starts_on, ends_on, career_months, granted_days)
 		VALUES (#{leaveCycleId}, #{companyId}, #{employeeId}, TO_DATE(#{startsOn}, 'YYYY-MM-DD'), TO_DATE(#{endsOn}, 'YYYY-MM-DD'),
-		        #{careerMonths}, #{grantedDays})
+		        0, #{grantedDays})
 	</insert>
 
-	<!-- 주기의 사용(-)·복원(+) 합. 남은 일수 = 부여 일수 + 이 값 -->
+	<!-- 부여 행의 사용(-)·복원(+) 합. 남은 일수 = 부여 일수 + 이 값 -->
 	<select id="selectLedgerSum" resultType="java.math.BigDecimal">
 		SELECT NVL(SUM(delta_days), 0)
 		FROM leave_ledger
 		WHERE company_id = #{companyId} AND leave_cycle_id = #{leaveCycleId}
 	</select>
 
-	<!-- 근태·연차 관리: 업체 직원들의 그 날 주기와 사용 합을 한 번에 -->
+	<!-- 근태·연차 관리: 업체 직원들의 부여 행과 사용 합을 한 번에 -->
 	<select id="selectCompanyCyclesOn" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
 		SELECT c.leave_cycle_id, c.company_id, c.employee_id,
 		       TO_CHAR(c.starts_on, 'YYYY-MM-DD') AS starts_on,
 		       TO_CHAR(c.ends_on, 'YYYY-MM-DD')   AS ends_on,
-		       c.career_months, c.granted_days,
+		       c.granted_days,
 		       (SELECT NVL(SUM(l.delta_days), 0) FROM leave_ledger l
 		        WHERE l.company_id = c.company_id AND l.leave_cycle_id = c.leave_cycle_id) AS ledger_days
 		FROM leave_cycle c
@@ -93,7 +94,7 @@
 
 	<!-- ===== 연차 화면: 신청 내역은 전자결재의 휴가 신청서에서 읽는다 ===== -->
 
-	<!-- 주기 안의 결재 중(승인 대기) 휴가 일수. 사용 일수는 위 사용 내역(leave_ledger)에서 센다 -->
+	<!-- 기간 안의 결재 중(승인 대기) 휴가 일수. 사용 일수는 위 사용 내역(leave_ledger)에서 센다 -->
 	<select id="selectPendingDays" resultType="java.math.BigDecimal">
 		SELECT NVL(SUM(d.deduct_days), 0)
 		FROM approval_document ad
@@ -104,7 +105,7 @@
 		  AND d.leave_date &lt; TO_DATE(#{endsOn}, 'YYYY-MM-DD')
 	</select>
 
-	<!-- 주기에 걸친 휴가 신청서 (제출한 것만), 시작일 늦은 순 -->
+	<!-- 기간에 걸친 휴가 신청서 (제출한 것만), 시작일 늦은 순 -->
 	<select id="selectRequests" resultType="com.ieum.gw.attendance.dto.LeaveRequestDTO">
 		SELECT ad.approval_document_id,
 		       CASE WHEN COUNT(DISTINCT d.leave_type) = 1 THEN MAX(d.leave_type) ELSE 'LV_FULL' END AS leave_type,

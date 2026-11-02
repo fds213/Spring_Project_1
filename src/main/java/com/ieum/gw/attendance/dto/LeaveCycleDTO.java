@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import lombok.Getter;
 import lombok.Setter;
 
-/** 연차 주기 (leave_cycle). 입사기념일마다 새로 부여한다 */
+/** 연차 부여 행 (leave_cycle). 직원마다 입사일에 15일 하나, 끝나는 날 없음 */
 @Getter
 @Setter
 public class LeaveCycleDTO {
@@ -13,8 +13,7 @@ public class LeaveCycleDTO {
     private Long companyId;
     private Long employeeId;
     private String startsOn;        // YYYY-MM-DD
-    private String endsOn;          // YYYY-MM-DD (다음 부여일, 이 날은 포함하지 않는다)
-    private Integer careerMonths;   // 쓰지 않음(0). 연차는 경력과 상관없이 15일
+    private String endsOn;          // YYYY-MM-DD (9999-12-31: 자동 부여가 없어 끝나지 않는다)
     private BigDecimal grantedDays;
     private BigDecimal ledgerDays;  // 사용(-)·복원(+) 내역 합 (조회에 따라 채운다)
 }
