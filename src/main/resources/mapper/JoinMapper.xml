@@ -93,4 +93,29 @@
         WHERE company_id = #{companyId} AND use_yn = 'Y'
         ORDER BY sort_order, job_grade_id
     </select>
+    
+     <!-- 지금 열려 있는 부서의 ID (이름으로). 닫혔거나 없으면 null -->
+    <select id="findOpenDeptId" resultType="java.lang.Long">
+        SELECT department_id FROM department
+        WHERE company_id = #{companyId}
+          AND department_name = #{deptName}
+          AND use_yn = 'Y'
+          AND join_open_until > <include refid="now"/>
+    </select>
+
+    <!-- 직급 ID (이름으로). 없으면 null -->
+    <select id="findGradeId" resultType="java.lang.Long">
+        SELECT job_grade_id FROM job_grade
+        WHERE company_id = #{companyId}
+          AND grade_name = #{gradeName}
+          AND use_yn = 'Y'
+    </select>
+
+    <!-- 이 업체에서 같은 이메일로 대기 중이거나 쓰는 계정 수 (반려·취소된 것은 빼고) -->
+    <select id="countLiveEmail" resultType="int">
+        SELECT COUNT(*) FROM user_account
+        WHERE company_id = #{companyId}
+          AND email = #{email}
+          AND status_code NOT IN ('REJECTED', 'CANCELED')
+    </select>
 </mapper>

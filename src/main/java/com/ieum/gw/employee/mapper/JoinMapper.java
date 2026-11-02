@@ -34,4 +34,9 @@ public interface JoinMapper {
 	JoinCompanyDTO findCompanyByCode(@Param("companyCode") String companyCode);
 	
 	List<String> listGradeNames(@Param("companyId") Long companyId);
+	
+	Long findOpenDeptId(@Param("companyId") Long companyId, @Param("deptName") String deptName);
+	Long findGradeId(@Param("companyId") Long companyId, @Param("gradeName") String gradeName);
+	int countLiveEmail(@Param("companyId") Long companyId, @Param("email") String email);
+
 }

@@ -71,4 +71,16 @@ public class JoinDAO {
     public List<String> listGradeNames(Long companyId){
     	return mapper.listGradeNames(companyId);
     }
+    
+    public Long findOpenDeptId(Long companyId, String deptName) {
+    	return mapper.findOpenDeptId(companyId, deptName);
+    }
+    
+    public Long findGradeId(Long companyId, String gradeName) {
+    	return mapper.findGradeId(companyId, gradeName);
+    }
+    
+    public int countLiveEmail(Long companyId, String email) {
+    	return mapper.countLiveEmail(companyId, email);
+    }
 }
