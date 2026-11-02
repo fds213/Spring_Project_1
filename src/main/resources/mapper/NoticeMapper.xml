@@ -203,6 +203,12 @@
 		   AND use_yn = 'Y'
 	</select>
 
+	<!-- 우리 업체의 공지 게시판 줄 만들기. 번호·사용 여부·작성일은 DB 기본값을 쓴다 -->
+	<insert id="insertNoticeBoard">
+		INSERT INTO board (company_id, board_name, board_type)
+		VALUES (#{companyId}, '공지사항', 'BOARD_NOTICE')
+	</insert>
+
 	<!-- 새 게시글 번호 하나 뽑기 -->
 	<select id="selectNextPostId" resultType="long">
 		SELECT sq_post.NEXTVAL FROM dual

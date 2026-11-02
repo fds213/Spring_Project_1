@@ -16,7 +16,7 @@
   <jsp:body>
     <section class="view on" id="view-hr-join">
       <%-- 가입 승인: 업체 관리자는 모든 요청, 부서장은 자기 부서 요청. 승인하면 바로 계정이 만들어진다 (employee/employee.js) --%>
-      <div class="page-head"><h1>가입 승인 <span class="page-code" id="joinCompanyCode"></span></h1></div>
+      <div class="page-head"><h1>가입 승인</h1><span class="page-code">업체 코드 <strong id="joinCompanyCode"></strong></span></div>
       <p class="muted join-scope" id="joinScope"></p>
       <%-- 가입 활성화: 켜 둔 동안만 직원이 계정 생성에서 업체 코드를 확인할 수 있다. 부서장은 자기 부서를 바로 열고,
            업체 관리자는 버튼을 누르면 아래에 부서 목록이 펼쳐져 고른 부서만 연다. 고른 시간이 지나면 저절로 꺼지고,

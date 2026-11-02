@@ -23,35 +23,35 @@ window.addEventListener('appinstalled', () => {
 
 // 브라우저가 설치 창을 넘겨주지 않았을 때 보여 준다: 버튼으로 설치할 수 없거나, 이음이
 // 이미 설치되어 있다(그러면 Chrome이 더 권하지 않는다). 브라우저마다 안내 하나, 메뉴 이름은 2026-10 기준.
-const ALREADY = ' 이미 설치했다면 설치된 IEUM 앱을 열면 됩니다.';
+const ALREADY = ' 이미 설치했다면 IEUM 앱을 여세요.';
 const INSTALL_GUIDE = {
   installed: {
     title: 'IEUM 앱이 설치되었습니다',
-    body: '앱을 실행하여 IEUM 그룹웨어를 사용해보세요!',
+    body: '앱을 열어 바로 사용하세요.',
   },
   chrome: {
     title: '주소창에서 설치해 주세요',
-    body: '주소창 오른쪽 끝의 설치 아이콘(모니터 모양)을 누르거나, 오른쪽 위 ⋮ 메뉴 > 전송, 저장, 공유에서 설치 항목을 고르세요.' + ALREADY,
+    body: '주소창 오른쪽의 설치 아이콘을 누르세요.' + ALREADY,
   },
   edge: {
     title: '주소창에서 설치해 주세요',
-    body: '주소창 오른쪽의 앱 설치 아이콘을 누르거나, 오른쪽 위 ⋯ 메뉴 > 앱 > 이 사이트를 앱으로 설치를 고르세요.' + ALREADY,
+    body: '주소창 오른쪽의 앱 설치 아이콘을 누르세요.' + ALREADY,
   },
   android: {
     title: '홈 화면에 설치해 주세요',
-    body: '오른쪽 위 ⋮ 메뉴에서 "앱 설치" 또는 "홈 화면에 추가"를 고르세요.' + ALREADY,
+    body: '⋮ 메뉴에서 "앱 설치"를 누르세요.' + ALREADY,
   },
   ios: {
     title: '홈 화면에 추가해 주세요',
-    body: 'Safari 아래쪽 공유 버튼을 누른 뒤 "홈 화면에 추가"를 고르면 IEUM 앱이 생깁니다.' + ALREADY,
+    body: '공유 버튼 > "홈 화면에 추가"를 누르세요.' + ALREADY,
   },
   macSafari: {
     title: 'Dock에 추가해 주세요',
-    body: 'Safari 위쪽 메뉴 막대에서 파일 > Dock에 추가를 고르면 IEUM 앱이 생깁니다. 크롬이나 엣지에서는 주소창의 설치 아이콘으로 설치할 수 있습니다.' + ALREADY,
+    body: '메뉴 막대의 파일 > Dock에 추가를 누르세요.' + ALREADY,
   },
   other: {
     title: '크롬이나 엣지에서 설치해 주세요',
-    body: '이 브라우저에서는 IEUM 앱을 설치할 수 없습니다. 크롬이나 엣지로 이 주소를 열고 다운로드를 다시 눌러 주세요.',
+    body: '크롬이나 엣지에서 이 주소를 열어 주세요.',
   },
 };
 // 이 브라우저에 맞는 안내 (Edge와 Whale도 user agent에 "Chrome"이 들어 있어 먼저 확인한다)
@@ -88,19 +88,21 @@ function showInstallGuide(kind) {
 
 async function startDownload() {
   if (installPrompt) {
-    installPrompt.prompt();
-    await installPrompt.userChoice; // "설치됨" 안내는 appinstalled 이벤트에서 보여 준다
-    installPrompt = null;
-    return;
+    const p = installPrompt;
+    installPrompt = null; // prompt() 는 한 번만 부를 수 있다
+    try {
+      await p.prompt();
+      await p.userChoice; // "설치됨" 안내는 appinstalled 이벤트에서 보여 준다
+      return;
+    } catch (e) { /* 사용자 동작 밖에서 불렸거나 이미 쓴 prompt: 아래 안내로 */ }
   }
   showInstallGuide(guideKind());
 }
 
 document.querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', startDownload));
 
-// 서비스 워커는 /resources/ 가 아니라 사이트 맨 위(/<context>/service-worker.js)에서 받아야
-// 앱의 페이지를 맡을 수 있다. 어디서 내려 줄지는 아직 정하지 않았다(가이드 6장).
-// 그때까지는 등록이 조용히 실패한다.
+// 서비스 워커는 /resources/ 가 아니라 사이트 맨 위(/<context>/service-worker.js)에서 받아야 앱의 페이지를 맡을 수 있다.
+// servlet-context.xml 이 그 주소를 resources/js/service-worker.js 로 내려주고, security-context.xml 이 로그인 없이 허용한다.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register((document.body.dataset.ctx || '') + '/service-worker.js').catch(() => {});
 }

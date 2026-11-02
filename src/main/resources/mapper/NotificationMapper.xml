@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.notification.mapper.NotificationMapper">
+
+    <!-- 받는 사원의 계정. 사원 하나에 계정은 많아야 하나다(UQ_07_01). 없으면 null -->
+    <select id="findAccountId" resultType="java.lang.Long">
+        SELECT user_account_id
+        FROM user_account
+        WHERE company_id = #{companyId}
+          AND employee_id = #{employeeId}
+    </select>
+
+    <!-- 알림 1행. 번호·전달 경로(NC_IN_APP)·시각은 컬럼 기본값을 쓴다.
+         같은 받는 계정에 같은 키면 고유 제약(UQ_69_01)에 걸린다 -->
+    <insert id="insertNotification" parameterType="com.ieum.gw.notification.dto.NotificationSaveDTO">
+        INSERT INTO notification
+            (company_id, receiver_account_id, notification_type, title, message,
+             approval_document_id, it_ticket_id, dedupe_key)
+        VALUES
+            (#{companyId}, #{receiverAccountId}, #{notificationType}, #{title}, #{message},
+             #{approvalDocumentId}, #{itTicketId}, #{dedupeKey})
+    </insert>
+
+    <!-- 본인 알림 한 페이지 (최신 순) -->
+    <select id="listNotifications" resultType="com.ieum.gw.notification.dto.NotificationDTO">
+        SELECT notification_id, notification_type, title, message,
+               approval_document_id, it_ticket_id,
+               TO_CHAR(read_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS read_at,
+               TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+        FROM notification
+        WHERE company_id = #{companyId}
+          AND receiver_account_id = #{userAccountId}
+        ORDER BY created_at DESC, notification_id DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <!-- 본인 알림 전체 수 -->
+    <select id="countNotifications" resultType="int">
+        SELECT COUNT(*)
+        FROM notification
+        WHERE company_id = #{companyId}
+          AND receiver_account_id = #{userAccountId}
+    </select>
+
+    <!-- 본인의 안 읽은 알림 수 (헤더 배지) -->
+    <select id="countUnread" resultType="int">
+        SELECT COUNT(*)
+        FROM notification
+        WHERE company_id = #{companyId}
+          AND receiver_account_id = #{userAccountId}
+          AND read_at IS NULL
+    </select>
+
+    <!-- 읽음 표시. 이미 읽은 알림은 처음 읽은 시각을 그대로 둔다 -->
+    <update id="markRead">
+        UPDATE notification
+        SET read_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE notification_id = #{notificationId}
+          AND company_id = #{companyId}
+          AND receiver_account_id = #{userAccountId}
+          AND read_at IS NULL
+    </update>
+
+    <!-- 이 번호가 본인 알림인지 (읽음 표시가 0행일 때 이미 읽음과 없음을 가른다) -->
+    <select id="countOwned" resultType="int">
+        SELECT COUNT(*)
+        FROM notification
+        WHERE notification_id = #{notificationId}
+          AND company_id = #{companyId}
+          AND receiver_account_id = #{userAccountId}
+    </select>
+</mapper>

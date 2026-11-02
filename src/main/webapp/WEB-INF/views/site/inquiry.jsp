@@ -72,7 +72,7 @@
             <div class="inq-agree form-row">
               <div class="agree-line">
                 <label class="check"><input type="checkbox" id="agree" name="agree" required> <span>[필수] 개인정보 수집 및 이용에 동의합니다.</span></label>
-                <button type="button" class="link-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
+                <button type="button" class="terms-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
               </div>
               <table class="terms" id="terms" hidden>
                 <tr><th>수집 항목</th><td>회사명, 이름, 이메일, 휴대전화</td></tr>
@@ -94,7 +94,7 @@
 
       <%-- 접수 완료: 위의 안내와 폼을 숨기고 이 화면만 보여준다 (같은 페이지, AJAX 성공 후) --%>
       <div class="wrap inq-done" id="inqDone" hidden tabindex="-1">
-        <img class="done-mark" src="${ctx}/resources/img/logo-mark.png" alt="">
+        <img class="done-mark" src="${ctx}/resources/img/logo-mark.svg" alt="">
         <h2>문의가 접수되었습니다</h2>
         <p>입력하신 이메일로 접수 내용을 보내 드렸고, 답변도 같은 주소로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
         <p class="done-no">접수번호 <strong id="doneNo"></strong></p>
