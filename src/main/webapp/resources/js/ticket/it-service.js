@@ -210,5 +210,5 @@ function renderAssetMine() {
     itCell('상태', itNode('span', `status status-${TICKET_CLASS[t.status]}`, TICKET_STATUS[t.status])))) : [emptyRow(4, '지급을 기다리는 신청이 없습니다')]));
 }
 itEl('btnAssetRequest')?.addEventListener('click', () => {
-  startApprovalWrite('EQUIP'); // 전자결재 장비 지급 신청서로 간다 (util.js)
+  startApprovalWrite('DOC_EQUIPMENT'); // 전자결재 장비 지급 신청서로 간다 (util.js)
 });
