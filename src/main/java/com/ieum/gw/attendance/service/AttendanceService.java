@@ -46,8 +46,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AttendanceService {
 
-    // 기본 근무 09:00~18:00 (요구분석서 3.4)
-    private static final String WORK_START = "09:00:00";
+    // 기본 근무 09:00~18:00 (요구분석서 3.4). 출근은 10분 유예: 09:10:00 까지 찍으면 정상, 그 뒤면 지각
+    // 근태·연차 관리의 그 달 지각·조퇴 수(SQL)도 이 두 값으로 센다
+    private static final String LATE_AFTER = "09:10:00";
     private static final String WORK_END = "18:00:00";
 
     // 휴가 구분 공통 코드 → 화면 값 (LeaveService 도 같이 쓴다)
@@ -194,7 +195,10 @@ public class AttendanceService {
             day.put("date", date);
             day.put("weekday", d.getDayOfWeek().getValue() % 7); // 0 = 일요일
             day.put("holiday", holidays.getOrDefault(date, ""));
-            day.put("punch", punchView(byDate.get(date)));
+            Map<String, String> punch = punchView(byDate.get(date));
+            // 퇴근 누락: 오늘보다 앞선 날인데 출근만 있고 퇴근이 없다(지난 날 퇴근은 나중에 찍을 수 없다). 오늘은 아직 퇴근할 수 있어 비워 둔다
+            if (punch != null && punch.get("out").isEmpty() && date.compareTo(today) < 0) punch.put("outStatus", "NO_OUT");
+            day.put("punch", punch);
             day.put("leave", leaves.get(date));
             days.add(day);
         }
@@ -359,7 +363,7 @@ public class AttendanceService {
         int serving = 0;
         int punched = 0;
         int lateToday = 0;
-        for (AttendanceSummaryDTO a : dao.selectMonthSummary(companyId, month)) {
+        for (AttendanceSummaryDTO a : dao.selectMonthSummary(companyId, month, LATE_AFTER, WORK_END)) {
             boolean isServing = "ST_SERVING".equals(a.getEmploymentStatus());
             if (isServing) serving++;
             boolean late = a.getTodayIn() != null && "LATE".equals(inStatus(a.getTodayIn()));
@@ -435,7 +439,7 @@ public class AttendanceService {
     }
 
     private static String inStatus(String hms) {
-        return hms.compareTo(WORK_START) > 0 ? "LATE" : "NORMAL";
+        return hms.compareTo(LATE_AFTER) > 0 ? "LATE" : "NORMAL";
     }
 
     private static String outStatus(String hms) {

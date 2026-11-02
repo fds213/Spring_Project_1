@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.attendance.dto.ApprovalStepDTO;
-import com.ieum.gw.attendance.dto.EmployeeCareerDTO;
+import com.ieum.gw.attendance.dto.EmployeeHireDTO;
 import com.ieum.gw.attendance.dto.LeaveCycleDTO;
 import com.ieum.gw.attendance.dto.LeaveRequestDTO;
 import com.ieum.gw.attendance.dto.LeaveSlotDTO;
@@ -19,8 +19,8 @@ import lombok.RequiredArgsConstructor;
 public class LeaveDAO {
     private final LeaveMapper mapper;
 
-    public EmployeeCareerDTO selectEmployeeCareer(Long companyId, Long employeeId) {
-        return mapper.selectEmployeeCareer(companyId, employeeId);
+    public EmployeeHireDTO selectEmployeeHire(Long companyId, Long employeeId) {
+        return mapper.selectEmployeeHire(companyId, employeeId);
     }
 
     public LeaveCycleDTO selectCycleOn(Long companyId, Long employeeId, String day) {

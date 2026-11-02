@@ -17,6 +17,6 @@ public class AttendanceSummaryDTO {
     private String todayIn;            // HH24:MI:SS, 오늘 기록 없으면 null
     private String todayOut;
     private Integer workDays;          // 그 달 출근한 날 수
-    private Integer lateDays;          // 09:00:00 이후 출근
+    private Integer lateDays;          // 09:10:00 보다 늦은 출근 (10분 유예)
     private Integer earlyDays;         // 18:00:00 전 퇴근
 }
