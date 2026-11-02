@@ -29,6 +29,8 @@ import lombok.RequiredArgsConstructor;
 public class HolidayService {
 
     private static final int NAME_MAX = 50;
+    private static final int YEAR_MIN = 2000; // 휴일 관리 화면에서 볼 수 있는 해. 넣을 때도 같은 범위만 받는다
+    private static final int YEAR_MAX = 2100;
 
     // 법정 공휴일 (대체공휴일·선거일 포함). 정부 발표로 확인한 해만 둔다. 다른 해는 하루씩 넣는다
     private static final Map<Integer, String[][]> PRESETS = Map.of(2026, new String[][] {
@@ -56,7 +58,7 @@ public class HolidayService {
 
     /** 휴일 관리 화면: 그 해 휴일과, 한 번에 넣을 수 있는 해 */
     public Map<String, Object> list(Long companyId, int year) {
-        if (year < 2000 || year > 2100) throw new AttendanceException(400, "해를 다시 골라 주세요");
+        if (year < YEAR_MIN || year > YEAR_MAX) throw new AttendanceException(400, "해를 다시 골라 주세요");
         List<Map<String, Object>> items = new ArrayList<>();
         for (HolidayDTO h : dao.selectHolidays(companyId, year + "-01-01", year + "-12-31")) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -78,6 +80,9 @@ public class HolidayService {
     public Map<String, Object> add(Long companyId, String date, String name) {
         requireWritable(companyId);
         LocalDate day = parseDay(date);
+        if (day.getYear() < YEAR_MIN || day.getYear() > YEAR_MAX) {
+            throw new AttendanceException(400, "휴일은 " + YEAR_MIN + "~" + YEAR_MAX + "년 안에서 넣어 주세요");
+        }
         String title = name == null ? "" : name.trim();
         if (title.isEmpty() || title.length() > NAME_MAX) {
             throw new AttendanceException(400, "휴일 이름은 1~" + NAME_MAX + "자로 적어 주세요");
