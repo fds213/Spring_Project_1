@@ -53,16 +53,16 @@ public class EmployeeJoinController {
     /** 가입 열기 (employee.js 가입 활성화). 관리자는 고른 부서들, 부서장은 자기 부서 */
     @PostMapping("/employee/api/join/openings")
     @ResponseBody
-    public Map<String, Object> open(@RequestBody JoinOpenFormDTO form,          // 🔧1 JSON 본문 → form
+    public Map<String, Object> open(@RequestBody JoinOpenFormDTO form,          
                                     @AuthenticationPrincipal LoginUser loginUser) {
-        Map<String, Object> result = joinService.openJoin(loginUser, form);    // 🔧2 joinService. 붙이기
-        return Map.of("success", true, "data", result);                        // 🔧3 결과 담기, 🔧4 ;
+        Map<String, Object> result = joinService.openJoin(loginUser, form);    
+        return Map.of("success", true, "data", result);                        
     }
 
     /** 한 부서 끄기. 부서장은 자기 부서만 */
     @PostMapping("/employee/api/join/openings/{dept}/delete")
     @ResponseBody
-    public Map<String, Object> close(@PathVariable String dept,                // 주소의 {dept} → dept
+    public Map<String, Object> close(@PathVariable String dept,                
                                      @AuthenticationPrincipal LoginUser loginUser) {
         joinService.closeJoin(loginUser, dept);
         return Map.of("success", true);
@@ -80,13 +80,13 @@ public class EmployeeJoinController {
     @GetMapping("/join/api/companies/{code}")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> checkCompany(@PathVariable String code) {
-        Map<String, Object> result = joinService.checkCompany(code);      // ① Service 부르기
+        Map<String, Object> result = joinService.checkCompany(code);      //  Service 부르기
 
-        if (result == null) {                                     // ② 받을 수 없는 업체
+        if (result == null) {                                     //  받을 수 없는 업체
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("message", "가입을 받을 수 없는 업체 코드입니다"));
         }
-        return ResponseEntity.ok(Map.of("success", true, "data", result));   // ③ 성공
+        return ResponseEntity.ok(Map.of("success", true, "data", result));   //  성공
     }
 
     // ---------- 오류 응답 ----------
