@@ -14,6 +14,8 @@
     <script>routeNoticeBoard('notice' + location.pathname.slice((document.body.dataset.ctx + '/board/notice').length));</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 게시판 전용 스타일 (공통 레이아웃에 화면별 CSS 칸이 없어서 본문 맨 앞에서 불러온다) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/board/board.css">
     <section class="view" id="view-notice-list">
       <%-- 공지사항 (board/board.js). 주소: /board/notice · /board/notice/view/3 · /board/notice/write · /board/notice/edit/3.
            목록·글 보기·글쓰기가 이 한 페이지에 있고, 주소를 보고 하나를 보인다 --%>
@@ -24,8 +26,8 @@
              data-write: 읽기 전용 업체에서는 흐리게 막는다 --%>
         <a href="${ctx}/board/notice/write" class="btn btn-primary" id="btnWrite" data-write hidden>글쓰기</a>
       </div>
-      <%-- 공지 구분: 전사 공지(전 직원) / 부서 공지(그 부서만. 업체 관리자·인사 담당은 모든 부서) --%>
-      <div class="type-tabs" id="noticeTabs" role="tablist" aria-label="공지 구분">
+      <%-- 공지 구분: 전사 공지(전 직원) / 부서 공지(그 부서만. 업체 관리자·인사 담당은 모든 부서) (부서 공지는 보류라 탭을 숨김. 부서 공지가 생기면 hidden을 지운다) --%>
+      <div class="type-tabs" id="noticeTabs" hidden role="tablist" aria-label="공지 구분">
         <button type="button" role="tab" class="type-tab" data-tab="all" aria-selected="true">전체</button>
         <button type="button" role="tab" class="type-tab" data-tab="DEPT" aria-selected="false" tabindex="-1" id="noticeTabDept">부서 공지</button>
       </div>
@@ -63,7 +65,7 @@
         <a href="${ctx}/board/notice" class="btn">목록으로</a>
         <div class="notice-actions-right" id="detailOwnerActions" hidden>
           <%-- 고정하기 / 고정 풀기: 수정 화면에 가지 않고 바로 바꾼다. 수정일은 바뀌지 않는다 --%>
-          <button type="button" class="btn" id="btnPin" data-write>고정하기</button>
+          <button type="button" class="btn" id="btnPin" data-write hidden>고정하기</button>
           <a href="#" class="btn" id="btnEdit" data-write>수정</a>
           <button type="button" class="btn btn-danger" id="btnDelete" data-write>삭제</button>
         </div>
@@ -135,7 +137,7 @@
         </div>
         <%-- 맨 위 고정: 모든 페이지의 목록 맨 위에 보인다. 최대 5개 --%>
         <div class="field">
-          <label class="agree pin-check"><input type="checkbox" id="fPinned"> 목록 맨 위에 고정 <span class="muted">(최대 5개)</span></label>
+          <label class="agree pin-check" hidden><input type="checkbox" id="fPinned"> 목록 맨 위에 고정 <span class="muted">(최대 5개)</span></label>
           <p class="form-error" id="fPinnedError" role="alert"></p>
         </div>
         <div class="bill-actions">
@@ -207,7 +209,7 @@
     <dialog class="modal modal-image" id="imageDialog" aria-label="이미지 크게 보기">
       <img id="imageDialogImg" alt="">
       <div class="modal-actions">
-        <a class="btn" id="imageDialogDownload" download>내려받기</a>
+        <a class="btn" id="imageDialogDownload" download>다운로드</a>
         <button type="button" class="btn btn-primary" value="ok">닫기</button>
         <button type="button" class="btn" value="cancel" hidden>닫기</button>
       </div>
