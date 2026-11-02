@@ -25,6 +25,8 @@ const COLOR_RE = /^(#[0-9a-f]{3,6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s
 
 function sanitizeHtml(html) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  // <form>은 입력칸 이름(name="childNodes" 등)으로 자기 속성을 가려 아래 검사를 건너뛰게 할 수 있다. 내용째 먼저 지운다
+  Document.prototype.querySelectorAll.call(doc, 'form').forEach(f => Element.prototype.remove.call(f));
   const clean = node => {
     [...node.childNodes].forEach(child => {
       if (child.nodeType === Node.TEXT_NODE) return;
@@ -77,6 +79,8 @@ const byId = id => document.getElementById(id);
 const fmtDate = ymd;      // 2026.10.29 (util.js)
 const fmtTime = whenFull; // 2026.10.29 14:05 (util.js)
 const enc = encodeURIComponent;
+// 작성자 표시: 부서가 없는 사람(체험 신청으로 만든 관리자 등)은 이름만
+const writerLabel = x => [x.writerDept, x.writerName].filter(Boolean).join(' ');
 
 
 // 안내는 그룹웨어 토스트(util.js showToast)로
@@ -286,7 +290,7 @@ function renderDetail(n) {
   byId('detailTitle').textContent = n.title;
 
   const who = el('span');
-  who.append(el('strong', {}, `${n.writerDept} ${n.writerName}`));
+  who.append(el('strong', {}, writerLabel(n)));
   const parts = [
     el('span', { class: `scope-tag${n.scope === ALL ? '' : ' is-dept'}` }, noticeScopeLabel(n.scope)),
     who, el('span', {}, `${fmtTime(n.createdAt)} 작성`),
@@ -442,7 +446,7 @@ async function deleteCommentAt(url, listHash, onDeleted) {
 // 부적절한 댓글을 정리할 수 있게 모든 댓글을 지울 수 있다 (서버가 canDelete로 알려 준다)
 function renderNoticeComments(n) {
   renderCommentList({ count: 'nCommentCount', empty: 'nCommentEmpty', list: 'nComments' }, n.comments, {
-    name: c => el('strong', {}, `${c.writerDept} ${c.writerName}`),
+    name: c => el('strong', {}, writerLabel(c)),
     onDelete: cid => deleteCommentAt(`/board/api/notices/${n.id}/comments/${cid}`, pageHref('/board/notice'),
       comments => { n.comments = comments; renderNoticeComments(n); }),
   });
@@ -803,7 +807,7 @@ function fillForm(res) {
   byId('fScope').disabled = res.scopeLocked;
   byId('fScopeHint').textContent = res.scopeLocked
     ? `부서장은 ${res.myDept} 공지만 쓸 수 있어요. ${res.myDept} 사람만 봅니다.`
-    : '전사 공지는 전 직원이, 부서 공지는 그 부서 사람만 봅니다.';
+    : '같은 업체 직원 모두가 봅니다.';
 
   formState.id = n ? n.id : null;
   formState.saving = false;
