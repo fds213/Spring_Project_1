@@ -1,5 +1,6 @@
 package com.ieum.gw.subscription.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -23,6 +24,20 @@ final class ServicePeriods {
      */
     static LocalDateTime trialEndsAt(LocalDateTime appliedAt) {
         return appliedAt.toLocalDate().plusDays(TRIAL_DAYS).atStartOfDay();
+    }
+
+    /**
+     * 유료 기간 만료 시각. 체험 만료(10/30 결정)와 같은 방식으로 날짜로 센다: 승인일을 첫날로 달력 개월 수만큼 쓰고 0시에 만료한다.
+     * 그 달에 같은 날이 없으면 말일로 맞춘다(요구분석서 3.6).
+     * 예: 11/2 14:00 승인 → 12/2 00:00 만료(마지막으로 쓰는 날 12/1), 1/31 승인 → 2/28 00:00 만료.
+     */
+    static LocalDateTime paidEndsAt(LocalDate approvedDate, int months) {
+        return approvedDate.plusMonths(months).atStartOfDay();
+    }
+
+    /** 마지막으로 쓰는 날. 만료 시각이 0시이므로 그 전날이다 */
+    static LocalDate lastDay(LocalDateTime endsAt) {
+        return endsAt.minusNanos(1).toLocalDate();
     }
 
     /**

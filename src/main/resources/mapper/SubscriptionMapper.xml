@@ -38,6 +38,33 @@
              #{startsAt}, #{endsAt}, #{purchasedSeats}, #{billingAnchorDate})
     </insert>
 
+    <!-- 유료 기간 1행 (PD_PAID). 주문당 한 기간은 고유 제약 UQ_17_01이 막는다 -->
+    <insert id="insertPaidPeriod" parameterType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
+        <selectKey keyProperty="servicePeriodId" resultType="long" order="BEFORE">
+            SELECT SQ_SERVICE_PERIOD.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO service_period
+            (service_period_id, company_id, period_type, subscription_plan_id,
+             starts_at, ends_at, purchased_seats, billing_anchor_date, source_order_id)
+        VALUES
+            (#{servicePeriodId}, #{companyId}, 'PD_PAID', #{subscriptionPlanId},
+             #{startsAt}, #{endsAt}, #{purchasedSeats}, #{billingAnchorDate}, #{sourceOrderId})
+    </insert>
+
+    <!-- 업체 행 잠금: 같은 업체의 결제 반영을 줄 세운다 -->
+    <select id="lockCompany" resultType="long">
+        SELECT company_id
+        FROM company
+        WHERE company_id = #{companyId}
+        FOR UPDATE
+    </select>
+
+    <select id="getCompany" resultType="com.ieum.gw.subscription.dto.CompanyDTO">
+        SELECT company_id, company_code, company_name
+        FROM company
+        WHERE company_id = #{companyId}
+    </select>
+
     <!-- 업체의 이용 기간 전부 (체험·유료, 시작 순). 지금 기간·마지막 기간은 Service가 고른다 -->
     <select id="listPeriods" resultType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
         SELECT service_period_id, company_id,

@@ -2,16 +2,17 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  이용 결제 화면 (/subscription/billing). 이 주소를 받는 Controller는 모듈 담당이 만든다: docs/front-screen-api.md 1장.
+  이용 결제 화면 (/subscription/billing). 토스 결제창이 돌아오는 /subscription/billing/success·fail 도 이 화면이다(BillingController).
   서버가 감싸 보낸 응답({ success, message, data })은 common.js 의 api 가 푼다(docs/front-screen-api.md 2장).
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:layout title="이용 결제" crumb="업체 관리" menu="admin-billing">
   <jsp:attribute name="scripts">
+    <script src="https://js.tosspayments.com/v2/standard"></script>
     <script src="${ctx}/resources/js/util.js"></script>
     <script src="${ctx}/resources/js/subscription/billing.js"></script>
-    <script>renderBilling();</script>
+    <script>startBilling();</script>
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-admin-billing">
@@ -40,9 +41,9 @@
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
             <div><h2 id="billPayTitle">결제</h2><p id="billHint"></p></div>
           </header>
-          <%-- 자동 결제 없이 관리자가 매번 월간·연간을 골라 직접 결제한다(SUB-03).
-               체험 중·체험 만료: 첫 결제(결제한 날부터) / 유료 이용 중: 연장(만료일 다음 날부터, 인원 그대로).
-               1. 요금제 선택 → 2. 결제 → 3. 결제 완료. 토스 결제가 승인되면 운영자 승인 없이 바로 반영한다(PAY-02) --%>
+          <%-- 자동 결제 없이 관리자가 직접 결제한다(SUB-03). 이번 범위는 체험 중·체험 만료 업체의 첫 결제(월간)뿐이다.
+               연간·연장은 '핵심 뒤 추가'에서 서버와 같이 연다(요구분석서 3장 범위 표).
+               1. 요금제 선택 → 2. 결제(토스 결제창) → 3. 결제 완료. 서버가 승인을 확인하면 운영자 승인 없이 바로 반영한다(PAY-02) --%>
           <div class="bill-pay" id="billPay">
             <ol class="bill-steps" id="billSteps">
               <li data-step="1">1. 요금제 선택</li>
@@ -59,12 +60,6 @@
                   <span class="plan-opt-price" id="planPriceMONTHLY"></span>
                   <span class="plan-opt-note">1개월 · 할인 없음</span>
                 </label>
-                <label class="plan-opt">
-                  <input type="radio" name="payPlan" value="ANNUAL">
-                  <span class="plan-opt-name">연간</span>
-                  <span class="plan-opt-price" id="planPriceANNUAL"></span>
-                  <span class="plan-opt-note" id="planNoteANNUAL"></span>
-                </label>
               </fieldset>
               <div class="bill-seats" id="payUsersBox">
                 <label for="payUsers">이용 인원</label>
@@ -76,18 +71,22 @@
               <dl class="pay-summary" id="payPreview"></dl>
               <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnPayNext">다음: 결제</button></div>
             </div>
-            <%-- 2. 결제: 실제로는 토스페이먼츠 테스트 결제창을 열고, 서버가 승인 결과와 금액을 확인한 뒤에만 반영한다 (PAY-01·02) --%>
+            <%-- 2. 결제: 토스페이먼츠 테스트 결제창을 연다. 서버가 승인 결과와 금액을 확인한 뒤에만 반영한다 (PAY-01·02) --%>
             <div class="bill-step" id="billStep2" hidden>
-              <p class="notice-warn">토스 테스트 결제창은 백엔드 연동 뒤에 붙습니다. 지금은 결제 성공·실패를 골라 흐름만 확인합니다. 카드 정보는 받지 않습니다.</p>
+              <p class="notice-warn">토스 테스트 결제창이 열립니다. 테스트 환경이라 실제 대금은 빠져나가지 않습니다.</p>
               <dl class="detail" id="billOrder"></dl>
               <label class="agree"><input type="checkbox" id="billAgree"> 시연용 서비스 이용 조건에 동의합니다.</label>
               <p class="form-error" id="billError" role="alert"></p>
               <div class="bill-actions">
                 <button type="button" class="btn" id="btnPayBack">이전</button>
-                <button type="button" class="btn" id="btnBillFail">결제 실패로 진행</button>
-                <button type="button" class="btn btn-primary" id="btnBillOk">결제 성공으로 진행</button>
+                <button type="button" class="btn btn-primary" id="btnBillOk">토스 결제창 열기</button>
               </div>
               <p class="muted" id="billBusy" aria-live="polite"></p>
+            </div>
+            <%-- 토스 결제창에서 돌아온 뒤 서버가 승인을 확인하는 동안. 결과를 모르면 같은 값으로 다시 확인한다 --%>
+            <div class="bill-step" id="billConfirm" hidden>
+              <p class="notice-warn" id="billConfirmText" aria-live="polite"></p>
+              <div class="bill-actions"><button type="button" class="btn btn-primary" id="btnConfirmRetry" hidden>승인 다시 확인</button></div>
             </div>
             <%-- 3. 결제 완료: 결제가 바로 반영되어, 반영된 기간과 금액을 보여 준다 --%>
             <div class="bill-step" id="billStep3" hidden>

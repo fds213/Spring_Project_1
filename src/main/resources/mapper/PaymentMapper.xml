@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.subscription.mapper.PaymentMapper">
+
+    <!-- 쓰는 중인 월간 요금제 -->
+    <select id="getMonthlyPlan" resultType="com.ieum.gw.subscription.dto.SubscriptionPlanDTO">
+        SELECT subscription_plan_id, duration_months, monthly_unit_price
+        FROM subscription_plan
+        WHERE plan_code = 'PLAN_MONTHLY'
+          AND use_yn = 'Y'
+    </select>
+
+    <!-- 주문 1행 (첫 결제, 상태는 기본값 ORD_CREATED). 주문 번호 겹침은 고유 제약 UQ_21_01이 막는다 -->
+    <insert id="insertOrder" parameterType="com.ieum.gw.subscription.dto.PaymentOrderDTO">
+        <selectKey keyProperty="paymentOrderId" resultType="long" order="BEFORE">
+            SELECT SQ_PAYMENT_ORDER.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO payment_order
+            (payment_order_id, company_id, external_order_no, buyer_account_id, subscription_plan_id,
+             purpose_code, seat_count, monthly_unit_price, total_amount, priced_at)
+        VALUES
+            (#{paymentOrderId}, #{companyId}, #{externalOrderNo}, #{buyerAccountId}, #{subscriptionPlanId},
+             'PP_FIRST', #{seatCount}, #{monthlyUnitPrice}, #{totalAmount}, #{pricedAt})
+    </insert>
+
+    <!-- 이 업체의 주문. 업체는 로그인 사용자에서만 꺼낸다 -->
+    <select id="getOrder" resultType="com.ieum.gw.subscription.dto.PaymentOrderDTO">
+        <include refid="orderSelect" />
+        WHERE o.company_id = #{companyId}
+          AND o.external_order_no = #{orderNo}
+    </select>
+
+    <!-- 승인을 기록했지만 아직 반영하지 못한 주문 -->
+    <select id="getConfirmedOrder" resultType="com.ieum.gw.subscription.dto.PaymentOrderDTO">
+        <include refid="orderSelect" />
+        WHERE o.company_id = #{companyId}
+          AND o.status_code = 'ORD_CONFIRMED'
+          AND ROWNUM = 1
+    </select>
+
+    <sql id="orderSelect">
+        SELECT o.payment_order_id, o.company_id, o.external_order_no, o.buyer_account_id,
+               o.subscription_plan_id, o.status_code, o.seat_count, o.monthly_unit_price,
+               o.total_amount, o.priced_at, p.duration_months
+        FROM payment_order o
+        JOIN subscription_plan p ON p.subscription_plan_id = o.subscription_plan_id
+    </sql>
+
+    <!-- 조건부 UPDATE: 같은 주문의 요청이 겹쳐도 한 요청만 1행을 바꾼다 -->
+    <update id="changeOrderStatus">
+        UPDATE payment_order
+        SET status_code = #{to},
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND payment_order_id = #{orderId}
+          AND status_code = #{from}
+    </update>
+
+    <!-- 토스 승인 확인. 실패로 닫힌 주문도 받는다: 서버가 확인한 승인이 브라우저의 실패 알림이나 새 주문보다 앞선다 -->
+    <update id="confirmOrder">
+        UPDATE payment_order
+        SET status_code = 'ORD_CONFIRMED',
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND payment_order_id = #{orderId}
+          AND status_code IN ('ORD_CREATED', 'ORD_FAILED')
+    </update>
+
+    <!-- 새 주문을 만들기 전에 결제 전 주문을 닫는다. 실패 건수에는 들어가지 않는다(PAYMENT 행이 없다) -->
+    <update id="closeOpenOrders">
+        UPDATE payment_order
+        SET status_code = 'ORD_FAILED',
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND status_code = 'ORD_CREATED'
+    </update>
+
+    <update id="markOrderApplied">
+        UPDATE payment_order
+        SET status_code = 'ORD_APPLIED',
+            applied_at = #{appliedAt},
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND payment_order_id = #{orderId}
+          AND status_code = 'ORD_CONFIRMED'
+    </update>
+
+    <!-- 승인 성공 1행. 주문당 하나(UX_PAYMENT_SUCCESS), 결제 키 하나(UQ_22_01) -->
+    <insert id="insertApprovedPayment" parameterType="com.ieum.gw.subscription.dto.PaymentDTO">
+        <selectKey keyProperty="paymentId" resultType="long" order="BEFORE">
+            SELECT SQ_PAYMENT.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO payment
+            (payment_id, company_id, payment_order_id, payment_key, idempotency_key,
+             status_code, approved_amount, approved_at)
+        VALUES
+            (#{paymentId}, #{companyId}, #{paymentOrderId}, #{paymentKey}, #{idempotencyKey},
+             'PAY_APPROVED', #{approvedAmount}, #{approvedAt})
+    </insert>
+
+    <!-- 승인 실패 1행 -->
+    <insert id="insertFailedPayment" parameterType="com.ieum.gw.subscription.dto.PaymentDTO">
+        <selectKey keyProperty="paymentId" resultType="long" order="BEFORE">
+            SELECT SQ_PAYMENT.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO payment
+            (payment_id, company_id, payment_order_id, idempotency_key,
+             status_code, failure_code, failure_message)
+        VALUES
+            (#{paymentId}, #{companyId}, #{paymentOrderId}, #{idempotencyKey},
+             'PAY_FAILED', #{failureCode, jdbcType=VARCHAR}, #{failureMessage, jdbcType=VARCHAR})
+    </insert>
+
+    <select id="getApprovedPayment" resultType="com.ieum.gw.subscription.dto.PaymentDTO">
+        SELECT payment_id, company_id, payment_order_id, payment_key, idempotency_key,
+               approved_amount, approved_at
+        FROM payment
+        WHERE company_id = #{companyId}
+          AND payment_order_id = #{orderId}
+          AND status_code = 'PAY_APPROVED'
+    </select>
+
+    <!-- 이용 기간 변경 1행. 승인·주문마다 하나(UQ_23_01, UQ_23_02). 변경 종류는 결제 목적 코드다 -->
+    <insert id="insertSubscriptionChange" parameterType="com.ieum.gw.subscription.dto.SubscriptionChangeDTO">
+        INSERT INTO subscription_change
+            (company_id, payment_id, payment_order_id, service_period_id, change_type,
+             before_seats, after_seats, before_ends_at, after_ends_at, applied_at)
+        VALUES
+            (#{companyId}, #{paymentId}, #{paymentOrderId}, #{servicePeriodId}, 'PP_FIRST',
+             #{beforeSeats, jdbcType=INTEGER}, #{afterSeats}, #{beforeEndsAt, jdbcType=TIMESTAMP}, #{afterEndsAt}, #{appliedAt})
+    </insert>
+
+    <!-- 업체의 결제 이력, 최신순. 반영 전이면 기간 칸이 비어 있다 -->
+    <select id="listPayments" resultType="com.ieum.gw.subscription.dto.PaymentRowDTO">
+        SELECT o.external_order_no AS order_no,
+               CASE WHEN o.purpose_code = 'PP_FIRST' THEN 'FIRST' ELSE 'EXTEND' END AS kind,
+               CASE WHEN pl.plan_code = 'PLAN_YEARLY' THEN 'ANNUAL' ELSE 'MONTHLY' END AS plan,
+               pl.duration_months, o.seat_count, o.total_amount, o.discount_rate,
+               CASE WHEN p.status_code = 'PAY_APPROVED' THEN 1 ELSE 0 END AS approved,
+               NVL(p.approved_at, p.created_at) AS paid_at,
+               sp.starts_at, sp.ends_at
+        FROM payment p
+        JOIN payment_order o ON o.company_id = p.company_id AND o.payment_order_id = p.payment_order_id
+        JOIN subscription_plan pl ON pl.subscription_plan_id = o.subscription_plan_id
+        LEFT JOIN service_period sp ON sp.company_id = o.company_id AND sp.source_order_id = o.payment_order_id
+        WHERE p.company_id = #{companyId}
+        ORDER BY p.created_at DESC, p.payment_id DESC
+    </select>
+</mapper>
