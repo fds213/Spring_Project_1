@@ -6,6 +6,7 @@ import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,22 +18,22 @@ import com.ieum.gw.employee.dto.AdminAccountDTO;
 import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.dto.EmployeeDTO;
 
-import lombok.RequiredArgsConstructor;
-
 /**
  * 사원이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
  */
 @Service
-@RequiredArgsConstructor
 public class EmployeeService {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final int MAX_SERIAL = 9999;          // 사번 뒤 4자리 (CK_14_01)
     private static final int MAX_PASSWORD_BYTES = 72;    // BCrypt가 보는 최대 길이
 
-    private final EmployeeDAO dao;
-    private final PasswordEncoder passwordEncoder;       // security-context.xml의 bCryptPasswordEncoder
-    private final AttendanceService attendanceService;
+    @Autowired
+    private EmployeeDAO dao;
+    @Autowired
+    private PasswordEncoder passwordEncoder;             // security-context.xml의 bCryptPasswordEncoder
+    @Autowired
+    private AttendanceService attendanceService;
 
     // 현재 활성화 상태인 직원 목록 ( excludeEmpId가 NULL이 아니면 해당 사번 제외한 나머지 반환)
     public List<EmpSummaryDTO> listActiveEmp(Long companyId, Long excludeEmpId) {
