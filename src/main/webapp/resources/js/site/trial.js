@@ -7,7 +7,6 @@
 // 업체 코드와 관리자 사번은 서버가 정한다. 둘을 알아야 로그인할 수 있어 완료 화면에 크게 보인다.
 (() => {
   const $ = id => document.getElementById(id);
-  const ctx = document.body.dataset.ctx || '';
   // 서버의 field 이름 → 입력 칸
   const FIELD_INPUT = { companyName: 'pCompany', seats: 'pUsers', email: 'pEmail', adminName: 'pAdminName', password: 'pPw' };
   const EMAIL = /^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/; // 서버(SiteService)와 같은 규칙
@@ -114,7 +113,8 @@
       .always(() => { sending = false; btn.disabled = false; btn.textContent = '무료 체험 시작'; });
   });
 
-  // 3. 신청 완료: 업체 코드와 관리자 사번이 가장 먼저 보이게. 로그인 화면이 업체 코드를 채워 두게 한다
+  // 3. 신청 완료: 업체 코드와 관리자 사번이 가장 먼저 보이게. 그룹웨어는 설치한 앱으로 들어가므로 앱 설치 버튼을 둔다.
+  // 앱의 로그인 화면이 업체 코드를 채워 두게 이 브라우저에 저장한다
   function showResult(r) {
     try { localStorage.setItem('ieum-last-company', r.companyCode); } catch (e) { /* 저장소 막힘: 직접 입력 */ }
     $('pPw').value = '';
@@ -128,12 +128,14 @@
       const text = `업체 코드 ${r.companyCode} / 관리자 사번 ${r.employeeNo}`;
       if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => { copy.textContent = '복사했습니다'; }, () => {});
     });
-    const login = node('a', 'btn btn-primary btn-lg', '로그인하러 가기');
-    login.href = `${ctx}/login`;
+    // 헤더의 다운로드와 같은 동작(install.js): 설치 창을 띄우고, 띄울 수 없으면 설치 안내를 보여 준다
+    const install = node('button', 'btn btn-primary btn-lg', 'IEUM 앱 설치하기');
+    install.type = 'button';
+    install.addEventListener('click', () => { if (typeof startDownload === 'function') startDownload(); });
 
     $('step3').replaceChildren(
       node('h3', '', '무료 체험을 시작했습니다'),
-      node('p', 'sub', `${r.companyName}의 관리자 계정이 만들어졌습니다. 아래 업체 코드와 관리자 사번, 신청할 때 정한 비밀번호로 바로 로그인할 수 있습니다.`),
+      node('p', 'sub', `${r.companyName}의 관리자 계정이 만들어졌습니다. IEUM 앱을 설치한 뒤 아래 업체 코드와 관리자 사번, 신청할 때 정한 비밀번호로 로그인하세요.`),
       node('table', 'summary',
         row('업체 코드', r.companyCode, 'sum'),
         row('관리자 사번', r.employeeNo, 'sum'),
@@ -142,7 +144,7 @@
         row('이용 인원', `${r.seats}명 (관리자 포함, 체험 중 10명까지)`),
         row('무료 체험 기간', `${dot(r.trialStartDate)} ~ ${dot(r.trialLastDate)}`)),
       node('p', 'done', '업체 코드와 사번은 로그인할 때마다 씁니다. 꼭 적어 두세요. 결제는 체험 중 그룹웨어의 업체 관리 > 이용 결제에서 합니다.'),
-      node('div', 'actions', copy, login));
+      node('div', 'actions', copy, install));
     go(3);
     $('step3').focus({ preventScroll: true });
   }
