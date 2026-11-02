@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,7 +27,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 일정 규칙을 맡는 Service.
- * - 다른 모듈에 주는 메서드(연동 계약, 10/30): addLeaveEvents. 이름·인자·반환값을 바꿀 때는 부르는 담당(결재)과 먼저 맞춘다.
+ * - 다른 모듈에 주는 메서드(연동 계약, 10/30): addLeaveEvents. 메인 화면 건수: countTodaySchedules. 이름·인자·반환값을 바꿀 때는 부르는 담당(결재)과 먼저 맞춘다.
  * - 달력의 휴일은 AttendanceService.getHolidays로 읽는다.
  * 업체·작성자는 로그인 정보에서만 꺼낸다 (AGENTS.md)
  */
@@ -40,6 +41,8 @@ public class ScheduleService {
     // 화면 구분 → DB 공개 범위 코드. 부서 일정(DEPT)은 이번 구현 범위 밖이라 쓰기 선택지에 없다
     private static final String PERSONAL = "PERSONAL";
     private static final String COMPANY = "COMPANY";
+
+    private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul"); // '오늘'을 정하는 기준 (DB 기본값과 같은 서울 시각)
 
     private final ScheduleDAO dao;
     private final AttendanceService attendanceService; // 휴일 목록 (근태 담당)
@@ -92,6 +95,23 @@ public class ScheduleService {
 
             dao.insertLeaveEvent(companyId, employeeId, day.getLeaveRequestDayId(), title, startsAt, endsAt, allDayYn);
         }
+    }
+
+    /**
+     * 메인 화면 '오늘 일정' 카드의 건수 (홈 담당이 부른다).
+     * 달력의 오늘 칸에 보이는 것과 같은 조건: 내 개인 일정 + 전사 일정 + 내 휴가 일정.
+     * '오늘'은 서울 시각 기준 0시부터 다음 날 0시 전까지.
+     */
+    public int countTodaySchedules(Long companyId, Long employeeId) {
+        return countSchedulesOn(companyId, employeeId, LocalDate.now(SEOUL));
+    }
+
+    // 정한 날짜 하루의 일정 수 (테스트에서 날짜를 정해 부를 수 있게 따로 둔다)
+    int countSchedulesOn(Long companyId, Long employeeId, LocalDate day) {
+        if (companyId == null || employeeId == null || day == null) {
+            throw new IllegalArgumentException("일정 수를 셀 값이 비어 있습니다");
+        }
+        return dao.countEvents(companyId, employeeId, day.atStartOfDay(), day.plusDays(1).atStartOfDay());
     }
 
     // ---------- 달력 화면 ----------
@@ -171,7 +191,7 @@ public class ScheduleService {
         return result;
     }
 
-    // 일정 삭제: 쓴 본인 또는 업체 관리자. 결재에서 온 휴가 일정은 지울 수 없다
+    // 일정 삭제: 개인 일정은 쓴 본인만, 전사 일정은 쓴 본인 또는 업체 관리자. 결재에서 온 휴가 일정은 지울 수 없다
     @Transactional
     public Map<String, Object> deleteSchedule(LoginUser user, Long id) {
         ScheduleDTO s = (id == null) ? null : dao.selectEvent(user.getCompanyId(), id);
@@ -203,10 +223,14 @@ public class ScheduleService {
         return scopes;
     }
 
-    // 삭제 버튼: 쓴 본인 또는 업체 관리자 (휴가 일정은 아니어야 함)
+    // 삭제 버튼 (휴가 일정은 아니어야 함)
+    // - 개인 일정: 쓴 본인만. 관리자도 남의 개인 일정은 화면에 안 보이므로 번호만으로 지우지 못하게 막는다
+    // - 전사 일정: 쓴 본인 또는 업체 관리자
     private boolean canDelete(LoginUser user, ScheduleDTO s) {
         if ("EV_LEAVE".equals(s.getEventType())) return false;
-        return hasRole(user, "ROLE_ADMIN") || user.getEmployeeId().equals(s.getOwnerId());
+        boolean mine = user.getEmployeeId().equals(s.getOwnerId());
+        if (PERSONAL.equals(s.getScope())) return mine;
+        return mine || hasRole(user, "ROLE_ADMIN");
     }
 
     private boolean hasRole(LoginUser user, String role) {

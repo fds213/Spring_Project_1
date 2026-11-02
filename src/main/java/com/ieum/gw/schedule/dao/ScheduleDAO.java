@@ -29,6 +29,11 @@ public class ScheduleDAO {
         return mapper.selectLeaveEvents(companyId, employeeId, from, to);
     }
 
+    // 기간 안의 일정 수 (내 개인 + 전사 + 내 휴가)
+    public int countEvents(Long companyId, Long employeeId, LocalDateTime from, LocalDateTime to) {
+        return mapper.countEvents(companyId, employeeId, from, to);
+    }
+
     // 일정 한 건 (없으면 null)
     public ScheduleDTO selectEvent(Long companyId, Long eventId) {
         return mapper.selectEvent(companyId, eventId);
