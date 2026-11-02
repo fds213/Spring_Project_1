@@ -32,6 +32,21 @@ public class SubscriptionDAO {
         return mapper.insertTrialPeriod(dto);
     }
 
+    /** 유료 기간 1행 기록. 성공하면 dto.servicePeriodId에 새 번호. 같은 주문이면 DuplicateKeyException */
+    public int insertPaidPeriod(ServicePeriodDTO dto) {
+        return mapper.insertPaidPeriod(dto);
+    }
+
+    /** 업체 행을 트랜잭션 끝까지 잠근다(SELECT ... FOR UPDATE) */
+    public void lockCompany(Long companyId) {
+        mapper.lockCompany(companyId);
+    }
+
+    /** 업체 코드·이름 */
+    public CompanyDTO getCompany(Long companyId) {
+        return mapper.getCompany(companyId);
+    }
+
     /** 업체의 이용 기간 전부 (시작 순). 없으면 빈 목록 */
     public List<ServicePeriodDTO> listPeriods(Long companyId) {
         return mapper.listPeriods(companyId);
