@@ -7,8 +7,8 @@
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
   </button>
   <a class="brand" href="${ctx}${isOps ? '/ops/company' : '/home'}">
-    <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-    <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+    <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+    <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
   </a>
   <%-- 업체 직원: 업체명, 이음 운영자: "이음 운영" --%>
   <span class="company"><c:out value="${isOps ? '이음 운영' : loginInfo.companyName}" /></span>
@@ -42,7 +42,7 @@
       <span class="avatar"><c:out value="${fn:substring(loginUser.name, 0, 1)}" /></span>
       <span class="user-text">
         <strong><c:out value="${loginUser.name}" /></strong>
-        <small><c:choose><c:when test="${isOps}">이음 운영팀</c:when><c:when test="${not empty loginInfo.deptName}"><c:out value="${loginInfo.deptName}" /> · <c:out value="${loginInfo.rankName}" /></c:when><c:otherwise>사번 <c:out value="${loginUser.empnum}" /></c:otherwise></c:choose></small>
+        <small id="userSub"><c:choose><c:when test="${isOps}">이음 운영팀</c:when><c:when test="${not empty loginInfo.deptName}"><c:out value="${loginInfo.deptName}" /> · <c:out value="${loginInfo.rankName}" /></c:when><c:otherwise>사번 <c:out value="${loginUser.empnum}" /></c:otherwise></c:choose></small>
       </span>
     </div>
     <%-- 본인 비밀번호 변경 (ACC-07, 로그인한 사람 누구나·읽기 전용 중에도 됨). 창은 layout.tag, 동작은 common.js --%>

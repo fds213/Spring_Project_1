@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.attendance.mapper.LeaveMapper">
+
+	<!-- 연차: 부여 행·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
+
+	<select id="selectEmployeeCareer" resultType="com.ieum.gw.attendance.dto.EmployeeCareerDTO">
+		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date
+		FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
+
+	<!-- ===== 연차 부여 행·사용 기록 (근태가 쓴다. 결재는 근태의 연동 메서드로만 부른다) ===== -->
+
+	<sql id="cycleColumns">
+		leave_cycle_id, company_id, employee_id,
+		TO_CHAR(starts_on, 'YYYY-MM-DD') AS starts_on,
+		TO_CHAR(ends_on, 'YYYY-MM-DD')   AS ends_on,
+		granted_days
+	</sql>
+
+	<!-- 그 날이 들어 있는 부여 행. 직원마다 입사일부터 끝없이(9999-12-31) 하나라 많아야 한 줄이다 -->
+	<select id="selectCycleOn" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
+		SELECT <include refid="cycleColumns"/>
+		FROM leave_cycle
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND starts_on &lt;= TO_DATE(#{day}, 'YYYY-MM-DD')
+		  AND ends_on &gt; TO_DATE(#{day}, 'YYYY-MM-DD')
+	</select>
+
+	<!-- 연차 차감 때: 같은 직원을 동시에 차감하지 못하게 부여 행을 잠근다 (결재 최종 승인 트랜잭션이 끝나면 풀린다) -->
+	<select id="selectCycleOnForUpdate" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
+		SELECT <include refid="cycleColumns"/>
+		FROM leave_cycle
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND starts_on &lt;= TO_DATE(#{day}, 'YYYY-MM-DD')
+		  AND ends_on &gt; TO_DATE(#{day}, 'YYYY-MM-DD')
+		FOR UPDATE
+	</select>
+
+	<!-- 15일 부여 (최초 부여, 또는 부여 행이 없는 직원의 첫 차감 때). 같은 시작일이면 UQ_32_01 로 막힌다.
+	     career_months 는 쓰지 않아 0 (연차는 경력과 상관없이 15일) -->
+	<insert id="insertCycle" parameterType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
+		<selectKey keyProperty="leaveCycleId" resultType="long" order="BEFORE">
+			SELECT sq_leave_cycle.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO leave_cycle (leave_cycle_id, company_id, employee_id, starts_on, ends_on, career_months, granted_days)
+		VALUES (#{leaveCycleId}, #{companyId}, #{employeeId}, TO_DATE(#{startsOn}, 'YYYY-MM-DD'), TO_DATE(#{endsOn}, 'YYYY-MM-DD'),
+		        0, #{grantedDays})
+	</insert>
+
+	<!-- 부여 행의 사용(-)·복원(+) 합. 남은 일수 = 부여 일수 + 이 값 -->
+	<select id="selectLedgerSum" resultType="java.math.BigDecimal">
+		SELECT NVL(SUM(delta_days), 0)
+		FROM leave_ledger
+		WHERE company_id = #{companyId} AND leave_cycle_id = #{leaveCycleId}
+	</select>
+
+	<!-- 근태·연차 관리: 업체 직원들의 부여 행과 사용 합을 한 번에 -->
+	<select id="selectCompanyCyclesOn" resultType="com.ieum.gw.attendance.dto.LeaveCycleDTO">
+		SELECT c.leave_cycle_id, c.company_id, c.employee_id,
+		       TO_CHAR(c.starts_on, 'YYYY-MM-DD') AS starts_on,
+		       TO_CHAR(c.ends_on, 'YYYY-MM-DD')   AS ends_on,
+		       c.granted_days,
+		       (SELECT NVL(SUM(l.delta_days), 0) FROM leave_ledger l
+		        WHERE l.company_id = c.company_id AND l.leave_cycle_id = c.leave_cycle_id) AS ledger_days
+		FROM leave_cycle c
+		WHERE c.company_id = #{companyId}
+		  AND c.starts_on &lt;= TO_DATE(#{day}, 'YYYY-MM-DD')
+		  AND c.ends_on &gt; TO_DATE(#{day}, 'YYYY-MM-DD')
+	</select>
+
+	<!-- 승인된 휴가가 이미 차지한 시간대 (그 날들 안에서) -->
+	<select id="selectTakenSlots" resultType="com.ieum.gw.attendance.dto.LeaveSlotDTO">
+		SELECT employee_id, leave_date, slot_code, leave_request_day_id
+		FROM leave_slot
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND leave_date IN
+		<foreach collection="days" item="d" open="(" separator="," close=")">TO_DATE(#{d}, 'YYYY-MM-DD')</foreach>
+	</select>
+
+	<!-- 시간대 하나. 이미 있으면 PK_LEAVE_SLOT(employee_id, leave_date, slot_code)로 막힌다 -->
+	<insert id="insertSlot" parameterType="com.ieum.gw.attendance.dto.LeaveSlotDTO">
+		INSERT INTO leave_slot (company_id, employee_id, leave_date, slot_code, leave_request_day_id)
+		VALUES (#{companyId}, #{employeeId}, #{leaveDate}, #{slotCode}, #{leaveRequestDayId})
+	</insert>
+
+	<!-- 사용 내역 (LC_USE, 음수). 같은 휴가 날짜 행은 UQ_33_01 로 한 번만 -->
+	<insert id="insertLedgerUse">
+		INSERT INTO leave_ledger (company_id, leave_cycle_id, leave_request_day_id, change_type, delta_days, actor_account_id)
+		VALUES (#{companyId}, #{leaveCycleId}, #{leaveRequestDayId}, 'LC_USE', #{deltaDays}, #{actorAccountId})
+	</insert>
+
+	<!-- ===== 연차 화면: 신청 내역은 전자결재의 휴가 신청서에서 읽는다 ===== -->
+
+	<!-- 기간 안의 결재 중(승인 대기) 휴가 일수. 사용 일수는 위 사용 내역(leave_ledger)에서 센다 -->
+	<select id="selectPendingDays" resultType="java.math.BigDecimal">
+		SELECT NVL(SUM(d.deduct_days), 0)
+		FROM approval_document ad
+		JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
+		WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
+		  AND ad.document_type = 'DOC_LEAVE' AND ad.status_code = 'IN_PROGRESS'
+		  AND d.leave_date &gt;= TO_DATE(#{startsOn}, 'YYYY-MM-DD')
+		  AND d.leave_date &lt; TO_DATE(#{endsOn}, 'YYYY-MM-DD')
+	</select>
+
+	<!-- 기간에 걸친 휴가 신청서 (제출한 것만), 시작일 늦은 순 -->
+	<select id="selectRequests" resultType="com.ieum.gw.attendance.dto.LeaveRequestDTO">
+		SELECT ad.approval_document_id,
+		       CASE WHEN COUNT(DISTINCT d.leave_type) = 1 THEN MAX(d.leave_type) ELSE 'LV_FULL' END AS leave_type,
+		       TO_CHAR(MIN(d.leave_date), 'YYYY-MM-DD') AS from_date,
+		       TO_CHAR(MAX(d.leave_date), 'YYYY-MM-DD') AS to_date,
+		       lr.requested_days AS days,
+		       lr.reason,
+		       TO_CHAR(ad.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS submitted_at,
+		       ad.status_code
+		FROM approval_document ad
+		JOIN leave_request lr     ON lr.approval_document_id = ad.approval_document_id AND lr.company_id = ad.company_id
+		JOIN leave_request_day d  ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
+		WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
+		  AND ad.document_type = 'DOC_LEAVE'
+		  AND ad.status_code IN ('IN_PROGRESS', 'APPROVED', 'REJECTED')
+		GROUP BY ad.approval_document_id, lr.requested_days, lr.reason, ad.submitted_at, ad.status_code
+		HAVING MAX(d.leave_date) &gt;= TO_DATE(#{startsOn}, 'YYYY-MM-DD')
+		   AND MIN(d.leave_date) &lt; TO_DATE(#{endsOn}, 'YYYY-MM-DD')
+		ORDER BY MIN(d.leave_date) DESC
+	</select>
+
+	<!-- 결재선: 신청서 여러 건을 한 번에 -->
+	<select id="selectSteps" resultType="com.ieum.gw.attendance.dto.ApprovalStepDTO">
+		SELECT s.approval_document_id, s.step_no, e.employee_name AS approver_name, s.status_code, s.opinion
+		FROM approval_step s
+		JOIN employee e ON e.employee_id = s.approver_employee_id AND e.company_id = s.company_id
+		WHERE s.company_id = #{companyId}
+		  AND s.approval_document_id IN
+		<foreach collection="documentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+		ORDER BY s.approval_document_id, s.step_no
+	</select>
+</mapper>

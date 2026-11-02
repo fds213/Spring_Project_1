@@ -25,8 +25,8 @@
   <section class="login-screen">
     <div class="login-box">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <%-- 계정 만들기 (요구분석서 3장 단순화 ①): 업체 코드 확인 → 부서·직급·이름·이메일 → 비밀번호 → 승인 요청 →
            업체 관리자·부서장이 승인하면 사번이 배정되고 바로 로그인한다. 직원 이메일 인증 코드·요청 키·1시간 기한은 이번 범위에서 뺐다.

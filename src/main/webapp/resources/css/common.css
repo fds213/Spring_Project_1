@@ -17,7 +17,9 @@
   --radius: 8px;
   --radius-card: 12px;
   --header-h: 60px;
-  --sidebar-w: 220px;
+  --rail-w: 76px;      /* 사이드바 왼쪽 아이콘 줄 */
+  --sidebar-w: 208px;  /* 사이드바 오른쪽 메뉴 칸 */
+  --rail-bg: #172231;
   --nav-bg: #1e2a3b;
   --nav-text: #c9d2de;
   --nav-group: #8ea0b6;
@@ -235,12 +237,38 @@ input::-ms-reveal { display: none; }
 
 /* 본문 */
 .app-body { flex: 1; display: flex; min-height: 0; }
-/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색 */
+/* 네이비 사이드바 (2안): 어두운 바탕에 밝은 글자, 열린 화면은 조금 밝은 남색.
+   두 단이다: 왼쪽 아이콘 줄(.nav-rail)에서 메뉴 묶음을 고르면 오른쪽 칸(.nav-panel)에 그 묶음의 메뉴만 보인다 */
 .sidebar {
-  width: var(--sidebar-w); flex: none;
-  padding: 14px 12px; overflow-y: auto;
+  width: calc(var(--rail-w) + var(--sidebar-w)); flex: none;
+  display: flex;
   background: var(--nav-bg); color: var(--nav-text);
 }
+.nav-rail {
+  width: var(--rail-w); flex: none;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 12px 8px; overflow-y: auto;
+  background: var(--rail-bg);
+}
+.rail-item {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 10px 2px 8px; border: 0; border-radius: var(--radius);
+  background: none; color: var(--nav-group); font: inherit; font-size: 11px; line-height: 1.2;
+  cursor: pointer;
+}
+.rail-item svg { width: 22px; height: 22px; }
+.rail-item:hover { background: var(--nav-hover); color: #fff; }
+.rail-item.on { background: var(--accent); color: #fff; }
+.rail-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
+/* 아이콘 위의 개수: 메뉴 칸의 배지와 같은 이름(data-badge)이라 같이 채워진다 */
+.sidebar .badge.rail-badge {
+  position: absolute; top: 3px; right: 6px;
+  min-width: 18px; padding: 0 5px; line-height: 18px; text-align: center; font-size: 10px;
+  background: #e5484d; color: #fff;
+}
+.nav-panel { flex: 1; min-width: 0; padding: 14px 12px; overflow-y: auto; }
+.nav-title { margin: 4px 12px 10px; font-size: 16px; font-weight: 600; color: #fff; }
 .nav-group { margin: 16px 12px 4px; font-size: 12px; color: var(--nav-group); }
 .nav-item {
   display: flex; align-items: center; justify-content: space-between;
@@ -261,9 +289,18 @@ input::-ms-reveal { display: none; }
 .crumb { margin: 0; font-size: 12px; color: var(--text-muted); }
 .crumb-current { color: var(--text); font-weight: 500; }
 .page-head { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 18px; }
+/* 위치 표시(근무 > 근태)가 있는 화면은 그 마지막 칸이 곧 페이지 제목이라, 큰 제목(h1)은 눈에서만 숨긴다.
+   화면 낭독기와 제목 이동은 그대로 h1 을 읽는다. 오른쪽 버튼은 제목이 빠져도 오른쪽에 남긴다 */
+.crumb ~ * .page-head h1 {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+.crumb ~ * .page-head > :is(a, button, .page-actions, .page-head-actions) { margin-left: auto; }
+.crumb ~ * .page-head:not(:has(> :not(h1))) { margin: 0 0 14px; } /* 제목만 있던 줄은 빈 줄로 크게 남기지 않는다 */
 h1 { margin: 0; font-size: 22px; font-weight: 700; }
-/* 제목 옆의 회색 보조 글자 (가입 승인의 업체 코드) */
-.page-code { margin-left: 6px; font-size: 15px; font-weight: 400; color: var(--text-sub); }
+/* 제목 줄의 회색 보조 글자 (가입 승인의 업체 코드). 큰 제목이 숨으므로 줄 왼쪽에 놓인다 */
+.page-code { font-size: 14px; font-weight: 400; color: var(--text-sub); }
+.page-code strong { margin-left: 4px; font-weight: 600; color: var(--text); }
 h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .muted { color: var(--text-sub); }
 
@@ -297,8 +334,7 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 /* 사원 관리 > 인사 정보 dialog: 고용 형태 · 재직 상태 · 성별 */
 .hr-info-fields { display: grid; gap: 12px; margin: 4px 0 8px; }
 .org-table td:first-child { width: 96px; }
-.status-requested { background: var(--accent-bg); color: var(--accent); }
-.status-approved { background: var(--accent-bg); color: var(--accent); }
+.status-requested, .status-approved { background: var(--accent-bg); color: var(--accent); }
 .status-waiting { background: #fff4e5; color: #8a4b08; }
 
 .tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-sub); }
@@ -347,20 +383,8 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 
 /* 사번은 자동으로 정해진다: 입력칸처럼 보이지만 고칠 수 없다 */
 .emp-no { display: flex; align-items: center; background: var(--bg-sub); color: var(--text-sub); font-variant-numeric: tabular-nums; }
-.emp-roles { grid-column: 1 / -1; margin: 0; padding: 0; border: 0; flex-direction: row; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
-.emp-roles legend { padding: 0; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: var(--text-sub); }
-.emp-roles label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 400; color: var(--text); }
-.emp-roles input { accent-color: var(--accent); }
+/* 계정 생성·비밀번호 찾기 화면의 안내 한 줄 */
 .emp-roles-hint { flex-basis: 100%; margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
-/* 사원 등록 폼 (예전 공통 틀로 만든 화면이 있을 수 있어 남긴다) */
-.emp-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; padding: 16px 18px 4px; }
-.emp-fields .form-error { margin-top: -2px; }
-.emp-fields .emp-roles-hint { margin: -2px 0 10px; }
-.emp-form .info-card-foot { margin-top: 8px; }
-.emp-form .bill-actions .btn { height: 40px; }
-@media (max-width: 600px) {
-  .emp-fields { grid-template-columns: minmax(0, 1fr); }
-}
 
 /* 헤더 아래 체험 띠: 남은 날짜, 업체 관리자에게는 결제 화면으로 가는 버튼 */
 .trial-bar {
@@ -428,13 +452,15 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .plan-opt-note { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .bill-history-box { padding: 4px 18px 14px; border-top: 1px solid var(--line); }
 .bill-sub { margin: 4px 0 6px; font-size: 14px; font-weight: 600; }
-/* 근태·연차 / 일정 */
+/* 근태 · 연차 / 일정 */
 .att-link { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font-size: 13px; }
 .att-link-text { margin: 0; line-height: 1.6; color: var(--text-sub); }
 .att-link-form { width: 220px; }
 .att-month { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
 .att-month strong { min-width: 110px; text-align: center; font-size: 15px; }
+.att-month-center { justify-content: center; } /* 근태 기록: 달 이동을 카드 가운데에 (일정 달력은 왼쪽 그대로) */
 .att-table { margin: 0 16px 16px; max-height: 520px; overflow-y: auto; }
+.att-table thead th { position: sticky; top: 0; z-index: 1; box-shadow: inset 0 -1px 0 var(--line); } /* 목록을 내려도 머리줄은 남는다. 밑선은 collapse 표에서 스크롤하면 사라져 그림자로 */
 .att-table tr.att-rest td { background: var(--bg-sub); color: var(--text-muted); }
 .att-table tr.att-today td { box-shadow: inset 0 2px 0 var(--accent), inset 0 -2px 0 var(--accent); font-weight: 600; }
 .att-note { color: var(--text-sub); }
@@ -443,6 +469,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .leave-row .input, .leave-row .filter-select { min-width: 0; }
 .leave-form .bill-note, .info-card > .bill-history { margin: 0; padding: 0 16px 16px; }
 .info-card > .bill-sub { padding: 0 16px; }
+.info-card > .bill-note { padding: 12px 16px 4px; }
 .leave-line { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .sch-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .sch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-right: 16px; }
@@ -722,3 +749,167 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .more-link { margin-left: 8px; font-size: 12px; color: var(--accent); }
 /* 헤더의 로그아웃: Spring Security가 POST /logout만 받아서 버튼을 form으로 감쌌다 */
 .logout-form { display: flex; margin: 0; }
+
+/* ---------- 근태 단말기 관리 (attendance/admin/device.jsp) ---------- */
+.dev-body { padding: 14px 18px 18px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.info-card-head .dev-issue { margin-left: auto; flex: none; }
+/* 근태 단말기 카드: 머리줄만 보이다가(옆 카드 높이로 늘이지 않는다) 버튼을 누르면 아래로 펼쳐진다 */
+.dev-card { align-self: start; overflow: visible; } /* 펼친 칸의 드롭다운 목록이 카드 밖으로 나올 수 있게 */
+.dev-card .info-card-head { border-bottom: 0; }
+.dev-fold { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .28s ease, opacity .2s ease; }
+.dev-fold.open { grid-template-rows: 1fr; opacity: 1; }
+.dev-fold-inner { min-height: 0; overflow: hidden; }
+/* 다 펼쳐진 뒤에는 잘라 내지 않는다 (드롭다운 목록이 칸 아래로 펼쳐지도록). 접을 때는 바로 다시 자른다 */
+.dev-fold.open .dev-fold-inner { animation: dev-unclip 0s .28s forwards; }
+@keyframes dev-unclip { to { overflow: visible; } }
+.dev-fold .dev-body { border-top: 1px solid var(--line); }
+/* 펼쳐진 동안은 머리줄 버튼 대신 ^ 접기 버튼 (탭처럼). 나타날 때 v 에서 ^ 로 돈다 */
+.dev-collapse { margin-left: auto; flex: none; width: 32px; height: 32px; justify-content: center; border-radius: var(--radius); }
+.dev-collapse:hover { background: var(--accent-bg); color: var(--accent); }
+.dev-card:has(.dev-fold.open) .dev-issue,
+.dev-card:not(:has(.dev-fold.open)) .dev-collapse { display: none; }
+.dev-card:has(.dev-fold.open) .dev-collapse svg { animation: dev-chev .28s ease; }
+@keyframes dev-chev { from { transform: rotate(180deg); } }
+@media (prefers-reduced-motion: reduce) { .dev-fold { transition: none; } .dev-card .dev-collapse svg { animation: none; } }
+.dev-key { width: 100%; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-bg); }
+.dev-key-label { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--accent-hover); }
+.dev-key .input { font-family: Consolas, "Courier New", monospace; letter-spacing: 0.5px; }
+.dev-body .org-add { max-width: none; width: 100%; }
+.dev-body .form-error:empty { display: none; } /* 오류가 없을 때 아래 빈 줄을 남기지 않는다 */
+.dev-body .org-add .select { flex: 1 1 200px; min-width: 0; }
+/* 휴일 관리: 날짜 칸은 고정 폭, 이름 칸이 남는 폭 */
+.hol-add .hol-date { flex: 0 0 170px; }
+/* 근태·연차 관리: 열이 많아 이름·부서가 한 글자씩 꺾이지 않게 (좁으면 표가 옆으로 밀린다) */
+.aa-table th, .aa-table td { white-space: nowrap; } /* 꾸민 드롭다운(select.js)이 감싼 직원 고르기 */
+.dev-body .dev-no { flex: 0 0 120px; }
+
+/* ---------- 지문 단말기 시뮬레이터 (attendance/simulator.jsp) ---------- */
+body.sim-page { display: block; overflow: auto; background: var(--page-bg); }
+.sim { max-width: 560px; margin: 0 auto; padding: 20px 16px 40px; }
+.sim-head { display: flex; align-items: center; gap: 10px; }
+.sim-head img { height: 26px; }
+.sim-head strong { font-weight: 600; }
+.sim-head-actions { margin-left: auto; display: flex; gap: 6px; }
+.sim-reset { height: 30px; font-size: 12px; white-space: nowrap; }
+.sim-panel { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 18px; margin-top: 14px; }
+.sim-title { font-size: 13px; color: var(--text-sub); margin: 0 0 10px; }
+.sim-help { margin: 0 0 10px; font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+.sim-clock { text-align: center; }
+.sim-time { font-size: 44px; font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.sim-date, .sim-device { color: var(--text-sub); font-size: 13px; }
+.sim-device { margin-top: 4px; color: var(--text); font-weight: 500; }
+/* 사람 고르기: 위에 검색, 아래에 한 줄에 한 사람 (번호 · 이름 · 부서 · 상태) */
+.sim-search { width: 100%; margin-bottom: 10px; }
+.sim-people { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.sim-person {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) minmax(0, 1fr) 64px; align-items: center; gap: 10px;
+  min-height: 48px; padding: 0 14px; border: 0; border-bottom: 1px solid var(--line);
+  background: var(--bg); font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.sim-person:last-child { border-bottom: 0; }
+.sim-person:hover { background: var(--accent-bg); }
+.sim-person:focus-visible { background: var(--accent-bg); outline: 2px solid var(--accent); outline-offset: -2px; } /* 키보드 초점은 배경만으로는 안 보인다 */
+.sim-no { color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.sim-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-dept { color: var(--text-sub); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sim-state { font-size: 12px; text-align: right; }
+.sim-state.is-off { color: var(--danger); }
+.sim-person.is-unregistered .sim-name { font-weight: 400; color: var(--text-sub); }
+.sim-empty { margin: 12px 0 0; text-align: center; }
+.sim-pager { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+.sim-page-no {
+  min-width: 34px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); font: inherit; font-size: 13px; cursor: pointer;
+}
+.sim-page-no:hover:not(:disabled):not([aria-current="page"]) { background: var(--bg-sub); } /* 지금 페이지는 올려도 파란 칠을 유지 */
+.sim-page-no[aria-current="page"] { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+.sim-page-no:disabled { color: var(--text-muted); cursor: default; }
+.sim-type {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font: inherit; color: var(--text); cursor: pointer;
+}
+.sim-type:hover { background: var(--bg-sub); }
+.sim-type[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-bg); }
+.sim-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sim-type { height: 48px; font-size: 15px; font-weight: 600; }
+.sim-scan { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.sim-finger {
+  width: 120px; height: 120px; border-radius: 50%; border: 2px solid var(--line); background: var(--bg);
+  display: grid; place-items: center; cursor: pointer; color: var(--text-sub);
+}
+.sim-finger:hover { border-color: var(--accent); color: var(--accent); }
+.sim-finger.scanning { border-color: var(--accent); color: var(--accent); animation: sim-pulse 0.6s ease-in-out infinite alternate; }
+@keyframes sim-pulse { from { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.25); } to { box-shadow: 0 0 0 14px rgba(37, 99, 235, 0); } }
+@media (prefers-reduced-motion: reduce) { .sim-finger.scanning { animation: none; } }
+.sim-hint { font-size: 13px; color: var(--text-sub); }
+.sim-result { text-align: center; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; }
+.sim-result .btn { margin-top: 10px; }
+.sim-result .sim-hint { font-size: 12px; color: var(--text-muted); }
+/* 진행 단계 표시: 1 사람 · 2 출근·퇴근 · 3 지문. 한 틀에 묶고, 지금 단계를 가리키는 칸(::after)이
+   --step 값(0·1·2)을 따라 옆으로 미끄러진다. 결과 화면(.all-done)에서는 칸이 사라진다 */
+.sim-steps {
+  position: relative; list-style: none; display: flex; margin: 14px 0 0; padding: 4px; counter-reset: simstep;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 999px; --step: 0;
+}
+.sim-steps::after {
+  content: ""; position: absolute; top: 4px; bottom: 4px; left: 4px; width: calc((100% - 8px) / 3);
+  border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-bg);
+  transform: translateX(calc(var(--step) * 100%));
+  transition: transform .35s cubic-bezier(.3, .8, .25, 1), opacity .2s;
+}
+.sim-steps.all-done::after { opacity: 0; }
+.sim-steps li { position: relative; z-index: 1; flex: 1; display: flex; }
+.sim-steps button {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 4px; border: 0; border-radius: 999px; background: none;
+  font: inherit; font-size: 13px; color: var(--text-muted); transition: color .25s;
+}
+.sim-steps button:disabled { cursor: default; }
+.sim-steps li.done button { cursor: pointer; }
+.sim-steps li.done button:hover { color: var(--accent); }
+.sim-steps button::before {
+  counter-increment: simstep; content: counter(simstep);
+  width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--bg-sub); font-size: 11px; font-weight: 600; transition: background-color .25s, color .25s;
+}
+.sim-steps li.on button { color: var(--accent); font-weight: 600; }
+.sim-steps li.on button::before { background: var(--accent); color: #fff; }
+.sim-steps li.done button { color: var(--text-sub); }
+.sim-steps li.done button::before { content: "✓"; background: var(--accent-bg); color: var(--accent); }
+/* 단계 화면은 나아갈 때 오른쪽에서, 돌아갈 때 왼쪽에서 들어온다 (simulator.js 의 simGo) */
+.sim-step.in-next { animation: sim-in-next .3s ease; }
+.sim-step.in-back { animation: sim-in-back .3s ease; }
+@keyframes sim-in-next { from { opacity: 0; transform: translateX(24px); } }
+@keyframes sim-in-back { from { opacity: 0; transform: translateX(-24px); } }
+@media (prefers-reduced-motion: reduce) {
+  .sim-steps::after, .sim-steps button, .sim-steps button::before { transition: none; }
+  .sim-step.in-next, .sim-step.in-back { animation: none; }
+}
+/* 한 단계 화면 */
+.sim-chosen { margin: -2px 0 14px; font-size: 16px; font-weight: 600; }
+.sim-types .sim-type { height: 72px; font-size: 18px; }
+/* 출근은 파란 테두리, 퇴근은 붉은 테두리. 올리면 같은 색으로 옅게 칠한다 */
+.sim-types .sim-type[data-type="IN"] { border-color: var(--accent); }
+.sim-types .sim-type[data-type="IN"]:hover { background: var(--accent-bg); }
+.sim-types .sim-type[data-type="OUT"] { border-color: var(--danger); }
+.sim-types .sim-type[data-type="OUT"]:hover { background: var(--danger-bg); }
+.sim-big { font-size: 20px; font-weight: 600; }
+.sim-result.ok { color: #0f6e56; }
+.sim-result.warn { color: #854f0b; }
+.sim-result.err { color: var(--danger); }
+.sim-result.idle { color: var(--text-muted); }
+.sim-log { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.sim-log li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.sim-log li:last-child { border-bottom: 0; }
+.sim-log-dialog { width: min(420px, calc(100% - 32px)); }
+.sim-log-dialog .sim-log { max-height: 50vh; overflow-y: auto; }
+.sim-log-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.sim-log-head h2 { margin: 0; }
+.sim-log-x { width: 32px; height: 32px; margin-right: -6px; justify-content: center; border-radius: var(--radius); }
+.sim-log-x:hover { background: var(--bg-sub); color: var(--text); }
+/* 기록이 없을 때: 빈 카드 가운데에 안내 */
+.sim-log-dialog .sim-log-empty {
+  margin: 0; min-height: 120px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sub);
+  font-size: 13px; color: var(--text-muted);
+}
+.sim-log-dialog .sim-log-empty[hidden] { display: none; }

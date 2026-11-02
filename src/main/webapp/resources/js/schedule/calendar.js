@@ -38,7 +38,7 @@ function renderSchedule() {
   const month = schMonthParam();
   api.get('/schedule/api/schedules', { month })
     .done(r => {
-      if (r.month !== schMonthParam()) return; // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
+      if (month !== schMonthParam()) return; // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
       schState.data = r;
       drawSchedule();
     })

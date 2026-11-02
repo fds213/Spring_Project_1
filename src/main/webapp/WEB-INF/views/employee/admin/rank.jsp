@@ -17,7 +17,7 @@
   <jsp:body>
     <section class="view on" id="view-admin-rank">
       <div class="page-head"><h1>직급 관리</h1></div>
-      <p class="muted join-scope">위에서 아래로 낮은 직급부터 높은 직급 순서입니다. 여기 직급이 계정 생성에 그대로 나오고, 직원이 있는 직급은 지울 수 없습니다. 이름을 바꾸면 그 직급의 직원과 연차 계산에 쓰는 경력 연수도 함께 따라갑니다. 새로 만든 직급의 경력은 0년으로 봅니다(시연용 값).</p>
+      <p class="muted join-scope">위에서 아래로 낮은 직급부터 높은 직급 순서입니다. 여기 직급이 계정 생성에 그대로 나오고, 직원이 있는 직급은 지울 수 없습니다. 이름을 바꾸면 그 직급의 직원도 함께 따라갑니다.</p>
       <form class="org-add" id="rankAddForm" novalidate>
         <input class="input" id="rankNewName" maxlength="20" autocomplete="off" placeholder="새 직급 이름 (예: 책임)" aria-label="새 직급 이름" aria-describedby="rankError">
         <button type="submit" class="btn btn-primary" data-write>직급 추가</button>
@@ -26,7 +26,7 @@
       <p class="form-error" id="rankError" role="alert"></p>
       <div class="table-wrap">
         <table class="table org-table">
-          <thead><tr><th>순서</th><th>직급</th><th>인원</th><th>연차 경력</th><th>관리</th></tr></thead>
+          <thead><tr><th>순서</th><th>직급</th><th>인원</th><th>관리</th></tr></thead>
           <tbody id="rankList"></tbody>
         </table>
       </div>

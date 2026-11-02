@@ -37,6 +37,11 @@ class ScheduleServiceTest {
         }
     }
 
+    /** 휴가 일정 저장은 근태 서비스를 쓰지 않는다(달력의 휴일 목록만 씀). 근태 서비스가 받는 DAO·연차·휴일 서비스는 비워 둔다 */
+    private static AttendanceService noAttendance() {
+        return new AttendanceService(null, null, null);
+    }
+
     private static LeaveDayDTO day(long id, String date, String type) {
         LeaveDayDTO d = new LeaveDayDTO();
         d.setLeaveRequestDayId(id);
@@ -49,7 +54,7 @@ class ScheduleServiceTest {
     @DisplayName("휴가 최종 승인: 하루마다 일정 하나, 종일 연차는 그날 0시~다음 날 0시, 반차는 오전 9~13시·오후 14~18시")
     void addLeaveEventsMakesOnePerDay() {
         FakeDAO dao = new FakeDAO();
-        ScheduleService service = new ScheduleService(dao, new AttendanceService());
+        ScheduleService service = new ScheduleService(dao, noAttendance());
 
         service.addLeaveEvents(1L, 10L, List.of(
                 day(100L, "2026-11-05", "LV_FULL"),
@@ -81,7 +86,7 @@ class ScheduleServiceTest {
     @DisplayName("휴가 일자 ID가 비어 있으면 거절한다 (결재가 저장한 뒤 넘겨야 한다)")
     void rejectsDayWithoutId() {
         FakeDAO dao = new FakeDAO();
-        ScheduleService service = new ScheduleService(dao, new AttendanceService());
+        ScheduleService service = new ScheduleService(dao, noAttendance());
         LeaveDayDTO noId = day(1L, "2026-11-05", "LV_FULL");
         noId.setLeaveRequestDayId(null);
 
@@ -92,7 +97,7 @@ class ScheduleServiceTest {
     @Test
     @DisplayName("모르는 휴가 종류면 거절한다")
     void rejectsUnknownLeaveType() {
-        ScheduleService service = new ScheduleService(new FakeDAO(), new AttendanceService());
+        ScheduleService service = new ScheduleService(new FakeDAO(), noAttendance());
         assertThrows(IllegalArgumentException.class,
                 () -> service.addLeaveEvents(1L, 10L, List.of(day(1L, "2026-11-05", "LV_HOUR"))));
     }

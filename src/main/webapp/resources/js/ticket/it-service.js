@@ -74,8 +74,6 @@ itEl('ticketForm')?.addEventListener('submit', e => {
     .done(t => {
       itEl('ticketForm').reset();
       err.textContent = '';
-      itMine.open = t.id; // 접수하면 방금 만든 티켓이 열린 채로 내 티켓으로 간다
-      itMine.filter = 'all';
       showToast(`${t.id} 접수했습니다. IT 담당자에게 전달됩니다`);
       location.href = pageHref('/ticket/mine');
     })
@@ -209,11 +207,6 @@ function renderAssetMine() {
   itEl('assetCntUse').textContent = `${assets.length}개`;
   itEl('assetCntWait').textContent = `${waiting.length}건`;
 
-  const emptyRow = (cols, label) => {
-    const td = itNode('td', '', label);
-    td.colSpan = cols;
-    return itNode('tr', 'row-empty', td);
-  };
   itEl('assetList').replaceChildren(...(assets.length ? assets.map(a => itNode('tr', '',
     itCell('장비', itNode('span', '', a.name)),
     itCell('일련번호', itNode('span', '', a.serial)),
