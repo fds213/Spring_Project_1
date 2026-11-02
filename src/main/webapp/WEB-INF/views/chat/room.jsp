@@ -44,10 +44,10 @@ pageEncoding="UTF-8"%>
 
 
         $(function() {
-            // 접속 주소: /chatRoom?roomId=1 처럼 방 번호를 쿼리로 받는다
-            var roomId = new URLSearchParams(location.search).get("roomId");
+            // 방 번호는 컨트롤러가 모델(roomId, long)로 넘긴다
+            var roomId = ${roomId};
             var scheme = location.protocol === "https:" ? "wss://" : "ws://";
-            var ws = new WebSocket(scheme + location.host + "${pageContext.request.contextPath}/chat/" + encodeURIComponent(roomId));
+            var ws = new WebSocket(scheme + location.host + "${pageContext.request.contextPath}/chat/room/" + roomId);
 
             ws.onopen = function() { console.log("연결됨 / 방 " + roomId); };
             ws.onclose = function(e) { console.log("연결 종료 code=" + e.code); };

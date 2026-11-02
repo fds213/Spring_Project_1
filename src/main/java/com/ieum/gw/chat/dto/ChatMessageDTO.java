@@ -4,13 +4,18 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
+import java.sql.Timestamp;
+
 @Getter
 @Setter
 @ToString
 public class ChatMessageDTO {
-    private Long msgId;
-    private Long roomId;
-    private String sender;
-    private String msg_type;
-    private String content;
+    private Long chatMessageId;
+    private Long companyId;
+    private Long chatRoomId;
+    private Long senderEmployeeId;
+    private String messageType;
+    private String messageText;
+    private String clientMessageKey;
+    private Timestamp createdAt;
 }
