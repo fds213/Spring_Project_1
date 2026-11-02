@@ -7,6 +7,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -14,13 +15,15 @@ import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.ieum.gw.attendance.service.AttendanceException;
 import com.ieum.gw.attendance.service.AttendanceService;
+import com.ieum.gw.attendance.service.HolidayService;
 import com.ieum.gw.attendance.service.LeaveService;
 import com.ieum.gw.common.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
 
 /**
- * 근무 > 근태·연차 화면과, 로그인한 본인의 근태 API (/attendance/api/**).
+ * 근무 > 근태·연차 화면과 로그인한 본인의 근태 API (/attendance/api/**),
+ * 업체 관리자·인사 담당의 근태 단말기·근태 관리·휴일 관리 (/attendance/admin/**).
  * 업체·직원은 로그인 정보에서만 정한다. 다른 업체·직원의 자료는 주소로 고를 수 없다.
  */
 @Controller
@@ -29,6 +32,7 @@ public class AttendanceController {
 
     private final AttendanceService service;
     private final LeaveService leaveService;
+    private final HolidayService holidayService;
 
     // ===== 화면 =====
 
@@ -75,7 +79,7 @@ public class AttendanceController {
         return service.unlinkDevice(user.getCompanyId(), user.getEmployeeId());
     }
 
-    // ===== 인사 관리 > 근태 단말기 (Security: /attendance/admin/** 는 업체 관리자·인사 담당만) =====
+    // ===== 근무 > 근태 단말기 (Security: /attendance/admin/** 는 업체 관리자·인사 담당만) =====
 
     @GetMapping("/attendance/admin/device")
     public String deviceAdminPage() {
@@ -107,12 +111,57 @@ public class AttendanceController {
         return service.adminUnlinkDevice(user.getCompanyId(), toLong(body.get("employeeId")));
     }
 
+    // ===== 인사 관리 > 근태·연차 관리, 휴일 관리 (업체 관리자·인사 담당) =====
+
+    @GetMapping("/attendance/admin/list")
+    public String overviewPage() {
+        return "attendance/admin/list";
+    }
+
+    /** 직원별 오늘 출퇴근, 그 달 출근일·지각·조퇴, 남은 연차 */
+    @GetMapping("/attendance/admin/api/overview")
+    @ResponseBody
+    public Map<String, Object> overview(@AuthenticationPrincipal LoginUser user, @RequestParam String month) {
+        return service.overview(user.getCompanyId(), month);
+    }
+
+    @GetMapping("/attendance/admin/holiday")
+    public String holidayPage() {
+        return "attendance/admin/holiday";
+    }
+
+    @GetMapping("/attendance/admin/api/holidays")
+    @ResponseBody
+    public Map<String, Object> holidays(@AuthenticationPrincipal LoginUser user, @RequestParam int year) {
+        return holidayService.list(user.getCompanyId(), year);
+    }
+
+    @PostMapping("/attendance/admin/api/holidays")
+    @ResponseBody
+    public Map<String, Object> addHoliday(@AuthenticationPrincipal LoginUser user, @RequestBody Map<String, String> body) {
+        return holidayService.add(user.getCompanyId(), body.get("date"), body.get("name"));
+    }
+
+    @PostMapping("/attendance/admin/api/holidays/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> deleteHoliday(@AuthenticationPrincipal LoginUser user, @PathVariable Long id) {
+        return holidayService.delete(user.getCompanyId(), id);
+    }
+
+    /** 그 해 법정 공휴일을 한 번에 넣는다 (이미 있는 날은 건너뛴다) */
+    @PostMapping("/attendance/admin/api/holidays/preset")
+    @ResponseBody
+    public Map<String, Object> addPresetHolidays(@AuthenticationPrincipal LoginUser user, @RequestBody Map<String, Object> body) {
+        Long year = toLong(body.get("year"));
+        return holidayService.addPreset(user.getCompanyId(), year == null ? null : year.intValue());
+    }
+
     private static Long toLong(Object v) {
         if (v == null) return null;
         try {
             return Long.valueOf(String.valueOf(v));
         } catch (NumberFormatException e) {
-            throw new AttendanceException(400, "직원을 골라 주세요");
+            throw new AttendanceException(400, "값이 올바르지 않습니다");
         }
     }
 

@@ -5,11 +5,13 @@ import java.util.List;
 import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.attendance.dto.AttendanceDTO;
+import com.ieum.gw.attendance.dto.AttendanceSummaryDTO;
 import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
 import com.ieum.gw.attendance.dto.DevicePersonDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
+import com.ieum.gw.attendance.dto.TodayAttendanceDTO;
 import com.ieum.gw.attendance.mapper.AttendanceMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -79,8 +81,32 @@ public class AttendanceDAO {
         return mapper.selectMonthAttendance(companyId, employeeId, month);
     }
 
+    public TodayAttendanceDTO selectTodayTimes(Long companyId, Long employeeId) {
+        return mapper.selectTodayTimes(companyId, employeeId);
+    }
+
     public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) {
         return mapper.selectMonthHolidays(companyId, month);
+    }
+
+    public List<HolidayDTO> selectHolidays(Long companyId, String from, String to) {
+        return mapper.selectHolidays(companyId, from, to);
+    }
+
+    public List<Integer> selectHolidayYears(Long companyId, int fromYear, int toYear) {
+        return mapper.selectHolidayYears(companyId, fromYear, toYear);
+    }
+
+    public int insertHoliday(Long companyId, String holidayDate, String holidayName) {
+        return mapper.insertHoliday(companyId, holidayDate, holidayName);
+    }
+
+    public int deleteHoliday(Long companyId, Long holidayId) {
+        return mapper.deleteHoliday(companyId, holidayId);
+    }
+
+    public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month) {
+        return mapper.selectMonthSummary(companyId, month);
     }
 
     public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) {

@@ -770,7 +770,11 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .dev-key .input { font-family: Consolas, "Courier New", monospace; letter-spacing: 0.5px; }
 .dev-body .org-add { max-width: none; width: 100%; }
 .dev-body .form-error:empty { display: none; } /* 오류가 없을 때 아래 빈 줄을 남기지 않는다 */
-.dev-body .org-add .select { flex: 1 1 200px; min-width: 0; } /* 꾸민 드롭다운(select.js)이 감싼 직원 고르기 */
+.dev-body .org-add .select { flex: 1 1 200px; min-width: 0; }
+/* 휴일 관리: 날짜 칸은 고정 폭, 이름 칸이 남는 폭 */
+.hol-add .hol-date { flex: 0 0 170px; }
+/* 근태·연차 관리: 열이 많아 이름·부서가 한 글자씩 꺾이지 않게 (좁으면 표가 옆으로 밀린다) */
+.aa-table th, .aa-table td { white-space: nowrap; } /* 꾸민 드롭다운(select.js)이 감싼 직원 고르기 */
 .dev-body .dev-no { flex: 0 0 120px; }
 
 /* ---------- 지문 단말기 시뮬레이터 (attendance/simulator.jsp) ---------- */

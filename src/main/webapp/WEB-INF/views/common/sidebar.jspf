@@ -148,7 +148,8 @@
         <p class="nav-title">인사 관리</p>
         <ui:nav key="hr-employee" path="/employee/admin/list" current="${menu}">사원 관리</ui:nav>
         <sec:authorize access="hasRole('ADMIN')"><ui:nav key="hr-join" path="/employee/join" current="${menu}">가입 승인 <span class="badge" data-badge="join" hidden></span></ui:nav></sec:authorize>
-        <%-- 근태·연차 관리(/attendance/admin/list)·휴일 관리(/attendance/admin/holiday): 근태 담당이 화면을 만들면 여기에 단다 --%>
+        <ui:nav key="hr-attendance" path="/attendance/admin/list" current="${menu}">근태·연차 관리</ui:nav>
+        <ui:nav key="hr-holiday" path="/attendance/admin/holiday" current="${menu}">휴일 관리</ui:nav>
       </div>
     </sec:authorize>
     <sec:authorize access="hasRole('ADMIN')">

@@ -3,6 +3,9 @@ package com.ieum.gw.attendance;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,15 +17,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
 import com.ieum.gw.attendance.dao.AttendanceDAO;
+import com.ieum.gw.attendance.dao.LeaveDAO;
 import com.ieum.gw.attendance.dto.AttendanceDTO;
+import com.ieum.gw.attendance.dto.AttendanceSummaryDTO;
 import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
 import com.ieum.gw.attendance.dto.DevicePersonDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
+import com.ieum.gw.attendance.dto.TodayAttendanceDTO;
 import com.ieum.gw.attendance.mapper.AttendanceMapper;
 import com.ieum.gw.attendance.service.AttendanceException;
 import com.ieum.gw.attendance.service.AttendanceService;
+import com.ieum.gw.attendance.service.HolidayService;
+import com.ieum.gw.attendance.service.LeaveService;
 
 /** 지문 단말기 출퇴근 규칙 (요구분석서 3.4·3.10, AGENTS.md 테스트: 만료 읽기 전용을 단말기로 우회하는 요청 거절) */
 class AttendanceServiceTest {
@@ -35,7 +43,8 @@ class AttendanceServiceTest {
     @BeforeEach
     void setUp() {
         mapper = new FakeMapper();
-        service = new AttendanceService(new AttendanceDAO(mapper));
+        AttendanceDAO dao = new AttendanceDAO(mapper);
+        service = new AttendanceService(dao, new LeaveService(new LeaveDAO(new LeaveServiceTest.FakeLeaveMapper()), dao), new HolidayService(dao));
     }
 
     @Test
@@ -195,6 +204,17 @@ class AttendanceServiceTest {
         assertEquals("0007", service.adminLinkDevice(10L, 103L, "0007").get("deviceId"));
     }
 
+    @Test
+    @DisplayName("헤더의 오늘 출퇴근: 기록이 없으면 null, 찍으면 시:분")
+    void headerPunch() {
+        assertEquals(null, service.todayPunchForHeader(10L, 102L));
+        mapper.clock = "08:52:30";
+        service.punch(KEY, "0002", "IN");
+        Map<String, String> h = service.todayPunchForHeader(10L, 102L);
+        assertEquals("08:52", h.get("inTime"));
+        assertEquals("", h.get("outTime"));
+    }
+
     /** 팀 DB 없이 규칙만 시험하는 메모리 Mapper: 업체 10, 단말기 1, 사원 0002(재직)·0005(퇴사) */
     static class FakeMapper implements AttendanceMapper {
         String clock = "08:55:00";
@@ -283,6 +303,47 @@ class AttendanceServiceTest {
         }
 
         @Override public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) { return List.of(); }
+
+        // 휴일: 날짜 → 이름
+        final java.util.TreeMap<LocalDate, String> holidays = new java.util.TreeMap<>();
+
+        @Override public TodayAttendanceDTO selectTodayTimes(Long companyId, Long employeeId) {
+            AttendanceDTO a = today.get(employeeId);
+            if (a == null) return null;
+            TodayAttendanceDTO t = new TodayAttendanceDTO();
+            LocalDate d = LocalDate.parse(a.getWorkDate());
+            t.setCheckInAt(LocalDateTime.of(d, LocalTime.parse(a.getCheckIn())));
+            if (a.getCheckOut() != null) t.setCheckOutAt(LocalDateTime.of(d, LocalTime.parse(a.getCheckOut())));
+            return t;
+        }
+
+        @Override public List<HolidayDTO> selectHolidays(Long companyId, String from, String to) {
+            List<HolidayDTO> list = new ArrayList<>();
+            holidays.subMap(LocalDate.parse(from), true, LocalDate.parse(to), true).forEach((d, n) -> {
+                HolidayDTO h = new HolidayDTO();
+                h.setHolidayId((long) d.getDayOfYear());
+                h.setHolidayDate(d);
+                h.setHolidayName(n);
+                list.add(h);
+            });
+            return list;
+        }
+
+        @Override public List<Integer> selectHolidayYears(Long companyId, int fromYear, int toYear) {
+            return holidays.keySet().stream().map(LocalDate::getYear).filter(y -> y >= fromYear && y <= toYear).distinct()
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        @Override public int insertHoliday(Long companyId, String holidayDate, String holidayName) {
+            if (holidays.putIfAbsent(LocalDate.parse(holidayDate), holidayName) != null) throw new DuplicateKeyException("UQ_41_01");
+            return 1;
+        }
+
+        @Override public int deleteHoliday(Long companyId, Long holidayId) {
+            return holidays.keySet().removeIf(d -> d.getDayOfYear() == holidayId) ? 1 : 0;
+        }
+
+        @Override public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month) { return List.of(); }
 
         @Override public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) { return List.of(); }
 

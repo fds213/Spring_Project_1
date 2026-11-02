@@ -141,12 +141,81 @@
 		ORDER BY work_date
 	</select>
 
+	<!-- 오늘 출퇴근 시각 (연동 계약 getTodayAttendance, 헤더 표시) -->
+	<select id="selectTodayTimes" resultType="com.ieum.gw.attendance.dto.TodayAttendanceDTO">
+		SELECT check_in_at, check_out_at
+		FROM attendance
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND work_date = TRUNC(<include refid="now"/>)
+	</select>
+
 	<select id="selectMonthHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
 		SELECT holiday_date, holiday_name
 		FROM holiday
 		WHERE company_id = #{companyId}
 		  AND holiday_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
 		  AND holiday_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+	</select>
+
+	<!-- ===== 휴일 (업체마다. 휴가 날짜 계산과 달력이 쓴다) ===== -->
+
+	<select id="selectHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
+		SELECT holiday_id, holiday_date, holiday_name
+		FROM holiday
+		WHERE company_id = #{companyId}
+		  AND holiday_date &gt;= TO_DATE(#{from}, 'YYYY-MM-DD')
+		  AND holiday_date &lt;= TO_DATE(#{to}, 'YYYY-MM-DD')
+		ORDER BY holiday_date
+	</select>
+
+	<!-- 휴일 자료가 들어 있는 해 (휴가 기간에 자료 없는 해가 끼어 있는지 본다) -->
+	<select id="selectHolidayYears" resultType="int">
+		SELECT DISTINCT EXTRACT(YEAR FROM holiday_date)
+		FROM holiday
+		WHERE company_id = #{companyId}
+		  AND holiday_date &gt;= TO_DATE(#{fromYear} || '-01-01', 'YYYY-MM-DD')
+		  AND holiday_date &lt; TO_DATE((#{toYear} + 1) || '-01-01', 'YYYY-MM-DD')
+	</select>
+
+	<!-- 같은 날은 하나만 (UQ_41_01) -->
+	<insert id="insertHoliday">
+		INSERT INTO holiday (company_id, holiday_date, holiday_name)
+		VALUES (#{companyId}, TO_DATE(#{holidayDate}, 'YYYY-MM-DD'), #{holidayName})
+	</insert>
+
+	<delete id="deleteHoliday">
+		DELETE FROM holiday WHERE company_id = #{companyId} AND holiday_id = #{holidayId}
+	</delete>
+
+	<!-- ===== 근태·연차 관리: 업체 직원별 한 달 요약 (한 번에) ===== -->
+	<select id="selectMonthSummary" resultType="com.ieum.gw.attendance.dto.AttendanceSummaryDTO">
+		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status,
+		       TO_CHAR(e.hire_date, 'YYYY-MM-DD') AS hire_date, e.prior_career_months,
+		       (SELECT MIN(de.device_user_no) FROM device_employee de
+		        JOIN attendance_device d ON d.attendance_device_id = de.attendance_device_id AND d.use_yn = 'Y'
+		        WHERE de.company_id = e.company_id AND de.employee_id = e.employee_id AND de.use_yn = 'Y') AS device_user_no,
+		       TO_CHAR(t.check_in_at, 'HH24:MI:SS')  AS today_in,
+		       TO_CHAR(t.check_out_at, 'HH24:MI:SS') AS today_out,
+		       NVL(m.work_days, 0)  AS work_days,
+		       NVL(m.late_days, 0)  AS late_days,
+		       NVL(m.early_days, 0) AS early_days
+		FROM employee e
+		LEFT JOIN department dp ON dp.department_id = e.department_id
+		LEFT JOIN attendance t ON t.company_id = e.company_id AND t.employee_id = e.employee_id
+		                      AND t.work_date = TRUNC(<include refid="now"/>)
+		LEFT JOIN (
+		    SELECT employee_id,
+		           COUNT(*) AS work_days,
+		           SUM(CASE WHEN TO_CHAR(check_in_at, 'HH24:MI:SS') &gt; '09:00:00' THEN 1 ELSE 0 END) AS late_days,
+		           SUM(CASE WHEN check_out_at IS NOT NULL AND TO_CHAR(check_out_at, 'HH24:MI:SS') &lt; '18:00:00' THEN 1 ELSE 0 END) AS early_days
+		    FROM attendance
+		    WHERE company_id = #{companyId}
+		      AND work_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
+		      AND work_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+		    GROUP BY employee_id
+		) m ON m.employee_id = e.employee_id
+		WHERE e.company_id = #{companyId}
+		ORDER BY e.employee_no
 	</select>
 
 	<!-- 한 달 동안 최종 승인된 휴가 날짜 (전자결재 휴가 신청서). 기록의 비고에 연차·반차로 보여 준다 -->
