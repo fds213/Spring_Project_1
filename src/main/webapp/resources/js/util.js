@@ -58,6 +58,70 @@ function emptyTr(cols, label) {
   td.colSpan = cols;
   return h('tr', 'row-empty', td);
 }
+// 쓰는 버튼: 읽기 전용 업체에서는 흐리게 두고 누르면 안내만 한다(data-write, common.js)
+function writeBtn(label, cls, onClick) {
+  const b = h('button', cls, label);
+  b.type = 'button';
+  b.dataset.write = '';
+  b.addEventListener('click', () => onClick(b));
+  return b;
+}
+function textBox(placeholder, max, label) {
+  const t = h('textarea', 'inq-text');
+  t.maxLength = max;
+  t.placeholder = placeholder;
+  t.setAttribute('aria-label', label);
+  return t;
+}
+// 고르기 칸: 첫 줄은 '고르기' 안내(값 없음). options 는 [글자, 값] 목록, selected 는 처음 골라 둘 값
+function pickSelect(label, first, options, selected) {
+  const s = h('select', 'input ta-assignee', h('option', '', options.length ? first : '고를 항목이 없습니다'),
+    ...options.map(([text, value]) => {
+      const o = h('option', '', text);
+      o.value = value;
+      o.selected = selected != null && String(value) === String(selected);
+      return o;
+    }));
+  s.firstChild.value = '';
+  s.setAttribute('aria-label', label);
+  return s;
+}
+// 이력·댓글 목록 (bill-history). rows 는 한 줄에 넣을 요소(또는 그 목록)
+const historyList = (rows, emptyText) =>
+  h('ul', 'bill-history', ...(rows.length ? rows.map(r => h('li', '', ...[].concat(r))) : [h('li', '', span(emptyText, 'muted'))]));
+// 페이지 번호 (nav.pager). 지금 페이지 앞뒤 두 쪽만 번호로 보이고, 누르면 go(쪽)를 부르고 화면을 맨 위로 올린다
+function pagerOf(nav, page, pages, go) {
+  const btn = (label, p, aria, disabled) => {
+    const b = h('button', '', label);
+    b.type = 'button';
+    b.setAttribute('aria-label', aria);
+    b.disabled = !!disabled;
+    b.addEventListener('click', () => {
+      go(p);
+      const box = document.querySelector('.content'); // 그룹웨어는 본문 칸이 스크롤된다
+      if (box) box.scrollTop = 0;
+      window.scrollTo(0, 0);
+    });
+    return b;
+  };
+  const items = [btn('이전', page - 1, '이전 페이지', page <= 1)];
+  for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) {
+    const b = btn(String(p), p, `${p}페이지`);
+    if (p === page) b.setAttribute('aria-current', 'page');
+    items.push(b);
+  }
+  items.push(btn('다음', page + 1, '다음 페이지', page >= pages));
+  nav.replaceChildren(...items);
+  nav.hidden = pages <= 1;
+}
+// 받은 쪽이 비었는데 지금 쪽이 마지막 쪽보다 뒤면(마지막 쪽의 남은 건을 처리했을 때) 마지막 쪽을 다시 받는다. 다시 받으면 true
+function pageOverflow(state, r, reload) {
+  const pages = r.pages || 1;
+  if ((r.items || []).length || state.page <= pages) return false;
+  state.page = pages;
+  reload();
+  return true;
+}
 
 // el(태그, { 속성 }, 글자)
 function el(tag, attrs = {}, text) {

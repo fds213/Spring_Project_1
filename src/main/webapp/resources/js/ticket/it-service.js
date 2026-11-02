@@ -11,13 +11,15 @@ const TICKET_STATUS = {
 const TICKET_CLASS = {
   RECEIVED: 'requested', ASSIGNED: 'requested', IN_PROGRESS: 'waiting', RESOLVED: 'paid', CLOSED: 'paid', CANCELED: 'expired', REJECTED: 'failed',
 };
-// 내 티켓 요약 카드는 세 묶음으로 센다: 접수(접수·배정), 처리 중, 완료(처리 완료·종료·취소·반려)
+// 내 티켓 요약 카드는 네 묶음으로 센다: 접수(접수·배정), 처리 중, 확인 대기(처리 완료: 내가 확인하면 종료), 완료(종료·취소·반려)
+// 홈의 '진행 중인 내 티켓'은 완료가 아닌 것(접수·처리 중·확인 대기)을 센다
 const TICKET_GROUP = {
-  RECEIVED: 'RECEIVED', ASSIGNED: 'RECEIVED', IN_PROGRESS: 'IN_PROGRESS', RESOLVED: 'DONE', CLOSED: 'DONE', CANCELED: 'DONE', REJECTED: 'DONE',
+  RECEIVED: 'RECEIVED', ASSIGNED: 'RECEIVED', IN_PROGRESS: 'IN_PROGRESS', RESOLVED: 'RESOLVED', CLOSED: 'DONE', CANCELED: 'DONE', REJECTED: 'DONE',
 };
 const TICKET_TITLE_MAX = 60;
 const TICKET_BODY_MAX = 1000;
 const TICKET_COMMENT_MAX = 300;
+const TICKET_REOPEN_MAX = 300;
 
 const itEl = id => document.getElementById(id);
 const itNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
@@ -95,7 +97,7 @@ function loadTicketMine() {
 function renderTicketMine() {
   const mine = itMine.items;
   const count = st => mine.filter(t => st === 'all' || TICKET_GROUP[t.status] === st).length;
-  [['all', 'ticketCntAll'], ['RECEIVED', 'ticketCntReceived'], ['IN_PROGRESS', 'ticketCntProgress'], ['DONE', 'ticketCntDone']]
+  [['all', 'ticketCntAll'], ['RECEIVED', 'ticketCntReceived'], ['IN_PROGRESS', 'ticketCntProgress'], ['RESOLVED', 'ticketCntResolved'], ['DONE', 'ticketCntDone']]
     .forEach(([st, id]) => { itEl(id).textContent = `${count(st)}건`; });
   document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.filter === itMine.filter));
 
@@ -145,6 +147,31 @@ function ticketDetail(t) {
     itNode('section', 'info-card', itNode('header', 'info-card-head', itNode('h2', '', '처리 이력')), log,
       itNode('header', 'info-card-head', itNode('h2', '', '댓글')), comments)];
 
+  // 처리 완료된 티켓: 결과를 보고 확인(종료)하거나, 해결되지 않았으면 사유를 적어 다시 요청한다(처리 완료 → 처리 중, 기능명세서 상태 표)
+  if (t.canClose || t.canReopen) {
+    const head = itNode('header', 'info-card-head', itNode('h2', '', '처리 결과 확인'));
+    const note = itNode('p', 'muted inq-body', '처리 이력의 해결 결과를 확인해 주세요. 확인하면 종료되고, 해결되지 않았으면 다시 요청할 수 있습니다.');
+    const row = itNode('div', 'inq-actions');
+    if (t.canClose) {
+      const ok = itButton('확인(종료)', 'btn btn-primary');
+      ok.addEventListener('click', () => changeTicket(t, 'close', {}, ok, `${t.id} 종료했습니다`));
+      row.append(ok);
+    }
+    let reason = null;
+    if (t.canReopen) {
+      reason = itNode('textarea', 'inq-text');
+      reason.maxLength = TICKET_REOPEN_MAX;
+      reason.placeholder = `다시 요청하는 이유 (${TICKET_REOPEN_MAX}자까지, 담당자에게 보입니다)`;
+      reason.setAttribute('aria-label', '다시 요청하는 이유');
+      const again = itButton('다시 요청', 'btn');
+      again.addEventListener('click', () => {
+        if (!reason.value.trim()) { showToast('다시 요청하는 이유를 적어 주세요'); reason.focus(); return; }
+        changeTicket(t, 'reopen', { reason: reason.value.trim() }, again, `${t.id} 다시 요청했습니다. 담당자가 이어서 처리합니다`);
+      });
+      row.append(again);
+    }
+    parts[1].prepend(head, note, itNode('div', 'inq-body', ...(reason ? [reason] : []), row));
+  }
   if (t.canComment) {
     // 완료되면 더 쓰지 않는다. 처리 중에도 사원이 추가로 알릴 것이 있으면 댓글로 남긴다
     const box = itNode('textarea', 'inq-text');
@@ -155,7 +182,7 @@ function ticketDetail(t) {
     send.addEventListener('click', () => addComment(t.id, box.value, send));
     parts[1].append(itNode('div', 'inq-body', box, itNode('div', 'inq-actions', send)));
   }
-  return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1], ...(parts[2] ? [itNode('section', 'info-card', parts[2])] : [])));
+  return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1]));
 }
 
 // 쓰는 버튼: 읽기 전용 업체에서는 누르지 못하게 data-write 를 단다
@@ -164,6 +191,15 @@ function itButton(label, cls) {
   b.type = 'button';
   b.dataset.write = '';
   return b;
+}
+
+// 확인(종료)·다시 요청: 주소·값 이름은 화면이 먼저 정한 제안이다(ticket 모듈 담당이 정하면 그에 맞춘다).
+// POST /ticket/api/tickets/{id}/close { version }, POST /ticket/api/tickets/{id}/reopen { reason, version }. 그사이 상태가 바뀌었으면 409
+function changeTicket(t, action, body, btn, done) {
+  btn.disabled = true;
+  api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/${action}`, { ...body, version: t.version })
+    .done(() => { showToast(done); loadTicketMine(); })
+    .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
 }
 
 function addComment(id, bodyRaw, btn) {
