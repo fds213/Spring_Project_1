@@ -195,7 +195,10 @@ public class AttendanceService {
             day.put("date", date);
             day.put("weekday", d.getDayOfWeek().getValue() % 7); // 0 = 일요일
             day.put("holiday", holidays.getOrDefault(date, ""));
-            day.put("punch", punchView(byDate.get(date)));
+            Map<String, String> punch = punchView(byDate.get(date));
+            // 퇴근 누락: 오늘보다 앞선 날인데 출근만 있고 퇴근이 없다(지난 날 퇴근은 나중에 찍을 수 없다). 오늘은 아직 퇴근할 수 있어 비워 둔다
+            if (punch != null && punch.get("out").isEmpty() && date.compareTo(today) < 0) punch.put("outStatus", "NO_OUT");
+            day.put("punch", punch);
             day.put("leave", leaves.get(date));
             days.add(day);
         }

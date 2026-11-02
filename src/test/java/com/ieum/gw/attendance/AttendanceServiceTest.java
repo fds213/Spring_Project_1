@@ -139,6 +139,28 @@ class AttendanceServiceTest {
     }
 
     @Test
+    @DisplayName("퇴근 누락: 지난 날 출근만 있으면 NO_OUT, 오늘은 아직 퇴근할 수 있어 비워 둔다")
+    void missingCheckOut() {
+        mapper.clock = "08:55:00";
+        service.punch(KEY, "0002", "IN");
+        assertEquals("", dayPunch(service.records(10L, 102L, "2026-10"), "2026-10-30").get("outStatus"));
+
+        mapper.today.get(102L).setWorkDate("2026-10-29"); // 어제 출근만 찍고 퇴근은 안 찍은 기록으로 바꾼다
+        Map<String, String> past = dayPunch(service.records(10L, 102L, "2026-10"), "2026-10-29");
+        assertEquals("NO_OUT", past.get("outStatus"));
+        assertEquals("NORMAL", past.get("inStatus"));
+        assertEquals("", past.get("out"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> dayPunch(Map<String, Object> records, String date) {
+        for (Map<String, Object> d : (List<Map<String, Object>>) records.get("days")) {
+            if (date.equals(d.get("date"))) return (Map<String, String>) d.get("punch");
+        }
+        return null;
+    }
+
+    @Test
     @DisplayName("연결을 끊으면 번호가 비고, 단말기가 없는 업체의 연결은 409")
     void unlinkAndNoDevice() {
         assertEquals("", service.unlinkDevice(10L, 102L).get("deviceId"));
