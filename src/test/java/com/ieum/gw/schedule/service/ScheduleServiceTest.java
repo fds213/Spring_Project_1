@@ -32,6 +32,7 @@ class ScheduleServiceTest {
         final List<Object[]> leaveInserts = new ArrayList<>();
         final List<Long> deleted = new ArrayList<>();
         ScheduleDTO event; // selectEvent가 돌려줄 일정
+        LocalDateTime countFrom, countTo; // countEvents에 넘어온 기간
 
         FakeDAO() {
             super(null);
@@ -42,6 +43,13 @@ class ScheduleServiceTest {
                                     LocalDateTime startsAt, LocalDateTime endsAt, String allDayYn) {
             leaveInserts.add(new Object[] { companyId, ownerId, leaveRequestDayId, title, startsAt, endsAt, allDayYn });
             return 1;
+        }
+
+        @Override
+        public int countEvents(Long companyId, Long employeeId, LocalDateTime from, LocalDateTime to) {
+            countFrom = from;
+            countTo = to;
+            return 2;
         }
 
         @Override
@@ -168,5 +176,16 @@ class ScheduleServiceTest {
         assertThrows(ResponseStatusException.class, () -> service.deleteSchedule(user(30L, "ROLE_HR"), 7L));
         service.deleteSchedule(user(20L, "ROLE_ADMIN"), 7L);
         assertTrue(dao.deleted.contains(7L));
+    }
+
+    @Test
+    @DisplayName("오늘 일정 수: 그날 0시부터 다음 날 0시 전까지를 센다")
+    void countsOneDay() {
+        FakeDAO dao = new FakeDAO();
+        int n = new ScheduleService(dao, null).countSchedulesOn(1L, 10L, LocalDate.parse("2026-11-30"));
+
+        assertEquals(2, n);
+        assertEquals(LocalDateTime.of(2026, 11, 30, 0, 0), dao.countFrom);
+        assertEquals(LocalDateTime.of(2026, 12, 1, 0, 0), dao.countTo); // 달이 넘어가도 다음 날 0시
     }
 }
