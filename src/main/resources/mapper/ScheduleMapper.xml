@@ -46,9 +46,12 @@
 		 ORDER BY d.leave_date
 	</select>
 
-	<!-- 일정 한 건 (삭제 권한 확인용) -->
+	<!-- 일정 한 건 (삭제 권한 확인용). 개인 일정은 쓴 본인만 지울 수 있어 구분도 같이 읽는다 -->
 	<select id="selectEvent" resultType="com.ieum.gw.schedule.dto.ScheduleDTO">
 		SELECT calendar_event_id AS id,
+		       CASE scope_code WHEN 'SCOPE_PERSONAL' THEN 'PERSONAL'
+		                       WHEN 'SCOPE_COMPANY'  THEN 'COMPANY'
+		                       ELSE 'DEPT' END AS scope,
 		       owner_employee_id AS ownerId,
 		       event_type        AS eventType
 		  FROM calendar_event

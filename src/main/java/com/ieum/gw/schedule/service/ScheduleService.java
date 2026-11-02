@@ -171,7 +171,7 @@ public class ScheduleService {
         return result;
     }
 
-    // 일정 삭제: 쓴 본인 또는 업체 관리자. 결재에서 온 휴가 일정은 지울 수 없다
+    // 일정 삭제: 개인 일정은 쓴 본인만, 전사 일정은 쓴 본인 또는 업체 관리자. 결재에서 온 휴가 일정은 지울 수 없다
     @Transactional
     public Map<String, Object> deleteSchedule(LoginUser user, Long id) {
         ScheduleDTO s = (id == null) ? null : dao.selectEvent(user.getCompanyId(), id);
@@ -203,10 +203,14 @@ public class ScheduleService {
         return scopes;
     }
 
-    // 삭제 버튼: 쓴 본인 또는 업체 관리자 (휴가 일정은 아니어야 함)
+    // 삭제 버튼 (휴가 일정은 아니어야 함)
+    // - 개인 일정: 쓴 본인만. 관리자도 남의 개인 일정은 화면에 안 보이므로 번호만으로 지우지 못하게 막는다
+    // - 전사 일정: 쓴 본인 또는 업체 관리자
     private boolean canDelete(LoginUser user, ScheduleDTO s) {
         if ("EV_LEAVE".equals(s.getEventType())) return false;
-        return hasRole(user, "ROLE_ADMIN") || user.getEmployeeId().equals(s.getOwnerId());
+        boolean mine = user.getEmployeeId().equals(s.getOwnerId());
+        if (PERSONAL.equals(s.getScope())) return mine;
+        return mine || hasRole(user, "ROLE_ADMIN");
     }
 
     private boolean hasRole(LoginUser user, String role) {

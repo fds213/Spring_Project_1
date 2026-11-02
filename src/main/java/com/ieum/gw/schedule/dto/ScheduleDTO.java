@@ -17,7 +17,7 @@ public class ScheduleDTO {
     private String date;        // 날짜 (예: 2026-11-02)
     private String title;       // 제목
     private String memo;        // 메모 (CALENDAR_EVENT.CONTENT)
-    private boolean canDelete;  // 삭제 버튼을 보일지 (쓴 본인 또는 업체 관리자) — Service가 채운다
+    private boolean canDelete;  // 삭제 버튼을 보일지 (개인: 쓴 본인, 전사: 쓴 본인·업체 관리자) — Service가 채운다
 
     @JsonIgnore
     private Long ownerId;       // 쓴 사람 사원 ID (화면에는 보내지 않는다. 삭제 권한 비교용)
