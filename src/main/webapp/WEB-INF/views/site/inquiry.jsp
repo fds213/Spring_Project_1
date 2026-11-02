@@ -3,10 +3,11 @@
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
   소개 사이트: 도입 문의 (GET /inquiry, 로그인 없이 연다).
-  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
+  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다. 입력 확인과 접수(POST /inquiry/api/submit)는 resources/js/site/inquiry.js.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:site title="도입 문의" current="inquiry" mainClass="inq-page">
+  <jsp:attribute name="scripts"><script src="${ctx}/resources/js/site/inquiry.js"></script></jsp:attribute>
   <jsp:body>
       <%-- 입력: 위에 제목·안내, 아래에 폼 (한 줄 구성) --%>
       <div class="wrap inq-layout" id="inqLayout">
@@ -82,6 +83,8 @@
               <span class="field-error"></span>
             </div>
 
+            <%-- 칸과 상관없는 실패(너무 잦은 접수·서버 오류)의 안내. 칸이 틀린 실패는 그 칸 아래에 보인다 --%>
+            <p class="done err" id="inqError" role="alert" hidden></p>
             <div class="inq-submit">
               <button class="btn btn-primary btn-lg" type="submit" id="btnSubmit">문의 접수</button>
             </div>
