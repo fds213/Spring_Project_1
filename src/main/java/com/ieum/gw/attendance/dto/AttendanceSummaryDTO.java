@@ -13,7 +13,6 @@ public class AttendanceSummaryDTO {
     private String departmentName;
     private String employmentStatus;
     private String hireDate;           // YYYY-MM-DD, 없으면 null
-    private Integer priorCareerMonths;
     private String deviceUserNo;       // 단말기 번호, 연결 안 됐으면 null
     private String todayIn;            // HH24:MI:SS, 오늘 기록 없으면 null
     private String todayOut;

@@ -30,10 +30,10 @@ import com.ieum.gw.attendance.mapper.LeaveMapper;
 import com.ieum.gw.attendance.service.HolidayService;
 import com.ieum.gw.attendance.service.LeaveService;
 
-/** 연차 연동 규칙 (결재가 부르는 날짜 나누기·남은 일수·겹침·차감·최초 부여, 요구분석서 3.9). 오늘은 2026-10-30 */
+/** 연차 연동 규칙 (결재가 부르는 날짜 나누기·남은 일수·겹침·차감·최초 부여, 요구분석서 3.9). 모든 직원 15일, 자동 부여 없음 */
 class LeaveServiceTest {
 
-    // 업체 10의 사원 102: 2024-03-04 입사, 이전 경력 48개월 → 오늘 주기 2026-03-04 ~ 2027-03-04, 경력 72개월, 17일
+    // 업체 10의 사원 102: 2024-03-04 입사, 연차 15일 (이전 경력은 연차에 반영하지 않는다)
     private static final long CO = 10L;
     private static final long EMP = 102L;
     private static final long ACTOR = 900L;
@@ -91,25 +91,26 @@ class LeaveServiceTest {
     }
 
     @Test
-    @DisplayName("주기 행이 없으면 계산식의 부여 일수가 남은 일수다 (기존 직원도 휴가를 낼 수 있다)")
+    @DisplayName("부여 행이 없으면 15일이 남은 일수다 (가입 승인 전에 들어온 직원도 휴가를 낼 수 있다)")
     void remainingWithoutCycleRow() {
-        assertEquals(BigDecimal.valueOf(17), leave.getRemainingLeaveDays(CO, EMP));
+        assertEquals(BigDecimal.valueOf(15), leave.getRemainingLeaveDays(CO, EMP));
         assertEquals(BigDecimal.ZERO, leave.getRemainingLeaveDays(CO, 999L)); // 입사일 모름
     }
 
     @Test
-    @DisplayName("차감: 주기 행을 만들고 시간대·사용 내역을 남긴다. 남은 일수와 연차 화면이 같은 값을 본다")
+    @DisplayName("차감: 부여 행을 만들고 시간대·사용 내역을 남긴다. 남은 일수와 연차 화면이 같은 값을 본다")
     void useLeave() {
         leave.useLeave(CO, EMP, ACTOR, List.of(day("2026-11-03", "LV_FULL", 1), day("2026-11-04", "LV_AM", 2)));
 
         assertEquals(1, leaveMapper.cycles.size());
         assertEquals(3, leaveMapper.slots.size()); // 종일 2 + 오전 1
-        assertEquals(new BigDecimal("15.5"), leave.getRemainingLeaveDays(CO, EMP));
+        assertEquals(new BigDecimal("13.5"), leave.getRemainingLeaveDays(CO, EMP));
 
         @SuppressWarnings("unchecked")
         Map<String, Object> sum = (Map<String, Object>) leave.leaves(CO, EMP).get("summary");
         assertEquals(new BigDecimal("1.5"), sum.get("usedDays"));
-        assertEquals(new BigDecimal("15.5"), sum.get("left"));
+        assertEquals(new BigDecimal("13.5"), sum.get("left"));
+        assertEquals(BigDecimal.valueOf(15), sum.get("grant"));
     }
 
     @Test
@@ -136,36 +137,43 @@ class LeaveServiceTest {
         LocalDate d = LocalDate.of(2026, 11, 2);
         for (int i = 0; i < 18; i++, d = d.plusDays(1)) many.add(day(d.toString(), "LV_FULL", 100 + i));
         IllegalStateException e = assertThrows(IllegalStateException.class, () -> leave.useLeave(CO, EMP, ACTOR, many));
-        assertTrue(e.getMessage().contains("남은 17일, 신청 18일"));
+        assertTrue(e.getMessage().contains("남은 15일, 신청 18일"));
         assertEquals(0, leaveMapper.ledger.size());
         assertEquals(0, leaveMapper.slots.size());
     }
 
     @Test
-    @DisplayName("주기 경계를 넘는 휴가: 날마다 그 날의 주기에서 차감하고, 주기마다 행을 하나씩 만든다")
-    void acrossCycles() {
-        // 사원 102의 주기는 3월 4일에 바뀐다: 3/3(수)은 2026 주기(17일), 3/4(목)·3/5(금)은 2027 주기(17일, 경력 84개월 = 7년)
+    @DisplayName("입사기념일이 지나도 새로 부여하지 않는다: 기념일 앞뒤 휴가도 같은 15일에서 차감한다")
+    void noAnniversaryGrant() {
         leave.useLeave(CO, EMP, ACTOR, List.of(day("2027-03-03", "LV_FULL", 1), day("2027-03-04", "LV_FULL", 2), day("2027-03-05", "LV_FULL", 3)));
-        assertEquals(2, leaveMapper.cycles.size());
-        LeaveCycleDTO next = leaveMapper.cycles.stream().filter(c -> c.getStartsOn().equals("2027-03-04")).findFirst().orElseThrow();
-        assertEquals(BigDecimal.valueOf(17), next.getGrantedDays()); // 경력 84개월 = 7년 → 15 + 2
-        assertEquals(new BigDecimal("-2"), leaveMapper.selectLedgerSum(CO, next.getLeaveCycleId()));
-        assertEquals(BigDecimal.valueOf(16), leave.getRemainingLeaveDays(CO, EMP)); // 오늘 주기는 하루만 썼다
+        assertEquals(1, leaveMapper.cycles.size());
+        LeaveCycleDTO row = leaveMapper.cycles.get(0);
+        assertEquals("2024-03-04", row.getStartsOn());
+        assertEquals("9999-12-31", row.getEndsOn());
+        assertEquals(BigDecimal.valueOf(15), row.getGrantedDays());
+        assertEquals(BigDecimal.valueOf(12), leave.getRemainingLeaveDays(CO, EMP));
     }
 
     @Test
-    @DisplayName("근태·연차 관리의 남은 연차: 저장된 주기는 부여+사용 합, 없으면 계산식, 입사일이 없으면 비운다")
+    @DisplayName("입사일 전 날짜는 차감하지 않는다")
+    void beforeHire() {
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> leave.useLeave(CO, EMP, ACTOR, List.of(day("2024-03-01", "LV_FULL", 1))));
+        assertTrue(e.getMessage().contains("입사일"));
+        assertEquals(0, leaveMapper.ledger.size());
+    }
+
+    @Test
+    @DisplayName("근태·연차 관리의 남은 연차: 저장된 부여 행은 부여+사용 합, 없으면 15일, 입사일이 없으면 비운다")
     void remainingOf() {
         LeaveCycleDTO saved = new LeaveCycleDTO();
-        saved.setStartsOn("2026-03-04");
-        saved.setEndsOn("2027-03-04");
-        saved.setCareerMonths(72);
-        saved.setGrantedDays(BigDecimal.valueOf(17));
+        saved.setStartsOn("2024-03-04");
+        saved.setEndsOn("9999-12-31");
+        saved.setGrantedDays(BigDecimal.valueOf(15));
         saved.setLedgerDays(new BigDecimal("-2.5"));
-        LocalDate today = LocalDate.of(2026, 10, 30);
-        assertEquals(new BigDecimal("14.5"), LeaveService.remainingOf(saved, "2024-03-04", 48, today));
-        assertEquals(BigDecimal.valueOf(17), LeaveService.remainingOf(null, "2024-03-04", 48, today));
-        assertEquals(null, LeaveService.remainingOf(null, null, 0, today));
+        assertEquals(new BigDecimal("12.5"), LeaveService.remainingOf(saved, "2024-03-04"));
+        assertEquals(BigDecimal.valueOf(15), LeaveService.remainingOf(null, "2024-03-04"));
+        assertEquals(null, LeaveService.remainingOf(null, null));
     }
 
     @Test
@@ -177,16 +185,16 @@ class LeaveServiceTest {
     }
 
     @Test
-    @DisplayName("최초 부여: 입사일부터 첫 주기, 이전 경력이 있으면 같은 계산식. 두 번 불러도 하나만")
+    @DisplayName("최초 부여: 입사일부터 15일 하나(끝나는 날 없음). 두 번 불러도 하나만")
     void grantInitialLeave() {
-        leaveMapper.career.put(200L, career("2026-11-02", 72)); // 이전 경력 6년 → 17일
+        leaveMapper.career.put(200L, career("2026-11-02"));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
         List<LeaveCycleDTO> rows = leaveMapper.cycles.stream().filter(c -> c.getEmployeeId() == 200L).collect(Collectors.toList());
         assertEquals(1, rows.size());
         assertEquals("2026-11-02", rows.get(0).getStartsOn());
-        assertEquals("2027-11-02", rows.get(0).getEndsOn());
-        assertEquals(BigDecimal.valueOf(17), rows.get(0).getGrantedDays());
+        assertEquals("9999-12-31", rows.get(0).getEndsOn());
+        assertEquals(BigDecimal.valueOf(15), rows.get(0).getGrantedDays());
     }
 
     @Test
@@ -202,16 +210,15 @@ class LeaveServiceTest {
                 () -> holiday.addPreset(CO, 2031)).getStatus());
     }
 
-    private static EmployeeCareerDTO career(String hire, int prior) {
+    private static EmployeeCareerDTO career(String hire) {
         EmployeeCareerDTO c = new EmployeeCareerDTO();
         c.setHireDate(hire);
-        c.setPriorCareerMonths(prior);
         return c;
     }
 
     /** 연차 테이블 메모리판: leave_cycle(UQ 사원+시작일), leave_slot(PK 사원+날짜+시간대), leave_ledger(UQ 날짜 행+종류) */
     static class FakeLeaveMapper implements LeaveMapper {
-        final Map<Long, EmployeeCareerDTO> career = new HashMap<>(Map.of(EMP, career("2024-03-04", 48)));
+        final Map<Long, EmployeeCareerDTO> career = new HashMap<>(Map.of(EMP, career("2024-03-04")));
         final List<LeaveCycleDTO> cycles = new ArrayList<>();
         final List<LeaveSlotDTO> slots = new ArrayList<>();
         final Map<Long, BigDecimal> ledger = new HashMap<>(); // leave_request_day_id → delta (사용 내역 한 줄)

@@ -182,7 +182,7 @@
 	<!-- ===== 근태·연차 관리: 업체 직원별 한 달 요약 (한 번에) ===== -->
 	<select id="selectMonthSummary" resultType="com.ieum.gw.attendance.dto.AttendanceSummaryDTO">
 		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status,
-		       TO_CHAR(e.hire_date, 'YYYY-MM-DD') AS hire_date, e.prior_career_months,
+		       TO_CHAR(e.hire_date, 'YYYY-MM-DD') AS hire_date,
 		       (SELECT MIN(de.device_user_no) FROM device_employee de
 		        JOIN attendance_device d ON d.attendance_device_id = de.attendance_device_id AND d.use_yn = 'Y'
 		        WHERE de.company_id = e.company_id AND de.employee_id = e.employee_id AND de.use_yn = 'Y') AS device_user_no,

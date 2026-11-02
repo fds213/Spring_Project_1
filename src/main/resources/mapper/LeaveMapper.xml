@@ -6,7 +6,7 @@
 	<!-- 연차: 주기·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
 
 	<select id="selectEmployeeCareer" resultType="com.ieum.gw.attendance.dto.EmployeeCareerDTO">
-		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date, prior_career_months
+		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date
 		FROM employee
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
 	</select>

@@ -1,7 +1,7 @@
-// 근무 > 연차 (views/attendance/leave.jsp): 로그인한 본인의 연차 현황과 이번 연차 기간의 휴가 신청 내역만 보여 준다 (요구분석서 3.9).
+// 근무 > 연차 (views/attendance/leave.jsp): 로그인한 본인의 연차 현황과 휴가 신청 내역만 보여 준다 (요구분석서 3.9).
 // 다른 직원의 연차, 근태·연차 관리(인사)는 이 화면에 없다. 출퇴근 기록은 근태 화면(attendance.js)에 있다.
 //
-// 연차: 15일 + 내림(총 완료 경력 연수 ÷ 3). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
+// 연차: 모든 직원 15일, 입사할 때 한 번 부여한다(경력·입사기념일로 바뀌지 않음). 계산과 신청 규칙(겹침·잔여·주말·휴일)은 서버가 정하고, 화면은 받은 값을 보여 준다.
 // 연차를 쓰는 것(휴가)은 전자결재의 휴가 신청서로 신청한다(요구분석서 3장 범위). 최종 승인 때 연차가 차감되고 여기 내역에 들어온다.
 // 이 화면은 연차 현황·내역만 보여 주고, 신청은 전자결재(기안 작성)에서 한다.
 
@@ -24,7 +24,7 @@ function openLeaveView() {
 // 다른 탭(전자결재)에서 신청·결재하고 돌아오면 다시 받는다
 document.addEventListener('visibilitychange', () => { if (!document.hidden) openLeaveView(); });
 
-// 카드, 연차 현황, 이번 연차 기간의 신청 내역
+// 카드, 연차 현황, 신청 내역
 function renderLeaveView(r) {
   const sum = r.summary;
   const dl = leaveEl('leaveInfo');
@@ -41,13 +41,10 @@ function renderLeaveView(r) {
   }
   const row = (k, v) => [leaveNode('dt', '', k), leaveNode('dd', '', v)];
   dl.replaceChildren(
-    ...row('이번 연차 기간', `${ymd(sum.start)} ~ ${ymd(new Date(new Date(sum.end).getTime() - DAY_MS))}`),
-    ...row('부여', `${dayText(sum.grant)} (15일 + 총 경력 ${sum.career}년 ÷ 3의 몫 ${Math.floor(sum.career / 3)}일)`),
-    ...row('총 경력', `이전 경력 ${sum.prev}년 + 현재 업체 근속 ${sum.years}년`),
+    ...row('부여', `${dayText(sum.grant)} (${ymd(sum.start)} 입사 때 부여, 모든 직원 같음)`),
     ...row('사용 (승인됨)', dayText(sum.usedDays)),
     ...row('승인 대기', dayText(sum.pendingDays)),
-    ...row('남은 연차', dayText(sum.left)),
-    ...row('다음 부여', `${ymd(sum.end)} 입사기념일 (남은 연차는 이월되지 않습니다)`));
+    ...row('남은 연차', dayText(sum.left)));
 
   // 신청 내역: 상태와, 대기 중이면 지금 결재할 사람, 반려면 사유
   hist.replaceChildren(...(r.items.length ? r.items.map(l => {
@@ -57,5 +54,5 @@ function renderLeaveView(r) {
       : l.status === 'REJECTED' ? `반려${l.comment ? `: ${l.comment}` : ''}` : '';
     return leaveNode('li', '', leaveNode('span', 'leave-line', leaveNode('span', '', range), ...(sub ? [leaveNode('small', 'cell-sub', sub)] : [])),
       leaveNode('span', `status status-${LEAVE_STATUS_CLASS[l.status]}`, LEAVE_STATUS[l.status]));
-  }) : [leaveNode('li', 'muted', '이번 연차 기간에 신청한 내역이 없습니다')]));
+  }) : [leaveNode('li', 'muted', '신청한 휴가가 없습니다')]));
 }

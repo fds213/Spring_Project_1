@@ -349,7 +349,7 @@ public class AttendanceService {
 
     /**
      * 근태·연차 관리: 업체 직원별 오늘 출퇴근, 그 달 출근일·지각·조퇴, 오늘 기준 남은 연차.
-     * 직원 수만큼 따로 묻지 않는다: 근태 요약 한 번, 연차 주기·사용 합 한 번.
+     * 직원 수만큼 따로 묻지 않는다: 근태 요약 한 번, 연차 부여 행·사용 합 한 번.
      */
     public Map<String, Object> overview(Long companyId, String month) {
         requireMonth(month);
@@ -380,7 +380,7 @@ public class AttendanceService {
             m.put("late", a.getLateDays());
             m.put("early", a.getEarlyDays());
             // 남은 연차는 재직 중인 사람만 (퇴사자에게는 의미가 없다)
-            m.put("leaveLeft", isServing ? LeaveService.remainingOf(cycles.get(a.getEmployeeId()), a.getHireDate(), a.getPriorCareerMonths(), today) : null);
+            m.put("leaveLeft", isServing ? LeaveService.remainingOf(cycles.get(a.getEmployeeId()), a.getHireDate()) : null);
             items.add(m);
         }
         Map<String, Object> counts = new LinkedHashMap<>();
@@ -475,8 +475,8 @@ public class AttendanceService {
     /**
      * 오늘이 속한 연차 주기의 남은 일수(부여 일수 + 사용·복원 내역 합). 주기가 없으면 0.
      * 승인 대기 중인 휴가는 결재 쪽 자료라 여기서 빼지 않는다.
-     * (구현 메모: 주기 행이 아직 없으면 연차 화면과 같은 계산식의 부여 일수를 돌려준다. 입사일이 없을 때만 0.
-     *  행은 첫 차감(useLeave) 때 만든다. 그래서 행이 없던 기존 직원도 휴가를 낼 수 있다)
+     * (구현 메모: 연차는 모든 직원 15일이고 자동 부여가 없어 주기는 입사일부터 하나다. 그 행이 아직 없으면 15일을 돌려준다.
+     *  입사일이 없을 때만 0. 행은 첫 차감(useLeave) 때도 만든다. 그래서 행이 없던 기존 직원도 휴가를 낼 수 있다)
      */
     public BigDecimal getRemainingLeaveDays(Long companyId, Long employeeId) {
         return leaveService.getRemainingLeaveDays(companyId, employeeId);
@@ -510,7 +510,7 @@ public class AttendanceService {
      * 사원을 만드는 쪽(직원 가입 승인, 체험 신청의 관리자 계정)이 같은 트랜잭션 안에서 부른다.
      *
      * @param hireDate 입사일. 이 날부터 첫 연차 주기를 센다
-     * (구현 메모: 이전 경력이 있으면 연차 화면과 같은 계산식으로 15일보다 많을 수 있다. 이미 있으면 그대로 둔다)
+     * (구현 메모: 모든 직원 15일, 경력으로 바꾸지 않는다. 입사기념일 자동 부여는 없다. 이미 있으면 그대로 둔다)
      */
     public void grantInitialLeave(Long companyId, Long employeeId, LocalDate hireDate) {
         leaveService.grantInitialLeave(companyId, employeeId, hireDate);
