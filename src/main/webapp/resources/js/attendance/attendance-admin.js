@@ -8,15 +8,16 @@
 
 const aaState = { month: null }; // { y, m } 보고 있는 달
 
+const aaMonthParam = () => `${aaState.month.y}-${pad2(aaState.month.m + 1)}`;
+
 function openAttendanceAdmin() {
   if (!aaState.month) {
     const now = new Date();
     aaState.month = { y: now.getFullYear(), m: now.getMonth() };
   }
-  const month = `${aaState.month.y}-${pad2(aaState.month.m + 1)}`;
   document.getElementById('aaMonth').textContent = `${aaState.month.y}년 ${aaState.month.m + 1}월`;
-  api.get('/attendance/admin/api/overview', { month })
-    .done(r => { if (r.month === month) renderAttendanceAdmin(r); }) // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
+  api.get('/attendance/admin/api/overview', { month: aaMonthParam() })
+    .done(r => { if (r.month === aaMonthParam()) renderAttendanceAdmin(r); }) // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
     .fail(xhr => showToast(apiMessage(xhr, '근태를 불러오지 못했습니다')));
 }
 

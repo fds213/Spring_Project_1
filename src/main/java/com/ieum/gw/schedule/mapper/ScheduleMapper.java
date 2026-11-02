@@ -25,6 +25,12 @@ public interface ScheduleMapper {
                                              @Param("from") LocalDateTime from,
                                              @Param("to") LocalDateTime to);
 
+    // 기간 안의 일정 수: 달력에 보이는 것과 같은 조건 (내 개인 일정 + 전사 일정 + 내 휴가 일정)
+    int countEvents(@Param("companyId") Long companyId,
+                    @Param("employeeId") Long employeeId,
+                    @Param("from") LocalDateTime from,
+                    @Param("to") LocalDateTime to);
+
     // 일정 한 건 (삭제 권한 확인용. 다른 업체 일정이면 null)
     ScheduleDTO selectEvent(@Param("companyId") Long companyId,
                             @Param("eventId") Long eventId);

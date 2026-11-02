@@ -102,7 +102,7 @@
     </div>
   </div>
 
-  <%-- 근태 기록: 이 화면을 연 뒤 찍은 것만, 최근 10건. 머리줄의 기록 보기로 연다 --%>
+  <%-- 근태 기록: 지금 단말기에 연결한 뒤 찍은 것만(키를 다시 넣으면 비운다), 최근 10건. 머리줄의 기록 보기로 연다 --%>
   <dialog class="modal sim-log-dialog" id="simLogDialog" aria-labelledby="simLogTitle">
     <div class="sim-log-head">
       <h2 id="simLogTitle">근태 기록</h2>

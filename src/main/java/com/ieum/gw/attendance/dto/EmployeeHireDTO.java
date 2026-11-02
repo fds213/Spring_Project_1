@@ -7,5 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class EmployeeHireDTO {
+    private Long employeeId;           // 있는 직원이면 항상 값이 있다 (입사일이 빈 직원을 '없는 직원'과 구분한다)
     private String hireDate;           // YYYY-MM-DD, 없으면 null
 }

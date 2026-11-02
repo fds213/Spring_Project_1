@@ -2,6 +2,7 @@ package com.ieum.gw.attendance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -210,6 +211,31 @@ class LeaveServiceTest {
         assertEquals(19, r.get("added"));
         assertEquals(404, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
                 () -> holiday.addPreset(CO, 2031)).getStatus());
+    }
+
+    @Test
+    @DisplayName("휴일 넣기: 휴일 관리 화면에서 볼 수 있는 2000~2100년만 받는다 (범위 밖은 넣으면 화면에서 못 지운다)")
+    void holidayYearRange() {
+        for (String outside : List.of("1999-12-31", "2101-01-01")) {
+            assertEquals(400, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
+                    () -> holiday.add(CO, outside, "범위 밖")).getStatus());
+        }
+        holiday.add(CO, "2000-01-01", "처음 해");
+        holiday.add(CO, "2100-12-31", "마지막 해");
+        assertEquals(1, ((List<?>) holiday.list(CO, 2000).get("items")).size());
+        assertEquals(1, ((List<?>) holiday.list(CO, 2100).get("items")).size());
+    }
+
+    @Test
+    @DisplayName("연차 화면: 입사일이 빈 직원과 없는 직원의 안내를 가른다")
+    void leavesWithoutHireDate() {
+        EmployeeHireDTO hireless = hire(null);
+        hireless.setEmployeeId(103L); // 실제 매퍼처럼 employee_id 만 차 있다 (LeaveMapper.xml selectEmployeeHire)
+        leaveMapper.hires.put(103L, hireless);
+        Map<String, Object> noHire = leave.leaves(CO, 103L);
+        assertNull(noHire.get("summary"));
+        assertEquals("NO_HIRE_DATE", noHire.get("reason"));
+        assertEquals("NO_EMPLOYEE", leave.leaves(CO, 999L).get("reason"));
     }
 
     private static EmployeeHireDTO hire(String date) {
