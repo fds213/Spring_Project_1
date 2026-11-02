@@ -61,8 +61,9 @@ public interface AttendanceMapper {
 
     int deleteHoliday(@Param("companyId") Long companyId, @Param("holidayId") Long holidayId);
 
-    // 근태·연차 관리: 업체 직원별 한 달 요약
-    List<AttendanceSummaryDTO> selectMonthSummary(@Param("companyId") Long companyId, @Param("month") String month);
+    // 근태·연차 관리: 업체 직원별 한 달 요약. lateAfter 보다 늦은 출근은 지각, earlyBefore 보다 이른 퇴근은 조퇴 (HH24:MI:SS)
+    List<AttendanceSummaryDTO> selectMonthSummary(@Param("companyId") Long companyId, @Param("month") String month,
+                                                  @Param("lateAfter") String lateAfter, @Param("earlyBefore") String earlyBefore);
 
     List<LeaveDayDTO> selectMonthLeaveDays(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("month") String month);
 
