@@ -1,10 +1,39 @@
 <%-- tag 파일(layout.tag, site.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
 <%@ tag pageEncoding="UTF-8" %>
-<%-- 홈페이지형 푸터. site.tag 가 include 한다 --%>
+<%--
+  홈페이지형 푸터. site.tag 가 include 한다.
+  이용약관·개인정보처리방침은 따로 주소를 두지 않고 이 푸터의 창(dialog)으로 연다(로그인 없이 여는 주소를 늘리지 않으려고).
+  버튼의 data-legal 값과 창의 id(legal-<값>)가 짝이고, 여닫기는 site.js 가 한다. 문서 내용은 legal-*.jspf.
+--%>
 <footer class="site-footer">
-  <div class="wrap">
+  <div class="wrap foot-wrap">
+    <div class="foot-top">
     <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word"></a>
-    <nav><a href="${ctx}/#features">기능</a><a href="${ctx}/#pricing">가격</a><a href="${ctx}/inquiry">문의</a></nav>
-    <span>© IEUM · 부트캠프 팀 프로젝트 시연용 서비스입니다. 실제 결제는 이루어지지 않습니다.</span>
+      <nav class="foot-links" aria-label="사이트 안내">
+        <a href="${ctx}/#intro">서비스 소개</a>
+        <a href="${ctx}/#features">기능</a>
+        <a href="${ctx}/#pricing">가격</a>
+        <a href="${ctx}/trial">무료 체험</a>
+        <a href="${ctx}/inquiry">도입 문의</a>
+        <%-- 그룹웨어는 설치한 앱으로 들어가므로 로그인 링크 대신 앱 설치(헤더의 다운로드와 같은 동작, install.js) --%>
+        <button type="button" class="foot-link-btn" data-download>앱 다운로드</button>
+      </nav>
+    </div>
+    <div class="foot-bottom">
+      <div class="foot-legal">
+        <button type="button" class="foot-legal-btn" data-legal="terms" aria-haspopup="dialog">이용약관</button>
+        <%-- 개인정보처리방침은 다른 안내와 구분해 굵게 보인다 --%>
+        <button type="button" class="foot-legal-btn is-strong" data-legal="privacy" aria-haspopup="dialog">개인정보처리방침</button>
+      </div>
+      <p class="foot-info">IEUM 그룹웨어 · 부트캠프 팀 프로젝트로 만든 시연용 서비스입니다. 실제 결제는 이루어지지 않습니다.</p>
+      <p class="foot-copy">© 2026 IEUM. 서비스 문의는 <a href="${ctx}/inquiry">도입 문의</a>로 받습니다.</p>
+    </div>
   </div>
+
+  <dialog class="legal-dialog" id="legal-terms" aria-labelledby="legalTermsTitle">
+    <%@ include file="/WEB-INF/views/common/legal-terms.jspf" %>
+  </dialog>
+  <dialog class="legal-dialog" id="legal-privacy" aria-labelledby="legalPrivacyTitle">
+    <%@ include file="/WEB-INF/views/common/legal-privacy.jspf" %>
+  </dialog>
 </footer>
