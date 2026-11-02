@@ -98,11 +98,11 @@
         <div class="wrap">
           <div class="section-head center">
             <h2>신청하면 바로 체험이 시작됩니다</h2>
-            <p class="lead">신청하고 이메일을 인증하면 우리 회사 그룹웨어가 열립니다. 직원 계정은 관리자나 부서장이 가입을 열어 둔 동안 요청을 받아 승인하면 바로 만들어집니다.</p>
+            <p class="lead">신청하면 바로 우리 회사 그룹웨어가 열립니다. 직원 계정은 관리자나 부서장이 가입을 열어 둔 동안 요청을 받아 승인하면 바로 만들어집니다.</p>
           </div>
           <ol class="flow">
             <li class="hl"><strong>무료 체험 신청</strong><span>업체 정보와 관리자 정보를 입력합니다. 결제는 없고, 관리자 포함 10명까지 써 볼 수 있습니다.</span></li>
-            <li><strong>업체 개설</strong><span>업체 코드와 관리자 계정이 바로 만들어지고, 이메일 인증을 마치면 로그인할 수 있습니다. 2주 체험은 신청한 날부터예요.</span></li>
+            <li><strong>업체 개설</strong><span>업체 코드와 관리자 계정이 바로 만들어지고, 곧바로 로그인할 수 있습니다. 2주 체험은 신청한 날부터예요.</span></li>
             <li><strong>직원 계정 만들기</strong><span>관리자가 가입을 열면 직원이 업체 코드로 계정 생성을 요청하고, 1시간 안에 승인하면 사번이 붙어 바로 로그인합니다.</span></li>
             <li><strong>2주 체험</strong><span>모든 직원이 모든 기능을 그대로 써 봅니다. 결제는 체험 중 언제든 할 수 있습니다.</span></li>
             <li><strong>결제하고 계속 이용</strong><span>그룹웨어 안에서 결제하면 그날부터 바로 유료로, 계정과 데이터 그대로 이어서 씁니다.</span></li>
@@ -156,7 +156,7 @@
         <div class="wrap">
           <div>
             <h2>지금 신청하면 2주 동안 무료입니다</h2>
-            <p>업체 정보와 관리자 계정을 입력하고 이메일만 인증하면 결제 없이 우리 회사 그룹웨어가 열립니다.</p>
+            <p>업체 정보와 관리자 계정만 입력하면 결제 없이 우리 회사 그룹웨어가 열립니다.</p>
             <div class="cta-actions">
               <a class="btn btn-primary btn-lg btn-arrow" href="${ctx}/trial">2주 무료 체험 시작하기</a>
               <a class="btn btn-lg btn-outline-light" href="${ctx}/inquiry">도입 문의</a>
