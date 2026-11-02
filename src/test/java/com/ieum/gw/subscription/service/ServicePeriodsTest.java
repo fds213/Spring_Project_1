@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -98,5 +99,39 @@ class ServicePeriodsTest {
     void seatLimit() {
         assertEquals(10, ServicePeriods.seatLimitOf(period(true, "2026-10-30T15:20", "2026-11-13T00:00", 3)));
         assertEquals(25, ServicePeriods.seatLimitOf(period(false, "2026-11-05T10:00", "2026-12-05T10:00", 25)));
+    }
+
+    @Test
+    @DisplayName("유료 만료는 승인일을 첫날로 달력 1개월 뒤 0시다: 11/2 승인 → 12/2 0시 만료, 마지막 날 12/1")
+    void paidEndsAt() {
+        LocalDateTime endsAt = ServicePeriods.paidEndsAt(LocalDate.of(2026, 11, 2), 1);
+
+        assertEquals(LocalDateTime.of(2026, 12, 2, 0, 0), endsAt);
+        assertEquals(LocalDate.of(2026, 12, 1), ServicePeriods.lastDay(endsAt));
+    }
+
+    @Test
+    @DisplayName("같은 날이 없는 달은 말일로 맞춘다: 1/31 → 2/28, 윤년 1/31 → 2/29, 연간 2/29 → 다음 해 2/28")
+    void paidEndsAtMonthEnd() {
+        assertEquals(LocalDateTime.of(2027, 2, 28, 0, 0), ServicePeriods.paidEndsAt(LocalDate.of(2027, 1, 31), 1));
+        assertEquals(LocalDateTime.of(2028, 2, 29, 0, 0), ServicePeriods.paidEndsAt(LocalDate.of(2028, 1, 31), 1));
+        assertEquals(LocalDateTime.of(2029, 2, 28, 0, 0), ServicePeriods.paidEndsAt(LocalDate.of(2028, 2, 29), 12));
+    }
+
+    @Test
+    @DisplayName("체험 중 결제하면 유료 기간이 체험 위에 겹치고, 유료로 본다")
+    void pickPaidOverTrial() {
+        LocalDateTime now = LocalDateTime.of(2026, 11, 5, 12, 0);
+        ServicePeriodDTO trial = new ServicePeriodDTO();
+        trial.setTrial(true);
+        trial.setStartsAt(LocalDateTime.of(2026, 11, 1, 9, 0));
+        trial.setEndsAt(LocalDateTime.of(2026, 11, 15, 0, 0));
+        ServicePeriodDTO paid = new ServicePeriodDTO();
+        paid.setStartsAt(LocalDateTime.of(2026, 11, 5, 10, 0));
+        paid.setEndsAt(ServicePeriods.paidEndsAt(LocalDate.of(2026, 11, 5), 1));
+
+        assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), now));
+        assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 4, 23, 59)));
+        assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 5, 0, 0)), "만료 뒤에도 마지막 기간은 유료");
     }
 }

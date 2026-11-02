@@ -18,6 +18,12 @@ public interface SubscriptionMapper {
 
     int insertTrialPeriod(ServicePeriodDTO dto);
 
+    int insertPaidPeriod(ServicePeriodDTO dto);
+
+    Long lockCompany(@Param("companyId") Long companyId);
+
+    CompanyDTO getCompany(@Param("companyId") Long companyId);
+
     List<ServicePeriodDTO> listPeriods(@Param("companyId") Long companyId);
 
     LocalDateTime getEmailVerifiedAt(@Param("companyId") Long companyId);
