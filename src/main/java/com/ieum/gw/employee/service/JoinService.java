@@ -1,21 +1,22 @@
 package com.ieum.gw.employee.service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;                                         
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;                                                  
+import java.util.Set;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;       
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.dao.JoinDAO;
-import com.ieum.gw.employee.dto.JoinOpenFormDTO;                       
+import com.ieum.gw.employee.dto.JoinCompanyDTO;
+import com.ieum.gw.employee.dto.JoinOpenFormDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.service.SubscriptionService;
@@ -153,6 +154,55 @@ public class JoinService {
             throw new AccessDeniedException("모두 끄기는 업체 관리자만 할 수 있습니다");
         }
         dao.closeAll(user.getCompanyId());
+    }
+    
+ // ---------- 계정 만들기 (로그인 없음) ----------
+
+    /**
+     * 업체 코드 확인 (GET /join/api/companies/{code}). 가입이 열린 부서와 직급 목록.
+     * 없는 업체·만료된 업체·열린 부서 없음은 구분하지 않고 null (화면에 같은 모습으로 보이게)
+     */
+    public Map<String, Object> checkCompany(String companyCode) {
+        // ① 코드 정리: 공백 빼고 소문자로
+        if (companyCode == null) {
+            return null;
+        }
+        String code = companyCode.trim().toLowerCase();
+
+        // ② 업체 찾기
+        JoinCompanyDTO company = dao.findCompanyByCode(code);
+        if (company == null) {
+            return null;
+        }
+        Long companyId = company.getCompanyId();
+
+        // ③ 이용 상태: 기간이 없거나(운영 업체) 끝났으면 받지 않음
+        CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
+        if (usage == null || usage.isExpired()) {
+            return null;
+        }
+
+        // ④ 이메일 인증 전 업체 거절 (준원님 요청: 인증 메일이 아직 없어 주석)
+        // TODO(ACC-06): 인증 메일이 붙으면 주석을 푼다
+        // if (!usage.isEmailVerified()) {
+        //     return null;
+        // }
+
+        // ⑤ 열린 부서 이름만 모으기
+        List<String> depts = new ArrayList<>();
+        for (JoinOpeningDTO o : dao.listOpenings(companyId)) {
+            depts.add(o.getDepartmentName());
+        }
+        if (depts.isEmpty()) {
+            return null;
+        }
+
+        // ⑥ 조립
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("companyName", company.getCompanyName());
+        result.put("depts", depts);
+        result.put("ranks", dao.listGradeNames(companyId));
+        return result;
     }
 
     //  ---------- 권한 ----------

@@ -75,6 +75,19 @@ public class EmployeeJoinController {
         joinService.closeAllJoin(loginUser);
         return Map.of("success", true);
     }
+    
+    /** 업체 코드 확인 (계정 만들기 화면, 로그인 없음). 열린 부서·직급 목록 */
+    @GetMapping("/join/api/companies/{code}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> checkCompany(@PathVariable String code) {
+        Map<String, Object> result = joinService.checkCompany(code);      // ① Service 부르기
+
+        if (result == null) {                                     // ② 받을 수 없는 업체
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "가입을 받을 수 없는 업체 코드입니다"));
+        }
+        return ResponseEntity.ok(Map.of("success", true, "data", result));   // ③ 성공
+    }
 
     // ---------- 오류 응답 ----------
 

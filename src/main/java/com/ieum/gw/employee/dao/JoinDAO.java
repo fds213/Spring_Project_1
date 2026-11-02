@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Repository;
 
+import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
 import com.ieum.gw.employee.mapper.JoinMapper;
 
@@ -59,5 +60,15 @@ public class JoinDAO {
     /** 모두 끄기 */
     public int closeAll(Long companyId) {
         return mapper.closeAll(companyId);
+    }
+    
+    /** 업체 코드로 업체 찾기 (계정 만들기 화면). 없으면 null */ 
+    public JoinCompanyDTO findCompanyByCode(String companyCode) {
+    	return mapper.findCompanyByCode(companyCode);
+    }
+    
+    /** 직급 목록 */
+    public List<String> listGradeNames(Long companyId){
+    	return mapper.listGradeNames(companyId);
     }
 }

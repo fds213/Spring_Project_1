@@ -81,5 +81,16 @@
         WHERE company_id = #{companyId}
           AND join_open_until IS NOT NULL
     </update>
+    
+    <!-- 업체 코드로 업체 찾기 (계정 만들기 화면) -->
+    <select id="findCompanyByCode" resultType="com.ieum.gw.employee.dto.JoinCompanyDTO">
+        SELECT company_id, company_name FROM company WHERE company_code = #{companyCode}
+    </select>
 
+    <!-- 직급 목록 (사용 중인 것만, 정렬 순서대로) -->
+    <select id="listGradeNames" resultType="string">
+        SELECT grade_name FROM job_grade
+        WHERE company_id = #{companyId} AND use_yn = 'Y'
+        ORDER BY sort_order, job_grade_id
+    </select>
 </mapper>

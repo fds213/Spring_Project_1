@@ -6,6 +6,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
 
 @Mapper
@@ -29,4 +30,8 @@ public interface JoinMapper {
 	int closeDept(@Param("companyId") Long companyId, @Param("deptName") String deptName);
 
 	int closeAll(@Param("companyId") Long companyId);
+	
+	JoinCompanyDTO findCompanyByCode(@Param("companyCode") String companyCode);
+	
+	List<String> listGradeNames(@Param("companyId") Long companyId);
 }
