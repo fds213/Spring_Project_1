@@ -150,15 +150,15 @@ function renderPager(navId, state, pages, reload) {
   nav.hidden = pages <= 1;
 }
 
-// 목록 한 줄의 제목 칸: 제목 링크 + 댓글 수 [3] + 첨부 + 수정됨
+// 목록 한 줄의 제목 칸: 제목 링크 + 댓글 수 [3] + 첨부 클립 (수정 여부는 글 보기의 수정 시각으로 본다)
 function titleCell(href, row, before) {
   const td = el('td', { 'data-label': '제목' });
   const wrap = el('span');
   if (before) wrap.append(before);
   wrap.append(el('a', { href, class: 'notice-link' }, row.title));
   if (row.commentCount) wrap.append(el('span', { class: 'comment-badge', 'aria-label': `댓글 ${row.commentCount}개` }, `[${row.commentCount}]`));
-  if (row.fileCount) wrap.append(el('span', { class: 'file-tag', 'aria-label': `첨부파일 ${row.fileCount}개` }, '첨부'));
-  if (row.updatedAt) wrap.append(el('span', { class: 'edited-tag' }, '수정됨'));
+  // 첨부가 있으면 회색 클립 아이콘 (모양은 board.css의 .file-tag)
+  if (row.fileCount) wrap.append(el('span', { class: 'file-tag', role: 'img', title: `첨부파일 ${row.fileCount}개`, 'aria-label': `첨부파일 ${row.fileCount}개` }));
   td.append(wrap);
   return td;
 }
@@ -354,22 +354,23 @@ function renderFilesBox(files, ids) {
   byId(ids.count).textContent = String(files.length);
   byId(ids.images).replaceChildren(...files.filter(isImage).map(f => {
     const b = el('button', { type: 'button', class: 'attach-thumb', 'aria-label': `${f.name} 크게 보기` });
-    const img = el('img', { src: f.url, alt: f.name, loading: 'lazy' });
+    const img = el('img', { src: pageHref(f.url), alt: f.name, loading: 'lazy' });
     b.append(img, el('span', {}, f.name));
     b.addEventListener('click', () => {
-      byId('imageDialogImg').src = f.url;
+      byId('imageDialogImg').src = pageHref(f.url);
       byId('imageDialogImg').alt = f.name;
-      byId('imageDialogDownload').href = f.url;
+      byId('imageDialogDownload').href = pageHref(f.url);
       byId('imageDialogDownload').setAttribute('download', f.name);
       confirmDialog('imageDialog');
     });
     return b;
   }));
+  // 파일 이름을 누르면 다운로드 (아이콘 + 이름 + 회색 크기)
   byId(ids.list).replaceChildren(...files.map(f => {
     const li = el('li');
-    li.append(el('span', { class: 'attach-name' }, f.name), el('small', {}, fmtSize(f.size)));
-    const a = el('a', { class: 'link-btn', href: f.url, download: f.name }, '내려받기');
-    li.append(a);
+    const a = el('a', { class: 'attach-link', href: pageHref(f.url), download: f.name, title: `${f.name} 다운로드` });
+    a.append(el('span', { class: 'attach-icon', 'aria-hidden': 'true' }), el('span', { class: 'attach-name' }, f.name)); // 문서 아이콘은 board.css
+    li.append(a, el('small', {}, fmtSize(f.size)));
     return li;
   }));
 }
@@ -475,7 +476,7 @@ byId('btnDelete')?.addEventListener('click', async () => {
 const SIZE_MIN = 10;
 const SIZE_MAX = 40;
 const SIZE_BASE = 15;
-const ZWSP = '​'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
+const ZWSP = '\u200B'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
 const SWATCH_RGB = new Map(['#1f1f1d', '#a32d2d', '#185fa5', '#2b6a2f', '#8a4b08'].map(c => {
   const h = c.slice(1);
   return [c, `rgb(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)})`];
@@ -651,7 +652,7 @@ function makeEditor(areaId) {
   area.addEventListener('drop', e => e.preventDefault());
 
   // 바깥에서 쓰는 것
-  ed.html = () => sanitizeHtml(area.innerHTML.replace(/​/g, '')); // 저장할 서식 글 (걸러진 것)
+  ed.html = () => sanitizeHtml(area.innerHTML.replace(/\u200B/g, '')); // 저장할 서식 글 (걸러진 것)
   ed.text = () => textOf(ed.html());                                    // 서식을 뺀 글자 (글자 수·빈칸 검사)
   ed.set = html => {
     area.innerHTML = html ? sanitizeHtml(html) : '';
@@ -669,7 +670,7 @@ document.addEventListener('selectionchange', () => editors.forEach(ed => ed.onSe
 
 // ---------- 공통: 첨부파일 (공지 · 부서 게시판) ----------
 // 글 하나에 5개까지, 파일당 10MB (AGENTS.md 파일 규칙. 서버가 다시 검사한다)
-// 고른 파일은 data URL로 읽어 두었다가 저장할 때 JSON으로 보낸다. 서버가 파일 받는 방식(FormData·multipart 등)을 정하면 그에 맞춘다
+// 고르는 즉시 서버에 올려(POST /board/api/files, multipart) 파일 번호를 받아 두고, 글을 저장할 때 번호만 보낸다
 const FILE_MAX = 5;
 const FILE_SIZE_MAX = 10 * 1024 * 1024;
 // 첨부할 수 있는 확장자 (팀에서 정한 목록, 서버도 같은 목록으로 막는다):
@@ -680,16 +681,16 @@ const fileSig = files => files.map(f => f.id).join(',');
 // 글쓰기 화면의 "파일 선택" 묶음. ids: { pick, input, info, list, error }
 function makeFilePicker(ids) {
   if (!byId(ids.pick)) return null; // 이 페이지에 없는 게시판
-  const fp = { files: [] };
+  const fp = { files: [], uploading: false };
   fp.render = () => {
     byId(ids.info).textContent = fp.files.length ? `${fp.files.length} / ${FILE_MAX}개` : '선택한 파일 없음';
-    byId(ids.pick).disabled = fp.files.length >= FILE_MAX;
+    byId(ids.pick).disabled = fp.uploading || fp.files.length >= FILE_MAX;
     byId(ids.list).replaceChildren(...fp.files.map(f => {
       const li = el('li');
-      if (isImage(f)) li.append(el('img', { src: f.url || f.data, alt: '', class: 'attach-mini' }));
+      if (isImage(f)) li.append(el('img', { src: f.preview || pageHref(f.url), alt: '', class: 'attach-mini' }));
       li.append(el('span', { class: 'attach-name' }, f.name), el('small', {}, fmtSize(f.size)));
-      const del = el('button', { type: 'button', class: 'link-btn' }, '빼기');
-      del.setAttribute('aria-label', `${f.name} 첨부 빼기`);
+      const del = el('button', { type: 'button', class: 'link-btn' }, '삭제');
+      del.setAttribute('aria-label', `${f.name} 첨부 삭제`);
       del.addEventListener('click', () => {
         fp.files = fp.files.filter(x => x.id !== f.id);
         byId(ids.error).textContent = '';
@@ -708,36 +709,44 @@ function makeFilePicker(ids) {
     e.target.value = ''; // 같은 파일을 다시 골라도 change가 오게
     byId(ids.error).textContent = '';
     const errors = [];
+    const ok = []; // 화면 검사를 통과한 파일만 서버에 올린다 (서버가 형식·크기를 다시 검사한다)
     for (const file of picked) {
-      if (fp.files.length >= FILE_MAX) { errors.push(`첨부파일은 ${FILE_MAX}개까지입니다`); break; }
+      if (fp.files.length + ok.length >= FILE_MAX) { errors.push(`첨부파일은 ${FILE_MAX}개까지입니다`); break; }
       if (!FILE_EXT.test(file.name)) { errors.push(`${file.name}: 이미지·문서 파일만 올릴 수 있습니다`); continue; }
       if (file.size > FILE_SIZE_MAX) {
         errors.push(`${file.name}: 파일당 ${fmtSize(FILE_SIZE_MAX)}까지 올릴 수 있어요`);
         continue;
       }
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      }).catch(() => null);
-      if (!data) { errors.push(`${file.name}: 파일을 읽지 못했습니다`); continue; }
-      fp.files.push({ id: `f${Date.now()}${Math.random().toString(36).slice(2, 6)}`, name: file.name, size: file.size, type: file.type, data });
+      ok.push(file);
     }
     if (errors.length) byId(ids.error).textContent = [...new Set(errors)].join(' / ');
-    fp.render();
+    if (!ok.length) { fp.render(); return; }
+
+    // 서버에 올리기: 이름 "files"로 여러 개를 한 번에. 성공하면 [{ id, name, size, type }]
+    const form = new FormData();
+    ok.forEach(file => form.append('files', file));
+    fp.uploading = true;
+    byId(ids.info).textContent = '올리는 중…';
+    byId(ids.pick).disabled = true;
+    $.ajax({ url: pageHref('/board/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
+      .done(saved => {
+        // 이미지 미리보기는 내 컴퓨터의 파일로 바로 보여 준다 (아직 글에 붙기 전이라 내려받기 주소가 없다)
+        saved.forEach((f, i) => fp.files.push({ ...f, preview: isImage(f) ? URL.createObjectURL(ok[i]) : null }));
+      })
+      .fail(xhr => { byId(ids.error).textContent = apiMessage(xhr, '파일을 올리지 못했습니다'); })
+      .always(() => { fp.uploading = false; fp.render(); });
   });
   return fp;
 }
 
-// 저장할 첨부파일: 이미 올라가 있던 파일은 { id }만, 새로 고른 파일은 내용(data URL)까지 보낸다
-// (서버가 multipart로 받기로 하면 새 파일을 FormData에 담아 보낸다)
-const filesToSend = files => files.map(f => (f.data ? { name: f.name, size: f.size, type: f.type, data: f.data } : { id: f.id }));
+// 저장할 첨부파일: 파일은 고를 때 이미 서버에 올라가 있으므로 번호(id)만 보낸다.
+// 목록에서 뺀 파일은 보내지 않으면 서버가 공지에서 뗀다
+const filesToSend = files => files.map(f => ({ id: f.id }));
 
 // 작성 화면 공통 도구
 function updateCount(input, counter, max) {
   // 에디터(서식 글)는 서식을 뺀 글자 수를 센다
-  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/​/g, '')).length : byId(input).value.length;
+  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/\u200B/g, '')).length : byId(input).value.length;
   byId(counter).textContent = `${len} / ${max}`;
   byId(counter).classList.toggle('is-full', len >= max);
 }
@@ -799,6 +808,7 @@ function fillForm(res) {
   formState.id = n ? n.id : null;
   formState.saving = false;
   byId('formTitle').textContent = n ? '공지 수정' : '공지 쓰기';
+  if (byId('formCrumb')) byId('formCrumb').textContent = n ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('fScope').value = n ? n.scope : res.scopes[0];
   byId('fTitle').value = n ? n.title : '';
   noticeEditor.set(n ? n.content : '');
@@ -839,6 +849,7 @@ byId('fScope')?.addEventListener('change', () => { byId('fPinnedError').textCont
 byId('noticeForm')?.addEventListener('submit', e => {
   e.preventDefault();
   if (formState.saving) return; // 두 번 눌러도 한 번만 저장
+  if (noticeFiles.uploading) { toast('파일을 올리는 중입니다. 잠시 뒤 저장해 주세요'); return; }
   clearErrors();
   const title = byId('fTitle').value.trim();
   const content = editorHtml();
@@ -1010,6 +1021,7 @@ function fillBoardForm(res) {
   boardFormState.id = p ? p.id : null;
   boardFormState.saving = false;
   byId('bFormTitle').textContent = p ? '글 수정' : '글쓰기';
+  if (byId('bFormCrumb')) byId('bFormCrumb').textContent = p ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('bFormSub').textContent = `${res.dept} 게시판에 올라갑니다. ${res.dept} 사람만 볼 수 있어요.`;
   byId('bTitle').value = p ? p.title : '';
   boardEditor.set(p ? p.content : '');
