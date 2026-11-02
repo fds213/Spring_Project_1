@@ -63,7 +63,7 @@
               <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M7 19.5c-1.2-2-1.8-4.4-1.8-7a6.8 6.8 0 0 1 13.6 0"/><path d="M9.6 20.5c-.9-2.2-1.4-4.8-1.4-8a3.8 3.8 0 0 1 7.6 0c0 1.4-.1 2.7-.3 4"/><path d="M12 12.5c0 3.2.5 5.9 1.6 8.3"/><path d="M4.6 8.5A8.8 8.8 0 0 1 12 3.7c2.4 0 4.6.9 6.2 2.5"/></svg></div>
               <span class="tag">근태·연차</span>
               <h3>지문 단말기로 출퇴근 자동 기록</h3>
-              <p>출입 지문 단말기의 기록을 받아 출근·퇴근, 지각·조퇴를 보여주고, 연차는 경력에 맞춰 자동으로 계산합니다. 지문 정보는 이음에 저장하지 않습니다.</p>
+              <p>출입 지문 단말기의 기록을 받아 출근·퇴근, 지각·조퇴를 보여주고, 연차 15일과 남은 일수는 휴가 결재와 함께 자동으로 계산합니다. 지문 정보는 이음에 저장하지 않습니다.</p>
             </div>
             <div class="feature tint-orange">
               <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6z"/></svg></div>
