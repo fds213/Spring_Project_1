@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import java.util.Map;
 
 /**
- * 상품 홈페이지(로그인 없이 여는 주소: '/'는 그 주소만, '/trial'은 하위 주소까지, security-context.xml).
+ * 상품 홈페이지(로그인 없이 여는 주소: '/'는 그 주소만, '/trial'·'/inquiry'는 하위 주소까지, security-context.xml).
  * 화면 JSP는 프론트가 만들었고, 화면 JS가 부르는 주소·요청·응답은 여기서 정한다(AGENTS.md '수정 범위').
  */
 @Controller
@@ -43,6 +43,12 @@ public class SiteController {
     @GetMapping("/trial")
     public String trial() {
         return "site/trial";
+    }
+
+    // 도입 문의 화면 (WEB-02)
+    @GetMapping("/inquiry")
+    public String inquiry() {
+        return "site/inquiry";
     }
 
     /**
