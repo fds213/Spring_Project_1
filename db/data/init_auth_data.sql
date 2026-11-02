@@ -1,6 +1,12 @@
+-- 2026-11-02: 신규 빈 DB용 전체 초기 자료. 기존 팀 DB에는 재실행하지 않는다.
+-- 기존 팀 DB에는 patches/11-02_01_SCHEMA_PATCH.sql → patches/11-02_02_DATA_PATCH.sql 순서를 사용한다.
+SET DEFINE OFF
+SET SERVEROUTPUT ON
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+
 -- =====================================================================
 -- 로그인·사원 초기 데이터 (시연·테스트용)
--- 실행: 팀 DB(ieum 계정). PK는 컬럼 기본값(SQ_*.NEXTVAL)으로 자동 생성
+-- 실행: 신규 빈 개발 DB의 ieum 계정. 기존 팀 DB에는 전체 재실행 금지. PK는 컬럼 기본값(SQ_*.NEXTVAL)으로 자동 생성
 -- 순서: COMPANY → DEPARTMENT·JOB_GRADE → EMPLOYEE → USER_ACCOUNT → 부서장 → 사번 카운터
 -- 비밀번호: 모두 1234 (BCrypt)
 -- 사번 규칙: 발급 연도 4자리 + 업체별 일련번호 4자리, 업체마다 0001부터 (요구분석서 ACC-03)
@@ -86,35 +92,43 @@ WHERE c.company_code = 'ieum0002';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'ops@ieum.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_OPS', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0000' AND e.employee_no = '20260001';  -- 이음운영자
+-- 이음운영자
+WHERE c.company_code = 'ieum0000' AND e.employee_no = '20260001';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'admin@ieum0001.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_ADMIN', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260001';  -- 강아지
+-- 강아지
+WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260001';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'hong@ieum0001.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_EMP', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260002';  -- 홍길동
+-- 홍길동
+WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260002';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'it@ieum0001.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_IT', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260003';  -- 아무개
+-- 아무개
+WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260003';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'hr@ieum0001.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_HR', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260004';  -- 고양이
+-- 고양이
+WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260004';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'koala@ieum0001.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_EMP', 'RETIRED', LOCALTIMESTAMP, LOCALTIMESTAMP, LOCALTIMESTAMP
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260005';  -- 코알라
+-- 코알라
+WHERE c.company_code = 'ieum0001' AND e.employee_no = '20260005';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'admin@ieum0002.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_ADMIN', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0002' AND e.employee_no = '20260001';  -- 다른회사관리자
+-- 다른회사관리자
+WHERE c.company_code = 'ieum0002' AND e.employee_no = '20260001';
 INSERT INTO user_account (company_id, employee_id, email, password_hash, role_code, status_code, email_verified_at, activated_at, deactivated_at)
 SELECT e.company_id, e.employee_id, 'hong@ieum0002.test', '$2a$10$/EgOc8YI8ovfzFdRPnYzoesPSCh.0z2cMh49WedJZttUw3BPFNRS2', 'ROLE_EMP', 'ACTIVE', LOCALTIMESTAMP, LOCALTIMESTAMP, NULL
 FROM employee e JOIN company c ON c.company_id = e.company_id
-WHERE c.company_code = 'ieum0002' AND e.employee_no = '20260002';  -- 다른회사홍길동
+-- 다른회사홍길동
+WHERE c.company_code = 'ieum0002' AND e.employee_no = '20260002';
 
 -- 6. 부서장 (사원이 생긴 뒤에 지정)
 UPDATE department d
@@ -138,7 +152,9 @@ SELECT company_id, 5 FROM company WHERE company_code = 'ieum0001';
 INSERT INTO employee_no_counter (company_id, last_serial)
 SELECT company_id, 2 FROM company WHERE company_code = 'ieum0002';
 
-COMMIT;
+-- 8. 월간 요금제·시험 기간·지점·자산·직원 근무 지점
+-- 이 파일과 IEUM_DEMO_SEED.sql을 같은 폴더에 둔다. SQL Developer F5 / SQL*Plus / SQLcl 스크립트 실행.
+@@IEUM_DEMO_SEED.sql
 
 -- 확인
 SELECT c.company_code, e.employee_no, e.employee_name, dp.department_name, g.grade_name,
@@ -149,3 +165,7 @@ JOIN employee   e  ON e.employee_id    = a.employee_id
 JOIN department dp ON dp.department_id = e.department_id
 JOIN job_grade  g  ON g.job_grade_id   = e.job_grade_id
 ORDER BY c.company_code, e.employee_no;
+
+-- 결과 확인 후 다음 문장 중 하나를 별도로 실행한다.
+-- COMMIT;
+-- ROLLBACK;
