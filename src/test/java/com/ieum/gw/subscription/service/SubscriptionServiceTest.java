@@ -34,7 +34,7 @@ class SubscriptionServiceTest {
 
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
 
-    /** 업체 코드 고유 제약과 (요청한) 이메일 고유 제약을 흉내 내는 가짜 DAO */
+    /** 업체 코드 고유 제약(UQ_02_01)과 이메일 고유 인덱스(UX_COMPANY_EMAIL)를 흉내 내는 가짜 DAO */
     static class FakeDAO extends SubscriptionDAO {
         final Set<String> usedCodes = new HashSet<>();
         final Set<String> usedEmails = new HashSet<>();

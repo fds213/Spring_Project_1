@@ -11,7 +11,8 @@
     </select>
 
     <!-- 체험 신청 업체 1행. 번호를 먼저 뽑아 dto.companyId에 넣고 INSERT.
-         업체 코드가 겹치면 고유 제약(UQ_02_01)에 걸린다: Service가 다른 코드로 다시 부른다 -->
+         업체 코드가 겹치면 고유 제약(UQ_02_01), 같은 이메일이면 고유 인덱스(UX_COMPANY_EMAIL)에 걸린다:
+         Service가 이메일이면 거절하고, 코드면 다른 코드로 다시 부른다 -->
     <insert id="insertCompany" parameterType="com.ieum.gw.subscription.dto.CompanyDTO">
         <selectKey keyProperty="companyId" resultType="long" order="BEFORE">
             SELECT SQ_COMPANY.NEXTVAL FROM dual
