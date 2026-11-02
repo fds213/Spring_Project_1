@@ -108,7 +108,7 @@ function renderDayPanel() {
       li.append(del);
     }
     return li;
-  }) : [schNode('li', 'muted', '이 날짜에는 일정이 없습니다')]));
+  }) : [schNode('li', 'empty-box', '이 날짜에는 일정이 없습니다')]));
 
   // 구분 선택지는 쓸 수 있는 것만 (서버가 정해 보낸다). 부서 일정은 내 부서 이름을 함께 보여 준다
   const scope = schEl('schScope');
@@ -132,7 +132,6 @@ function openAddDialog(dateKey) {
   if (!dlg.open) dlg.showModal();
   schEl('schTitle').focus();
 }
-schEl('schAdd').addEventListener('click', () => openAddDialog(schState.selected));
 schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
 schEl('schCancel').addEventListener('click', () => schEl('schDialog').close());
 
