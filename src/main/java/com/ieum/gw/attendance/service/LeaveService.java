@@ -194,19 +194,23 @@ public class LeaveService {
         LocalDate hire = LocalDate.parse(career.getHireDate());
         int prior = priorOf(career);
 
-        // 날짜순으로 주기를 잠근다 (같은 순서로 잠가야 두 승인이 서로 기다리다 멈추지 않는다)
+        // 날짜순으로 주기를 잠근다 (같은 순서로 잠가야 두 승인이 서로 기다리다 멈추지 않는다).
+        // 같은 주기에 든 날은 이미 잠근 행을 그대로 쓴다: 열흘 휴가라도 주기 하나면 잠그는 조회는 한 번
         List<LeaveDayDTO> sorted = new ArrayList<>(days);
         sorted.sort(Comparator.comparing(LeaveDayDTO::getLeaveDate));
         Map<Long, LeaveCycleDTO> cycles = new LinkedHashMap<>();
         Map<Long, List<LeaveDayDTO>> byCycle = new HashMap<>();
+        LeaveCycleDTO row = null;
         for (LeaveDayDTO d : sorted) {
-            LeaveCycleDTO row = lockCycle(companyId, employeeId, hire, prior, d.getLeaveDate());
-            cycles.putIfAbsent(row.getLeaveCycleId(), row);
+            if (row == null || !contains(row, d.getLeaveDate())) {
+                row = lockCycle(companyId, employeeId, hire, prior, d.getLeaveDate());
+                cycles.putIfAbsent(row.getLeaveCycleId(), row);
+            }
             byCycle.computeIfAbsent(row.getLeaveCycleId(), k -> new ArrayList<>()).add(d);
         }
         for (Map.Entry<Long, LeaveCycleDTO> e : cycles.entrySet()) {
-            LeaveCycleDTO row = e.getValue();
-            BigDecimal left = row.getGrantedDays().add(dao.selectLedgerSum(companyId, row.getLeaveCycleId()));
+            LeaveCycleDTO cycle = e.getValue();
+            BigDecimal left = cycle.getGrantedDays().add(dao.selectLedgerSum(companyId, cycle.getLeaveCycleId()));
             BigDecimal need = byCycle.get(e.getKey()).stream().map(LeaveService::deductOf).reduce(BigDecimal.ZERO, BigDecimal::add);
             if (left.compareTo(need) < 0) {
                 throw new IllegalStateException("남은 연차가 모자랍니다 (남은 " + plain(left) + "일, 신청 " + plain(need) + "일)");
@@ -331,6 +335,11 @@ public class LeaveService {
     }
 
     // ===== 도구 =====
+
+    /** 그 날이 주기 [시작일, 끝나는 날) 안에 드는지 */
+    private static boolean contains(LeaveCycleDTO row, LocalDate day) {
+        return !day.isBefore(LocalDate.parse(row.getStartsOn())) && day.isBefore(LocalDate.parse(row.getEndsOn()));
+    }
 
     /** 휴가 구분이 차지하는 시간대. 종일 = 오전·오후 */
     static List<String> slotsOf(String leaveType) {

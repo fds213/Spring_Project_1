@@ -85,10 +85,6 @@ public class AttendanceDAO {
         return mapper.selectTodayTimes(companyId, employeeId);
     }
 
-    public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) {
-        return mapper.selectMonthHolidays(companyId, month);
-    }
-
     public List<HolidayDTO> selectHolidays(Long companyId, String from, String to) {
         return mapper.selectHolidays(companyId, from, to);
     }

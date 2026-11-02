@@ -142,6 +142,33 @@ class LeaveServiceTest {
     }
 
     @Test
+    @DisplayName("주기 경계를 넘는 휴가: 날마다 그 날의 주기에서 차감하고, 주기마다 행을 하나씩 만든다")
+    void acrossCycles() {
+        // 사원 102의 주기는 3월 4일에 바뀐다: 3/3(수)은 2026 주기(17일), 3/4(목)·3/5(금)은 2027 주기(17일, 경력 84개월 = 7년)
+        leave.useLeave(CO, EMP, ACTOR, List.of(day("2027-03-03", "LV_FULL", 1), day("2027-03-04", "LV_FULL", 2), day("2027-03-05", "LV_FULL", 3)));
+        assertEquals(2, leaveMapper.cycles.size());
+        LeaveCycleDTO next = leaveMapper.cycles.stream().filter(c -> c.getStartsOn().equals("2027-03-04")).findFirst().orElseThrow();
+        assertEquals(BigDecimal.valueOf(17), next.getGrantedDays()); // 경력 84개월 = 7년 → 15 + 2
+        assertEquals(new BigDecimal("-2"), leaveMapper.selectLedgerSum(CO, next.getLeaveCycleId()));
+        assertEquals(BigDecimal.valueOf(16), leave.getRemainingLeaveDays(CO, EMP)); // 오늘 주기는 하루만 썼다
+    }
+
+    @Test
+    @DisplayName("근태·연차 관리의 남은 연차: 저장된 주기는 부여+사용 합, 없으면 계산식, 입사일이 없으면 비운다")
+    void remainingOf() {
+        LeaveCycleDTO saved = new LeaveCycleDTO();
+        saved.setStartsOn("2026-03-04");
+        saved.setEndsOn("2027-03-04");
+        saved.setCareerMonths(72);
+        saved.setGrantedDays(BigDecimal.valueOf(17));
+        saved.setLedgerDays(new BigDecimal("-2.5"));
+        LocalDate today = LocalDate.of(2026, 10, 30);
+        assertEquals(new BigDecimal("14.5"), LeaveService.remainingOf(saved, "2024-03-04", 48, today));
+        assertEquals(BigDecimal.valueOf(17), LeaveService.remainingOf(null, "2024-03-04", 48, today));
+        assertEquals(null, LeaveService.remainingOf(null, null, 0, today));
+    }
+
+    @Test
     @DisplayName("결재가 저장하기 전의 날짜(행 ID 없음)는 차감하지 않는다")
     void needsSavedDays() {
         LeaveDayDTO unsaved = day("2026-11-03", "LV_FULL", 1);

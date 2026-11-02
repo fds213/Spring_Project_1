@@ -52,8 +52,6 @@ public interface AttendanceMapper {
 
     TodayAttendanceDTO selectTodayTimes(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
-    List<HolidayDTO> selectMonthHolidays(@Param("companyId") Long companyId, @Param("month") String month);
-
     // 휴일 (from·to 는 YYYY-MM-DD, 둘 다 포함)
     List<HolidayDTO> selectHolidays(@Param("companyId") Long companyId, @Param("from") String from, @Param("to") String to);
 

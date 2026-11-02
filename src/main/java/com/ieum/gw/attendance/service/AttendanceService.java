@@ -162,7 +162,8 @@ public class AttendanceService {
             byDate.put(a.getWorkDate(), a);
         }
         Map<String, String> holidays = new HashMap<>();
-        for (HolidayDTO h : dao.selectMonthHolidays(companyId, month)) {
+        LocalDate first = LocalDate.parse(month + "-01");
+        for (HolidayDTO h : dao.selectHolidays(companyId, first.toString(), first.withDayOfMonth(first.lengthOfMonth()).toString())) {
             holidays.put(h.getHolidayDate().toString(), h.getHolidayName());
         }
         // 최종 승인된 휴가: 오전·오후 반차가 같은 날 둘 다 있으면 종일로 본다
@@ -187,7 +188,6 @@ public class AttendanceService {
         }
 
         List<Map<String, Object>> days = new ArrayList<>();
-        LocalDate first = LocalDate.parse(month + "-01");
         for (LocalDate d = first; d.getMonthValue() == first.getMonthValue(); d = d.plusDays(1)) {
             String date = d.toString();
             Map<String, Object> day = new LinkedHashMap<>();
@@ -362,10 +362,9 @@ public class AttendanceService {
         for (AttendanceSummaryDTO a : dao.selectMonthSummary(companyId, month)) {
             boolean isServing = "ST_SERVING".equals(a.getEmploymentStatus());
             if (isServing) serving++;
-            if (a.getTodayIn() != null) {
-                punched++;
-                if ("LATE".equals(inStatus(a.getTodayIn()))) lateToday++;
-            }
+            boolean late = a.getTodayIn() != null && "LATE".equals(inStatus(a.getTodayIn()));
+            if (a.getTodayIn() != null) punched++;
+            if (late) lateToday++;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("employeeId", a.getEmployeeId());
             m.put("employeeNo", a.getEmployeeNo());
@@ -375,12 +374,13 @@ public class AttendanceService {
             m.put("deviceNo", a.getDeviceUserNo() == null ? "" : a.getDeviceUserNo());
             m.put("todayIn", a.getTodayIn() == null ? "" : hhmm(a.getTodayIn()));
             m.put("todayOut", a.getTodayOut() == null ? "" : hhmm(a.getTodayOut()));
-            m.put("todayLate", a.getTodayIn() != null && "LATE".equals(inStatus(a.getTodayIn())));
+            m.put("todayLate", late);
             m.put("todayEarly", a.getTodayOut() != null && "EARLY_LEAVE".equals(outStatus(a.getTodayOut())));
             m.put("workDays", a.getWorkDays());
             m.put("late", a.getLateDays());
             m.put("early", a.getEarlyDays());
-            m.put("leaveLeft", LeaveService.remainingOf(cycles.get(a.getEmployeeId()), a.getHireDate(), a.getPriorCareerMonths(), today));
+            // 남은 연차는 재직 중인 사람만 (퇴사자에게는 의미가 없다)
+            m.put("leaveLeft", isServing ? LeaveService.remainingOf(cycles.get(a.getEmployeeId()), a.getHireDate(), a.getPriorCareerMonths(), today) : null);
             items.add(m);
         }
         Map<String, Object> counts = new LinkedHashMap<>();

@@ -302,8 +302,6 @@ class AttendanceServiceTest {
             return today.containsKey(employeeId) ? List.of(today.get(employeeId)) : List.of();
         }
 
-        @Override public List<HolidayDTO> selectMonthHolidays(Long companyId, String month) { return List.of(); }
-
         // 휴일: 날짜 → 이름
         final java.util.TreeMap<LocalDate, String> holidays = new java.util.TreeMap<>();
 

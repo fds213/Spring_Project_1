@@ -149,14 +149,6 @@
 		  AND work_date = TRUNC(<include refid="now"/>)
 	</select>
 
-	<select id="selectMonthHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
-		SELECT holiday_date, holiday_name
-		FROM holiday
-		WHERE company_id = #{companyId}
-		  AND holiday_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
-		  AND holiday_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
-	</select>
-
 	<!-- ===== 휴일 (업체마다. 휴가 날짜 계산과 달력이 쓴다) ===== -->
 
 	<select id="selectHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
