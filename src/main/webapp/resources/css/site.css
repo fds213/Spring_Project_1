@@ -454,7 +454,8 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 .site-footer .foot-wrap { display: block; }
 .foot-top { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; padding-bottom: 22px; border-bottom: 1px solid var(--line); }
 .foot-links { display: flex; flex-wrap: wrap; gap: 8px 20px; }
-.foot-links a:hover { color: var(--ink); }
+.foot-links a:hover, .foot-link-btn:hover { color: var(--ink); }
+.foot-link-btn { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
 .foot-bottom { display: grid; gap: 8px; padding-top: 20px; }
 .foot-legal { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .foot-legal-btn { padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--text-sub); cursor: pointer; }

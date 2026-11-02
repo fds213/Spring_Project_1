@@ -15,7 +15,8 @@
         <a href="${ctx}/#pricing">가격</a>
         <a href="${ctx}/trial">무료 체험</a>
         <a href="${ctx}/inquiry">도입 문의</a>
-        <a href="${ctx}/login">로그인</a>
+        <%-- 그룹웨어는 설치한 앱으로 들어가므로 로그인 링크 대신 앱 설치(헤더의 다운로드와 같은 동작, install.js) --%>
+        <button type="button" class="foot-link-btn" data-download>앱 다운로드</button>
       </nav>
     </div>
     <div class="foot-bottom">
