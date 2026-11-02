@@ -133,9 +133,21 @@ function setLeaving(v) {
 }
 
 // 페이지 번호 (공지·게시판 같이 씀): state.page를 바꾸고 reload로 그 페이지를 다시 받는다
-// 페이지 번호는 util.js 의 pagerOf (티켓 처리·자산 관리와 같은 모양)
 function renderPager(navId, state, pages, reload) {
-  pagerOf(byId(navId), state.page, pages, p => { state.page = p; reload(); });
+  const nav = byId(navId);
+  const btn = (label, page, opts = {}) => {
+    const b = el('button', { type: 'button' }, label);
+    if (opts.aria) b.setAttribute('aria-label', opts.aria);
+    if (page === state.page && opts.current) b.setAttribute('aria-current', 'page');
+    b.disabled = !!opts.disabled;
+    b.addEventListener('click', () => { state.page = page; reload(); document.querySelector('.content').scrollTop = 0; });
+    return b;
+  };
+  const items = [btn('이전', state.page - 1, { disabled: state.page === 1, aria: '이전 페이지' })];
+  for (let p = 1; p <= pages; p++) items.push(btn(String(p), p, { current: true, aria: `${p}페이지` }));
+  items.push(btn('다음', state.page + 1, { disabled: state.page === pages, aria: '다음 페이지' }));
+  nav.replaceChildren(...items);
+  nav.hidden = pages <= 1;
 }
 
 // 목록 한 줄의 제목 칸: 제목 링크 + 댓글 수 [3] + 첨부 클립 (수정 여부는 글 보기의 수정 시각으로 본다)

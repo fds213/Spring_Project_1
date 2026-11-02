@@ -89,39 +89,6 @@ function pickSelect(label, first, options, selected) {
 // 이력·댓글 목록 (bill-history). rows 는 한 줄에 넣을 요소(또는 그 목록)
 const historyList = (rows, emptyText) =>
   h('ul', 'bill-history', ...(rows.length ? rows.map(r => h('li', '', ...[].concat(r))) : [h('li', '', span(emptyText, 'muted'))]));
-// 페이지 번호 (nav.pager). 지금 페이지 앞뒤 두 쪽만 번호로 보이고, 누르면 go(쪽)를 부르고 화면을 맨 위로 올린다
-function pagerOf(nav, page, pages, go) {
-  const btn = (label, p, aria, disabled) => {
-    const b = h('button', '', label);
-    b.type = 'button';
-    b.setAttribute('aria-label', aria);
-    b.disabled = !!disabled;
-    b.addEventListener('click', () => {
-      go(p);
-      const box = document.querySelector('.content'); // 그룹웨어는 본문 칸이 스크롤된다
-      if (box) box.scrollTop = 0;
-      window.scrollTo(0, 0);
-    });
-    return b;
-  };
-  const items = [btn('이전', page - 1, '이전 페이지', page <= 1)];
-  for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) {
-    const b = btn(String(p), p, `${p}페이지`);
-    if (p === page) b.setAttribute('aria-current', 'page');
-    items.push(b);
-  }
-  items.push(btn('다음', page + 1, '다음 페이지', page >= pages));
-  nav.replaceChildren(...items);
-  nav.hidden = pages <= 1;
-}
-// 받은 쪽이 비었는데 지금 쪽이 마지막 쪽보다 뒤면(마지막 쪽의 남은 건을 처리했을 때) 마지막 쪽을 다시 받는다. 다시 받으면 true
-function pageOverflow(state, r, reload) {
-  const pages = r.pages || 1;
-  if ((r.items || []).length || state.page <= pages) return false;
-  state.page = pages;
-  reload();
-  return true;
-}
 
 // el(태그, { 속성 }, 글자)
 function el(tag, attrs = {}, text) {

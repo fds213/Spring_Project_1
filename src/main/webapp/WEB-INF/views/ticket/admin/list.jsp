@@ -16,7 +16,7 @@
   <jsp:body>
     <section class="view on" id="view-ticket-admin">
       <div class="page-head"><h1>티켓 처리</h1></div>
-      <p class="muted join-scope">IT 담당자는 미배정 티켓을 자신에게 배정해 처리하고, 업체 관리자는 담당자를 지정하거나 바꿉니다. 처리 완료한 티켓은 요청자가 내 티켓에서 확인하면 종료되고, 다시 요청하면 처리 중으로 돌아옵니다.</p>
+      <p class="muted join-scope">IT 담당자는 미배정 티켓을 자신에게 배정해 처리하고, 업체 관리자는 담당자를 지정하거나 바꿉니다. 처리 완료한 티켓은 요청자가 내 티켓에서 확인하면 종료됩니다.</p>
 
       <%-- 카드를 누르면 아래 목록이 그 조건으로 걸러진다 --%>
       <div class="cards" id="taFilters">
@@ -27,24 +27,12 @@
         <button type="button" class="card card-filter" data-filter="ALL" aria-pressed="false"><small>전체</small><strong id="taCntALL">-</strong></button>
       </div>
 
-      <form class="search-row" id="taSearchForm" role="search">
-        <select class="input ta-type" id="taType" aria-label="구분">
-          <option value="">전체 구분</option>
-          <option value="INCIDENT">장애</option>
-          <option value="INQUIRY">문의</option>
-          <option value="EQUIPMENT">장비 지급</option>
-        </select>
-        <input type="search" class="search-input" id="taSearch" placeholder="번호·제목·요청자로 검색" aria-label="티켓 검색" autocomplete="off">
-        <button type="submit" class="btn">검색</button>
-      </form>
-
-      <section class="info-card">
+      <section class="info-card table-gap">
         <div class="table-wrap"><table class="table">
           <thead><tr><th>번호</th><th>구분</th><th>제목</th><th>요청자</th><th>접수 지점</th><th>담당자</th><th>상태</th><th>접수일</th></tr></thead>
           <tbody id="taList"></tbody>
         </table></div>
       </section>
-      <nav class="pager" id="taPager" aria-label="티켓 목록 페이지" hidden></nav>
     </section>
   </jsp:body>
 </ui:layout>

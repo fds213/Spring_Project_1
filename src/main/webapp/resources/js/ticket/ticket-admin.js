@@ -2,7 +2,8 @@
 // 상태: 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인, 내 티켓 화면), 그 밖에 취소·반려. 누를 수 있는 버튼은 서버가 준 actions 로 정한다.
 // 상태를 바꾸는 요청에는 받은 version 을 같이 보낸다. 그사이 다른 사람이 바꿨으면 서버가 409 로 거절하고 화면은 새로 받는다.
 // 주소·값 이름은 화면이 먼저 정한 제안이다(ticket 모듈 담당이 정하면 그에 맞춘다, AGENTS.md '수정 범위').
-// util.js 의 h, span, inqCell, titleBtn, dataRow, detailTr, emptyTr, dlOf, cardOf, writeBtn, textBox, pickSelect, historyList, pagerOf 를 쓴다.
+// 요청서 범위만 둔다: 상태 카드로 거르는 목록, 배정, 처리 시작, 처리 완료(장비 지급 건은 재고 지급), 반려, 댓글. 검색·페이지 번호는 없다.
+// util.js 의 h, span, inqCell, titleBtn, dataRow, detailTr, emptyTr, dlOf, cardOf, writeBtn, textBox, pickSelect, historyList 를 쓴다.
 (() => {
   const TYPE = { INCIDENT: '장애', INQUIRY: '문의', EQUIPMENT: '장비 지급' };
   const STATUS = { RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려' };
@@ -16,7 +17,7 @@
   const COMMENT_MAX = 300;
   const COLS = 8;
   const $ = id => document.getElementById(id);
-  const state = { filter: 'UNASSIGNED', type: '', q: '', page: 1, open: null, detail: null, seq: 0, last: null };
+  const state = { filter: 'UNASSIGNED', open: null, detail: null, seq: 0, last: null };
 
   function openTicketAdmin() { load(); }
   window.openTicketAdmin = openTicketAdmin;
@@ -24,8 +25,8 @@
   // ---------- 목록 ----------
   function load() {
     const my = ++state.seq;
-    api.get('/ticket/admin/api/tickets', { filter: state.filter, type: state.type, q: state.q, page: state.page })
-      .done(r => { if (my === state.seq && !pageOverflow(state, r, load)) render(r); }) // 조건을 빨리 바꾸면 늦게 온 앞 응답은 버린다
+    api.get('/ticket/admin/api/tickets', { filter: state.filter })
+      .done(r => { if (my === state.seq) render(r); }) // 카드를 빨리 바꾸면 늦게 온 앞 응답은 버린다
       .fail(xhr => showToast(apiMessage(xhr, '티켓 목록을 불러오지 못했습니다')));
   }
 
@@ -55,21 +56,14 @@
         inqCell('접수일', span(whenFull(t.at))));
       return isOpen ? [tr, detailTr(COLS, d && d.id === t.id ? detailView(d) : span('불러오는 중…', 'muted'))] : [tr];
     });
-    $('taList').replaceChildren(...(rows.length ? rows : [emptyTr(COLS, state.q || state.type ? '찾는 티켓이 없습니다' : EMPTY[state.filter])]));
-    pagerOf($('taPager'), r.page || 1, r.pages || 1, p => { state.page = p; state.open = null; load(); });
+    $('taList').replaceChildren(...(rows.length ? rows : [emptyTr(COLS, EMPTY[state.filter])]));
   }
 
-  // 조건을 바꾸면 첫 쪽부터, 열린 상세는 닫는다
-  function search(change) {
-    Object.assign(state, change, { page: 1, open: null });
+  // 카드를 누르면 그 조건으로 다시 받고, 열린 상세는 닫는다
+  document.querySelectorAll('#taFilters .card-filter').forEach(b => b.addEventListener('click', () => {
+    Object.assign(state, { filter: b.dataset.filter, open: null });
     load();
-  }
-  document.querySelectorAll('#taFilters .card-filter').forEach(b => b.addEventListener('click', () => search({ filter: b.dataset.filter })));
-  $('taSearchForm').addEventListener('submit', e => {
-    e.preventDefault();
-    search({ type: $('taType').value, q: $('taSearch').value.trim() });
-  });
-  $('taType').addEventListener('change', () => $('taSearchForm').requestSubmit());
+  }));
 
   // ---------- 상세 ----------
   function toggle(id) {
@@ -130,7 +124,10 @@
     }
     if (row.childElementCount) blocks.push(h('div', 'inq-body', row));
 
-    if (a.resolve) {
+    if (a.resolve && d.type === 'EQUIPMENT' && !(d.stock || []).length) {
+      // 장비 지급 건인데 재고가 없으면 처리 완료할 수 없다: 사유를 댓글로 남기고 처리 중으로 둔다(요청서)
+      blocks.push(h('div', 'inq-body', h('p', 'muted','지급할 재고 장비가 없습니다. 아래 댓글로 사유를 남기고 처리 중으로 둡니다. 재고가 들어오면 이어서 처리 완료합니다.')));
+    } else if (a.resolve) {
       // 처리 완료: 해결 결과는 꼭 적는다. 장비 지급 건은 지급할 재고 장비를 고른다
       const result = textBox(`해결 결과 (${RESULT_MAX}자까지, 요청자에게 보입니다)`, RESULT_MAX, '해결 결과');
       const stock = d.type === 'EQUIPMENT'
