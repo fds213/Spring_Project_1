@@ -1,14 +1,8 @@
 // 알림 목록 (views/notification/list.jsp). 모든 직원 (요구분석서 3.4 업무 알림, 통합 계획서 4장 업무 알림).
 // 본인 알림만 본다. 누르면 읽음으로 바꾸고 그 화면(link)으로 간다. 메뉴 배지(종 아이콘의 숫자)는 common.js 가 /badges 로 다시 센다.
 // 읽음 저장도 쓰기라서 이용 기간이 끝난 업체(body.is-readonly)에서는 저장하지 않고 화면만 연다.
-//
-// 서버 API (화면이 먼저 정한 제안. notification 모듈 담당이 정하면 그에 맞춘다):
-//   GET  /notification/api/notifications?filter=ALL|UNREAD&page=
-//        → { page, pages, unread, items: [{ id, type, title, body, link, read, at }] }
-//        type: APPROVAL_REQUEST(결재 요청) | APPROVAL_RESULT(결재 결과) | TICKET_ASSIGNED(티켓 배정) | TICKET_RESULT(티켓 처리 결과)
-//        link: 누르면 갈 화면 주소(컨텍스트 경로 뒤, 예: /approval/list). 없으면 읽음만 바꾼다
-//   POST /notification/api/notifications/{id}/read
-//   POST /notification/api/notifications/read-all
+// 홈의 최근 알림(home.js)도 누르면 같은 주소로 읽음을 저장한다.
+// 주소·값 이름은 화면이 먼저 정한 제안이다(notification 모듈 담당이 정하면 그에 맞춘다, AGENTS.md '수정 범위').
 // util.js 의 h, span, whenFull, showToast 를 쓴다.
 (() => {
   const TYPE = {
@@ -26,6 +20,8 @@
   const $ = id => document.getElementById(id);
   const state = { filter: 'ALL', page: 1, pages: 1, items: [], seq: 0 };
   const readOnly = () => document.body.classList.contains('is-readonly');
+  // 이 사이트 안의 화면 주소만 따라간다('/'로 시작하고 '//'·'/\'가 아닌 것: 브라우저는 둘 다 다른 사이트로 읽는다). 그 밖의 값이면 읽음만 바꾼다
+  const safeLink = link => (typeof link === 'string' && /^\/(?![/\\])/.test(link) ? link : null);
 
   function openNotificationView() { load(true); }
   window.openNotificationView = openNotificationView;
@@ -39,7 +35,9 @@
         if (my !== state.seq) return;
         state.page = r.page || page;
         state.pages = r.pages || 1;
-        state.items = first ? (r.items || []) : state.items.concat(r.items || []);
+        // 더 보기 사이에 새 알림이 오면 쪽이 밀려 같은 알림이 다시 올 수 있어 이미 보인 것은 뺀다
+        const seen = new Set(first ? [] : state.items.map(n => n.id));
+        state.items = (first ? [] : state.items).concat((r.items || []).filter(n => !seen.has(n.id)));
         $('notiUnread').textContent = r.unread || 0;
         render();
       })
@@ -75,14 +73,15 @@
 
   // 누르면: 안 읽었으면 읽음으로 바꾸고(읽기 전용 업체는 건너뜀), 갈 화면이 있으면 그리로
   function open(n) {
-    const go = () => { if (n.link) location.href = ctx + n.link; };
+    const link = safeLink(n.link);
+    const go = () => { if (link) location.href = ctx + link; };
     if (n.read || readOnly()) { go(); return; }
     api.post(`/notification/api/notifications/${encodeURIComponent(n.id)}/read`)
       .done(() => {
         n.read = true;
         $('notiUnread').textContent = Math.max(0, Number($('notiUnread').textContent) - 1);
         if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
-        if (n.link) go(); else render();
+        if (link) go(); else render();
       })
       .fail(xhr => { showToast(apiMessage(xhr, '읽음으로 바꾸지 못했습니다')); go(); });
   }

@@ -33,6 +33,7 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/asset/mine` | `asset/mine` |
 | `/attendance/my` | `attendance/my` |
 | `/schedule/calendar` | `schedule/calendar` |
+| `/notification/list` | `notification/list` (헤더의 종 아이콘) |
 | `/employee/admin/list` | `employee/admin/list` |
 | `/employee/join` | `employee/join` |
 | `/employee/admin/dept` | `employee/admin/dept` |
