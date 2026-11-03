@@ -33,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 public class NoticeService {
 
     private static final int PAGE_SIZE = 10; // 한 페이지에 10개
+    private static final int RECENT_MAX = 10; // 메인 화면 최신 공지는 많아도 10개까지
     private static final int TITLE_MAX = 100;    // 제목 글자 수 (board.js와 같게)
     private static final int CONTENT_MAX = 2000; // 내용 글자 수: 서식을 뺀 글자 기준 (board.js와 같게)
     private static final int CONTENT_HTML_MAX = 100000; // 서식까지 포함한 길이 상한 (터무니없이 큰 요청 막기)
@@ -78,6 +79,19 @@ public class NoticeService {
         result.put("myDept", "부서");                       // 부서 공지가 생기면 실제 부서 이름으로
         result.put("perms", perms);
         return result;
+    }
+
+    /**
+     * 메인 화면 '공지사항' 칸에 보일 최신 공지 (홈 담당이 부른다).
+     * 공지 목록 화면과 같은 조건(우리 업체·지우지 않은 공지)으로 최신 글부터 limit개.
+     * 쓰는 값: id(글 번호 → /board/notice/view/{id}), title, createdAt, writerName, writerDept, commentCount
+     */
+    public List<NoticeDTO> getRecentNotices(Long companyId, int limit) {
+        if (companyId == null) {
+            throw new IllegalArgumentException("업체 ID가 비어 있습니다");
+        }
+        int size = Math.min(Math.max(1, limit), RECENT_MAX); // 1 ~ 10개 사이로 맞춘다
+        return dao.selectNoticeList(companyId, new ArrayList<>(), 0, size);
     }
 
     // ---------- 글 보기 ----------
