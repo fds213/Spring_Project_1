@@ -2,7 +2,10 @@ package com.ieum.gw.approval.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,8 +19,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ieum.gw.approval.dao.ApprovalDAO;
+import com.ieum.gw.approval.dto.ApprovalDocumentDTO;
+import com.ieum.gw.approval.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.approval.dto.ApprovalFieldsDTO;
+import com.ieum.gw.approval.dto.ApprovalHistoryDTO;
+import com.ieum.gw.approval.dto.ApprovalLeaveDTO;
+import com.ieum.gw.approval.dto.ApprovalStepDTO;
 import com.ieum.gw.approval.dto.ApprovalSubmitDTO;
+import com.ieum.gw.approval.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.approval.dto.ApproverDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.service.AttendanceService;
@@ -25,6 +34,8 @@ import com.ieum.gw.common.dto.AuthEmpDTO;
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.service.EmployeeService;
+import com.ieum.gw.location.dto.BranchDTO;
+import com.ieum.gw.location.service.BranchService;
 
 class ApprovalServiceTest {
 
@@ -86,15 +97,76 @@ class ApprovalServiceTest {
         }
     }
 
-    /** 결재 중 휴가 일수·날짜를 정해 두고, 받은 기간을 적어 두는 가짜 DAO */
+    /** 결재 중 휴가 일수·날짜를 정해 두고, 받은 기간과 저장한 행을 적어 두는 가짜 DAO */
     static class FakeDao extends ApprovalDAO {
+        static final Long NEW_DOCUMENT_ID = 5000L;
+
         BigDecimal pendingSum = BigDecimal.ZERO;
         List<LeaveDayDTO> pendingDays = List.of();
         String fromDate;
         String toDate;
 
+        ApprovalDocumentDTO document;
+        final List<ApprovalStepDTO> steps = new ArrayList<>();
+        ApprovalHistoryDTO history;
+        ApprovalLeaveDTO leave;
+        final List<LeaveDayDTO> leaveDays = new ArrayList<>();
+        final List<Long> leaveDayCompanyIds = new ArrayList<>();
+        final List<Long> leaveDayDocumentIds = new ArrayList<>();
+        ApprovalEquipmentDTO equipment;
+
+        ApprovedEquipmentDTO approvedEquipment;
+        Long approvedQueryCompanyId;
+        Long approvedQueryDocumentId;
+
         FakeDao() {
             super(null);
+        }
+
+        /** 저장한 행이 하나도 없는지 */
+        boolean savedNothing() {
+            return document == null && steps.isEmpty() && history == null && leave == null && leaveDays.isEmpty()
+                    && equipment == null;
+        }
+
+        @Override
+        public void insertDocument(ApprovalDocumentDTO document) {
+            document.setApprovalDocumentId(NEW_DOCUMENT_ID); // selectKey가 하는 일
+            this.document = document;
+        }
+
+        @Override
+        public void insertStep(ApprovalStepDTO step) {
+            steps.add(step);
+        }
+
+        @Override
+        public void insertHistory(ApprovalHistoryDTO history) {
+            this.history = history;
+        }
+
+        @Override
+        public void insertLeaveRequest(ApprovalLeaveDTO leave) {
+            this.leave = leave;
+        }
+
+        @Override
+        public void insertLeaveDay(Long companyId, Long documentId, LeaveDayDTO day) {
+            leaveDayCompanyIds.add(companyId);
+            leaveDayDocumentIds.add(documentId);
+            leaveDays.add(day);
+        }
+
+        @Override
+        public void insertEquipmentRequest(ApprovalEquipmentDTO equipment) {
+            this.equipment = equipment;
+        }
+
+        @Override
+        public ApprovedEquipmentDTO selectApprovedEquipment(Long companyId, Long approvalDocumentId) {
+            approvedQueryCompanyId = companyId;
+            approvedQueryDocumentId = approvalDocumentId;
+            return approvedEquipment;
         }
 
         @Override
@@ -110,10 +182,50 @@ class ApprovalServiceTest {
         }
     }
 
+    /** 우리 업체의 사용 중 지점을 정해 두고, 물어본 업체를 적어 두는 가짜 지점 */
+    static class FakeBranch extends BranchService {
+        List<BranchDTO> branches = List.of(branch(10L, "본사"), branch(11L, "강남지점"));
+        final List<Long> askedCompanyIds = new ArrayList<>();
+
+        FakeBranch() {
+            super(null);
+        }
+
+        @Override
+        public List<BranchDTO> getBranches(Long companyId) {
+            askedCompanyIds.add(companyId);
+            return branches;
+        }
+    }
+
     private final FakeEmployee employee = new FakeEmployee();
     private final FakeAttendance attendance = new FakeAttendance();
     private final FakeDao dao = new FakeDao();
-    private final ApprovalService service = new ApprovalService(employee, attendance, dao);
+    private final FakeBranch branch = new FakeBranch();
+    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch);
+
+    private static BranchDTO branch(Long id, String name) {
+        BranchDTO b = new BranchDTO();
+        b.setBranchId(id);
+        b.setBranchName(name);
+        return b;
+    }
+
+    /** 결재자 검사를 통과하는 장비 지급 신청서 */
+    private static ApprovalSubmitDTO equipment(String assetType, Integer quantity, String branchId, String purpose) {
+        ApprovalSubmitDTO dto = form("DOC_EQUIPMENT", "1001", "");
+        ApprovalFieldsDTO f = new ApprovalFieldsDTO();
+        f.setAssetType(assetType);
+        f.setQuantity(quantity);
+        f.setBranchId(branchId);
+        f.setPurpose(purpose);
+        dto.setFields(f);
+        return dto;
+    }
+
+    private static ApprovalSubmitDTO validEquipment() {
+        return equipment("AT_LAPTOP", 1, "10", "개발용 노트북 교체");
+    }
 
     private static LoginUser user() {
         AuthEmpDTO emp = new AuthEmpDTO();
@@ -161,9 +273,9 @@ class ApprovalServiceTest {
     // ---------- 양식 ----------
 
     @Test
-    @DisplayName("양식 검사: 장비 신청서는 아직 받지 않는다")
-    void rejectsEquipmentForm() {
-        assertEquals("지원하지 않는 양식", rejectedMessage(form("DOC_EQUIPMENT", "1001", "")));
+    @DisplayName("양식 검사: 휴가·장비가 아닌 양식은 거절한다")
+    void rejectsUnknownForm() {
+        assertEquals("지원하지 않는 양식", rejectedMessage(form("DOC_ETC", "1001", "")));
     }
 
     @Test
@@ -251,9 +363,10 @@ class ApprovalServiceTest {
     // ---------- 휴가 입력값 ----------
 
     @Test
-    @DisplayName("휴가 입력: 휴가 정보가 없으면 거절한다")
+    @DisplayName("신청 정보: 휴가·장비 모두 신청 내용이 없으면 거절한다")
     void rejectsMissingFields() {
-        assertEquals("휴가 정보를 입력하세요.", rejectedMessage(form("DOC_LEAVE", "1001", "")));
+        assertEquals("신청 정보를 입력하세요.", rejectedMessage(form("DOC_LEAVE", "1001", "")));
+        assertEquals("신청 정보를 입력하세요.", rejectedMessage(form("DOC_EQUIPMENT", "1001", "")));
     }
 
     @Test
@@ -413,7 +526,227 @@ class ApprovalServiceTest {
         assertDoesNotThrow(() -> service.submit(user(), validLeave()));
     }
 
+    // ---------- 저장 ----------
+
+    @Test
+    @DisplayName("저장: 상신하면 새 문서 번호를 돌려준다")
+    void returnsNewDocumentId() {
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, service.submit(user(), validLeave()));
+    }
+
+    @Test
+    @DisplayName("저장: 문서는 로그인 업체·기안자로 결재 중 상태로 저장한다")
+    void savesDocument() {
+        service.submit(user(), validLeave());
+
+        ApprovalDocumentDTO doc = dao.document;
+        assertEquals(COMPANY_ID, doc.getCompanyId());
+        assertEquals(MY_ID, doc.getAuthorEmployeeId());
+        assertEquals("DOC_LEAVE", doc.getDocumentType());
+        assertEquals("IN_PROGRESS", doc.getStatusCode());
+        assertEquals("휴가 신청서 - 2026-11-10 ~ 2026-11-11", doc.getTitle());
+        assertEquals("개인 사정", doc.getContent());
+    }
+
+    @Test
+    @DisplayName("저장: 결재선은 고른 순서대로 1단계·2단계로 저장하고 업체는 로그인 업체다")
+    void savesStepsInOrder() {
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setLine(List.of("1002", "1001"));
+
+        service.submit(user(), dto);
+
+        assertEquals(2, dao.steps.size());
+        assertEquals(1, dao.steps.get(0).getStepNo());
+        assertEquals(1002L, dao.steps.get(0).getApproverEmployeeId());
+        assertEquals(2, dao.steps.get(1).getStepNo());
+        assertEquals(1001L, dao.steps.get(1).getApproverEmployeeId());
+        for (ApprovalStepDTO s : dao.steps) {
+            assertEquals(COMPANY_ID, s.getCompanyId());
+            assertEquals(FakeDao.NEW_DOCUMENT_ID, s.getApprovalDocumentId());
+        }
+    }
+
+    @Test
+    @DisplayName("저장: 결재자가 1명이면 결재선은 1단계 하나만 저장한다")
+    void savesOneStep() {
+        service.submit(user(), validLeave());
+
+        assertEquals(1, dao.steps.size());
+        assertEquals(1, dao.steps.get(0).getStepNo());
+        assertEquals(1001L, dao.steps.get(0).getApproverEmployeeId());
+    }
+
+    @Test
+    @DisplayName("저장: 이력은 제출(APR_SUBMIT)로, 처리한 사람은 사원 ID가 아니라 계정 ID로 남긴다")
+    void savesSubmitHistory() {
+        service.submit(user(), validLeave());
+
+        ApprovalHistoryDTO h = dao.history;
+        assertEquals(COMPANY_ID, h.getCompanyId());
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, h.getApprovalDocumentId());
+        assertEquals(200L, h.getActorAccountId());
+        assertEquals("APR_SUBMIT", h.getActionCode());
+        assertNull(h.getBeforeStatus());
+        assertEquals("IN_PROGRESS", h.getAfterStatus());
+        assertNull(h.getOpinion());
+    }
+
+    @Test
+    @DisplayName("저장: 휴가 상세에 사유와 총 신청 일수(반차 0.5일 포함)를 저장한다")
+    void savesLeaveRequest() {
+        attendance.days = List.of(day("2026-11-10", "LV_FULL"), day("2026-11-11", "LV_AM"));
+
+        service.submit(user(), validLeave());
+
+        assertEquals(COMPANY_ID, dao.leave.getCompanyId());
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, dao.leave.getApprovalDocumentId());
+        assertEquals("개인 사정", dao.leave.getReason());
+        assertEquals(0, new BigDecimal("1.5").compareTo(dao.leave.getRequestedDays()));
+    }
+
+    @Test
+    @DisplayName("저장: 휴가 날짜는 근태가 계산한 날마다 한 줄씩 같은 문서 번호로 저장한다")
+    void savesEveryLeaveDay() {
+        service.submit(user(), validLeave());
+
+        assertEquals(attendance.days, dao.leaveDays);
+        assertEquals(List.of(COMPANY_ID, COMPANY_ID), dao.leaveDayCompanyIds);
+        assertEquals(List.of(FakeDao.NEW_DOCUMENT_ID, FakeDao.NEW_DOCUMENT_ID), dao.leaveDayDocumentIds);
+    }
+
+    @Test
+    @DisplayName("저장: 검사에서 거절되면 아무것도 저장하지 않는다")
+    void savesNothingWhenRejected() {
+        attendance.remaining = BigDecimal.ONE;
+
+        rejectedMessage(validLeave());
+
+        assertTrue(dao.savedNothing());
+    }
+
+    // ---------- 장비 지급 신청서 ----------
+
+    @Test
+    @DisplayName("장비: 문서·결재선·이력·장비 상세를 저장하고 휴가 자료와 근태는 건드리지 않는다")
+    void savesEquipmentRequest() {
+        Long id = service.submit(user(), validEquipment());
+
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, id);
+        assertEquals("DOC_EQUIPMENT", dao.document.getDocumentType());
+        assertEquals("IN_PROGRESS", dao.document.getStatusCode());
+        assertEquals("장비 지급 신청서 - 노트북", dao.document.getTitle());
+        assertEquals("개발용 노트북 교체", dao.document.getContent());
+        assertEquals(1, dao.steps.size());
+        assertEquals("APR_SUBMIT", dao.history.getActionCode());
+
+        ApprovalEquipmentDTO e = dao.equipment;
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, e.getApprovalDocumentId());
+        assertEquals(COMPANY_ID, e.getCompanyId());
+        assertEquals(10L, e.getBranchId());
+        assertEquals("AT_LAPTOP", e.getAssetType());
+        assertEquals(1, e.getQuantity());
+        assertEquals("개발용 노트북 교체", e.getPurpose());
+
+        assertNull(dao.leave);
+        assertTrue(dao.leaveDays.isEmpty());
+        assertNull(attendance.leaveType);
+    }
+
+    @Test
+    @DisplayName("장비: 공통 코드에서 사용하지 않는 장비 종류(프린터)는 거절한다")
+    void rejectsUnusedAssetType() {
+        assertEquals("장비 종류가 올바르지 않습니다.", rejectedMessage(equipment("AT_PRINTER", 1, "10", "출력용")));
+    }
+
+    @Test
+    @DisplayName("장비: 없는 장비 종류나 빈 종류는 거절한다")
+    void rejectsUnknownAssetType() {
+        assertEquals("장비 종류가 올바르지 않습니다.", rejectedMessage(equipment("노트북", 1, "10", "개발용")));
+        assertEquals("장비 종류가 올바르지 않습니다.", rejectedMessage(equipment(null, 1, "10", "개발용")));
+    }
+
+    @Test
+    @DisplayName("장비: 수량은 1개만 받는다 (계획서 3장 B)")
+    void rejectsQuantityOtherThanOne() {
+        assertEquals("장비는 한 번에 1개만 신청할 수 있습니다.", rejectedMessage(equipment("AT_LAPTOP", 2, "10", "개발용")));
+        assertEquals("장비는 한 번에 1개만 신청할 수 있습니다.", rejectedMessage(equipment("AT_LAPTOP", 0, "10", "개발용")));
+        assertEquals("장비는 한 번에 1개만 신청할 수 있습니다.", rejectedMessage(equipment("AT_LAPTOP", null, "10", "개발용")));
+    }
+
+    @Test
+    @DisplayName("장비: 수령 지점을 고르지 않았거나 숫자가 아니면 거절한다")
+    void rejectsMissingBranch() {
+        assertEquals("수령 지점을 골라 주세요.", rejectedMessage(equipment("AT_LAPTOP", 1, "", "개발용")));
+        assertEquals("수령 지점을 골라 주세요.", rejectedMessage(equipment("AT_LAPTOP", 1, null, "개발용")));
+        assertEquals("수령 지점을 골라 주세요.", rejectedMessage(equipment("AT_LAPTOP", 1, "abc", "개발용")));
+    }
+
+    @Test
+    @DisplayName("업체 분리: 우리 업체의 사용 중 지점이 아닌 번호(다른 업체·사용 중지)는 거절하고, 지점은 로그인 업체로 찾는다")
+    void rejectsOtherCompanyBranch() {
+        assertEquals("수령 지점을 다시 골라 주세요.", rejectedMessage(equipment("AT_LAPTOP", 1, "99", "개발용")));
+        assertEquals(List.of(COMPANY_ID), branch.askedCompanyIds);
+        assertTrue(dao.savedNothing());
+    }
+
+    @Test
+    @DisplayName("장비: 사용 목적이 공백뿐이면 거절한다")
+    void rejectsBlankPurpose() {
+        assertEquals("사용 목적을 입력하세요.", rejectedMessage(equipment("AT_LAPTOP", 1, "10", "   ")));
+    }
+
+    @Test
+    @DisplayName("장비: 사용 목적이 1000자를 넘으면 거절한다")
+    void rejectsLongPurpose() {
+        assertEquals("사용 목적은 1000자까지 입력할 수 있습니다.", rejectedMessage(equipment("AT_LAPTOP", 1, "10", "가".repeat(1001))));
+    }
+
+    @Test
+    @DisplayName("장비: 사용 목적은 글자 수로 센다(이모지 1000자는 티켓과 같이 받는다)")
+    void countsPurposeByCharacters() {
+        assertDoesNotThrow(() -> service.submit(user(), equipment("AT_LAPTOP", 1, "10", "😀".repeat(1000))));
+    }
+
+    // ---------- 다른 모듈에 주는 조회 ----------
+
+    @Test
+    @DisplayName("장비 지급 정보: 받은 업체·문서 번호로 결재 완료 장비 정보를 찾아 그대로 돌려준다")
+    void returnsApprovedEquipmentInfo() {
+        ApprovedEquipmentDTO info = new ApprovedEquipmentDTO();
+        info.setAssetType("AT_MONITOR");
+        info.setQuantity(1);
+        info.setPurpose("듀얼 모니터");
+        dao.approvedEquipment = info;
+
+        assertSame(info, service.getApprovedEquipmentInfo(COMPANY_ID, 5000L));
+        assertEquals(COMPANY_ID, dao.approvedQueryCompanyId);
+        assertEquals(5000L, dao.approvedQueryDocumentId);
+    }
+
+    @Test
+    @DisplayName("장비 지급 정보: 업체나 문서 번호가 없으면 조회하지 않고 null")
+    void approvedEquipmentInfoNeedsIds() {
+        assertNull(service.getApprovedEquipmentInfo(null, 5000L));
+        assertNull(service.getApprovedEquipmentInfo(COMPANY_ID, null));
+        assertNull(dao.approvedQueryCompanyId);
+    }
+
     // ---------- 기안 화면 ----------
+
+    @Test
+    @DisplayName("기안 화면: 수령 지점은 로그인 업체의 사용 중 지점, 장비 종류는 사용 중인 4개를 보낸다")
+    void formOptionsListsBranchesAndKinds() {
+        Map<String, Object> options = service.getFormOptions(COMPANY_ID, MY_ID);
+
+        assertSame(branch.branches, options.get("branches"));
+        assertEquals(List.of(COMPANY_ID), branch.askedCompanyIds);
+        assertEquals(List.of(
+                Map.of("code", "AT_LAPTOP", "codeName", "노트북"),
+                Map.of("code", "AT_DESKTOP", "codeName", "데스크톱"),
+                Map.of("code", "AT_MONITOR", "codeName", "모니터"),
+                Map.of("code", "AT_OTHER", "codeName", "기타 장비")), options.get("equipKinds"));
+    }
 
     @Test
     @DisplayName("기안 화면: 남은 연차는 결재 중 일수를 뺀 값과 결재 중 일수를 함께 보낸다")

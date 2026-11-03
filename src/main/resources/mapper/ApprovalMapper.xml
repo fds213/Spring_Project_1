@@ -21,5 +21,61 @@
           AND d.leave_date &lt;= TO_DATE(#{toDate}, 'YYYY-MM-DD')
     </select>
 
+    <!-- ===== 상신 저장: 문서 → 결재선 → 이력 → 휴가 상세 → 휴가 날짜 (한 트랜잭션) ===== -->
+
+    <!-- 문서. 새 번호를 먼저 받아 DTO의 approvalDocumentId에 채운다(뒤 저장들이 이 번호를 쓴다) -->
+    <insert id="insertDocument" parameterType="com.ieum.gw.approval.dto.ApprovalDocumentDTO">
+        <selectKey keyProperty="approvalDocumentId" resultType="long" order="BEFORE">
+            SELECT sq_approval_document.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO approval_document (approval_document_id, company_id, author_employee_id, document_type,
+                                       title, content, status_code, submitted_at)
+        VALUES (#{approvalDocumentId}, #{companyId}, #{authorEmployeeId}, #{documentType},
+                #{title}, #{content}, #{statusCode}, CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP))
+    </insert>
+
+    <!-- 결재선 한 단계. 번호는 DB 기본값(sq_approval_step), 상태는 기본값 WAITING -->
+    <insert id="insertStep" parameterType="com.ieum.gw.approval.dto.ApprovalStepDTO">
+        INSERT INTO approval_step (company_id, approval_document_id, step_no, approver_employee_id)
+        VALUES (#{companyId}, #{approvalDocumentId}, #{stepNo}, #{approverEmployeeId})
+    </insert>
+
+    <!-- 처리 이력 한 줄. 이전 상태·의견은 비어 있을 수 있다 -->
+    <insert id="insertHistory" parameterType="com.ieum.gw.approval.dto.ApprovalHistoryDTO">
+        INSERT INTO approval_history (company_id, approval_document_id, actor_account_id, action_code,
+                                      before_status, after_status, opinion)
+        VALUES (#{companyId}, #{approvalDocumentId}, #{actorAccountId}, #{actionCode},
+                #{beforeStatus}, #{afterStatus}, #{opinion})
+    </insert>
+
+    <!-- 휴가 상세. PK는 문서 번호 -->
+    <insert id="insertLeaveRequest" parameterType="com.ieum.gw.approval.dto.ApprovalLeaveDTO">
+        INSERT INTO leave_request (approval_document_id, company_id, reason, requested_days)
+        VALUES (#{approvalDocumentId}, #{companyId}, #{reason}, #{requestedDays})
+    </insert>
+
+    <!-- 휴가 날짜 하루. 근태가 계산한 LeaveDayDTO를 그대로 받는다. 번호는 DB 기본값(sq_leave_request_day) -->
+    <insert id="insertLeaveDay">
+        INSERT INTO leave_request_day (company_id, approval_document_id, leave_date, leave_type, deduct_days)
+        VALUES (#{companyId}, #{approvalDocumentId}, #{day.leaveDate}, #{day.leaveType}, #{day.deductDays})
+    </insert>
+
+    <!-- 장비 신청 상세. PK는 문서 번호. 지점은 (업체, 지점) 복합 FK라 다른 업체 지점은 DB도 막는다 -->
+    <insert id="insertEquipmentRequest" parameterType="com.ieum.gw.approval.dto.ApprovalEquipmentDTO">
+        INSERT INTO equipment_request (approval_document_id, company_id, branch_id, asset_type, quantity, purpose)
+        VALUES (#{approvalDocumentId}, #{companyId}, #{branchId}, #{assetType}, #{quantity}, #{purpose})
+    </insert>
+
+    <!-- ===== 다른 모듈에 주는 조회 ===== -->
+
+    <!-- 결재 완료된 장비 신청의 지급 정보. 결재 중·반려 문서와 다른 업체 문서는 나오지 않는다 -->
+    <select id="selectApprovedEquipment" resultType="com.ieum.gw.approval.dto.ApprovedEquipmentDTO">
+        SELECT er.asset_type, er.quantity, er.purpose
+        FROM equipment_request er
+                 JOIN approval_document ad ON ad.approval_document_id = er.approval_document_id AND ad.company_id = er.company_id
+        WHERE er.company_id = #{companyId} AND er.approval_document_id = #{approvalDocumentId}
+          AND ad.document_type = 'DOC_EQUIPMENT' AND ad.status_code = 'APPROVED'
+    </select>
+
 
 </mapper>

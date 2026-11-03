@@ -1,13 +1,13 @@
 package com.ieum.gw.approval.service;
 
 import com.ieum.gw.approval.dao.ApprovalDAO;
-import com.ieum.gw.approval.dto.ApprovalFieldsDTO;
-import com.ieum.gw.approval.dto.ApprovalSubmitDTO;
-import com.ieum.gw.approval.dto.ApproverDTO;
+import com.ieum.gw.approval.dto.*;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.service.AttendanceService;
+import com.ieum.gw.common.code.AssetType;
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.service.EmployeeService;
+import com.ieum.gw.location.service.BranchService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,9 +27,17 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ApprovalService {
+    // 장비 신청서에서 고를 수 있는 장비 종류: 공통 코드 ASSET_TYPE 중 사용 중(USE_YN = 'Y')인 것.
+    // 티켓 createEquipmentTicket의 허용 목록과 같게 둔다(다르면 최종 승인 때 티켓 생성이 실패한다)
+    private static final List<AssetType> EQUIPMENT_KINDS =
+            List.of(AssetType.AT_LAPTOP, AssetType.AT_DESKTOP, AssetType.AT_MONITOR, AssetType.AT_OTHER);
+    private static final int EQUIPMENT_QUANTITY = 1; // 계획서 3장 B: 수량 1개
+    private static final int PURPOSE_MAX = 1000;     // EQUIPMENT_REQUEST.PURPOSE VARCHAR2(1000 CHAR)
+
     private final EmployeeService eService;
     private final AttendanceService aService;
     private final ApprovalDAO dao;
+    private final BranchService bService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -53,10 +61,15 @@ public class ApprovalService {
         leave.put("available", remain.subtract(pending));
         leave.put("pendingDays", pending);
 
+        // 화면(approval.js)은 장비 종류를 { code, codeName }으로 읽는다
+        List<Map<String, String>> equipKinds = EQUIPMENT_KINDS.stream()
+                .map(t -> Map.of("code", t.name(), "codeName", t.getLabel()))
+                .collect(Collectors.toList());
+
         Map<String, Object> options = new HashMap<>();
         options.put("approvers", approvers);
-        options.put("branches", List.of());   // 장비 양식 단계에서 채운다
-        options.put("equipKinds", List.of()); // 장비 양식 단계에서 채운다
+        options.put("branches", bService.getBranches(companyId)); // 사용 중인 우리 업체 지점 (branchId, branchName)
+        options.put("equipKinds", equipKinds);
         options.put("leave", leave);
 
         return options;
@@ -71,11 +84,25 @@ public class ApprovalService {
         return 0;
     }
 
+    /**
+     * 결재 완료(APPROVED)된 장비 신청의 지급 정보(장비 종류·수량·사용 목적). 티켓의 지급 대기 목록·관리자 상세가 부른다.
+     * 문서 내용·결재 첨부는 넘기지 않는다. 결재 중·반려 문서, 휴가 문서, 다른 업체 문서면 null.
+     *
+     * @param companyId 부르는 쪽이 로그인 사용자 정보에서 꺼낸 업체 ID
+     */
+    @Transactional(readOnly = true)
+    public ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long approvalDocumentId) {
+        if(companyId == null || approvalDocumentId == null) return null;
+
+        return dao.selectApprovedEquipment(companyId, approvalDocumentId);
+    }
+
     @Transactional
     public Long submit(LoginUser user, ApprovalSubmitDTO dto) {
 
         // 양식 확인
-        if(!"DOC_LEAVE".equals(dto.getDocumentType()) /* && !"DOC_EQUIPMENT".equals(dto.getDocumentType()) */ ) {
+        boolean isLeave = "DOC_LEAVE".equals(dto.getDocumentType());
+        if(!isLeave && !"DOC_EQUIPMENT".equals(dto.getDocumentType())) {
             throw new IllegalArgumentException("지원하지 않는 양식");
         }
 
@@ -95,13 +122,19 @@ public class ApprovalService {
             if(!eService.isActiveEmployee(user.getCompanyId(), id)) throw new IllegalArgumentException("재직 중인 사람만 결재자로 지정할 수 있습니다.");
         }
 
-
-        // 휴가 입력값 검사
         ApprovalFieldsDTO fields = dto.getFields();
         if(fields == null) {
-            throw new IllegalArgumentException("휴가 정보를 입력하세요.");
+            throw new IllegalArgumentException("신청 정보를 입력하세요.");
         }
 
+        // 양식마다 검사와 상세 저장이 다르다
+        return isLeave ? submitLeave(user, approverIds, fields) : submitEquipment(user, approverIds, fields);
+    }
+
+    // 휴가 신청서: 날짜 계산·연차·겹침을 검사하고 휴가 상세·날짜를 저장한다
+    private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
+
+        // 휴가 입력값 검사
         if(!StringUtils.hasText(fields.getReason())) throw new IllegalArgumentException("사유를 입력하세요.");
         if(fields.getReason().length() > 1000) throw new IllegalArgumentException("사유는 1000자까지 입력할 수 있습니다.");
 
@@ -125,6 +158,7 @@ public class ApprovalService {
             total = total.add(day.getDeductDays());
         }
 
+        // 연차확인
         BigDecimal remain = aService.getRemainingLeaveDays(user.getCompanyId(), user.getEmployeeId());
         BigDecimal pending = dao.sumPendingLeaveDays(user.getCompanyId(), user.getEmployeeId());
         BigDecimal available = remain.subtract(pending);
@@ -142,8 +176,104 @@ public class ApprovalService {
         }
 
 
-        return 0L;
+        // DB 저장
+        Long documentId = saveDocument(user, "DOC_LEAVE", "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds);
+
+        ApprovalLeaveDTO leave = new ApprovalLeaveDTO();
+        leave.setCompanyId(user.getCompanyId());
+        leave.setApprovalDocumentId(documentId);
+        leave.setReason(fields.getReason());
+        leave.setRequestedDays(total);
+        dao.insertLeaveRequest(leave);
+
+        for (LeaveDayDTO day :leaveDays) {
+            dao.insertLeaveDay(user.getCompanyId(), documentId, day);
+        }
+
+        return documentId;
     }
 
+    // 장비 지급 신청서: 장비 종류·수량·수령 지점·사용 목적을 검사하고 장비 상세를 저장한다.
+    // 지급 티켓은 최종 승인 때 만든다(계획서 3장 B)
+    private Long submitEquipment(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
 
+        AssetType assetType = EQUIPMENT_KINDS.stream()
+                .filter(t -> t.name().equals(fields.getAssetType()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("장비 종류가 올바르지 않습니다."));
+
+        if(!Integer.valueOf(EQUIPMENT_QUANTITY).equals(fields.getQuantity())) throw new IllegalArgumentException("장비는 한 번에 1개만 신청할 수 있습니다.");
+
+        Long branchId = parseBranchId(user.getCompanyId(), fields.getBranchId());
+
+        // 티켓도 같은 방식(글자 수)으로 1~1,000자를 검사한다
+        String purpose = fields.getPurpose();
+        if(!StringUtils.hasText(purpose)) throw new IllegalArgumentException("사용 목적을 입력하세요.");
+        if(purpose.codePointCount(0, purpose.length()) > PURPOSE_MAX) throw new IllegalArgumentException("사용 목적은 1000자까지 입력할 수 있습니다.");
+
+
+        // DB 저장
+        Long documentId = saveDocument(user, "DOC_EQUIPMENT", "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds);
+
+        ApprovalEquipmentDTO equipment = new ApprovalEquipmentDTO();
+        equipment.setApprovalDocumentId(documentId);
+        equipment.setCompanyId(user.getCompanyId());
+        equipment.setBranchId(branchId);
+        equipment.setAssetType(assetType.name());
+        equipment.setQuantity(EQUIPMENT_QUANTITY);
+        equipment.setPurpose(purpose);
+        dao.insertEquipmentRequest(equipment);
+
+        return documentId;
+    }
+
+    // 수령 지점: 숫자여야 하고, 우리 업체의 사용 중인 지점이어야 한다(다른 업체 지점 번호를 보내도 막는다)
+    private Long parseBranchId(Long companyId, String value) {
+        Long branchId;
+        try {
+            branchId = Long.valueOf(value);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("수령 지점을 골라 주세요.");
+        }
+
+        boolean usable = bService.getBranches(companyId).stream().anyMatch(b -> branchId.equals(b.getBranchId()));
+        if(!usable) throw new IllegalArgumentException("수령 지점을 다시 골라 주세요.");
+
+        return branchId;
+    }
+
+    // 두 양식이 같이 쓰는 저장: 문서(결재 중) → 결재선(고른 순서대로 1·2단계) → 제출 이력. 새 문서 번호를 돌려준다
+    private Long saveDocument(LoginUser user, String documentType, String title, String content, List<Long> approverIds) {
+        ApprovalDocumentDTO document = new ApprovalDocumentDTO();
+        document.setCompanyId(user.getCompanyId());
+        document.setAuthorEmployeeId(user.getEmployeeId());
+        document.setStatusCode("IN_PROGRESS"); // enum 들어오면 수정
+        document.setDocumentType(documentType);
+        document.setTitle(title);
+        document.setContent(content);
+
+        dao.insertDocument(document);
+
+        Long documentId = document.getApprovalDocumentId();
+
+        for(int i=0; i< approverIds.size(); i++) {
+            ApprovalStepDTO stepDto = new ApprovalStepDTO();
+            stepDto.setStepNo(i+1);
+            stepDto.setApprovalDocumentId(documentId);
+            stepDto.setCompanyId(user.getCompanyId());
+            stepDto.setApproverEmployeeId(approverIds.get(i));
+
+            dao.insertStep(stepDto);
+        }
+
+        ApprovalHistoryDTO history = new ApprovalHistoryDTO();
+        history.setActionCode("APR_SUBMIT"); // enum 수정
+        history.setAfterStatus("IN_PROGRESS");
+        history.setActorAccountId(user.getUserAccountId());
+        history.setApprovalDocumentId(documentId);
+        history.setCompanyId(user.getCompanyId());
+        dao.insertHistory(history);
+
+        return documentId;
+    }
 }
