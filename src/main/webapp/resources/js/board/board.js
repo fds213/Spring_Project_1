@@ -786,7 +786,7 @@ const noticeFiles = makeFilePicker({ pick: 'btnPickFiles', input: 'fFiles', info
 const editorHtml = () => noticeEditor.html();
 
 const formState = { id: null, initial: { title: '', content: '', pinned: false, scope: '', files: '' }, saving: false, leaving: false };
-const formOpen = () => byId('view-notice-form').classList.contains('on');
+const formOpen = () => !!byId('view-notice-form')?.classList.contains('on'); // 부서 게시판 페이지에는 이 화면이 없다
 const formDirty = () => formOpen() && !formState.leaving && !formState.saving &&
   (byId('fTitle').value !== formState.initial.title || editorHtml() !== formState.initial.content ||
    byId('fPinned').checked !== formState.initial.pinned || byId('fScope').value !== formState.initial.scope ||
@@ -1008,7 +1008,7 @@ byId('bBtnDelete')?.addEventListener('click', async () => {
 const boardEditor = makeEditor('bContent');
 const boardFiles = makeFilePicker({ pick: 'bBtnPickFiles', input: 'bFiles', info: 'bFilesInfo', list: 'bFileList', error: 'bFilesError' });
 const boardFormState = { id: null, initial: { title: '', content: '', files: '' }, saving: false, leaving: false };
-const boardFormOpen = () => byId('view-board-form').classList.contains('on');
+const boardFormOpen = () => !!byId('view-board-form')?.classList.contains('on'); // 공지 페이지에는 이 화면이 없다
 const boardFormDirty = () => boardFormOpen() && !boardFormState.leaving && !boardFormState.saving &&
   (byId('bTitle').value !== boardFormState.initial.title || boardEditor.html() !== boardFormState.initial.content ||
    fileSig(boardFiles.files) !== boardFormState.initial.files);

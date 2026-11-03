@@ -1,7 +1,5 @@
-// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 날짜 계산, 알림(toast).
-// common.js 다음, 각 모듈 JS 앞에 불린다. JSP에서는 layout.tag가 불러오고, 알림을 쓰려면 <div class="toast" id="toast" hidden>이 있어야 한다.
-const DAY_MS = 86400000;
-
+// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 알림(toast), 목록·상세 칸 만들기.
+// common.js 다음, 각 모듈 JS 앞에 불린다. 각 JSP 의 scripts 조각이 불러오고, 알림을 쓰려면 <div class="toast" id="toast" hidden>이 있어야 한다.
 const pad2 = n => String(n).padStart(2, '0');
 // 2026.10.29
 const ymd = iso => { const d = new Date(iso); return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`; };
@@ -12,15 +10,9 @@ const whenFull = iso => { const d = new Date(iso); return `${d.getFullYear()}.${
 // 80,000원
 const won = n => `${n.toLocaleString('ko-KR')}원`;
 
-// 화면 아래 알림 한 줄 (4초 뒤 사라진다)
-let toastTimer = null;
+// 화면 아래 알림 한 줄 (4초 뒤 사라진다). common.js 의 토스트를 그대로 쓴다: 타이머가 둘이면 앞 알림이 뒤 알림을 일찍 지운다
 function showToast(text) {
-  const toast = document.getElementById('toast');
-  if (!toast) return;
-  toast.textContent = text;
-  toast.hidden = false;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { toast.hidden = true; }, 4000);
+  if (window.IEUM && IEUM.toast) IEUM.toast(text);
 }
 
 // ---------- 화면 만들기 도구 (여러 모듈의 화면 JS가 같이 쓴다) ----------
@@ -66,11 +58,7 @@ function el(tag, attrs = {}, text) {
   if (text !== undefined) e.textContent = text;
   return e;
 }
-function emptyRow(cols, text) {
-  const tr = el('tr', { class: 'row-empty' });
-  tr.append(el('td', { colspan: String(cols) }, text));
-  return tr;
-}
+const emptyRow = emptyTr; // 옛 이름 (board.js 가 쓴다)
 
 // 다른 화면(내 장비, 결재함의 재기안·이어서 쓰기)에서 기안 작성을 채워서 연다. 페이지가 바뀌므로 sessionStorage로 넘긴다
 const APPROVAL_PRE_KEY = 'ieum-approval-pre';

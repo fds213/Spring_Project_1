@@ -75,12 +75,13 @@ class SiteControllerTest {
     }
 
     @Test
-    @DisplayName("소개·체험 신청 화면 주소가 site JSP를 연다")
+    @DisplayName("소개·체험 신청·도입 문의 화면 주소가 site JSP를 연다")
     void pages() throws Exception {
         MockMvc mvc = mvc(TrialResultDTO::new);
         // view().name()·jsonPath()는 pom에 없는 Hamcrest·json-path가 있어야 해서 결과에서 직접 꺼낸다
         assertEquals("site/intro", mvc.perform(get("/")).andReturn().getModelAndView().getViewName());
         assertEquals("site/trial", mvc.perform(get("/trial")).andReturn().getModelAndView().getViewName());
+        assertEquals("site/inquiry", mvc.perform(get("/inquiry")).andReturn().getModelAndView().getViewName());
     }
 
     @Test

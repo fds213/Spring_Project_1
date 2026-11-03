@@ -63,11 +63,6 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
 .section.alt { background: linear-gradient(180deg, #f7f9fc 0%, #ffffff 100%); }
 .section-head { max-width: 640px; margin-bottom: 44px; }
 .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
-.eyebrow {
-  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px;
-  font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--accent);
-}
-.eyebrow::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .section h2 { margin: 0 0 14px; font-size: 34px; line-height: 1.3; font-weight: 700; letter-spacing: -0.02em; }
 .section .lead { margin: 0; color: var(--text-sub); font-size: 16.5px; }
 
@@ -236,7 +231,7 @@ body.site .plan .btn:hover { background: #eef4fb; }
 .calc-row input[type="range"] { flex: 1; accent-color: var(--accent); }
 .calc-row .input { width: 96px; text-align: right; font-weight: 600; font-size: 16px; }
 .calc-row .unit { font-size: 14px; color: var(--text-sub); }
-.calc .total { margin-top: auto; padding-top: 22px; margin-top: 22px; border-top: 1px dashed var(--line); display: flex; justify-content: space-between; align-items: baseline; }
+.calc .total { margin-top: auto; padding-top: 22px; border-top: 1px dashed var(--line); display: flex; justify-content: space-between; align-items: baseline; }
 .calc .total span { font-size: 15px; color: var(--text-sub); }
 .calc .total strong { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; color: var(--accent-deep); }
 .calc .total strong small { font-size: 15px; font-weight: 500; color: var(--text-sub); margin-left: 4px; }
@@ -246,7 +241,6 @@ body.site .plan .btn:hover { background: #eef4fb; }
 .note { font-size: 12.5px; color: var(--text-muted); margin-top: 12px; line-height: 1.6; }
 
 /* ---------- 문의 ---------- */
-.two-col { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 24px; align-items: start; }
 .box { border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 30px; background: #fff; box-shadow: var(--shadow-soft); }
 .box h3 { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
 .box .sub { margin: 0 0 20px; font-size: 14px; color: var(--text-sub); }
@@ -264,7 +258,6 @@ body.site .plan .btn:hover { background: #eef4fb; }
 .field-error { font-size: 12px; color: var(--danger); min-height: 16px; }
 .field-hint { margin-top: -2px; font-size: 12px; line-height: 1.5; color: var(--text-muted); }
 .field-hint.is-ok { color: #2b6a2f; }
-.label-opt { font-weight: 400; color: var(--text-muted); }
 /* 시스템이 정하는 값(예: 관리자 사번): 입력칸처럼 보이지만 고칠 수 없다 */
 .input-readonly { display: flex; align-items: center; background: var(--bg-sub); color: var(--text-sub); font-variant-numeric: tabular-nums; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: var(--text-sub); }
@@ -273,7 +266,6 @@ body.site .plan .btn:hover { background: #eef4fb; }
 .done.err { background: var(--danger-bg); color: var(--danger); }
 .actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
 .actions .btn { justify-content: center; }
-.btn[disabled] { opacity: 0.5; cursor: default; }
 
 /* ---------- CTA 띠 ---------- */
 .cta {
@@ -303,7 +295,6 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 .stepper li { flex: 1; padding: 12px 0 0; border-top: 3px solid var(--line); font-size: 13px; color: var(--text-muted); font-weight: 500; }
 .stepper li.on { border-color: var(--accent); color: var(--accent); }
 .stepper li.done-step { border-color: var(--accent); color: var(--text-sub); }
-.mock-banner { padding: 12px 16px; border-radius: 12px; background: #fff4e5; color: #8a4b08; font-size: 14px; margin-bottom: 20px; border: 1px solid #fde2c1; }
 .summary { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .summary th { text-align: left; font-weight: 400; color: var(--text-sub); padding: 11px 0; width: 40%; }
 .summary td { padding: 11px 0; text-align: right; font-weight: 500; }
@@ -345,11 +336,11 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 .inq-agree .field-error { min-height: 0; }
 .inq-agree .field-error:not(:empty) { margin-top: 6px; }
 .inq-agree .check input { margin-top: 0; width: 18px; height: 18px; }
-.link-btn {
+.terms-btn { /* 문의 약관 보기 (로그인의 .link-btn 과 다른 모양) */
   flex: none; padding: 4px 0; border: 0; background: none; font: inherit; font-size: 13px;
   color: var(--text-sub); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
 }
-.link-btn:hover { color: var(--ink); }
+.terms-btn:hover { color: var(--ink); }
 .terms { width: 100%; margin-top: 12px; border-collapse: collapse; font-size: 13px; }
 .terms th { width: 72px; padding: 5px 0; text-align: left; font-weight: 600; color: var(--text-sub); vertical-align: top; }
 .terms td { padding: 5px 0; color: var(--ink); }
@@ -369,7 +360,6 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 .inq-summary dt { color: var(--text-sub); font-size: 14px; }
 .inq-summary dd { overflow-wrap: anywhere; }
 .inq-summary dt:last-of-type, .inq-summary dd:last-of-type { border-bottom: 0; }
-.inq-summary .em { font-weight: 600; }
 .inq-summary .clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.6; }
 .done-actions { display: flex; justify-content: center; gap: 10px; margin-top: 32px; flex-wrap: wrap; }
 .done-actions .btn { min-width: 160px; justify-content: center; }
@@ -379,9 +369,6 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
 .done-no strong { margin-left: 6px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
 .inq-panel .form-row label .opt { font-weight: 400; font-size: 12.5px; color: var(--text-muted); }
 .field-hint + .field-error:empty { display: none; }
-/* 운영자 쪽 상태 코드: class status-<소문자 코드> (가이드 9장) */
-.status-received { background: #fff4e5; color: #8a4b08; }
-.status-answered { background: #e5f4e4; color: #2b6a2f; }
 
 /* ---------- 떠 있는 도입 문의 버튼 (소개 페이지만) ---------- */
 .fab-inquiry {
@@ -411,7 +398,7 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
   .inq-strip > div { padding: 12px 4px; }
   .inq-strip > div + div { border-left: 0; border-top: 1px solid var(--line); }
   .hero { padding: 56px 0 64px; }
-  .hero .wrap, .pricing, .two-col { grid-template-columns: 1fr; }
+  .hero .wrap, .pricing { grid-template-columns: 1fr; }
   .hero h1 { font-size: 36px; }
   .device { transform: none; }
   .device-wrap { margin: 0 auto; }
