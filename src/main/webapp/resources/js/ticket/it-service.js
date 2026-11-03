@@ -1,16 +1,9 @@
 // IT 서비스(사원): 장애·문의 접수(ticket-new), 내 티켓(ticket-mine), 내 장비(asset-mine) (요구분석서 3.4 IT 티켓·자산, 지점).
 // 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
-// 장비 지급 신청서(전자결재)가 최종 승인되면 EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
+// 장비 지급 신청서(전자결재)가 최종 승인되면 TK_EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
 
-const TICKET_TYPE = { INCIDENT: '장애', INQUIRY: '문의', EQUIPMENT: '장비 지급' };
-// 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려
-const TICKET_STATUS = {
-  RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려',
-};
-const TICKET_CLASS = {
-  RECEIVED: 'requested', ASSIGNED: 'requested', IN_PROGRESS: 'waiting', RESOLVED: 'paid', CLOSED: 'paid', CANCELED: 'expired', REJECTED: 'failed',
-};
+// 종류·상태 이름표(TICKET_TYPE, TICKET_STATUS, TICKET_CLASS)와 장비 종류(assetTypeName)는 util.js
 // 내 티켓 요약 카드는 세 묶음으로 센다: 접수(접수·배정), 처리 중, 완료(처리 완료·종료·취소·반려)
 const TICKET_GROUP = {
   RECEIVED: 'RECEIVED', ASSIGNED: 'RECEIVED', IN_PROGRESS: 'IN_PROGRESS', RESOLVED: 'DONE', CLOSED: 'DONE', CANCELED: 'DONE', REJECTED: 'DONE',
@@ -63,7 +56,7 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   const body = itEl('ticketBody').value.trim();
   const branchId = itEl('ticketBranch').value;
   // 서버도 같은 검사를 다시 한다. 화면은 먼저 알려 줄 뿐이다
-  if (!['INCIDENT', 'INQUIRY'].includes(type)) { err.textContent = '구분을 골라 주세요'; return; }
+  if (!['TK_INCIDENT', 'TK_QUESTION'].includes(type)) { err.textContent = '구분을 골라 주세요'; return; }
   if (!title) { err.textContent = '제목을 입력해 주세요'; itEl('ticketTitle').focus(); return; }
   if (title.length > TICKET_TITLE_MAX) { err.textContent = `제목은 ${TICKET_TITLE_MAX}자까지 쓸 수 있습니다`; return; }
   if (!body) { err.textContent = '내용을 입력해 주세요'; itEl('ticketBody').focus(); return; }
@@ -217,7 +210,7 @@ function renderAssetMine() {
     itCell('지급 티켓', itNode('span', '', a.ticketId || '-')))) : [emptyRow(5, '지급된 장비가 없습니다')]));
   itEl('assetWaitList').replaceChildren(...(waiting.length ? waiting.map(t => itNode('tr', '',
     itCell('티켓', itNode('span', '', t.id)),
-    itCell('신청 장비', itNode('span', '', `${t.kind} ${t.qty}대`)),
+    itCell('신청 장비', itNode('span', '', `${assetTypeName(t.kind)} ${t.qty}대`)),
     itCell('수령 지점', itNode('span', '', t.branchName)),
     itCell('상태', itNode('span', `status status-${TICKET_CLASS[t.status]}`, TICKET_STATUS[t.status])))) : [emptyRow(4, '지급을 기다리는 신청이 없습니다')]));
 }

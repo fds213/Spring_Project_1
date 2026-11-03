@@ -23,7 +23,7 @@
           <form class="leave-form" id="ticketForm" novalidate>
             <div class="leave-row">
               <label for="ticketType">구분</label>
-              <select class="filter-select" id="ticketType"><option value="INCIDENT">장애</option><option value="INQUIRY">문의</option></select>
+              <select class="filter-select" id="ticketType"><option value="TK_INCIDENT">장애</option><option value="TK_QUESTION">문의</option></select>
             </div>
             <div class="leave-row"><label for="ticketTitle">제목</label><input class="input" id="ticketTitle" maxlength="60" autocomplete="off"></div>
             <div class="leave-row"><label for="ticketBody">내용</label><textarea class="inq-text" id="ticketBody" maxlength="1000"></textarea></div>
