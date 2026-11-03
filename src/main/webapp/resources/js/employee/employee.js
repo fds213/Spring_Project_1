@@ -11,7 +11,7 @@
 // 서버는 공통 코드 테이블에서 읽는다.
 // 계정 형태 (ROLE): 한 계정에 하나. 서버가 ROLE_* 코드를 그대로 준다. IT 담당·인사 담당도 역할로 정하고 부서 형태와는 상관없다.
 // 사원 관리는 업체 안 사람만 보여서 ROLE_OPS(이음 운영자)는 나오지 않는다
-const ROLE_CODE = { ROLE_ADMIN: '관리자', ROLE_IT: 'IT 담당', ROLE_HR: '인사 담당', ROLE_EMP: '직원' };
+const ROLE_CODE = { ROLE_ADMIN: '업체 관리자', ROLE_IT: 'IT 담당', ROLE_HR: '인사 담당', ROLE_EMP: '직원' };
 // 부서 형태 (DEPT_TYPE): 부서마다 하나 또는 없음(일반 부서, ''). 부서 관리(org-admin.js)에서 정한다.
 // 부서를 나누어 보이는 표시일 뿐 메뉴·권한은 주지 않는다(권한은 역할).
 const DEPT_TYPE = { DEPT_IT: 'IT 부서', DEPT_HR: '인사 부서', DEPT_OPS: '운영 부서' };
@@ -299,6 +299,7 @@ document.querySelectorAll('#seatDialog button').forEach(b => b.addEventListener(
 // 업체 관리자는 모든 요청을, 부서장은 자기 부서 요청만 본다 (서버가 골라 보낸다).
 let lastEmployees = null; // 사원 관리에서 마지막으로 받은 값 (다시 사용 전에 자리를 본다)
 let lastJoin = null; // 가입 승인에서 마지막으로 받은 값
+let joinWaiting = null; // 마지막으로 그린 승인 대기 수 (바뀌었을 때만 메뉴 배지를 다시 센다)
 let joinPickOpen = false; // 업체 관리자의 부서 목록이 펼쳐져 있다
 const scopeLabel = x => (x.all ? '업체 전체' : x.scope);
 
@@ -492,7 +493,10 @@ function drawJoin(d) {
   $j('joinList').replaceChildren(...rows);
   $j('joinEmpty').hidden = rows.length > 0;
 
-  setJoinBadge(open.length);
+  // 대기 수가 바뀌었으면(승인·반려, 새 요청) 메뉴 배지(common.js, GET /badges)도 15초 기다리지 않고 다시 센다.
+  // 처음 그릴 때는 common.js 가 이미 세었고, 30초마다 다시 그려도 수가 그대로면 묻지 않는다
+  if (joinWaiting !== null && joinWaiting !== open.length && window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
+  joinWaiting = open.length;
 }
 
 // 승인: 붙을 사번을 보여 주는 창. 고를 역할은 없다: 승인된 직원은 모두 직원(ROLE_EMP)으로 시작한다
