@@ -24,4 +24,5 @@ public class JoinRequestViewDTO {
 	private LocalDateTime requestedAt;
 	private Long departmentId;
 	private Long jobGradeId;
+	private String accountStatus;
 }

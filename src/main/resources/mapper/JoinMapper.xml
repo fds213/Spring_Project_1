@@ -112,8 +112,7 @@
 		SELECT grade_name FROM
 		job_grade
 		WHERE company_id = #{companyId} AND use_yn = 'Y'
-		ORDER BY
-		sort_order, job_grade_id
+		ORDER BY sort_order, job_grade_id
 	</select>
 
 	<!-- 지금 열려 있는 부서의 ID (이름으로). 닫혔거나 없으면 null -->
@@ -145,6 +144,14 @@
 		status_code NOT IN ('REJECTED', 'CANCELED')
 	</select>
 
+	<!-- 이 업체에서 같은 이메일의 비활성(RETIRED) 계정 수 -->
+	<select id="countRetiredEmail" resultType="int">
+		SELECT COUNT(*) FROM user_account
+		WHERE company_id = #{companyId}
+		  AND email = #{email}
+		  AND status_code = 'RETIRED'
+	</select>
+
 	<!-- 가입 요청 1줄. 번호를 먼저 뽑아 dto.accountRequestId에 넣음 -->
 	<insert id="insertRequest"
 		parameterType="com.ieum.gw.employee.dto.JoinRequestDTO">
@@ -171,6 +178,7 @@
 		resultType="com.ieum.gw.employee.dto.JoinRequestViewDTO">
 		SELECT r.account_request_id, r.status_code AS
 		request_status,
+		a.status_code AS account_status,
 		r.request_name,
 		d.department_name, g.grade_name,
 		a.email, a.user_account_id,

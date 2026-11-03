@@ -59,6 +59,14 @@ public class EmployeeJoinController {
 		Map<String, Object> result = joinService.approveRequest(loginUser, reqId);
 		return Map.of("success", true, "data", result);
 	}
+	
+	/** 가입 반려 (관리자·부서장) */
+	@PostMapping("/employee/api/join/requests/{reqId}/reject")
+	@ResponseBody
+	public Map<String, Object> reject(@PathVariable Long reqId, @AuthenticationPrincipal LoginUser loginUser) {
+		Map<String, Object> result = joinService.rejectRequest(loginUser, reqId);
+		return Map.of("success", true, "data", result);
+	}
 
 	/** 가입 열기 (employee.js 가입 활성화). 관리자는 고른 부서들, 부서장은 자기 부서 */
 	@PostMapping("/employee/api/join/openings")
