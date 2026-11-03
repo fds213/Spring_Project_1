@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 import com.ieum.gw.employee.dto.AccountDTO;
 import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.dto.EmployeeDTO;
+import com.ieum.gw.employee.dto.EmployeeOptionDTO;
+import com.ieum.gw.employee.dto.IdNameDTO;
 import com.ieum.gw.employee.mapper.EmployeeMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -62,4 +64,26 @@ public class EmployeeDAO {
     public int countRole(Long companyId, Long employeeId, List<String> roleCodes) {
         return mapper.countRole(companyId, employeeId, roleCodes);
     }
+    
+ // ── 다른 모듈용 직원 조회 (같은 업체만) ──
+    
+    /** 직원의 근무 지점 ID. 없으면 null */
+	public Long getWorkBranchId(Long companyId, Long employeeId) {
+		return mapper.getWorkBranchId(companyId, employeeId);
+	}
+
+    /** 직원 ID → 이름 (퇴사자 포함) */
+	public List<IdNameDTO> listEmployeeNames(Long companyId, List<Long> ids) {
+		return mapper.listEmployeeNames(companyId, ids);
+	}
+
+    /** 계정 ID → 직원 이름 (사원이 연결된 계정만) */
+	public List<IdNameDTO> listAccountNames(Long companyId, List<Long> ids) {
+		return mapper.listAccountNames(companyId, ids);
+	}
+
+    /** 담당자로 고를 수 있는 재직자 */
+	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId) {
+		return mapper.listAssignableEmployees(companyId);
+	}
 }

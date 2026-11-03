@@ -4,7 +4,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -17,6 +19,8 @@ import com.ieum.gw.employee.dto.AccountDTO;
 import com.ieum.gw.employee.dto.AdminAccountDTO;
 import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.dto.EmployeeDTO;
+import com.ieum.gw.employee.dto.EmployeeOptionDTO;
+import com.ieum.gw.employee.dto.IdNameDTO;
 
 /**
  * 사원이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
@@ -141,4 +145,44 @@ public class EmployeeService {
         }
         return passwordEncoder.encode(rawPassword);
     }
+    
+	// ---------- 다른 모듈용 직원 조회 (같은 업체만) ----------
+
+	/** 직원의 근무 지점 ID. 없거나 다른 업체 직원이면 null */
+	public Long getWorkBranchId(Long companyId, Long employeeId) {
+		if (companyId == null || employeeId == null) {
+			return null;
+		}
+		return dao.getWorkBranchId(companyId, employeeId);
+	}
+
+	/** 직원 ID → 이름 (퇴사자 포함). 다른 업체 직원은 빠진다 */
+	public Map<Long, String> getEmployeeNames(Long companyId, List<Long> employeeIds) {
+		if (companyId == null || employeeIds == null || employeeIds.isEmpty()) {
+			return Map.of();        // 빈 목록이면 IN () 문법 오류라 SQL을 부르지 않는다
+		}
+		return toMap(dao.listEmployeeNames(companyId, employeeIds));
+	}
+
+	/** 계정 ID → 직원 이름. 사원이 없는 계정·다른 업체 계정은 빠진다 */
+	public Map<Long, String> getAccountNames(Long companyId, List<Long> accountIds) {
+		if (companyId == null || accountIds == null || accountIds.isEmpty()) {
+			return Map.of();
+		}
+		return toMap(dao.listAccountNames(companyId, accountIds));
+	}
+
+	/** 담당자로 고를 수 있는 재직자 (ID·이름·부서명) */
+	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId) {
+		return dao.listAssignableEmployees(companyId);
+	}
+
+	/** (id, name) 목록 → Map */
+	private Map<Long, String> toMap(List<IdNameDTO> rows) {
+		Map<Long, String> map = new LinkedHashMap<>();
+		for (IdNameDTO r : rows) {
+			map.put(r.getId(), r.getName());
+		}
+		return map;
+	}
 }

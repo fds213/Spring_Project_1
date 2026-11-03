@@ -83,5 +83,39 @@
               #{r}
           </foreach>
     </select>
+    
+    	<!-- 다른 모듈용: 직원의 근무 지점 -->
+	<select id="getWorkBranchId" resultType="java.lang.Long">
+		SELECT branch_id FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
 
+	<!-- 다른 모듈용: 직원 ID → 이름 (퇴사자 포함) -->
+	<select id="listEmployeeNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+		SELECT employee_id AS id, employee_name AS name
+		FROM employee
+		WHERE company_id = #{companyId}
+		  AND employee_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
+	
+		<!-- 다른 모듈용: 계정 ID → 직원 이름 (사원이 연결된 계정만) -->
+	<select id="listAccountNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+		SELECT a.user_account_id AS id, e.employee_name AS name
+		FROM user_account a
+		JOIN employee e ON e.employee_id = a.employee_id AND e.company_id = a.company_id
+		WHERE a.company_id = #{companyId}
+		  AND a.user_account_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
+	
+		<!-- 다른 모듈용: 담당자로 고를 수 있는 재직자 -->
+	<select id="listAssignableEmployees" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+		SELECT e.employee_id, e.employee_name, d.department_name
+		FROM employee e
+		LEFT JOIN department d ON d.department_id = e.department_id   
+		WHERE e.company_id = #{companyId}
+		  AND e.employment_status = 'ST_SERVING'
+		ORDER BY d.sort_order, e.employee_name, e.employee_id
+	</select>
 </mapper>

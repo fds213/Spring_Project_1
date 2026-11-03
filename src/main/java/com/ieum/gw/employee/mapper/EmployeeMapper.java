@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Param;
 import com.ieum.gw.employee.dto.AccountDTO;
 import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.dto.EmployeeDTO;
+import com.ieum.gw.employee.dto.EmployeeOptionDTO;
+import com.ieum.gw.employee.dto.IdNameDTO;
 
 @Mapper
 public interface EmployeeMapper {
@@ -28,4 +30,12 @@ public interface EmployeeMapper {
     int countActiveEmployee(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
     int countRole(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,
                   @Param("roleCodes") List<String> roleCodes);
+    
+	Long getWorkBranchId(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+
+	List<IdNameDTO> listEmployeeNames(@Param("companyId") Long companyId, @Param("ids") List<Long> ids);
+
+	List<IdNameDTO> listAccountNames(@Param("companyId") Long companyId, @Param("ids") List<Long> ids);
+
+	List<EmployeeOptionDTO> listAssignableEmployees(@Param("companyId") Long companyId);
 }
