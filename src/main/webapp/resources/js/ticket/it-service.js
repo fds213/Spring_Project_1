@@ -133,12 +133,12 @@ document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.addEvent
 function ticketDetail(t) {
   const info = itNode('dl', 'detail');
   [['번호', t.id], ['구분', TICKET_TYPE[t.type] || '-'], ['접수 지점', t.branchName],
-    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', t.body]]
+    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', text(t.body)]]
     .forEach(([k, v]) => info.append(itNode('dt', '', k), itNode('dd', '', v)));
 
-  const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', itNode('span', '', `${whenFull(h.at)} · ${h.name} · ${h.text}`))));
+  const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', text(`${whenFull(h.at)} · ${h.name} · ${h.text}`))));
   const comments = itNode('ul', 'bill-history', ...(t.comments.length
-    ? t.comments.map(c => itNode('li', '', itNode('span', '', `${whenFull(c.at)} · ${c.name} · ${c.body}`)))
+    ? t.comments.map(c => itNode('li', '', text(`${whenFull(c.at)} · ${c.name} · ${c.body}`)))
     : [itNode('li', '', itNode('span', 'muted', '아직 댓글이 없습니다'))]));
 
   const parts = [itNode('section', 'info-card', itNode('header', 'info-card-head', itNode('h2', '', '접수 내용')), info),
@@ -179,7 +179,7 @@ function itButton(label, cls) {
 function closeTicket(t, btn) {
   btn.disabled = true;
   api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/close`, { version: t.version })
-    .done(() => { showToast(`${t.id} 종료했습니다`); loadTicketMine(); })
+    .done(() => { showToast(`${t.id}번 티켓을 종료했습니다`); loadTicketMine(); })
     .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
 }
 

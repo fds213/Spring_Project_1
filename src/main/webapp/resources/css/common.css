@@ -698,6 +698,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .btn-danger-line:hover:not(:disabled) { background: var(--danger-bg); }
 /* 고르기 칸(util.js pickSelect: 티켓 담당자·장비, 자산 지급 직원) */
 .ta-assignee { width: auto; min-width: 180px; flex: 1 1 180px; }
+/* 세로로 쌓는 처리 칸(지급할 장비) 안에서는 늘어나지 않게: flex-basis 가 높이로 먹는다 */
+.inq-body > .ta-assignee { flex: none; }
 .inq-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
 .inq-body + .inq-body { border-top: 1px solid var(--line); }
 .inq-text { width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); resize: vertical; }
