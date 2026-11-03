@@ -133,7 +133,8 @@ function renderDayPanel() {
     if (it.schedule && it.schedule.canDelete) {
       const del = schNode('button', 'sch-del', '삭제');
       del.type = 'button';
-      del.addEventListener('click', () => deleteSchedule(it.schedule.id, del));
+      del.setAttribute('data-write', ''); // 읽기 전용 업체에서는 흐리게 두고 누르면 안내만 (common.js)
+      del.addEventListener('click', () => deleteSchedule(it.schedule, del));
       li.append(del);
     }
     return li;
@@ -153,6 +154,9 @@ function renderDayPanel() {
 // 일정 추가 팝업 열기: 날짜를 채우고, 제목·메모·안내는 비운다
 function openAddDialog(dateKey) {
   if (!schState.data) return;
+  // 읽기 전용 업체(체험이 끝나 결제하지 않음): 날짜 칸을 두 번 눌러 열 때도 막는다.
+  // [+ 일정 추가] 버튼(data-write)을 대신 눌러 공통 안내(common.js)를 띄운다. 창을 다 쓴 뒤에야 저장이 막히지 않게
+  if (document.body.classList.contains('is-readonly')) { schEl('schAddDay').click(); return; }
   schEl('schDate').value = dateKey || schState.selected;
   schEl('schTitle').value = '';
   schEl('schMemo').value = '';
@@ -164,11 +168,25 @@ function openAddDialog(dateKey) {
 schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
 schEl('schCancel').addEventListener('click', () => schEl('schDialog').close());
 
-function deleteSchedule(id, btn) {
-  btn.disabled = true;
-  api.post(`/schedule/api/schedules/${encodeURIComponent(id)}/delete`)
-    .done(() => { showToast('일정을 삭제했습니다'); renderSchedule(); })
-    .fail(xhr => { showToast(apiMessage(xhr)); btn.disabled = false; });
+// 삭제: 확인 창에서 [삭제]를 눌러야 지운다. 이미 지워진 일정(404, 다른 창·다른 사람이 먼저 지움)이면 달력을 다시 받는다
+function deleteSchedule(s, btn) {
+  const dlg = schEl('schDeleteDialog');
+  schEl('schDeleteText').textContent = `'${s.title}' 일정을 지웁니다. 삭제한 일정은 되돌릴 수 없습니다.`;
+  dlg.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      dlg.close();
+      if (b.value !== 'ok') return;
+      btn.disabled = true;
+      api.post(`/schedule/api/schedules/${encodeURIComponent(s.id)}/delete`)
+        .done(() => { showToast('일정을 삭제했습니다'); renderSchedule(); })
+        .fail(xhr => {
+          showToast(apiMessage(xhr));
+          if (xhr.status === 404) renderSchedule(); // 이미 없는 일정: 목록에서 없앤다
+          else btn.disabled = false;
+        });
+    };
+  });
+  dlg.showModal();
 }
 
 // 달을 옮기면 그달의 오늘(없으면 1일)을 선택한다 (받아 오는 것은 그달 것뿐이다)
