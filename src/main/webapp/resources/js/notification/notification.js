@@ -1,15 +1,18 @@
 // 알림 목록 (views/notification/list.jsp). 모든 직원 (요구분석서 3.4 업무 알림, 통합 계획서 4장 업무 알림).
-// 본인 알림만 본다. 누르면 읽음으로 바꾸고 그 화면(link)으로 간다. 메뉴 배지(종 아이콘의 숫자)는 common.js 가 /badges 로 다시 센다.
+// 본인 알림만 본다(제목·내용·시각·읽음 여부). 누르면 읽음으로 바꾸고 결재·티켓 화면으로 간다. 메뉴 배지(종 아이콘)는 common.js 가 /badges 로 다시 센다.
 // 읽음 저장도 쓰기라서 이용 기간이 끝난 업체(body.is-readonly)에서는 저장하지 않고 화면만 연다.
-// 홈의 최근 알림(home.js)도 누르면 같은 주소로 읽음을 저장한다.
-// 주소·값 이름은 화면이 먼저 정한 제안이다(notification 모듈 담당이 정하면 그에 맞춘다, AGENTS.md '수정 범위').
+// 서버: NotificationController (notification 모듈)
+//   GET  /notification/api/list?page=      → { page, pages, total, items: [{ notificationId, notificationType, title, message, approvalDocumentId, itTicketId, readAt, createdAt }] }
+//   POST /notification/api/{id}/read       → 없거나 남의 알림이면 404
 // util.js 의 h, span, whenFull, showToast 를 쓴다.
 (() => {
+  // 알림 종류(NotificationType)별 아이콘 색과 누르면 갈 화면. 결재는 결재함, 티켓 배정은 티켓 처리, 처리 완료는 요청자의 내 티켓
   const TYPE = {
-    APPROVAL_REQUEST: { label: '결재 요청', cls: 'is-approval' },
-    APPROVAL_RESULT: { label: '결재 결과', cls: 'is-approval' },
-    TICKET_ASSIGNED: { label: '티켓 배정', cls: 'is-ticket' },
-    TICKET_RESULT: { label: '티켓 처리', cls: 'is-ticket' },
+    NT_APPROVAL_REQUEST: { cls: 'is-approval', link: '/approval/list' },
+    NT_APPROVAL_DONE: { cls: 'is-approval', link: '/approval/list' },
+    NT_APPROVAL_REJECT: { cls: 'is-approval', link: '/approval/list' },
+    NT_TICKET_ASSIGNED: { cls: 'is-ticket', link: '/ticket/admin/list' },
+    NT_TICKET_RESOLVED: { cls: 'is-ticket', link: '/ticket/mine' },
   };
   const ICON = {
     'is-approval': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 15 2 2 4-4"/>',
@@ -18,89 +21,62 @@
   };
   const ctx = document.body.dataset.ctx || '';
   const $ = id => document.getElementById(id);
-  const state = { filter: 'ALL', page: 1, pages: 1, items: [], seq: 0 };
+  const state = { page: 1, pages: 1, items: [], seq: 0 };
   const readOnly = () => document.body.classList.contains('is-readonly');
-  // 이 사이트 안의 화면 주소만 따라간다('/'로 시작하고 '//'·'/\'가 아닌 것: 브라우저는 둘 다 다른 사이트로 읽는다). 그 밖의 값이면 읽음만 바꾼다
-  const safeLink = link => (typeof link === 'string' && /^\/(?![/\\])/.test(link) ? link : null);
 
   function openNotificationView() { load(true); }
   window.openNotificationView = openNotificationView;
 
-  // first: 처음부터 다시(탭을 바꿨을 때). 아니면 다음 쪽을 아래에 붙인다(더 보기)
+  // first: 처음부터. 아니면 다음 쪽을 아래에 붙인다(더 보기)
   function load(first) {
     const my = ++state.seq;
     const page = first ? 1 : state.page + 1;
-    api.get('/notification/api/notifications', { filter: state.filter, page })
+    api.get('/notification/api/list', { page })
       .done(r => {
         if (my !== state.seq) return;
         state.page = r.page || page;
         state.pages = r.pages || 1;
         // 더 보기 사이에 새 알림이 오면 쪽이 밀려 같은 알림이 다시 올 수 있어 이미 보인 것은 뺀다
-        const seen = new Set(first ? [] : state.items.map(n => n.id));
-        state.items = (first ? [] : state.items).concat((r.items || []).filter(n => !seen.has(n.id)));
-        $('notiUnread').textContent = r.unread || 0;
+        const seen = new Set(first ? [] : state.items.map(n => n.notificationId));
+        state.items = (first ? [] : state.items).concat((r.items || []).filter(n => !seen.has(n.notificationId)));
         render();
       })
       .fail(xhr => showToast(apiMessage(xhr, '알림을 불러오지 못했습니다')));
   }
 
   function render() {
-    document.querySelectorAll('.noti-tab').forEach(t => t.setAttribute('aria-selected', t.dataset.filter === state.filter));
-    const list = $('notiList');
-    if (!state.items.length) {
-      list.replaceChildren(h('li', 'noti-empty', state.filter === 'UNREAD' ? '안 읽은 알림이 없습니다' : '아직 받은 알림이 없습니다'));
-    } else {
-      list.replaceChildren(...state.items.map(item));
-    }
+    $('notiList').replaceChildren(...(state.items.length ? state.items.map(item) : [h('li', 'noti-empty', '아직 받은 알림이 없습니다')]));
     $('btnNotiMore').hidden = state.page >= state.pages;
-    $('btnReadAll').disabled = !Number($('notiUnread').textContent);
   }
 
   function item(n) {
-    const type = TYPE[n.type] || { label: '알림', cls: 'is-other' };
+    const type = TYPE[n.notificationType] || { cls: 'is-other', link: null };
+    const unread = !n.readAt;
     const icon = h('span', `noti-ic ${type.cls}`);
     icon.innerHTML = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[type.cls]}</svg>`;
-    const btn = h('button', 'noti-item' + (n.read ? '' : ' is-unread'), icon,
+    // message 에는 사용자가 쓴 문서·티켓 제목이 들어 있다: h() 는 글자로만 넣는다
+    const btn = h('button', 'noti-item' + (unread ? ' is-unread' : ''), icon,
       h('span', 'noti-main',
-        h('span', 'noti-head', span(type.label, 'noti-type'), span(whenFull(n.at), 'noti-time')),
-        h('strong', 'noti-title', n.title),
-        ...(n.body ? [h('span', 'noti-body', n.body)] : [])),
-      ...(n.read ? [] : [h('span', 'noti-dot', h('span', 'visually-hidden', '안 읽음'))]));
+        h('span', 'noti-head', span(n.title || '알림', 'noti-type'), span(whenFull(n.createdAt), 'noti-time')),
+        h('strong', 'noti-title', n.message || '')),
+      ...(unread ? [h('span', 'noti-dot', h('span', 'visually-hidden', '안 읽음'))] : []));
     btn.type = 'button';
-    btn.addEventListener('click', () => open(n));
+    btn.addEventListener('click', () => open(n, type.link));
     return h('li', '', btn);
   }
 
   // 누르면: 안 읽었으면 읽음으로 바꾸고(읽기 전용 업체는 건너뜀), 갈 화면이 있으면 그리로
-  function open(n) {
-    const link = safeLink(n.link);
+  function open(n, link) {
     const go = () => { if (link) location.href = ctx + link; };
-    if (n.read || readOnly()) { go(); return; }
-    api.post(`/notification/api/notifications/${encodeURIComponent(n.id)}/read`)
+    if (n.readAt || readOnly()) { go(); return; }
+    api.post(`/notification/api/${encodeURIComponent(n.notificationId)}/read`)
       .done(() => {
-        n.read = true;
-        $('notiUnread').textContent = Math.max(0, Number($('notiUnread').textContent) - 1);
+        n.readAt = new Date().toISOString();
         if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
         if (link) go(); else render();
       })
       .fail(xhr => { showToast(apiMessage(xhr, '읽음으로 바꾸지 못했습니다')); go(); });
   }
 
-  document.querySelectorAll('.noti-tab').forEach(t => t.addEventListener('click', () => {
-    if (state.filter === t.dataset.filter) return;
-    state.filter = t.dataset.filter;
-    load(true);
-  }));
   $('btnNotiMore').addEventListener('click', () => load(false));
-  $('btnReadAll').addEventListener('click', e => {
-    const b = e.currentTarget;
-    b.disabled = true;
-    api.post('/notification/api/notifications/read-all')
-      .done(() => {
-        showToast('모든 알림을 읽음으로 바꿨습니다');
-        if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
-        load(true);
-      })
-      .fail(xhr => { showToast(apiMessage(xhr)); b.disabled = false; });
-  });
 })();

@@ -738,13 +738,6 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .type-tab .badge { position: static; }
 
 /* ---------- 알림 목록 (views/notification/list.jsp) ---------- */
-.noti-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.noti-tab {
-  display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px;
-  background: var(--bg); color: var(--text-sub); font: inherit; font-size: 13.5px; cursor: pointer;
-}
-.noti-tab[aria-selected="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); font-weight: 600; }
-.noti-count { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--danger-bg); color: var(--danger); font-size: 11.5px; font-weight: 600; text-align: center; }
 .noti-list { list-style: none; margin: 0; padding: 0; }
 .noti-list li + li { border-top: 1px solid var(--line); }
 .noti-item {
@@ -763,7 +756,6 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .noti-type { font-weight: 600; color: var(--text-sub); }
 .noti-title { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .noti-item:not(.is-unread) .noti-title { font-weight: 500; color: var(--text-sub); }
-.noti-body { font-size: 13px; color: var(--text-sub); overflow-wrap: anywhere; }
 .noti-dot { flex: none; width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--accent); }
 .noti-empty { padding: 40px 18px; text-align: center; color: var(--text-muted); }
 .noti-more { display: flex; justify-content: center; }
