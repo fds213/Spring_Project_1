@@ -95,7 +95,7 @@
     <%-- 업체 직원 기본 메뉴 (운영자도 본다). 관리 묶음은 역할로 가린다 --%>
     <div class="nav-cat" id="navCat-home" data-cat="home"${navCat eq 'home' ? '' : ' hidden'}>
       <p class="nav-title">홈</p>
-      <ui:nav key="home" path="/home" current="${menu}">홈</ui:nav>
+      <ui:nav key="home" path="/home" current="${menu}">메인</ui:nav>
       <ui:nav key="notice" path="/board/notice" current="${menu}">공지사항</ui:nav>
     </div>
     <div class="nav-cat" id="navCat-approval" data-cat="approval"${navCat eq 'approval' ? '' : ' hidden'}>
