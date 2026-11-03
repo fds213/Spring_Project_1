@@ -41,8 +41,8 @@ function renderLeaveView(r) {
   }
   const row = (k, v) => [leaveNode('dt', '', k), leaveNode('dd', '', v)];
   dl.replaceChildren(
-    ...row('부여', `${dayText(sum.grant)} (${ymd(sum.start)} 입사 때 부여, 모든 직원 같음)`),
-    ...row('사용 (승인됨)', dayText(sum.usedDays)),
+    ...row('보유', dayText(sum.grant)),
+    ...row('승인 완료', dayText(sum.usedDays)),
     ...row('승인 대기', dayText(sum.pendingDays)),
     ...row('남은 연차', dayText(sum.left)));
 
@@ -54,5 +54,5 @@ function renderLeaveView(r) {
       : l.status === 'REJECTED' ? `반려${l.comment ? `: ${l.comment}` : ''}` : '';
     return leaveNode('li', '', leaveNode('span', 'leave-line', leaveNode('span', '', range), ...(sub ? [leaveNode('small', 'cell-sub', sub)] : [])),
       leaveNode('span', `status status-${LEAVE_STATUS_CLASS[l.status]}`, LEAVE_STATUS[l.status]));
-  }) : [leaveNode('li', 'muted', '신청한 휴가가 없습니다')]));
+  }) : [leaveNode('li', 'empty-box', '신청한 휴가가 없습니다')]));
 }
