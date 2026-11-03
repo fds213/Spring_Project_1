@@ -4,10 +4,8 @@
 /* 왼쪽 달력과 오른쪽 날짜 목록의 높이를 맞춘다 */
 #view-schedule .sch-layout { align-items: stretch; }
 
-/* 오른쪽 날짜 카드 제목 줄: 날짜 · 개수 · [+ 일정 추가] (동국 님 연차 브랜치의 배치와 같게) */
-#view-schedule .info-card-head .sch-day-add { flex: none; height: 32px; padding: 0 12px; }
-#view-schedule .info-card-head .sch-day-count { margin-left: auto; }
-#view-schedule .info-card-head .sch-day-count:empty + .sch-day-add { margin-left: auto; }
+/* 오른쪽 날짜 카드 제목 줄: 날짜 · 개수(날짜 바로 옆) · [+ 일정 추가](오른쪽 끝) */
+#view-schedule .info-card-head .sch-day-add { flex: none; height: 32px; padding: 0 12px; margin-left: auto; }
 
 /* 고른 날짜에 일정이 없을 때: 빈 카드 가운데 안내 (common.css에 같은 규칙이 들어오기 전에도 같은 모양) */
 #view-schedule .sch-day-list li.empty-box {
@@ -54,7 +52,7 @@
 #view-schedule .sch-more { padding-left: 4px; font-size: 11px; font-weight: 500; color: var(--text-sub); }
 
 /* ---------- 오른쪽: 고른 날짜의 목록 ---------- */
-#view-schedule .sch-day-count { margin-left: auto; font-size: 13px; font-weight: 500; color: var(--accent); }
+#view-schedule .sch-day-count { font-size: 13px; font-weight: 500; color: var(--accent); }
 #view-schedule .sch-day-list li { align-items: flex-start; flex-wrap: nowrap; gap: 10px; padding: 12px 0; }
 #view-schedule .sch-day-list .sch-chip { margin-top: 1px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
 #view-schedule .sch-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
