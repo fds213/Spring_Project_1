@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
   계정 생성 (GET /join → common/join, 로그인 없이 연다).
-  지금은 화면 모양만 있다. 업체 코드 확인·요청 처리(employee/employee.js)와 서버 API는 담당이 붙인다.
+  업체 코드 확인·승인 요청·요청 취소는 employee/employee.js('계정 생성' 부분), 서버는 EmployeeJoinController(/join/api/**).
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <!doctype html>
@@ -20,6 +20,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
+  <%-- 승인 요청·취소(POST)에 붙이는 CSRF 값 (common.js 가 읽는다) --%>
+  <meta name="_csrf" content="${_csrf.token}">
+  <meta name="_csrf_header" content="${_csrf.headerName}">
 </head>
 <body data-ctx="${ctx}">
   <section class="login-screen">
@@ -33,11 +36,9 @@
            승인 요청 버튼은 업체 확인과 비밀번호를 마쳐야 파란색으로 켜진다 --%>
       <form id="joinForm" class="join-form" novalidate>
         <h2 class="login-title">계정 생성</h2>
-        <p class="login-lead">업체 관리자나 부서장이 가입을 열어 둔 동안 업체 코드로 확인하고 정보를 적어 승인을 요청하세요. 승인되면 바로 계정이 만들어집니다.</p>
         <div class="field">
           <label for="joinCompany">업체 코드</label>
-          <%-- 확인: 가입 활성화가 켜진 업체면 열린 부서와 직급을 목록에 불러온다. 꺼져 있거나 없는 코드면 아무 반응이 없다.
-               틀린 확인이 10분 안에 5번이면 10분 동안 확인을 막는다 --%>
+          <%-- 확인: 가입 활성화가 켜진 업체면 열린 부서와 직급을 목록에 불러온다. 꺼져 있거나 없는 코드면 같은 안내를 보인다 --%>
           <div class="input-action">
             <input class="input" id="joinCompany" autocomplete="organization" placeholder="예: ieum7431">
             <button type="button" class="btn" id="btnJoinCheck">확인</button>
@@ -92,5 +93,9 @@
   <script src="${ctx}/resources/js/install.js"></script>
   <script src="${ctx}/resources/js/password-toggle.js"></script>
   <script src="${ctx}/resources/js/select.js"></script>
+  <script src="${ctx}/resources/lib/jquery-3.7.1.min.js"></script>
+  <script src="${ctx}/resources/js/common.js"></script>
+  <script src="${ctx}/resources/js/util.js"></script>
+  <script src="${ctx}/resources/js/employee/employee.js"></script>
 </body>
 </html>
