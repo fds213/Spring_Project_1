@@ -676,8 +676,9 @@ function setJoinStatus(text, kind) {
   s.hidden = !text;
 }
 
-// 끝난 요청의 이유 (서버의 reason)
+// 끝난 요청의 이유 (서버의 reason): 반려, 승인 뒤 비활성화된 계정(OFF)
 const JOIN_ENDED = {
+  OFF: '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요.',
   REJECTED: '가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.',
   OTHER: '이 요청은 더 진행할 수 없습니다. 다시 승인 요청을 해 주세요.',
 };
