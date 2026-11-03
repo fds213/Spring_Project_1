@@ -1,12 +1,22 @@
 package com.ieum.gw.ticket.service;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import com.ieum.gw.ticket.dao.TicketDAO;
+import com.ieum.gw.ticket.dto.EquipmentTicketDTO;
+import lombok.RequiredArgsConstructor;
+import java.util.List;
+import java.util.Objects;
 
 /**
  * 티켓이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
  */
 @Service
+@RequiredArgsConstructor
 public class TicketService {
+
+    private final TicketDAO dao;
 
     /**
      * 장비 신청 최종 승인 때 IT 지급 티켓(TK_EQUIPMENT, RECEIVED) 1건을 만든다(계획서 흐름 B).
@@ -19,8 +29,38 @@ public class TicketService {
      * @param assetType           장비 종류 코드(AT_LAPTOP·AT_DESKTOP·AT_MONITOR·AT_OTHER)
      * @param purpose             사용 목적
      */
+    @Transactional(propagation = Propagation.MANDATORY)
     public void createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long approvalDocumentId,
                                       Long branchId, String assetType, String purpose) {
-        // TODO(정상욱): 구현. 구현 전에는 아무것도 하지 않는다(티켓만 생기지 않는다).
+        requireId(companyId);
+        requireId(requesterEmployeeId);
+        requireId(approvalDocumentId);
+        requireId(branchId);
+        if (assetType == null || !List.of("AT_LAPTOP", "AT_DESKTOP", "AT_MONITOR", "AT_OTHER").contains(assetType)) {
+            throw new IllegalArgumentException("장비 종류가 올바르지 않습니다.");
+        }
+        if (purpose == null || purpose.isBlank() || purpose.codePointCount(0, purpose.length()) > 1000) {
+            throw new IllegalArgumentException("사용 목적은 1~1,000자로 입력해 주세요.");
+        }
+        // 회사·요청자·지점은 결재 Service가 검증한 값이며, 업체별 복합 FK로도 검사한다.
+        // 원본 장비 문서 고유 제약에 해당하는 중복만 SQL에서 건너뛴다.
+        int inserted = dao.insertEquipmentTicket(companyId, requesterEmployeeId, approvalDocumentId, branchId, purpose);
+        if (inserted == 1) {
+            return;
+        }
+        if (inserted == 0) {
+            EquipmentTicketDTO existing = dao.selectEquipmentTicket(companyId, approvalDocumentId);
+            if (existing != null && Objects.equals(requesterEmployeeId, existing.getRequesterEmployeeId())
+                    && Objects.equals(branchId, existing.getBranchId()) && Objects.equals(purpose, existing.getContent())) {
+                return;
+            }
+        }
+        throw new IllegalStateException("같은 결재 문서의 지급 티켓 정보를 확인해 주세요.");
+    }
+
+    private static void requireId(Long id) {
+        if (id == null || id <= 0) {
+            throw new IllegalArgumentException("업체·사원·결재 문서·지점 정보가 필요합니다.");
+        }
     }
 }
