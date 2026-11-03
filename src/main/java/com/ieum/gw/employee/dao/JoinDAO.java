@@ -90,8 +90,8 @@ public class JoinDAO {
         return mapper.insertRequest(dto);
     }
     
-    public JoinRequestViewDTO getRequestView(String companyCode, Long requestId) {
-    	return mapper.getRequestView(companyCode, requestId);
+    public JoinRequestViewDTO getRequestView(String companyCode, String keyHash) {
+        return mapper.getRequestView(companyCode, keyHash);
     }
     
     public int cancelRequest(Long requestId, Long companyId) {
