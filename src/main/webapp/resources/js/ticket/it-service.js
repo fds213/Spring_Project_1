@@ -76,24 +76,14 @@ itEl('ticketForm')?.addEventListener('submit', e => {
     .done(t => {
       itEl('ticketForm').reset();
       err.textContent = '';
-      // 바로 내 티켓으로 넘어가 여기서 띄운 안내는 사라진다: 내 티켓이 열리면서 띄운다(openTicketMineView)
-      try { sessionStorage.setItem(TICKET_NOTICE_KEY, `${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`); } catch { /* 저장소가 막혔다 */ }
-      location.href = pageHref('/ticket/mine');
+      toastAndGo(`${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`, pageHref('/ticket/mine'));
     })
     .fail(xhr => { err.textContent = apiMessage(xhr); })
     .always(() => { if (btn) btn.disabled = false; });
 });
 
 // ---------- 내 티켓 ----------
-// 접수 화면에서 넘겨 둔 안내가 있으면 한 번 띄운다
-const TICKET_NOTICE_KEY = 'ieum-ticket-notice';
-function openTicketMineView() {
-  try {
-    const notice = sessionStorage.getItem(TICKET_NOTICE_KEY);
-    if (notice) { sessionStorage.removeItem(TICKET_NOTICE_KEY); showToast(notice); }
-  } catch { /* 저장소가 막혔다 */ }
-  loadTicketMine();
-}
+function openTicketMineView() { loadTicketMine(); }
 
 function loadTicketMine() {
   api.get('/ticket/api/tickets')

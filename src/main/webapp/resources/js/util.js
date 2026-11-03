@@ -14,6 +14,21 @@ const won = n => `${n.toLocaleString('ko-KR')}원`;
 function showToast(text) {
   if (window.IEUM && IEUM.toast) IEUM.toast(text);
 }
+// 안내를 남기고 다른 화면으로 옮긴다. 옮기면 이 화면의 알림은 바로 사라지므로, 다음 화면이 열리며 한 번 띄운다
+const NEXT_TOAST_KEY = 'ieum-next-toast';
+function toastAndGo(text, href) {
+  try { sessionStorage.setItem(NEXT_TOAST_KEY, JSON.stringify({ text, at: Date.now() })); } catch { /* 저장소가 막혔으면 안내 없이 옮긴다 */ }
+  location.href = href;
+}
+// util.js 는 레이아웃의 알림 칸과 common.js 다음에 불리므로 여기서 바로 띄울 수 있다.
+// 알림 칸이 없는 화면(계정 생성 join.jsp)은 다음 화면에 넘기고, 로그인 화면을 거치는 등 30초가 지나 열리면 버린다
+try {
+  const next = JSON.parse(sessionStorage.getItem(NEXT_TOAST_KEY));
+  if (next && document.getElementById('toast')) {
+    sessionStorage.removeItem(NEXT_TOAST_KEY);
+    if (Date.now() - next.at < 30000) showToast(next.text);
+  }
+} catch { /* 저장소가 막혔다 */ }
 
 // ---------- 화면 만들기 도구 (여러 모듈의 화면 JS가 같이 쓴다) ----------
 // h(태그, class, ...자식): 요소를 만든다. 글자는 textContent로 들어가므로 사용자가 쓴 글도 그대로 넣어도 된다

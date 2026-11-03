@@ -181,8 +181,7 @@ eaEl('eaForm')?.addEventListener('submit', e => {
     .done(() => {
       eaState.draftId = null;
       err.textContent = '';
-      showToast(`${EA_FORMS[c.form]}를 제출했습니다. 첫 결재자에게 넘어갔습니다`);
-      location.href = pageHref('/approval/list');
+      toastAndGo(`${EA_FORMS[c.form]}를 제출했습니다. 첫 결재자에게 넘어갔습니다`, pageHref('/approval/list'));
     })
     .fail(xhr => { err.textContent = apiMessage(xhr); })
     .always(() => { if (btn) btn.disabled = false; });
