@@ -3,13 +3,19 @@
 <mapper namespace="com.ieum.gw.employee.mapper.EmployeeMapper">
 
     <select id="listActiveEmp" resultType="com.ieum.gw.employee.dto.EmpSummaryDTO">
-        SELECT company_id, employee_id, employee_name, department_id, job_grade_id
-        FROM employee WHERE company_id = #{companyId}
+        SELECT e.company_id, e.employee_id, e.employee_name, e.department_id, e.job_grade_id,
+        d.department_name, g.grade_name
+        FROM employee e
+        JOIN user_account a ON a.company_id = e.company_id AND a.employee_id = e.employee_id
+        LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+        LEFT JOIN job_grade g ON g.company_id = e.company_id AND g.job_grade_id = e.job_grade_id
+        WHERE e.company_id = #{companyId}
         <if test="excludeEmpId != null">
-            AND employee_id &lt;&gt; #{excludeEmpId}
+            AND e.employee_id &lt;&gt; #{excludeEmpId}
         </if>
-        AND employment_status = 'ST_SERVING'
-        ORDER BY employee_name
+        AND e.employment_status = 'ST_SERVING'
+        AND a.status_code = 'ACTIVE'
+        ORDER BY e.employee_name
     </select>
     
 	    <!-- 서울 시각 (테이블 기본값과 같은 기준) -->

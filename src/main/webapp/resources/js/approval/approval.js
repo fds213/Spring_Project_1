@@ -2,19 +2,19 @@
 // 결재선은 최대 2단계로 순서대로 승인한다. 마지막 결재자가 승인해야 최종 승인이다.
 // - 휴가: 최종 승인 때 연차가 차감되고 일정에 나타난다 (연차 화면의 신청 내역과 같은 데이터다).
 // - 장비 지급: 최종 승인 때 IT 서비스에 지급 티켓이 만들어진다. 지급이 끝나면 내 장비에 나타난다.
-// 임시저장은 검사 없이 입력값을 그대로 저장하고, 반려·회수된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다.
-// 결재자 목록, 내 순번인지, 회수·재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
+// 임시저장은 검사 없이 입력값을 그대로 저장하고, 반려된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다.
+// 결재자 목록, 내 순번인지, 재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
 // 읽기 전용 업체는 쓰는 요청이 403으로 거절된다 (버튼의 data-write로 화면도 먼저 막는다).
 
-const EA_FORMS = { LEAVE: '휴가 신청서', EQUIP: '장비 지급 신청서' };
-const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려·회수', DRAFT: '임시저장' };
-const EA_STATUS = { REQUESTED: '승인 대기', APPROVED: '승인', REJECTED: '반려', CANCELED: '회수' };
-const EA_STATUS_CLASS = { REQUESTED: 'waiting', APPROVED: 'paid', REJECTED: 'failed', CANCELED: 'expired' };
-const EA_LEAVE_KIND = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
+const EA_FORMS = { DOC_LEAVE: '휴가 신청서', DOC_EQUIPMENT: '장비 지급 신청서' };
+const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려', DRAFT: '임시저장' };
+const EA_STATUS = { IN_PROGRESS: '진행', APPROVED: '완료', REJECTED: '반려' };
+const EA_STATUS_CLASS = { IN_PROGRESS: 'waiting', APPROVED: 'paid', REJECTED: 'failed' };
+const EA_LEAVE_TYPE = { LV_FULL: '연차', LV_AM: '오전 반차', LV_PM: '오후 반차' };
 const EQUIP_QTY_MAX = 10;
 const EA_REASON_MAX = 200; // 장비 신청 사유, 장비 문서 결재 의견
 const EA_LEAVE_COMMENT_MAX = 100; // 휴가 문서 결재 의견
-const EA_ACTION = { APPROVE: '승인', REJECT: '반려', CANCEL: '회수' };
+const EA_ACTION = { APR_SUBMIT: '제출', APR_APPROVE: '승인', APR_REJECT: '반려' };
 
 const eaEl = id => document.getElementById(id);
 const eaNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
@@ -30,18 +30,18 @@ const eaButton = (label, cls, write) => {
   return b;
 };
 const eaDays = n => `${Number.isInteger(n) ? n : n.toFixed(1)}일`;
-const eaSpan = f => (f.from ? `${f.from}${f.to && f.to !== f.from ? ` ~ ${f.to}` : ''}` : '');
+const eaSpan = f => (f.fromDate ? `${f.fromDate}${f.toDate && f.toDate !== f.fromDate ? ` ~ ${f.toDate}` : ''}` : '');
 const eaState = { tab: 'WAIT', open: null, draftId: null, pre: null, box: null, opts: null };
 
 
 // "박관리 ✓ → 최팀장 (결재 중)"처럼 결재선의 진행을 한 줄로
 function eaLineText(d) {
-  if (!d.line.length) return '-';
-  return d.line.map((p, i) => {
-    if (d.status === 'APPROVED' || i < d.step) return `${p.name} ✓`;
-    if (i === d.step && d.status === 'REQUESTED') return `${p.name} (결재 중)`;
-    if (i === d.step && d.status === 'REJECTED') return `${p.name} (반려)`;
-    return p.name;
+  if (!d.steps.length) return '-';
+  const current = d.statusCode === 'IN_PROGRESS' ? d.steps.find(p => p.statusCode === 'WAITING') : null;
+  return d.steps.map(p => {
+    if (p.statusCode === 'APPROVED') return `${p.employeeName} ✓`;
+    if (p.statusCode === 'REJECTED') return `${p.employeeName} (반려)`;
+    return p === current ? `${p.employeeName} (결재 중)` : p.employeeName;
   }).join(' → ');
 }
 
@@ -52,26 +52,26 @@ function eaFillSelects() {
     const sel = eaEl(id);
     const keep = sel.value;
     sel.replaceChildren(...(withNone ? [new Option('(없음)', '')] : [new Option('(고르세요)', '')]),
-      ...o.approvers.map(e => new Option(`${e.name} (${e.dept} · ${e.rank})`, e.empNo)));
+      ...o.approvers.map(e => new Option(`${e.employeeName} (${e.departmentName} · ${e.gradeName})`, e.employeeId)));
     if ([...sel.options].some(x => x.value === keep)) sel.value = keep;
   };
   fill('eaAppr1', false);
   fill('eaAppr2', true);
-  eaEl('eaEquipBranch').replaceChildren(...o.branches.map(b => new Option(b.name, b.id)));
-  eaEl('eaEquipKind').replaceChildren(...o.equipKinds.map(k => new Option(k, k)));
+  eaEl('eaEquipBranch').replaceChildren(...o.branches.map(b => new Option(b.branchName, b.branchId)));
+  eaEl('eaEquipKind').replaceChildren(...o.equipKinds.map(k => new Option(k.codeName, k.code)));
 }
 
 // 양식에 따라 보이는 입력칸과 안내를 바꾼다. 입력해 둔 값은 지우지 않는다
 function eaSyncForm() {
   const form = eaEl('eaFormKind').value;
-  eaEl('eaLeaveFields').hidden = form !== 'LEAVE';
-  eaEl('eaEquipFields').hidden = form !== 'EQUIP';
+  eaEl('eaLeaveFields').hidden = form !== 'DOC_LEAVE';
+  eaEl('eaEquipFields').hidden = form !== 'DOC_EQUIPMENT';
   eaEl('eaFormTitle').textContent = EA_FORMS[form];
-  const half = eaEl('eaLeaveKind').value !== 'FULL';
+  const half = eaEl('eaLeaveKind').value !== 'LV_FULL';
   if (half) eaEl('eaLeaveTo').value = eaEl('eaLeaveFrom').value; // 반차는 하루만
   eaEl('eaLeaveTo').disabled = half;
-  const sum = form === 'LEAVE' && eaState.opts ? eaState.opts.leave : null;
-  const rows = form === 'LEAVE'
+  const sum = form === 'DOC_LEAVE' && eaState.opts ? eaState.opts.leave : null;
+  const rows = form === 'DOC_LEAVE'
     ? [['남은 연차', sum ? `${eaDays(sum.available)} (승인 대기 ${eaDays(sum.pendingDays)} 제외)` : '-'], ['결재', '최대 2단계, 순서대로 승인합니다'],
       ['최종 승인 후', '연차가 차감되고 일정에 나타납니다'], ['주의', '주말과 등록 휴일은 세지 않고, 오전·오후 반차는 0.5일입니다']]
     : [['결재', '최대 2단계, 순서대로 승인합니다'], ['최종 승인 후', 'IT 서비스에 지급 티켓이 만들어집니다'], ['지급 확인', '내 티켓에서 처리 상태를, 지급되면 내 장비에서 봅니다'],
@@ -82,15 +82,15 @@ function eaSyncForm() {
 function eaApplyForm(p) {
   const f = p.fields || {};
   const kinds = (eaState.opts && eaState.opts.equipKinds) || [];
-  eaEl('eaFormKind').value = p.form || 'LEAVE';
-  eaEl('eaLeaveKind').value = f.kind && ['FULL', 'AM', 'PM'].includes(f.kind) ? f.kind : 'FULL';
-  eaEl('eaLeaveFrom').value = (p.form === 'LEAVE' && f.from) || '';
-  eaEl('eaLeaveTo').value = (p.form === 'LEAVE' && f.to) || '';
-  eaEl('eaLeaveReason').value = (p.form === 'LEAVE' && f.reason) || '';
-  eaEl('eaEquipKind').value = p.form === 'EQUIP' && kinds.includes(f.kind) ? f.kind : (kinds[0] || '');
-  eaEl('eaEquipQty').value = (p.form === 'EQUIP' && f.qty) || 1;
-  if (p.form === 'EQUIP' && f.branchId) eaEl('eaEquipBranch').value = f.branchId;
-  eaEl('eaEquipReason').value = (p.form === 'EQUIP' && f.reason) || '';
+  eaEl('eaFormKind').value = p.form || 'DOC_LEAVE';
+  eaEl('eaLeaveKind').value = f.leaveType && ['LV_FULL', 'LV_AM', 'LV_PM'].includes(f.leaveType) ? f.leaveType : 'LV_FULL';
+  eaEl('eaLeaveFrom').value = (p.form === 'DOC_LEAVE' && f.fromDate) || '';
+  eaEl('eaLeaveTo').value = (p.form === 'DOC_LEAVE' && f.toDate) || '';
+  eaEl('eaLeaveReason').value = (p.form === 'DOC_LEAVE' && f.reason) || '';
+  eaEl('eaEquipKind').value = p.form === 'DOC_EQUIPMENT' && kinds.some(k => k.code === f.assetType) ? f.assetType : ((kinds[0] && kinds[0].code) || '');
+  eaEl('eaEquipQty').value = (p.form === 'DOC_EQUIPMENT' && f.quantity) || 1;
+  if (p.form === 'DOC_EQUIPMENT' && f.branchId) eaEl('eaEquipBranch').value = f.branchId;
+  eaEl('eaEquipReason').value = (p.form === 'DOC_EQUIPMENT' && f.purpose) || '';
   eaEl('eaAppr1').value = (p.line && p.line[0]) || '';
   eaEl('eaAppr2').value = (p.line && p.line[1]) || '';
   eaEl('eaError').textContent = '';
@@ -109,7 +109,7 @@ function openApprovalWriteView() {
     .done(opts => {
       eaState.opts = opts;
       eaFillSelects();
-      eaApplyForm(pre || { form: 'LEAVE', fields: {}, line: [] });
+      eaApplyForm(pre || { form: 'DOC_LEAVE', fields: {}, line: [] });
     })
     .fail(xhr => { eaEl('eaError').textContent = apiMessage(xhr, '결재자 목록을 불러오지 못했습니다'); });
 }
@@ -118,9 +118,9 @@ function eaCollect() {
   const form = eaEl('eaFormKind').value;
   return {
     form,
-    fields: form === 'LEAVE'
-      ? { kind: eaEl('eaLeaveKind').value, from: eaEl('eaLeaveFrom').value, to: eaEl('eaLeaveTo').value, reason: eaEl('eaLeaveReason').value.trim() }
-      : { kind: eaEl('eaEquipKind').value, qty: Number(eaEl('eaEquipQty').value), branchId: eaEl('eaEquipBranch').value, reason: eaEl('eaEquipReason').value.trim() },
+    fields: form === 'DOC_LEAVE'
+      ? { leaveType: eaEl('eaLeaveKind').value, fromDate: eaEl('eaLeaveFrom').value, toDate: eaEl('eaLeaveTo').value, reason: eaEl('eaLeaveReason').value.trim() }
+      : { assetType: eaEl('eaEquipKind').value, quantity: Number(eaEl('eaEquipQty').value), branchId: eaEl('eaEquipBranch').value, purpose: eaEl('eaEquipReason').value.trim() },
     a1: eaEl('eaAppr1').value, a2: eaEl('eaAppr2').value,
   };
 }
@@ -128,15 +128,15 @@ function eaCollect() {
 // 제출 전에 먼저 알려 줄 것. 서버도 같은 검사를 다시 하고, 연차 잔여·날짜 겹침·휴일·지난 날짜는 서버만 본다
 function eaCheck(c) {
   const f = c.fields;
-  if (c.form === 'LEAVE') {
-    if (!f.from) return '시작일을 입력해 주세요';
-    if (f.kind === 'FULL' && (!f.to || f.to < f.from)) return '종료일은 시작일 이후여야 합니다';
+  if (c.form === 'DOC_LEAVE') {
+    if (!f.fromDate) return '시작일을 입력해 주세요';
+    if (f.leaveType === 'LV_FULL' && (!f.toDate || f.toDate < f.fromDate)) return '종료일은 시작일 이후여야 합니다';
   } else {
-    if (!f.kind) return '장비 종류를 골라 주세요';
-    if (!Number.isInteger(f.qty) || f.qty < 1 || f.qty > EQUIP_QTY_MAX) return `수량은 1~${EQUIP_QTY_MAX}대로 입력해 주세요`;
+    if (!f.assetType) return '장비 종류를 골라 주세요';
+    if (!Number.isInteger(f.quantity) || f.quantity < 1 || f.quantity > EQUIP_QTY_MAX) return `수량은 1~${EQUIP_QTY_MAX}대로 입력해 주세요`;
     if (!f.branchId) return '수령 지점을 골라 주세요';
-    if (!f.reason) return '신청 사유를 입력해 주세요';
-    if (f.reason.length > EA_REASON_MAX) return `사유는 ${EA_REASON_MAX}자까지 쓸 수 있습니다`;
+    if (!f.purpose) return '신청 사유를 입력해 주세요';
+    if (f.purpose.length > EA_REASON_MAX) return `사유는 ${EA_REASON_MAX}자까지 쓸 수 있습니다`;
   }
   if (eaState.opts && !eaState.opts.approvers.length) return '결재할 사람이 없습니다. 같은 업체에 부서장·인사 담당·업체 관리자가 본인 말고 한 명 있어야 합니다';
   if (!c.a1) return '1단계 결재자를 골라 주세요';
@@ -155,7 +155,7 @@ function eaSaveDraft(body, btn) {
   (id ? api.post(`/approval/api/drafts/${encodeURIComponent(id)}`, body) : api.post('/approval/api/drafts', body))
     .always(() => { btn.disabled = false; })
     .done(d => {
-      eaState.draftId = d.id;
+      eaState.draftId = d.approvalDocumentId;
       showToast('임시저장했습니다. 결재함의 임시저장에서 이어서 쓸 수 있습니다');
     })
     .fail(xhr => {
@@ -166,7 +166,7 @@ function eaSaveDraft(body, btn) {
 }
 eaEl('btnEaDraft')?.addEventListener('click', () => {
   const c = eaCollect();
-  eaSaveDraft({ form: c.form, fields: c.fields, line: [c.a1, c.a2] }, eaEl('btnEaDraft'));
+  eaSaveDraft({ documentType: c.form, fields: c.fields, line: [c.a1, c.a2] }, eaEl('btnEaDraft'));
 });
 
 eaEl('eaForm')?.addEventListener('submit', e => {
@@ -177,7 +177,7 @@ eaEl('eaForm')?.addEventListener('submit', e => {
   if (msg) { err.textContent = msg; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/approval/api/documents', { form: c.form, fields: c.fields, line: [c.a1, c.a2], draftId: eaState.draftId })
+  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], draftId: eaState.draftId })
     .done(() => {
       eaState.draftId = null;
       err.textContent = '';
@@ -210,13 +210,13 @@ function renderApprovalBox() {
   const cols = draft ? 2 : 5;
   const rows = [];
   (buckets[eaState.tab] || []).forEach(d => {
-    const key = `${draft ? 'DRAFT' : d.form}:${d.id}`;
+    const key = `${draft ? 'DRAFT' : d.documentType}:${d.approvalDocumentId}`;
     const isOpen = eaState.open === key;
     const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''), ...(draft
-      ? [eaCell('문서', eaNode('span', '', `${EA_FORMS[d.form]}${eaDraftTitle(d)}`)), eaCell('저장 시각', eaNode('span', '', whenFull(d.savedAt)))]
-      : [eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.name), eaNode('small', 'cell-sub', d.dept)),
-        eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.status]}`, EA_STATUS[d.status])),
-        eaCell('기안일', eaNode('span', '', whenFull(d.at)))]));
+      ? [eaCell('문서', eaNode('span', '', `${EA_FORMS[d.documentType]}${eaDraftTitle(d)}`)), eaCell('저장 시각', eaNode('span', '', whenFull(d.updatedAt)))]
+      : [eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), eaNode('small', 'cell-sub', d.departmentName)),
+        eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode])),
+        eaCell('기안일', eaNode('span', '', whenFull(d.submittedAt)))]));
     tr.addEventListener('click', () => { eaState.open = isOpen ? null : key; renderApprovalBox(); });
     rows.push(tr);
     if (isOpen) {
@@ -226,7 +226,7 @@ function renderApprovalBox() {
     }
   });
   if (!rows.length) {
-    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려·회수된 문서가 없습니다', DRAFT: '임시저장한 문서가 없습니다' }[eaState.tab]);
+    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려된 문서가 없습니다', DRAFT: '임시저장한 문서가 없습니다' }[eaState.tab]);
     td.colSpan = cols;
     rows.push(eaNode('tr', 'row-empty', td));
   }
@@ -238,30 +238,30 @@ document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.addEventListene
   renderApprovalBox();
 }));
 
-const eaDraftTitle = d => (d.form === 'LEAVE'
-  ? (d.fields.from ? ` · ${eaSpan(d.fields)}` : '')
-  : (d.fields.kind ? ` · ${d.fields.kind} ${d.fields.qty || ''}대` : ''));
+const eaDraftTitle = d => (d.documentType === 'DOC_LEAVE'
+  ? (d.fields.fromDate ? ` · ${eaSpan(d.fields)}` : '')
+  : (d.fields.assetType ? ` · ${d.assetTypeName} ${d.fields.quantity || ''}대` : ''));
 
 // 문서 내용 줄: 양식마다 다르다
 function eaDocRows(d) {
   const f = d.fields;
-  if (d.form === 'LEAVE') return [['구분', EA_LEAVE_KIND[f.kind]], ['기간', `${eaSpan(f)} (${d.days}일)`], ['사유', f.reason || '-']];
-  return [['장비', `${f.kind} ${f.qty}대`], ['수령 지점', d.branchName], ['사유', f.reason],
+  if (d.documentType === 'DOC_LEAVE') return [['구분', EA_LEAVE_TYPE[f.leaveType]], ['기간', `${eaSpan(f)} (${d.requestedDays}일)`], ['사유', f.reason || '-']];
+  return [['장비', `${d.assetTypeName} ${f.quantity}대`], ['수령 지점', d.branchName], ['사유', f.purpose],
     ...(d.ticketId ? [['지급 티켓', `${d.ticketId} (내 티켓에서 처리 상태를 봅니다)`]] : [])];
 }
 
 function eaDocDetail(d) {
   const info = eaNode('dl', 'detail');
-  [['문서', d.title], ['기안자', `${d.name}${d.dept ? ` (${d.dept})` : ''}`], ['기안일', whenFull(d.at)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', EA_STATUS[d.status]]]
+  [['문서', d.title], ['기안자', `${d.employeeName}${d.departmentName ? ` (${d.departmentName})` : ''}`], ['기안일', whenFull(d.submittedAt)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', EA_STATUS[d.statusCode]]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
   const log = eaNode('ul', 'bill-history', ...(d.history.length
-    ? d.history.map(h => eaNode('li', '', eaNode('span', '', `${whenFull(h.at)} · ${h.name} · ${EA_ACTION[h.action] || h.action}${h.comment ? ` · ${h.comment}` : ''}`)))
+    ? d.history.map(h => eaNode('li', '', eaNode('span', '', `${whenFull(h.createdAt)} · ${h.employeeName} · ${EA_ACTION[h.actionCode] || h.actionCode}${h.opinion ? ` · ${h.opinion}` : ''}`)))
     : [eaNode('li', '', eaNode('span', 'muted', '아직 처리된 단계가 없습니다'))]));
   const side = eaNode('section', 'info-card', eaNode('header', 'info-card-head', eaNode('h2', '', '결재 이력')), log);
 
   if (d.canDecide) {
     const box = eaNode('textarea', 'inq-text');
-    box.maxLength = d.form === 'LEAVE' ? EA_LEAVE_COMMENT_MAX : EA_REASON_MAX;
+    box.maxLength = d.documentType === 'DOC_LEAVE' ? EA_LEAVE_COMMENT_MAX : EA_REASON_MAX;
     box.placeholder = '의견 (반려할 때는 사유가 꼭 필요합니다)';
     box.setAttribute('aria-label', '결재 의견');
     const ok = eaButton('승인', 'btn btn-primary', true);
@@ -269,14 +269,10 @@ function eaDocDetail(d) {
     ok.addEventListener('click', () => eaDecide(d, true, box.value.trim(), [ok, no]));
     no.addEventListener('click', () => eaDecide(d, false, box.value.trim(), [ok, no]));
     side.append(eaNode('div', 'inq-body', box, eaNode('div', 'inq-actions', ok, no)));
-  } else if (d.canWithdraw) {
-    const cancel = eaButton('회수', 'btn', true);
-    cancel.addEventListener('click', () => eaCancel(d, cancel));
-    side.append(eaNode('div', 'inq-body', eaNode('p', 'inq-hint', '결재가 끝나기 전에는 문서를 회수할 수 있습니다. 회수한 문서는 반려·회수 탭에서 다시 기안합니다.'), eaNode('div', 'inq-actions', cancel)));
   } else if (d.canRedraft) {
     const again = eaButton('재기안', 'btn btn-primary', true);
-    again.addEventListener('click', () => eaStartWrite(d.form, { fields: d.fields, line: d.line.map(p => p.empNo) }));
-    side.append(eaNode('div', 'inq-body', ...(d.rejectComment ? [eaNode('p', 'notice-warn', `반려 사유: ${d.rejectComment}`)] : []),
+    again.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.steps.map(p => p.approverEmployeeId) }));
+    side.append(eaNode('div', 'inq-body', ...(d.rejectOpinion ? [eaNode('p', 'notice-warn', `반려 사유: ${d.rejectOpinion}`)] : []),
       eaNode('p', 'inq-hint', '내용과 결재선을 채운 새 기안 화면이 열립니다. 고친 뒤 다시 제출하세요.'), eaNode('div', 'inq-actions', again)));
   }
   return eaNode('div', 'inq-grid', eaNode('section', 'info-card', eaNode('header', 'info-card-head', eaNode('h2', '', '문서 내용')), info), side);
@@ -285,17 +281,17 @@ function eaDocDetail(d) {
 function eaDraftDetail(d) {
   const info = eaNode('dl', 'detail');
   const f = d.fields;
-  const rows = d.form === 'LEAVE'
-    ? [['구분', EA_LEAVE_KIND[f.kind] || '-'], ['기간', eaSpan(f) || '-'], ['사유', f.reason || '-']]
-    : [['장비', f.kind ? `${f.kind} ${f.qty || ''}대` : '-'], ['수령 지점', d.branchName || '-'], ['사유', f.reason || '-']];
-  [['양식', EA_FORMS[d.form]], ...rows, ['결재선', d.lineNames.join(' → ') || '-'], ['저장', whenFull(d.savedAt)]]
+  const rows = d.documentType === 'DOC_LEAVE'
+    ? [['구분', EA_LEAVE_TYPE[f.leaveType] || '-'], ['기간', eaSpan(f) || '-'], ['사유', f.reason || '-']]
+    : [['장비', f.assetType ? `${d.assetTypeName} ${f.quantity || ''}대` : '-'], ['수령 지점', d.branchName || '-'], ['사유', f.purpose || '-']];
+  [['양식', EA_FORMS[d.documentType]], ...rows, ['결재선', d.steps.map(p => p.employeeName).join(' → ') || '-'], ['저장', whenFull(d.updatedAt)]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
   const resume = eaButton('이어서 쓰기', 'btn btn-primary', true);
   const drop = eaButton('삭제', 'btn', true);
-  resume.addEventListener('click', () => eaStartWrite(d.form, { fields: d.fields, line: d.line, draftId: d.id }));
+  resume.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.steps.map(p => p.approverEmployeeId), draftId: d.approvalDocumentId }));
   drop.addEventListener('click', () => {
     drop.disabled = true;
-    api.post(`/approval/api/drafts/${encodeURIComponent(d.id)}/delete`)
+    api.post(`/approval/api/drafts/${encodeURIComponent(d.approvalDocumentId)}/delete`)
       .done(() => { eaState.open = null; loadApprovalBox(); })
       .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 404) loadApprovalBox(); })
       .always(() => { drop.disabled = false; });
@@ -306,16 +302,16 @@ function eaDraftDetail(d) {
 
 // ---------- 결재 처리 ----------
 function eaDecideText(r, approve) {
-  const what = `${r.name}님의 ${r.form === 'LEAVE' ? '휴가를' : '장비 지급 신청을'}`;
+  const what = `${r.employeeName}님의 ${r.documentType === 'DOC_LEAVE' ? '휴가를' : '장비 지급 신청을'}`;
   if (!approve) return `${what} 반려했습니다`;
-  if (r.status === 'APPROVED') return `${what} 최종 승인했습니다${r.ticketId ? '. 지급 티켓을 만들었습니다' : ''}`;
+  if (r.statusCode === 'APPROVED') return `${what} 최종 승인했습니다${r.ticketId ? '. 지급 티켓을 만들었습니다' : ''}`;
   return `${what} 승인하고 다음 결재자에게 넘겼습니다`;
 }
 
-function eaDecide(d, approve, comment, btns) {
-  if (!approve && !comment) return showToast('반려 사유를 적어 주세요');
+function eaDecide(d, approve, opinion, btns) {
+  if (!approve && !opinion) return showToast('반려 사유를 적어 주세요');
   btns.forEach(b => { b.disabled = true; });
-  api.post(`/approval/api/documents/${encodeURIComponent(d.id)}/${approve ? 'approve' : 'reject'}`, { comment })
+  api.post(`/approval/api/documents/${encodeURIComponent(d.approvalDocumentId)}/${approve ? 'approve' : 'reject'}`, { opinion })
     .done(r => {
       showToast(eaDecideText(r, approve));
       eaState.open = null;
@@ -323,22 +319,7 @@ function eaDecide(d, approve, comment, btns) {
     })
     .fail(xhr => {
       showToast(apiMessage(xhr));
-      if (xhr.status === 404 || xhr.status === 409) loadApprovalBox(); // 이미 처리됐거나 회수된 문서: 새로 받아 그린다
+      if (xhr.status === 404 || xhr.status === 409) loadApprovalBox(); // 이미 처리된 문서: 새로 받아 그린다
     })
     .always(() => btns.forEach(b => { b.disabled = false; }));
-}
-
-function eaCancel(d, btn) {
-  btn.disabled = true;
-  api.post(`/approval/api/documents/${encodeURIComponent(d.id)}/withdraw`)
-    .done(() => {
-      showToast('신청을 회수했습니다');
-      eaState.open = null;
-      loadApprovalBox();
-    })
-    .fail(xhr => {
-      showToast(apiMessage(xhr));
-      if (xhr.status === 404 || xhr.status === 409) loadApprovalBox();
-    })
-    .always(() => { btn.disabled = false; });
 }

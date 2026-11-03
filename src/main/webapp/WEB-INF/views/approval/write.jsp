@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-approval-write">
-      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 임시저장은 이어서 쓰고, 반려·회수된 문서는 결재함에서 재기안한다 (approval/approval.js) --%>
+      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 임시저장은 이어서 쓰고, 반려된 문서는 결재함에서 재기안한다 (approval/approval.js) --%>
       <div class="page-head"><h1>기안 작성</h1></div>
       <div class="info-grid info-grid-2">
         <section class="info-card">
@@ -23,12 +23,12 @@
           <form class="leave-form" id="eaForm" novalidate>
             <div class="leave-row">
               <label for="eaFormKind">양식</label>
-              <select class="filter-select" id="eaFormKind"><option value="LEAVE">휴가 신청서</option><option value="EQUIP">장비 지급 신청서</option></select>
+              <select class="filter-select" id="eaFormKind"><option value="DOC_LEAVE">휴가 신청서</option><option value="DOC_EQUIPMENT">장비 지급 신청서</option></select>
             </div>
             <div id="eaLeaveFields">
               <div class="leave-row">
                 <label for="eaLeaveKind">구분</label>
-                <select class="filter-select" id="eaLeaveKind"><option value="FULL">연차 (종일)</option><option value="AM">오전 반차</option><option value="PM">오후 반차</option></select>
+                <select class="filter-select" id="eaLeaveKind"><option value="LV_FULL">연차 (종일)</option><option value="LV_AM">오전 반차</option><option value="LV_PM">오후 반차</option></select>
               </div>
               <div class="leave-row"><label for="eaLeaveFrom">시작일</label><input class="input" id="eaLeaveFrom" type="date"></div>
               <div class="leave-row"><label for="eaLeaveTo">종료일</label><input class="input" id="eaLeaveTo" type="date"></div>
