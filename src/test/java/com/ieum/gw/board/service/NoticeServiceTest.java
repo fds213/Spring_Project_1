@@ -13,6 +13,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.board.dao.NoticeDAO;
+import com.ieum.gw.board.dto.NoticeDTO;
 import com.ieum.gw.common.dto.AuthEmpDTO;
 import com.ieum.gw.common.dto.LoginUser;
 
@@ -28,6 +29,10 @@ class NoticeServiceTest {
         int boardInserts;          // 게시판 줄을 만든 횟수
         Long savedCompanyId;
         Long savedBoardId;
+        Long listCompanyId;        // 목록을 부른 업체
+        List<String> listWords;    // 목록 검색어
+        int listOffset = -1;
+        int listSize = -1;
 
         FakeNoticeDAO(Long boardId) {
             super(null);
@@ -56,6 +61,15 @@ class NoticeServiceTest {
             savedCompanyId = companyId;
             savedBoardId = boardId;
             return 1;
+        }
+
+        @Override
+        public List<NoticeDTO> selectNoticeList(Long companyId, List<String> words, int offset, int size) {
+            listCompanyId = companyId;
+            listWords = words;
+            listOffset = offset;
+            listSize = size;
+            return new ArrayList<>();
         }
 
         @Override
@@ -109,5 +123,21 @@ class NoticeServiceTest {
         assertEquals(HttpStatus.FORBIDDEN, e.getStatus());
         assertEquals(0, dao.boardInserts);
         assertEquals(null, dao.savedBoardId);
+    }
+
+    @Test
+    @DisplayName("메인 화면 최신 공지: 우리 업체 공지를 검색어 없이 처음부터 정한 개수만큼, 많아도 10개")
+    void recentNotices() {
+        FakeNoticeDAO dao = new FakeNoticeDAO(BOARD_ID);
+        NoticeService service = new NoticeService(dao, null);
+
+        service.getRecentNotices(COMPANY_ID, 5);
+        assertEquals(COMPANY_ID, dao.listCompanyId);
+        assertEquals(0, dao.listWords.size());
+        assertEquals(0, dao.listOffset);
+        assertEquals(5, dao.listSize);
+
+        service.getRecentNotices(COMPANY_ID, 100); // 너무 많이 달라고 해도 10개
+        assertEquals(10, dao.listSize);
     }
 }
