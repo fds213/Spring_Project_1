@@ -101,8 +101,8 @@ public class AttendanceDAO {
         return mapper.deleteHoliday(companyId, holidayId);
     }
 
-    public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month) {
-        return mapper.selectMonthSummary(companyId, month);
+    public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month, String lateAfter, String earlyBefore) {
+        return mapper.selectMonthSummary(companyId, month, lateAfter, earlyBefore);
     }
 
     public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) {

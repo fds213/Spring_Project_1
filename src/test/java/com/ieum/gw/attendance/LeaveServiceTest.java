@@ -2,6 +2,7 @@ package com.ieum.gw.attendance;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -21,7 +22,7 @@ import org.springframework.dao.DuplicateKeyException;
 import com.ieum.gw.attendance.dao.AttendanceDAO;
 import com.ieum.gw.attendance.dao.LeaveDAO;
 import com.ieum.gw.attendance.dto.ApprovalStepDTO;
-import com.ieum.gw.attendance.dto.EmployeeCareerDTO;
+import com.ieum.gw.attendance.dto.EmployeeHireDTO;
 import com.ieum.gw.attendance.dto.LeaveCycleDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.LeaveRequestDTO;
@@ -187,7 +188,7 @@ class LeaveServiceTest {
     @Test
     @DisplayName("최초 부여: 입사일부터 15일 하나(끝나는 날 없음). 두 번 불러도, 나중에 차감해도 하나만")
     void grantInitialLeave() {
-        leaveMapper.career.put(200L, career("2026-11-02"));
+        leaveMapper.hires.put(200L, hire("2026-11-02"));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
         leave.grantInitialLeave(CO, 200L, LocalDate.of(2026, 11, 2));
         leave.useLeave(CO, 200L, ACTOR, List.of(day("2027-05-03", "LV_FULL", 1)));
@@ -212,22 +213,47 @@ class LeaveServiceTest {
                 () -> holiday.addPreset(CO, 2031)).getStatus());
     }
 
-    private static EmployeeCareerDTO career(String hire) {
-        EmployeeCareerDTO c = new EmployeeCareerDTO();
-        c.setHireDate(hire);
-        return c;
+    @Test
+    @DisplayName("휴일 넣기: 휴일 관리 화면에서 볼 수 있는 2000~2100년만 받는다 (범위 밖은 넣으면 화면에서 못 지운다)")
+    void holidayYearRange() {
+        for (String outside : List.of("1999-12-31", "2101-01-01")) {
+            assertEquals(400, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
+                    () -> holiday.add(CO, outside, "범위 밖")).getStatus());
+        }
+        holiday.add(CO, "2000-01-01", "처음 해");
+        holiday.add(CO, "2100-12-31", "마지막 해");
+        assertEquals(1, ((List<?>) holiday.list(CO, 2000).get("items")).size());
+        assertEquals(1, ((List<?>) holiday.list(CO, 2100).get("items")).size());
+    }
+
+    @Test
+    @DisplayName("연차 화면: 입사일이 빈 직원과 없는 직원의 안내를 가른다")
+    void leavesWithoutHireDate() {
+        EmployeeHireDTO hireless = hire(null);
+        hireless.setEmployeeId(103L); // 실제 매퍼처럼 employee_id 만 차 있다 (LeaveMapper.xml selectEmployeeHire)
+        leaveMapper.hires.put(103L, hireless);
+        Map<String, Object> noHire = leave.leaves(CO, 103L);
+        assertNull(noHire.get("summary"));
+        assertEquals("NO_HIRE_DATE", noHire.get("reason"));
+        assertEquals("NO_EMPLOYEE", leave.leaves(CO, 999L).get("reason"));
+    }
+
+    private static EmployeeHireDTO hire(String date) {
+        EmployeeHireDTO e = new EmployeeHireDTO();
+        e.setHireDate(date);
+        return e;
     }
 
     /** 연차 테이블 메모리판: leave_cycle(UQ 사원+시작일), leave_slot(PK 사원+날짜+시간대), leave_ledger(UQ 날짜 행+종류) */
     static class FakeLeaveMapper implements LeaveMapper {
-        final Map<Long, EmployeeCareerDTO> career = new HashMap<>(Map.of(EMP, career("2024-03-04")));
+        final Map<Long, EmployeeHireDTO> hires = new HashMap<>(Map.of(EMP, hire("2024-03-04")));
         final List<LeaveCycleDTO> cycles = new ArrayList<>();
         final List<LeaveSlotDTO> slots = new ArrayList<>();
         final Map<Long, BigDecimal> ledger = new HashMap<>(); // leave_request_day_id → delta (사용 내역 한 줄)
         final Map<Long, Long> ledgerCycle = new HashMap<>();  // leave_request_day_id → leave_cycle_id
         long seq = 1;
 
-        @Override public EmployeeCareerDTO selectEmployeeCareer(Long companyId, Long employeeId) { return career.get(employeeId); }
+        @Override public EmployeeHireDTO selectEmployeeHire(Long companyId, Long employeeId) { return hires.get(employeeId); }
 
         @Override public LeaveCycleDTO selectCycleOn(Long companyId, Long employeeId, String day) {
             LocalDate d = LocalDate.parse(day);

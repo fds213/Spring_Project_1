@@ -48,12 +48,12 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("출근하면 받은 시각으로 기록하고, 9시가 지났으면 지각으로 답한다")
+    @DisplayName("출근하면 받은 시각으로 기록하고, 9시 10분(유예)이 지났으면 지각으로 답한다")
     void checkInLate() {
-        mapper.clock = "09:05:12";
+        mapper.clock = "09:12:30";
         Map<String, Object> r = service.punch(KEY, "0002", "IN");
         assertEquals("IN", r.get("type"));
-        assertEquals("09:05:12", r.get("time"));
+        assertEquals("09:12:30", r.get("time"));
         assertEquals("LATE", r.get("status"));
         assertEquals(1, mapper.events.size());
     }
@@ -86,15 +86,18 @@ class AttendanceServiceTest {
     }
 
     @Test
-    @DisplayName("09:00:00 정각 출근과 18:00:00 정각 퇴근은 정상, 1초만 지나거나 모자라면 지각·조퇴")
+    @DisplayName("출근은 10분 유예: 09:05·09:10:00 은 정상, 09:10:01 부터 지각. 18:00:00 정각 퇴근은 정상, 1초 이르면 조퇴")
     void boundaryTimes() {
-        mapper.clock = "09:00:00";
+        mapper.clock = "09:05:00";
+        assertEquals("NORMAL", service.punch(KEY, "0002", "IN").get("status"));
+        mapper.today.clear();
+        mapper.clock = "09:10:00";
         assertEquals("NORMAL", service.punch(KEY, "0002", "IN").get("status"));
         mapper.clock = "18:00:00";
         assertEquals("NORMAL", service.punch(KEY, "0002", "OUT").get("status"));
 
         mapper.today.clear();
-        mapper.clock = "09:00:01";
+        mapper.clock = "09:10:01";
         assertEquals("LATE", service.punch(KEY, "0002", "IN").get("status"));
         mapper.clock = "17:59:59";
         assertEquals("EARLY_LEAVE", service.punch(KEY, "0002", "OUT").get("status"));
@@ -118,7 +121,7 @@ class AttendanceServiceTest {
         Map<String, Object> feb = service.records(10L, 102L, "2026-02");
         assertEquals(28, ((List<?>) feb.get("days")).size());
 
-        mapper.clock = "09:10:00";
+        mapper.clock = "09:11:00";
         service.punch(KEY, "0002", "IN");
         Map<String, Object> r = service.records(10L, 102L, "2026-10");
         assertEquals("0002", r.get("deviceId"));
@@ -127,12 +130,34 @@ class AttendanceServiceTest {
         Map<String, Object> today = (Map<String, Object>) r.get("today");
         @SuppressWarnings("unchecked")
         Map<String, String> punch = (Map<String, String>) today.get("punch");
-        assertEquals("09:10", punch.get("in"));
+        assertEquals("09:11", punch.get("in"));
         assertEquals("LATE", punch.get("inStatus"));
         @SuppressWarnings("unchecked")
         Map<String, Object> counts = (Map<String, Object>) r.get("thisMonth");
         assertEquals(1, counts.get("late"));
         assertEquals(0, counts.get("early"));
+    }
+
+    @Test
+    @DisplayName("퇴근 누락: 지난 날 출근만 있으면 NO_OUT, 오늘은 아직 퇴근할 수 있어 비워 둔다")
+    void missingCheckOut() {
+        mapper.clock = "08:55:00";
+        service.punch(KEY, "0002", "IN");
+        assertEquals("", dayPunch(service.records(10L, 102L, "2026-10"), "2026-10-30").get("outStatus"));
+
+        mapper.today.get(102L).setWorkDate("2026-10-29"); // 어제 출근만 찍고 퇴근은 안 찍은 기록으로 바꾼다
+        Map<String, String> past = dayPunch(service.records(10L, 102L, "2026-10"), "2026-10-29");
+        assertEquals("NO_OUT", past.get("outStatus"));
+        assertEquals("NORMAL", past.get("inStatus"));
+        assertEquals("", past.get("out"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> dayPunch(Map<String, Object> records, String date) {
+        for (Map<String, Object> d : (List<Map<String, Object>>) records.get("days")) {
+            if (date.equals(d.get("date"))) return (Map<String, String>) d.get("punch");
+        }
+        return null;
     }
 
     @Test
@@ -341,7 +366,7 @@ class AttendanceServiceTest {
             return holidays.keySet().removeIf(d -> d.getDayOfYear() == holidayId) ? 1 : 0;
         }
 
-        @Override public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month) { return List.of(); }
+        @Override public List<AttendanceSummaryDTO> selectMonthSummary(Long companyId, String month, String lateAfter, String earlyBefore) { return List.of(); }
 
         @Override public List<LeaveDayDTO> selectMonthLeaveDays(Long companyId, Long employeeId, String month) { return List.of(); }
 

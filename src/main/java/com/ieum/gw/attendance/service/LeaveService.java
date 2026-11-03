@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ieum.gw.attendance.dao.AttendanceDAO;
 import com.ieum.gw.attendance.dao.LeaveDAO;
 import com.ieum.gw.attendance.dto.ApprovalStepDTO;
-import com.ieum.gw.attendance.dto.EmployeeCareerDTO;
+import com.ieum.gw.attendance.dto.EmployeeHireDTO;
 import com.ieum.gw.attendance.dto.HolidayDTO;
 import com.ieum.gw.attendance.dto.LeaveCycleDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
@@ -59,14 +59,14 @@ public class LeaveService {
     /** leave.js 의 renderLeaveView 가 그리는 모양: { summary | null, reason?, items } */
     public Map<String, Object> leaves(Long companyId, Long employeeId) {
         Map<String, Object> res = new LinkedHashMap<>();
-        EmployeeCareerDTO career = dao.selectEmployeeCareer(companyId, employeeId);
-        if (career == null || career.getHireDate() == null) {
+        EmployeeHireDTO emp = dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null || emp.getHireDate() == null) {
             res.put("summary", null);
-            res.put("reason", career == null ? "NO_EMPLOYEE" : "NO_HIRE_DATE"); // 화면 안내 문구를 가른다
+            res.put("reason", emp == null ? "NO_EMPLOYEE" : "NO_HIRE_DATE"); // 화면 안내 문구를 가른다
             res.put("items", List.of());
             return res;
         }
-        Grant grant = grantOf(companyId, employeeId, LocalDate.parse(career.getHireDate()));
+        Grant grant = grantOf(companyId, employeeId, LocalDate.parse(emp.getHireDate()));
 
         BigDecimal used = grant.ledger.negate();
         BigDecimal pending = dao.selectPendingDays(companyId, employeeId, grant.start.toString(), OPEN_END.toString());
@@ -159,9 +159,9 @@ public class LeaveService {
 
     /** 남은 연차 일수. 입사일이 없으면 0 */
     public BigDecimal getRemainingLeaveDays(Long companyId, Long employeeId) {
-        EmployeeCareerDTO career = dao.selectEmployeeCareer(companyId, employeeId);
-        if (career == null || career.getHireDate() == null) return BigDecimal.ZERO;
-        return grantOf(companyId, employeeId, LocalDate.parse(career.getHireDate())).remaining();
+        EmployeeHireDTO emp = dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null || emp.getHireDate() == null) return BigDecimal.ZERO;
+        return grantOf(companyId, employeeId, LocalDate.parse(emp.getHireDate())).remaining();
     }
 
     /** 이미 승인된 휴가(leave_slot)와 날짜·시간대가 겹치는지. 종일 연차는 오전·오후를 모두 차지한다 */
@@ -184,11 +184,11 @@ public class LeaveService {
             }
             slotsOf(d.getLeaveType());
         }
-        EmployeeCareerDTO career = dao.selectEmployeeCareer(companyId, employeeId);
-        if (career == null || career.getHireDate() == null) {
+        EmployeeHireDTO emp = dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null || emp.getHireDate() == null) {
             throw new IllegalStateException("입사일이 없어 연차를 차감할 수 없습니다");
         }
-        LocalDate hire = LocalDate.parse(career.getHireDate());
+        LocalDate hire = LocalDate.parse(emp.getHireDate());
         List<LeaveDayDTO> sorted = new ArrayList<>(days);
         sorted.sort(Comparator.comparing(LeaveDayDTO::getLeaveDate));
         if (sorted.get(0).getLeaveDate().isBefore(hire)) {

@@ -5,7 +5,7 @@
 // "업체·단말기 사용자 번호·사번 계정의 연결"이다. 이 화면에서는 본인이 번호를 연결한다 (원래는 인사 담당자·서버가 관리할 일이다).
 // 승인된 연차가 있는 날은 기록의 비고에 연차 구분을 적는다.
 
-const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴' };
+const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴', NO_OUT: '퇴근 누락' }; // NO_OUT: 지난 날 출근만 있고 퇴근이 없음
 const ATT_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 // 기록 비고에 쓰는 연차 구분 이름
 const ATT_LEAVE_NOTE = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };

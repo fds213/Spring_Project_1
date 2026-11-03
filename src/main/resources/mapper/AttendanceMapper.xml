@@ -179,7 +179,7 @@
 		DELETE FROM holiday WHERE company_id = #{companyId} AND holiday_id = #{holidayId}
 	</delete>
 
-	<!-- ===== 근태·연차 관리: 업체 직원별 한 달 요약 (한 번에) ===== -->
+	<!-- ===== 근태·연차 관리: 업체 직원별 한 달 요약 (한 번에). 지각·조퇴 기준 시각은 AttendanceService 가 넘긴다 ===== -->
 	<select id="selectMonthSummary" resultType="com.ieum.gw.attendance.dto.AttendanceSummaryDTO">
 		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status,
 		       TO_CHAR(e.hire_date, 'YYYY-MM-DD') AS hire_date,
@@ -198,8 +198,8 @@
 		LEFT JOIN (
 		    SELECT employee_id,
 		           COUNT(*) AS work_days,
-		           SUM(CASE WHEN TO_CHAR(check_in_at, 'HH24:MI:SS') &gt; '09:00:00' THEN 1 ELSE 0 END) AS late_days,
-		           SUM(CASE WHEN check_out_at IS NOT NULL AND TO_CHAR(check_out_at, 'HH24:MI:SS') &lt; '18:00:00' THEN 1 ELSE 0 END) AS early_days
+		           SUM(CASE WHEN TO_CHAR(check_in_at, 'HH24:MI:SS') &gt; #{lateAfter} THEN 1 ELSE 0 END) AS late_days,
+		           SUM(CASE WHEN check_out_at IS NOT NULL AND TO_CHAR(check_out_at, 'HH24:MI:SS') &lt; #{earlyBefore} THEN 1 ELSE 0 END) AS early_days
 		    FROM attendance
 		    WHERE company_id = #{companyId}
 		      AND work_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
