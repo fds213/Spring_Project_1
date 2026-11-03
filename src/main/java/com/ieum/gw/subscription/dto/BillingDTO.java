@@ -25,7 +25,8 @@ public class BillingDTO {
     private long daysLeft;        // 마지막 날까지 남은 일수. 0이면 마지막 날이거나 이미 만료
     private String trialFrom;     // 체험 첫날
     private String trialEnd;      // 체험 마지막 날
-    private String serviceFrom;   // 유료 기간 첫날. 체험이면 null
+    private String serviceFrom;   // 구독 시작일(SUB-01). 연장으로 이어진 기간의 처음 시작한 날이다. 체험이면 null
+    private String lastPaidDate;  // 결제일(SUB-01). 마지막으로 승인된 결제의 날짜. 승인된 결제가 없으면 null
     private boolean canPay;       // 첫 결제와 유료 이용 중 연장만 된다. 유료가 끝난 뒤 재구매는 이번 제외다
     private String mode;          // FIRST(첫 결제) / EXTEND(연장). 결제할 수 없으면 null
     private List<BillingPlanDTO> plans; // 고를 수 있는 요금제. 연장은 지금 요금제만

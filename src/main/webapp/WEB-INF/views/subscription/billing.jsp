@@ -22,7 +22,7 @@
         <div class="card"><small>이용 상태</small><strong id="billStatus">-</strong></div>
         <div class="card"><small>요금제</small><strong id="billPlan">-</strong></div>
         <div class="card"><small id="billEndLabel">체험 만료일</small><strong id="billEnd">-</strong></div>
-        <div class="card"><small>이용 인원</small><strong id="billUsersNow">-</strong></div>
+        <div class="card"><small id="billUsersLabel">이용 인원</small><strong id="billUsersNow">-</strong></div>
       </div>
       <div class="info-grid info-grid-2 table-gap">
         <section class="info-card">
