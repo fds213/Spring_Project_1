@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.location.mapper.BranchMapper">
+    <!-- 사용 중지한 지점은 새 선택 목록에서만 뺀다. 기존 자료는 수정하지 않는다. -->
+    <select id="selectActiveBranches" resultType="com.ieum.gw.location.dto.BranchDTO">
+        SELECT branch_id AS branchId, branch_name AS branchName
+          FROM branch
+         WHERE company_id = #{companyId}
+           AND use_yn = 'Y'
+         ORDER BY branch_name, branch_id
+    </select>
+</mapper>
