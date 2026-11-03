@@ -44,4 +44,18 @@
         FROM payment
         GROUP BY company_id
     </select>
+
+    <!-- 비회원 접수 전체, 최신 접수 순. 업체 자료가 아니라 company_id가 없다. 화면이 한 번에 받아 좁힌다 -->
+    <select id="listGuestInquiries" resultType="com.ieum.gw.ops.dto.OpsGuestInquiryDTO">
+        SELECT public_inquiry_id AS no, TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at,
+               company_name AS company, requester_name AS name, email, phone, title,
+               content AS body, status_code AS state
+        FROM public_inquiry
+        ORDER BY created_at DESC, public_inquiry_id DESC
+    </select>
+
+    <!-- 아직 답하지 않은 비회원 접수 수 -->
+    <select id="countWaitingGuestInquiries" resultType="int">
+        SELECT COUNT(*) FROM public_inquiry WHERE status_code = 'IQ_RECEIVED'
+    </select>
 </mapper>

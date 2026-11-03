@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import com.ieum.gw.ops.dto.OpsApplicationDTO;
 import com.ieum.gw.ops.dto.OpsCompanyDTO;
 import com.ieum.gw.ops.dto.OpsCompanyDetailDTO;
+import com.ieum.gw.ops.dto.OpsGuestInquiryDTO;
 import com.ieum.gw.ops.service.OpsNotFoundException;
 import com.ieum.gw.ops.service.OpsService;
 
@@ -45,6 +46,11 @@ public class OpsController {
         return "ops/application";
     }
 
+    @GetMapping("/ops/inquiry-guest")
+    public String inquiryGuest() {
+        return "ops/inquiry-guest";
+    }
+
     @GetMapping("/ops/api/companies")
     @ResponseBody
     public Map<String, Object> companies() {
@@ -64,6 +70,13 @@ public class OpsController {
     public Map<String, Object> applications() {
         List<OpsApplicationDTO> applications = opsService.listApplications();
         return ok(applications);
+    }
+
+    @GetMapping("/ops/api/guest-inquiries")
+    @ResponseBody
+    public Map<String, Object> guestInquiries() {
+        List<OpsGuestInquiryDTO> inquiries = opsService.listGuestInquiries();
+        return ok(inquiries);
     }
 
     private static Map<String, Object> ok(Object data) {
