@@ -14,6 +14,8 @@
     <script>openScheduleView();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 일정 화면만의 모양 (common.css의 일정 규칙을 이 화면에서만 덮어쓴다: 한 장짜리 표 달력, 색 막대, 칩 필터) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/schedule/schedule.css">
     <section class="view on" id="view-schedule">
       <%-- 일정: 개인·부서·전사 일정과 휴일, 본인의 연차를 달력으로 본다 (schedule/calendar.js) --%>
       <div class="page-head"><h1>일정</h1></div>
@@ -43,6 +45,7 @@
           <header class="info-card-head">
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
             <h2 id="schDayTitle">-</h2>
+            <span class="sch-day-count" id="schDayCount"></span>
           </header>
           <ul class="sch-day-list" id="schDayList"></ul>
           <div class="bill-actions" style="padding: 0 16px 16px;">
