@@ -61,6 +61,8 @@ const mapState = {
   confirmedAddress: '', // 위치와 짝이 맞는 주소 (검색·지도로 고른 주소). 창의 주소 칸이 이것과 다르면 저장하지 않는다
   relocating: false, // 수정 중에 지도에서 위치를 다시 고르는 중인지
   saving: false,
+  sort: 'recent',    // 목록 순서: recent(최근 수정순, 서버가 준 순서) | name(이름순)
+  formStart: '',     // 창을 열 때의 값. 닫을 때 이것과 다르면 '작성 중인 내용' 확인을 띄운다
 };
 
 // ---------- 시작 ----------
@@ -71,14 +73,16 @@ function openMapView() {
     mapSearchTo(mapById('mapQuery').value.trim(), mapById('mapResults'), r => mapOfferPick(r, true));
   });
   mapById('mapForm').addEventListener('submit', e => { e.preventDefault(); mapSave(); });
-  mapById('mfCancel').addEventListener('click', () => mapCloseForm());
+  mapById('mfCancel').addEventListener('click', mapAskClose);
+  // Esc로 닫을 때도 같은 확인을 거친다 (브라우저가 바로 닫지 않게 막고 직접 판단)
+  mapById('mapDialog').addEventListener('cancel', e => { e.preventDefault(); mapAskClose(); });
   mapById('mapDialog').addEventListener('close', () => {
     mapState.formSeq++; // 찾던 주소 결과는 버린다
     mapById('mfResults').replaceChildren();
     if (!mapState.relocating) mapClearPick();
   });
   mapById('mfRepick').addEventListener('click', mapStartRelocate);
-  mapById('mapRelocateCancel').addEventListener('click', () => { mapEndRelocate(); mapClearPick(); mapOpenForm(mapState.form); });
+  mapById('mapRelocateCancel').addEventListener('click', () => { mapEndRelocate(); mapClearPick(); mapOpenForm(mapState.form, true); });
   mapById('mfDesc').addEventListener('input', mapUpdateCount);
   // 창 안에서 주소 찾기: 버튼을 누르거나 주소 칸에서 Enter
   mapById('mfFind').addEventListener('click', mapFindInForm);
@@ -86,6 +90,10 @@ function openMapView() {
   mapById('mfAddress').addEventListener('input', mapUpdateAddressNote);
   mapById('mapFilter').addEventListener('input', e => mapApplyFilter(e.target.value));
   mapById('mapFitAll').addEventListener('click', () => mapFitAll());
+  mapById('mapSort').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    mapState.sort = b.dataset.sort;
+    mapRenderList();
+  }));
 
   mapLoad();        // 1. 마커 목록 먼저 (지도와 상관없이 보인다)
   mapInitKakao();   // 2. 그다음 카카오 지도
@@ -122,7 +130,13 @@ function mapInitKakao() {
         mapState.bubble = new kakao.maps.CustomOverlay({ yAnchor: 1, zIndex: 5 });
         mapState.pickCard = new kakao.maps.CustomOverlay({ yAnchor: 1, zIndex: 6 });
         // 빈 곳을 누르면 그 위치를 고른다 (기존 핀은 clickable이라 여기까지 오지 않는다)
-        kakao.maps.event.addListener(mapState.map, 'click', e => mapPickAt(e.latLng));
+        // 0.25초 기다렸다가 고른다: 그사이 한 번 더 누르면(더블클릭 = 확대) 고르기를 취소한다.
+        // 바로 고르면 지도가 누른 곳으로 움직이면서 말풍선이 마우스 밑으로 와서, 두 번째 클릭이 말풍선을 누르게 된다
+        kakao.maps.event.addListener(mapState.map, 'click', e => {
+          const seq = ++mapState.pickSeq;
+          setTimeout(() => { if (seq === mapState.pickSeq) mapPickAt(e.latLng); }, 250);
+        });
+        kakao.maps.event.addListener(mapState.map, 'dblclick', () => { mapState.pickSeq++; });
         clearTimeout(timer);
         mapState.ok = true;
         mapDrawPins(true);
@@ -192,14 +206,26 @@ function mapApplyFilter(text) {
   mapDrawPins(false);
 }
 
+// 목록에 보일 순서. 최근 수정순은 서버가 준 순서 그대로, 이름순은 한글 가나다순
+function mapSorted(markers) {
+  if (mapState.sort !== 'name') return markers;
+  return [...markers].sort((a, b) => String(a.title).localeCompare(String(b.title), 'ko'));
+}
+
 function mapRenderList() {
   const list = mapById('mapList');
-  const visible = mapVisibleMarkers();
+  const visible = mapSorted(mapVisibleMarkers());
   const total = mapState.markers.length;
   mapById('mapCount').textContent = mapState.filter ? `${visible.length} / ${total}` : total;
   mapById('mapEmpty').hidden = total > 0;
   mapById('mapNoMatch').hidden = !(total > 0 && visible.length === 0);
   mapById('mapFilter').hidden = total === 0 && !mapState.filter; // 마커가 없으면 찾을 것도 없다
+  mapById('mapSort').hidden = total < 2; // 두 개 이상일 때만 순서가 의미 있다
+  mapById('mapSort').querySelectorAll('button').forEach(b => {
+    const on = b.dataset.sort === mapState.sort;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', on);
+  });
   mapUpdateMapTools();
   list.replaceChildren(...visible.map(m => {
     const li = mapEl('li', m.id === mapState.selectedId ? 'is-on' : '');
@@ -245,6 +271,8 @@ function mapDetail(m) {
     actions.append(edit, del);
   }
   box.append(actions);
+  // 수정·삭제 버튼이 없는 사람에게 이유를 알려 준다
+  if (!mapState.canEdit) box.append(mapEl('p', 'map-perm-note', '수정·삭제는 관리자·인사 담당에게 요청하세요.'));
   if (m.updatedAt) box.append(mapEl('p', 'map-when', `${whenFull(m.updatedAt)} 수정`));
   return box;
 }
@@ -256,10 +284,22 @@ function mapSelect(id, moveMap) {
   mapRenderList();
   // 지도에서 핀을 눌렀을 때도 목록의 그 줄(수정·삭제·길찾기 칸)이 보이게 한다
   const on = mapById('mapList').querySelector('li.is-on');
-  if (on) on.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  if (on) mapScrollListTo(on);
   mapPaintPins();
   if (id !== null && moveMap) mapFocus(id);
   if (id === null && mapState.bubble) mapState.bubble.setMap(null);
+}
+
+// 목록 칸 안에서만 그 줄이 보이게 스크롤한다.
+// scrollIntoView는 페이지 전체도 움직여서, 휴대폰(지도 위·목록 아래)에서 핀을 누르면 지도가 화면 밖으로 밀려났다
+function mapScrollListTo(li) {
+  const list = mapById('mapList');
+  const lr = list.getBoundingClientRect();
+  const r = li.getBoundingClientRect();
+  let delta = 0;
+  if (r.top < lr.top) delta = r.top - lr.top;
+  else if (r.bottom > lr.bottom) delta = Math.min(r.bottom - lr.bottom, r.top - lr.top);
+  if (delta) list.scrollBy({ top: delta, behavior: 'smooth' });
 }
 
 // ---------- 지도 위 핀 ----------
@@ -422,7 +462,7 @@ function mapOfferPick(r, moveMap) {
   const actions = mapEl('div', 'map-pick-actions');
   actions.append(
     mapButton('btn btn-primary', mapState.relocating ? '이 위치로 바꾸기' : '이 위치에 마커 추가', () => mapChoose(r)),
-    mapButton('btn', '닫기', () => { mapClearPick(); if (mapState.relocating) { mapEndRelocate(); mapOpenForm(mapState.form); } }));
+    mapButton('btn', '닫기', () => { mapClearPick(); if (mapState.relocating) { mapEndRelocate(); mapOpenForm(mapState.form, true); } }));
   card.append(actions);
   mapStopMap(card);
   wrap.append(card);
@@ -439,7 +479,7 @@ function mapChoose(r) {
   if (mapState.pickCard) mapState.pickCard.setMap(null); // 핀은 두고 말풍선만 접는다
   if (mapState.relocating && mapState.form) {
     mapEndRelocate();
-    mapOpenForm({ ...mapState.form, address: r.address, lat: r.lat, lng: r.lng });
+    mapOpenForm({ ...mapState.form, address: r.address, lat: r.lat, lng: r.lng }, true);
     return;
   }
   mapOpenForm({ id: null, title: r.title || '', address: r.address, detailAddress: '', lat: r.lat, lng: r.lng, description: '' });
@@ -477,7 +517,8 @@ function mapEndRelocate() {
 
 // ---------- 추가·수정 창 ----------
 
-function mapOpenForm(f) {
+// restoring: 위치를 다시 고르고 돌아온 것이면 true. 처음 열 때의 값(formStart)을 그대로 둔다
+function mapOpenForm(f, restoring) {
   // 위치를 다시 고르던 중에 다른 마커의 [수정]을 눌렀으면 '위치 고르는 중'을 끝낸다 (안내 띠·다음 클릭이 꼬이지 않게)
   if (mapState.relocating) mapEndRelocate();
   mapState.formSeq++; // 앞 창에서 찾던 주소 결과가 이 창에 뜨지 않게
@@ -495,6 +536,7 @@ function mapOpenForm(f) {
   mapUpdateCount();
   mapUpdateAddressNote();
   if (mapState.ok && f.lat !== undefined && f.lat !== null) mapShowPick(f.lat, f.lng, true);
+  if (!restoring) mapState.formStart = mapFormValues();
   const dlg = mapById('mapDialog');
   if (!dlg.open) dlg.showModal();
   mapById('mfTitle').focus();
@@ -509,6 +551,23 @@ function mapUpdateFormTools() {
   mapById('mfAddress').readOnly = !ok; // 지도를 못 불러오면 주소를 찾을 수 없으므로 고치지 못하게
 }
 
+// 창의 지금 값 (제목·주소·상세주소·설명과 고른 위치). 처음 값과 비교해 고쳤는지 본다
+function mapFormValues() {
+  const f = mapState.form || {};
+  const v = id => mapById(id).value.trim();
+  return JSON.stringify([v('mfTitle'), v('mfAddress'), v('mfDetail'), v('mfDesc'), f.lat ?? null, f.lng ?? null]);
+}
+
+// [취소]·Esc: 고친 내용이 있으면 정말 닫을지 묻는다. 고친 게 없으면 바로 닫는다 (저장은 묻지 않는다)
+function mapAskClose() {
+  if (mapFormValues() === mapState.formStart) { mapCloseForm(); return; }
+  const dlg = mapById('mapDiscardDialog');
+  dlg.querySelectorAll('button').forEach(b => {
+    b.onclick = () => { dlg.close(); if (b.value === 'ok') mapCloseForm(); };
+  });
+  dlg.showModal();
+}
+
 function mapCloseForm() {
   mapEndRelocate();
   mapById('mapDialog').close();
@@ -519,8 +578,10 @@ function mapCloseForm() {
 function mapFindInForm() {
   const seq = ++mapState.formSeq;
   const alive = () => seq === mapState.formSeq && mapById('mapDialog').open;
+  mapById('mfResults').replaceChildren(); // 앞에서 찾은 결과는 먼저 지운다 (주소 칸을 비우고 다시 찾을 때 옛 결과가 남지 않게)
   mapSearchTo(mapById('mfAddress').value.trim(), mapById('mfResults'), r => {
     if (!alive()) return;
+    mapById('mfError').textContent = ''; // 위치를 새로 골랐으니 '주소를 찾아 주세요' 오류는 지운다
     const address = (r.address || '').trim();
     mapState.form = { ...mapReadForm(), address, lat: r.lat, lng: r.lng };
     mapState.confirmedAddress = address;

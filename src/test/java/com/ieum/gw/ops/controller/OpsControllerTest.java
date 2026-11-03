@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieum.gw.ops.dto.OpsApplicationDTO;
 import com.ieum.gw.ops.dto.OpsCompanyDTO;
 import com.ieum.gw.ops.dto.OpsCompanyDetailDTO;
+import com.ieum.gw.ops.dto.OpsGuestInquiryDTO;
 import com.ieum.gw.ops.dto.OpsStateDTO;
 import com.ieum.gw.ops.service.OpsNotFoundException;
 import com.ieum.gw.ops.service.OpsService;
@@ -72,6 +73,21 @@ class OpsControllerTest {
             application.setNewApplication(true);
             return List.of(application);
         }
+
+        @Override
+        public List<OpsGuestInquiryDTO> listGuestInquiries() {
+            check();
+            OpsGuestInquiryDTO inquiry = new OpsGuestInquiryDTO();
+            inquiry.setNo(1000L);
+            inquiry.setAt("2026-11-03T10:00:00");
+            inquiry.setCompany("가나다");
+            inquiry.setName("홍길동");
+            inquiry.setEmail("a@test.com");
+            inquiry.setTitle("도입 문의");
+            inquiry.setBody("내용");
+            inquiry.setState("IQ_RECEIVED");
+            return List.of(inquiry);
+        }
     }
 
     private final FakeService service = new FakeService();
@@ -87,6 +103,7 @@ class OpsControllerTest {
     void pages() throws Exception {
         assertEquals("ops/company", mvc.perform(get("/ops/company")).andReturn().getModelAndView().getViewName());
         assertEquals("ops/application", mvc.perform(get("/ops/application-status")).andReturn().getModelAndView().getViewName());
+        assertEquals("ops/inquiry-guest", mvc.perform(get("/ops/inquiry-guest")).andReturn().getModelAndView().getViewName());
     }
 
     @Test
@@ -131,6 +148,23 @@ class OpsControllerTest {
         assertTrue(item.get("isNew").asBoolean());
         assertFalse(item.has("new"));
         assertFalse(item.has("newApplication"));
+    }
+
+    @Test
+    @DisplayName("비회원 접수는 화면이 읽는 칸 이름으로 주고 비운 휴대전화는 null이다")
+    void guestInquiries() throws Exception {
+        JsonNode body = body(mvc.perform(get("/ops/api/guest-inquiries")).andReturn());
+        assertTrue(body.get("success").asBoolean());
+        JsonNode item = body.get("data").get(0);
+        assertEquals(1000, item.get("no").asInt());
+        assertEquals("2026-11-03T10:00:00", item.get("at").asText());
+        assertEquals("가나다", item.get("company").asText());
+        assertEquals("홍길동", item.get("name").asText());
+        assertEquals("a@test.com", item.get("email").asText());
+        assertTrue(item.get("phone").isNull());
+        assertEquals("도입 문의", item.get("title").asText());
+        assertEquals("내용", item.get("body").asText());
+        assertEquals("IQ_RECEIVED", item.get("state").asText());
     }
 
     @Test

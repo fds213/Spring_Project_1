@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.ieum.gw.ops.dto.OpsCompanyRowDTO;
 import com.ieum.gw.ops.dto.OpsEmployeeDTO;
+import com.ieum.gw.ops.dto.OpsGuestInquiryDTO;
 import com.ieum.gw.ops.dto.OpsPaymentStatDTO;
 
 @Mapper
@@ -19,4 +20,8 @@ public interface OpsMapper {
     List<OpsEmployeeDTO> listEmployees(@Param("companyId") Long companyId);
 
     List<OpsPaymentStatDTO> listPaymentStats();
+
+    List<OpsGuestInquiryDTO> listGuestInquiries();
+
+    int countWaitingGuestInquiries();
 }

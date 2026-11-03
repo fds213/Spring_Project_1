@@ -17,6 +17,7 @@ import com.ieum.gw.ops.dto.OpsCompanyDTO;
 import com.ieum.gw.ops.dto.OpsCompanyDetailDTO;
 import com.ieum.gw.ops.dto.OpsCompanyRowDTO;
 import com.ieum.gw.ops.dto.OpsEmployeeDTO;
+import com.ieum.gw.ops.dto.OpsGuestInquiryDTO;
 import com.ieum.gw.ops.dto.OpsPaymentDTO;
 import com.ieum.gw.ops.dto.OpsPaymentStatDTO;
 import com.ieum.gw.ops.dto.OpsStateDTO;
@@ -28,7 +29,7 @@ import com.ieum.gw.subscription.service.SubscriptionService;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 운영자의 업체 관리·신청 현황(OPS-01). /ops/**는 security-context.xml이 ROLE_OPS만 통과시킨다.
+ * 운영자의 업체 관리·신청 현황·비회원 접수(OPS-01). /ops/**는 security-context.xml이 ROLE_OPS만 통과시킨다.
  * 고객 업체를 가로질러 보는 화면이라 업체를 로그인 사용자에서 꺼내지 않는다. 그래서 업체·계정·결제 같은 운영 기록만 읽고
  * 결재·게시판 같은 업무 자료는 읽지 않는다(OPS-02).
  * 이용 기간이 없는 업체(이음 운영 업체 ieum0000)는 고객 업체가 아니라 목록에 넣지 않는다.
@@ -102,6 +103,16 @@ public class OpsService {
             }
         }
         return result;
+    }
+
+    /** 비회원 접수 목록, 최신 접수 순. 소개 사이트 도입 문의(WEB-02)로 들어온 것이라 업체와 묶이지 않는다 */
+    public List<OpsGuestInquiryDTO> listGuestInquiries() {
+        return opsDAO.listGuestInquiries();
+    }
+
+    /** 운영자 메뉴 배지(inquiryGuest)의 수: 아직 답하지 않은 비회원 접수 */
+    public int countWaitingGuestInquiries() {
+        return opsDAO.countWaitingGuestInquiries();
     }
 
     private static void fill(OpsCompanyDTO company, OpsCompanyRowDTO row, CompanyPeriodDTO period, long unitPrice) {

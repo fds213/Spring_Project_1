@@ -41,6 +41,11 @@
 
           <header class="map-list-head">
             <h2>마커 <span class="map-count" id="mapCount">0</span></h2>
+            <%-- 목록 순서: 최근 수정순(서버 순서) / 이름순. 마커가 두 개 이상일 때만 보인다 --%>
+            <div class="map-sort" id="mapSort" role="group" aria-label="목록 순서" hidden>
+              <button type="button" class="map-sort-btn is-on" data-sort="recent" aria-pressed="true">최근순</button>
+              <button type="button" class="map-sort-btn" data-sort="name" aria-pressed="false">이름순</button>
+            </div>
           </header>
           <%-- 목록에서 찾기: 제목·주소·설명에 들어 있는 마커만 목록과 지도에 남긴다 --%>
           <label class="sr-only" for="mapFilter">마커 목록에서 찾기</label>
@@ -99,6 +104,16 @@
           <button type="submit" class="btn btn-primary" id="mfSave" data-write>저장</button>
         </div>
       </form>
+    </dialog>
+
+    <%-- 작성 중 닫기 확인: 추가·수정 창에서 고친 내용이 있는데 [취소]·Esc를 누르면 --%>
+    <dialog class="modal" id="mapDiscardDialog">
+      <h2>작성 중인 내용이 있어요</h2>
+      <p>닫으면 고친 내용은 저장되지 않습니다.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" value="cancel">계속 쓰기</button>
+        <button type="button" class="btn btn-primary" value="ok">닫기</button>
+      </div>
     </dialog>
 
     <%-- 마커 삭제 확인 --%>
