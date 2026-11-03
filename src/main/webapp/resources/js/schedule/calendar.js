@@ -21,6 +21,8 @@ const schState = {
   selected: '', // 선택한 날짜 'YYYY-MM-DD'
   show: { PERSONAL: true, DEPT: true, COMPANY: true, LEAVE: true },
   data: null,   // 서버에서 받은 그달 것
+  jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
+  jumpTimer: null,
 };
 const schMonthParam = () => `${schState.month.y}-${pad2(schState.month.m + 1)}`;
 
@@ -76,6 +78,10 @@ function drawSchedule() {
     cell.addEventListener('click', () => {
       schState.month = { y: date.getFullYear(), m: date.getMonth() };
       schState.selected = schDayKey(date);
+      // 방금 앞뒤 달 칸을 눌러 달력이 바뀌었다고 잠깐 적어 둔다 (빠르게 한 번 더 누르면 이 날짜로 팝업을 연다)
+      schState.jumped = schState.selected;
+      clearTimeout(schState.jumpTimer);
+      schState.jumpTimer = setTimeout(() => { schState.jumped = ''; }, 500);
       renderSchedule();
     });
     return cell;
@@ -174,6 +180,14 @@ const schMoveMonth = step => {
   schState.selected = now.getFullYear() === d.getFullYear() && now.getMonth() === d.getMonth() ? schDayKey(now) : schDayKey(d);
   renderSchedule();
 };
+// 앞뒤 달 칸을 두 번 빠르게 누르면, 첫 클릭에 달력이 새로 그려져 두 번째 클릭이 새 달의 다른 칸에 떨어진다.
+// 그 두 번째 클릭은 칸에 닿기 전에(capture) 막고, 처음 누른 날짜로 추가 팝업을 연다
+['click', 'dblclick'].forEach(type => schEl('schGrid').addEventListener(type, e => {
+  if (!schState.jumped || e.detail < 2) return;
+  e.stopPropagation();
+  if (type === 'dblclick') openAddDialog(schState.jumped);
+}, true));
+
 schEl('schPrev').addEventListener('click', () => schMoveMonth(-1));
 schEl('schNext').addEventListener('click', () => schMoveMonth(1));
 schEl('schToday').addEventListener('click', openScheduleView);
