@@ -21,12 +21,12 @@ const DEPT_DUTY = { DEPT_IT: 'IT 담당', DEPT_HR: '인사 담당' };
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
 // 상태 (STATUS): 휴직 중에도 계정은 쓸 수 있어야 해서 두 칸에 나눠 담는다.
-//   계정 상태 status: ST_ACTIVE 사용 중 / ST_INACTIVE 비활성 (계정은 지우지 않고 비활성화만 한다)
+//   계정 상태 status (ACCOUNT_STATUS): ACTIVE 사용 중 / RETIRED 비활성 / REQUESTED 승인 대기 / ST_SUSPENDED 운영 차단 (계정은 지우지 않고 비활성화만 한다)
 //   재직 상태 work:   ST_SERVING 재직 / ST_LEAVE 휴직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
 const WORK_STATUS = { ST_SERVING: '재직', ST_LEAVE: '휴직', ST_RETIRED: '퇴사' };
-const EMP_STATUS = { ST_ACTIVE: '사용 중', ST_INACTIVE: '비활성' };
-// 꺼진 계정 (로그인 불가, 자리 없음)
-const offStatus = s => s === 'ST_INACTIVE';
+const EMP_STATUS = { REQUESTED: '승인 대기', ACTIVE: '사용 중', RETIRED: '비활성', ST_SUSPENDED: '운영 차단' };
+// 꺼진 계정: 비활성·운영 차단 (로그인 불가)
+const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
 
 // ---------- 화면 도구 ----------
 const $j = id => document.getElementById(id);
@@ -178,7 +178,7 @@ function setHead(e, on, btn) {
     .done(r => showToast(r.head ? `${r.name}님을 ${r.dept} 부서장으로 지정했습니다. 그 부서의 가입 요청을 승인할 수 있습니다` : `${r.name}님의 부서장 지정을 해제했습니다`));
 }
 
-// mode: 'off' 비활성화 (ST_INACTIVE), 'on' 다시 사용
+// mode: 'off' 비활성화 (RETIRED), 'on' 다시 사용
 let stateTarget = null;
 const STATE_TEXT = {
   off: { title: n => `${n} 계정을 비활성화할까요?`, ok: () => '비활성화',
