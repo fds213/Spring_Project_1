@@ -4,8 +4,8 @@
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 이 파일이 브라우저 저장소를 쓰는 곳은 하나다: 계정 생성을 한 기기가 자기 요청(업체 코드·요청 번호)을 기억하는 MY_JOIN_KEY.
-// 화면을 닫았다 열어도 요청을 이어 보려는 것이다. 쿠키나 페이지에 둔 요청 번호로 바꿔도 된다.
+// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성뿐이다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
+// 승인 뒤 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(ieum-joined-id, 한 번 읽고 지움).
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
 // 서버는 공통 코드 테이블에서 읽는다.
@@ -579,7 +579,7 @@ function tickJoin() {
 setInterval(tickJoin, 30000);
 document.addEventListener('visibilitychange', tickJoin);
 
-// ---------- 로그인 화면: 계정 생성 ----------
+// ---------- 계정 생성 화면 (/join, common/join.jsp) ----------
 // 한 양식, 세 상태: 요청(가입이 열린 동안 업체 확인, 입력, 비밀번호, 승인 요청) → 대기("승인 요청을 하였습니다") →
 // 승인(계정이 만들어짐: 사번과 로그인으로 가는 버튼). 이번 범위(단순화 ①)는 직원 이메일 인증 코드 없이 요청한다.
 // 이 기기는 자기 요청을 기억한다(MY_JOIN_KEY).
@@ -589,11 +589,13 @@ const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEma
 let checkedCompany = ''; // 확인으로 맞춘 업체 코드 ('' = 아직)
 let joinNotice = ''; // 지난 요청이 끝난 이유 (반려, 없음). 양식을 고치면 지운다
 
-// 이 기기의 요청 { company, reqId }. 화면 JS가 브라우저 저장소를 쓰는 유일한 곳이다 (맨 위 주석)
+// 이 기기의 요청 { company, reqId } (맨 위 주석)
 const MY_JOIN_KEY = 'ieum-join-mine';
 const loadMyJoin = () => { try { return JSON.parse(localStorage.getItem(MY_JOIN_KEY)); } catch { return null; } };
 const saveMyJoin = v => { try { if (v) localStorage.setItem(MY_JOIN_KEY, JSON.stringify(v)); else localStorage.removeItem(MY_JOIN_KEY); } catch { /* 저장소가 막혔다 */ } };
 const joinReqUrl = mine => `/join/api/companies/${pathPart(mine.company)}/requests/${pathPart(mine.reqId)}`;
+// 승인 요청·취소가 403이면: 이 화면을 연 뒤 같은 브라우저에서 로그인·로그아웃해 보안 확인 값(CSRF)이 바뀐 것이다
+const joinFailText = xhr => (xhr.status === 403 ? '화면을 연 뒤 로그인 상태가 바뀌었습니다. 새로 고친 뒤 다시 해 주세요' : apiMessage(xhr));
 
 // 부서·직급 목록은 확인한 업체의 것. 확인 전에는 안내 한 줄만 있고 꺼져 있다
 function fillSelect(id, list, pick, code) {
@@ -615,8 +617,7 @@ function setCompanyNote(text, ok) {
   note.classList.toggle('is-bad', !!text && !ok);
 }
 
-// 확인: 가입이 열려 있으면 열린 부서와 직급을 불러온다. 아니면 화면에 아무것도 나오지 않는다(닫힌 업체와 없는 코드가 똑같이 보인다).
-// 너무 많이 틀리면 서버가 막고(429) 언제 다시 할 수 있는지 알려 준다
+// 확인: 가입이 열려 있으면 열린 부서와 직급을 불러온다. 아니면 서버의 안내를 보인다(닫힌 업체와 없는 코드는 같은 문구다)
 function checkCompany() {
   const code = $j('joinCompany').value.trim().toLowerCase();
   if (!code) return;
@@ -633,7 +634,7 @@ function checkCompany() {
       // select.js가 드롭다운을 켠 뒤에 (다음 틱에 다시 그린다)
       setTimeout(() => $j('joinDeptBtn')?.focus());
     })
-    .fail(xhr => { if (xhr.status === 429) setCompanyNote(apiMessage(xhr), false); })
+    .fail(xhr => { if ($j('joinCompany').value.trim().toLowerCase() === code) setCompanyNote(apiMessage(xhr), false); })
     .always(() => { btn.disabled = !!$j('btnJoinRequest').dataset.locked; });
 }
 $j('btnJoinCheck')?.addEventListener('click', checkCompany);
@@ -650,10 +651,6 @@ function onCompanyInput() {
   syncRequestButton();
 }
 $j('joinCompany')?.addEventListener('input', onCompanyInput);
-if (joinForm) {
-  setDeptOptions('', [], []);
-  $j('joinDept').disabled = $j('joinRank').disabled = true;
-}
 
 // 승인 요청 버튼: 업체 코드 확인, 이메일, 비밀번호(8자 이상, 두 번 같게)를 마칠 때까지 회색으로 꺼져 있다.
 // 위의 한 줄이 무엇이 남았는지 알려 준다
@@ -668,8 +665,8 @@ function syncRequestButton() {
   b.classList.toggle('btn-primary', on);
   const hint = $j('joinRequestHint');
   hint.hidden = !!b.dataset.locked || on || !!b.dataset.sending;
-  const missing = [!company && '업체 코드 확인', !email && '이메일', !pw && '비밀번호 정하기(8자 이상, 확인과 같게)'].filter(Boolean);
-  hint.textContent = `승인 요청 전에 남은 것: ${missing.join(' · ')}`;
+  const missing = [!company && '업체 코드 확인', !email && '이메일', !pw && '비밀번호 정하기\n(8자 이상, 확인과 같게)'].filter(Boolean);
+  hint.textContent = missing.join(' · ');
 }
 
 function setJoinStatus(text, kind) {
@@ -681,15 +678,12 @@ function setJoinStatus(text, kind) {
 
 // 끝난 요청의 이유 (서버의 reason)
 const JOIN_ENDED = {
-  OLD_FLOW: '이전 방식으로 처리된 요청입니다. 다시 승인 요청을 해 주세요.',
-  OFF: '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요.',
   REJECTED: '가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.',
   OTHER: '이 요청은 더 진행할 수 없습니다. 다시 승인 요청을 해 주세요.',
 };
 
 // 이 기기의 요청을 서버에 물어 양식을 그린다 (계정 생성을 열 때, 승인을 기다리는 동안 5초마다)
 function loadJoinForm() {
-  if (joinForm.hidden) return;
   const mine = loadMyJoin();
   if (!mine) return drawJoinForm(null, null);
   api.get(joinReqUrl(mine))
@@ -773,18 +767,16 @@ $j('joinEmail')?.addEventListener('input', syncRequestButton);
 
 ['joinPw', 'joinPw2'].forEach(id => $j(id)?.addEventListener('input', syncRequestButton));
 
-function showJoin(open) {
-  loginForm.hidden = open;
-  joinForm.hidden = !open;
-  $j('pwForm').hidden = true;
-  if (open) {
-    if (!loadMyJoin()) { $j('joinCompany').value = $j('loginCompany').value; onCompanyInput(); }
-    loadJoinForm();
-    $j('joinCompany').focus();
+// 계정 생성 화면(/join, common/join.jsp)을 열면: 이 기기가 보낸 요청이 있으면 그 상태로 그리고,
+// 없으면 로그인 화면에서 마지막에 쓴 업체 코드를 채워 둔다(login.jsp 의 ieum-last-company)
+if (joinForm) {
+  if (!loadMyJoin()) {
+    try { $j('joinCompany').value = localStorage.getItem('ieum-last-company') || ''; } catch { /* 저장소가 막혔다 */ }
   }
+  onCompanyInput(); // 확인 전: 부서·직급 목록을 비우고 끈다
+  loadJoinForm();
+  $j('joinCompany').focus();
 }
-$j('btnJoin')?.addEventListener('click', () => showJoin(true));
-$j('btnJoinBack')?.addEventListener('click', () => showJoin(false));
 
 // 승인 요청: 모든 칸을 먼저 확인한다. 업체가 지금 받을 수 없으면 서버가 이유를 붙여 거절한다
 $j('btnJoinRequest')?.addEventListener('click', () => {
@@ -809,7 +801,7 @@ $j('btnJoinRequest')?.addEventListener('click', () => {
       saveMyJoin(mine);
       drawJoinForm(mine, v);
     })
-    .fail(xhr => { error.textContent = apiMessage(xhr); })
+    .fail(xhr => { error.textContent = joinFailText(xhr); })
     .always(() => { b.dataset.sending = ''; syncRequestButton(); });
 });
 
@@ -825,10 +817,11 @@ $j('btnJoinCancel')?.addEventListener('click', () => {
   if (!mine) return after();
   whileSending($j('btnJoinCancel'), api.post(`${joinReqUrl(mine)}/delete`))
     .done(after)
-    .fail(xhr => { $j('joinError').textContent = apiMessage(xhr); });
+    .fail(xhr => { $j('joinError').textContent = joinFailText(xhr); });
 });
 
-// 로그인하러 가기 (승인으로 계정이 만들어진 뒤): 업체 코드와 사번을 채운 로그인 양식으로 돌아간다
+// 로그인하러 가기 (승인으로 계정이 만들어진 뒤): 로그인 화면으로 가서 업체 코드와 사번을 채워 둔다.
+// 주소에 사번을 싣지 않고 브라우저 저장소로 넘긴다(login.jsp 가 한 번 읽고 지운다). 비밀번호는 넘기지 않는다
 joinForm?.addEventListener('submit', ev => {
   ev.preventDefault();
   const mine = loadMyJoin();
@@ -837,27 +830,21 @@ joinForm?.addEventListener('submit', ev => {
     .done(x => {
       if (x.state !== 'APPROVED') return drawJoinForm(mine, x);
       saveMyJoin(null);
-      ['joinPw', 'joinPw2', 'joinName', 'joinEmail'].forEach(id => { $j(id).value = ''; });
-      checkedCompany = '';
-      setCompanyNote('', false);
-      setDeptOptions('', [], []);
-      showJoin(false);
-      $j('loginCompany').value = mine.company;
-      $j('loginId').value = x.empNo;
-      $j('loginError').textContent = `계정이 만들어졌습니다. 사번 ${x.empNo}와 요청할 때 정한 비밀번호로 로그인하세요.`;
-      $j('loginError').classList.add('is-ok');
-      $j('loginPw').focus();
+      try {
+        localStorage.setItem('ieum-last-company', mine.company);
+        sessionStorage.setItem('ieum-joined-id', x.empNo);
+      } catch { /* 저장소가 막혔다: 로그인 화면에서 직접 넣는다 */ }
+      location.href = pageHref('/login');
     })
     .fail(xhr => {
       if (xhr.status === 404) drawJoinForm(mine, null);
       else $j('joinError').textContent = apiMessage(xhr);
     });
 });
-$j('loginForm')?.addEventListener('input', () => $j('loginError').classList.remove('is-ok'));
 
-// 승인을 기다리는 동안 5초마다 서버에 다시 묻는다. 계정 생성 양식이 있는 페이지에서만
+// 끝난 요청의 안내는 양식을 고치기 시작하면 지운다. 승인을 기다리는 동안은 5초마다 서버에 다시 묻는다
 joinForm?.addEventListener('input', () => { if (joinNotice && !loadMyJoin()) { joinNotice = ''; setJoinStatus('', ''); } });
-if (joinForm) setInterval(() => { if (!joinForm.hidden && !document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
+if (joinForm) setInterval(() => { if (!document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
 
 // ---------- 로그인 화면: 비밀번호 찾기 ----------
 // 업체 코드 + 사번 → 계정을 만들 때의 이메일로 6자리 코드 → 맞으면 새 비밀번호(8자 이상, 두 번)로 바꾼다. 지금 비밀번호는 보여 주지 않는다
