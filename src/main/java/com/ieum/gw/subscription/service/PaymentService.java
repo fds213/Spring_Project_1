@@ -459,10 +459,9 @@ public class PaymentService {
         }
     }
 
-    // 사용 중 계정 수. 사원 쪽 재직자 목록으로 센다. 이번 범위는 승인하면 바로 사용이라(단순화 ①) 재직자가 곧 사용 중 계정이다.
-    // TODO(최준원): 김상준의 '사용 중 계정 수' 메서드(구매 인원 초과 승인 거절에 쓰는 것)가 생기면 그것으로 바꾼다
+    // 사용 중 계정 수. 가입 승인의 좌석 확인과 같은 기준(계정 ACTIVE)으로 센다
     private int accountsInUse(Long companyId) {
-        return employeeService.listActiveEmp(companyId, null).size();
+        return employeeService.countAccountsInUse(companyId);
     }
 
     private SubscriptionPlanDTO monthlyPlan() {

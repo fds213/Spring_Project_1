@@ -25,7 +25,6 @@ import org.junit.jupiter.api.Test;
 
 import com.ieum.gw.common.dto.AuthEmpDTO;
 import com.ieum.gw.common.dto.LoginUser;
-import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.service.EmployeeService;
 import com.ieum.gw.subscription.dao.PaymentDAO;
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
@@ -317,8 +316,8 @@ class PaymentServiceTest {
         int active = 1;
 
         @Override
-        public List<EmpSummaryDTO> listActiveEmp(Long companyId, Long excludeEmpId) {
-            return Collections.nCopies(active, new EmpSummaryDTO());
+        public int countAccountsInUse(Long companyId) {
+            return active;
         }
     }
 
