@@ -19,6 +19,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ieum.gw.approval.dao.ApprovalDAO;
+import com.ieum.gw.approval.dto.ApprovalBoxDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxStepDTO;
 import com.ieum.gw.approval.dto.ApprovalDocumentDTO;
 import com.ieum.gw.approval.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.approval.dto.ApprovalFieldsDTO;
@@ -120,6 +123,13 @@ class ApprovalServiceTest {
         Long approvedQueryCompanyId;
         Long approvedQueryDocumentId;
 
+        List<ApprovalBoxDTO> boxDocuments = List.of();
+        List<ApprovalBoxStepDTO> boxSteps = List.of();
+        List<ApprovalBoxHistoryDTO> boxHistory = List.of();
+        int waitingCount;
+        Long boxQueryCompanyId;
+        Long boxQueryEmployeeId;
+
         FakeDao() {
             super(null);
         }
@@ -168,6 +178,30 @@ class ApprovalServiceTest {
             approvedQueryCompanyId = companyId;
             approvedQueryDocumentId = approvalDocumentId;
             return approvedEquipment;
+        }
+
+        @Override
+        public List<ApprovalBoxDTO> selectBoxDocuments(Long companyId, Long employeeId) {
+            boxQueryCompanyId = companyId;
+            boxQueryEmployeeId = employeeId;
+            return boxDocuments;
+        }
+
+        @Override
+        public List<ApprovalBoxStepDTO> selectBoxSteps(Long companyId, Long employeeId) {
+            return boxSteps;
+        }
+
+        @Override
+        public List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId) {
+            return boxHistory;
+        }
+
+        @Override
+        public int countWaitingForMe(Long companyId, Long employeeId) {
+            boxQueryCompanyId = companyId;
+            boxQueryEmployeeId = employeeId;
+            return waitingCount;
         }
 
         @Override
@@ -828,5 +862,101 @@ class ApprovalServiceTest {
         assertEquals("김결재", approvers.get(0).getEmployeeName());
         assertEquals("인사팀", approvers.get(0).getDepartmentName());
         assertEquals("팀장", approvers.get(0).getGradeName());
+    }
+
+    private static ApprovalBoxDTO boxDoc(Long id, String status, boolean myTurn) {
+        ApprovalBoxDTO d = new ApprovalBoxDTO();
+        d.setApprovalDocumentId(id);
+        d.setStatusCode(status);
+        d.setMyTurn(myTurn);
+        d.setFields(new ApprovalFieldsDTO());
+        return d;
+    }
+
+    @Test
+    @DisplayName("결재함: 탭 5개 키를 항상 만들고 DRAFT는 비어 있다")
+    void boxAlwaysHasFiveTabs() {
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertEquals(List.of("WAIT", "PROGRESS", "DONE", "REJECTED", "DRAFT"), new ArrayList<>(box.keySet()));
+        box.values().forEach(list -> assertTrue(list.isEmpty()));
+    }
+
+    @Test
+    @DisplayName("결재함: 상태별로 탭에 나누고 내 순번 문서는 WAIT에만 담고 진행 탭에는 넣지 않는다")
+    void boxSplitsByStatusAndMyTurn() {
+        dao.boxDocuments = List.of(boxDoc(1L, "IN_PROGRESS", true), boxDoc(2L, "IN_PROGRESS", false),
+                boxDoc(3L, "APPROVED", false), boxDoc(4L, "REJECTED", false));
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertEquals(1, box.get("WAIT").size());
+        assertEquals(1, box.get("PROGRESS").size());
+        assertEquals(2L, box.get("PROGRESS").get(0).getApprovalDocumentId());
+        assertEquals(1, box.get("DONE").size());
+        assertEquals(1, box.get("REJECTED").size());
+        assertEquals(COMPANY_ID, dao.boxQueryCompanyId);
+        assertEquals(MY_ID, dao.boxQueryEmployeeId);
+    }
+
+    @Test
+    @DisplayName("결재함: canDecide는 내 순번일 때만 true")
+    void boxCanDecideOnlyOnMyTurn() {
+        dao.boxDocuments = List.of(boxDoc(1L, "IN_PROGRESS", true), boxDoc(2L, "IN_PROGRESS", false));
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertTrue(box.get("WAIT").get(0).isCanDecide());
+        assertTrue(!box.get("PROGRESS").get(0).isCanDecide());
+    }
+
+    @Test
+    @DisplayName("결재함: 결재선·이력을 문서 번호별로 붙이고, 없으면 빈 목록")
+    void boxAttachesStepsAndHistoryPerDocument() {
+        dao.boxDocuments = List.of(boxDoc(1L, "IN_PROGRESS", false), boxDoc(2L, "APPROVED", false));
+        ApprovalBoxStepDTO step = new ApprovalBoxStepDTO();
+        step.setApprovalDocumentId(1L);
+        ApprovalBoxHistoryDTO h = new ApprovalBoxHistoryDTO();
+        h.setApprovalDocumentId(1L);
+        dao.boxSteps = List.of(step);
+        dao.boxHistory = List.of(h);
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        ApprovalBoxDTO first = box.get("PROGRESS").get(0);
+        ApprovalBoxDTO second = box.get("DONE").get(0);
+        assertEquals(1, first.getSteps().size());
+        assertEquals(1, first.getHistory().size());
+        assertTrue(second.getSteps().isEmpty());
+        assertTrue(second.getHistory().isEmpty());
+    }
+
+    @Test
+    @DisplayName("결재함: 장비 문서는 장비 종류의 한글 이름을 채우고 휴가 문서는 비운다")
+    void boxFillsAssetTypeName() {
+        ApprovalBoxDTO equip = boxDoc(1L, "IN_PROGRESS", false);
+        equip.getFields().setAssetType("AT_LAPTOP");
+        dao.boxDocuments = List.of(equip, boxDoc(2L, "IN_PROGRESS", false));
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertEquals("노트북", box.get("PROGRESS").get(0).getAssetTypeName());
+        assertNull(box.get("PROGRESS").get(1).getAssetTypeName());
+    }
+
+    @Test
+    @DisplayName("내 순번 대기 건수: 업체·사원을 그대로 넘겨 센다")
+    void countWaitingForMeUsesDao() {
+        dao.waitingCount = 3;
+
+        assertEquals(3, service.countWaitingForMe(COMPANY_ID, MY_ID));
+        assertEquals(COMPANY_ID, dao.boxQueryCompanyId);
+        assertEquals(MY_ID, dao.boxQueryEmployeeId);
+    }
+
+    @Test
+    @DisplayName("결재선: 결재자 값이 숫자가 아니면 내부 오류 문구 대신 안내 문구로 거절")
+    void nonNumericApproverIsRejectedWithGuide() {
+        assertEquals("결재자를 다시 골라 주세요.", rejectedMessage(form("DOC_LEAVE", "abc", "")));
     }
 }

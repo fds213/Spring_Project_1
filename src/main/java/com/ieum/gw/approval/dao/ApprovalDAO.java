@@ -1,5 +1,8 @@
 package com.ieum.gw.approval.dao;
 
+import com.ieum.gw.approval.dto.ApprovalBoxDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxStepDTO;
 import com.ieum.gw.approval.dto.ApprovalDocumentDTO;
 import com.ieum.gw.approval.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.approval.dto.ApprovedEquipmentDTO;
@@ -53,5 +56,21 @@ public class ApprovalDAO {
 
     public ApprovedEquipmentDTO selectApprovedEquipment(Long companyId, Long approvalDocumentId) {
         return mapper.selectApprovedEquipment(companyId, approvalDocumentId);
+    }
+
+    public List<ApprovalBoxDTO> selectBoxDocuments(Long companyId, Long employeeId) {
+        return mapper.selectBoxDocuments(companyId, employeeId);
+    }
+
+    public List<ApprovalBoxStepDTO> selectBoxSteps(Long companyId, Long employeeId) {
+        return mapper.selectBoxSteps(companyId, employeeId);
+    }
+
+    public List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId) {
+        return mapper.selectBoxHistory(companyId, employeeId);
+    }
+
+    public int countWaitingForMe(Long companyId, Long employeeId) {
+        return mapper.countWaitingForMe(companyId, employeeId);
     }
 }

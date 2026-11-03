@@ -17,7 +17,9 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -45,7 +47,15 @@ public class ApprovalService {
 
         if(line == null || line.isEmpty()) throw new IllegalArgumentException("1단계 결재자를 골라주세요.");
 
-        return line.stream().filter(StringUtils::hasText).map(Long::valueOf).collect(Collectors.toList());
+        return line.stream().filter(StringUtils::hasText).map(this::parseApproverId).collect(Collectors.toList());
+    }
+
+    private Long parseApproverId(String id) {
+        try {
+            return Long.valueOf(id.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("결재자를 다시 골라 주세요.");
+        }
     }
 
     private boolean overlaps(LeaveDayDTO day, LeaveDayDTO p) {
@@ -81,9 +91,9 @@ public class ApprovalService {
     /**
      * 내가 지금 처리할 차례인 결재 문서 수(헤더 배지 'approval'). 결재함 '내 순번 대기' 목록과 같은 조건으로 센다.
      */
+    @Transactional(readOnly = true)
     public int countWaitingForMe(Long companyId, Long employeeId) {
-        // TODO(서장호): 구현. 구현 전에는 0을 돌려준다.
-        return 0;
+        return dao.countWaitingForMe(companyId, employeeId);
     }
 
     /**
@@ -280,5 +290,49 @@ public class ApprovalService {
 
 
         return documentId;
+    }
+
+    /**
+     * 결재함: 내가 기안했거나 결재선에 있는 문서를 탭(WAIT·PROGRESS·DONE·REJECTED·DRAFT)별로 나눠 돌려준다.
+     * 임시저장은 이번 범위가 아니라 DRAFT는 항상 빈 목록이다.
+     * <ul>
+     *   <li>WAIT(내 순번 대기): 진행 중인 문서 중 지금 순번이 나인 문서
+     *       (내 단계가 WAITING이고 내 앞 단계가 모두 APPROVED)</li>
+     *   <li>PROGRESS(진행): 진행 중인 문서 중 지금 순번이 내가 아니고, 내가 올렸거나 이미 승인한 문서.
+     *       1차가 승인해 순번이 넘어간 문서는 사라지지 않고 여기에 남는다</li>
+     *   <li>DONE·REJECTED: 완료·반려 문서 중 내가 올렸거나 처리한 문서</li>
+     *   <li>2차 결재자는 차례가 오기 전에는 문서가 보이지 않는다(SQL의 boxRelated가 걸러 준다)</li>
+     * </ul>
+     */
+    @Transactional(readOnly = true)
+    public Map<String, List<ApprovalBoxDTO>> box(LoginUser user) {
+        Long companyId = user.getCompanyId();
+        Long employeeId = user.getEmployeeId();
+
+        Map<Long, List<ApprovalBoxStepDTO>> steps = dao.selectBoxSteps(companyId, employeeId).stream()
+                .collect(Collectors.groupingBy(ApprovalBoxStepDTO::getApprovalDocumentId));
+        Map<Long, List<ApprovalBoxHistoryDTO>> history = dao.selectBoxHistory(companyId, employeeId).stream()
+                .collect(Collectors.groupingBy(ApprovalBoxHistoryDTO::getApprovalDocumentId));
+
+        Map<String, List<ApprovalBoxDTO>> box = new LinkedHashMap<>();
+        for (String tab : List.of("WAIT", "PROGRESS", "DONE", "REJECTED", "DRAFT")) {
+            box.put(tab, new ArrayList<>());
+        }
+
+        for (ApprovalBoxDTO doc : dao.selectBoxDocuments(companyId, employeeId)) {
+            Long id = doc.getApprovalDocumentId();
+            doc.setSteps(steps.getOrDefault(id, List.of()));
+            doc.setHistory(history.getOrDefault(id, List.of()));
+            doc.setCanDecide(doc.isMyTurn());
+            if (doc.getFields() != null && doc.getFields().getAssetType() != null) {
+                doc.setAssetTypeName(AssetType.from(doc.getFields().getAssetType()).getLabel());
+            }
+
+            if (doc.isMyTurn()) box.get("WAIT").add(doc);
+            else if ("IN_PROGRESS".equals(doc.getStatusCode())) box.get("PROGRESS").add(doc);
+            else if ("APPROVED".equals(doc.getStatusCode())) box.get("DONE").add(doc);
+            else if ("REJECTED".equals(doc.getStatusCode())) box.get("REJECTED").add(doc);
+        }
+        return box;
     }
 }

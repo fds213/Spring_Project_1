@@ -1,5 +1,8 @@
 package com.ieum.gw.approval.mapper;
 
+import com.ieum.gw.approval.dto.ApprovalBoxDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO;
+import com.ieum.gw.approval.dto.ApprovalBoxStepDTO;
 import com.ieum.gw.approval.dto.ApprovalDocumentDTO;
 import com.ieum.gw.approval.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.approval.dto.ApprovedEquipmentDTO;
@@ -32,4 +35,12 @@ public interface ApprovalMapper {
     void insertEquipmentRequest(ApprovalEquipmentDTO equipment);
 
     ApprovedEquipmentDTO selectApprovedEquipment(Long companyId, Long approvalDocumentId);
+
+    List<ApprovalBoxDTO> selectBoxDocuments(Long companyId, Long employeeId);
+
+    List<ApprovalBoxStepDTO> selectBoxSteps(Long companyId, Long employeeId);
+
+    List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId);
+
+    int countWaitingForMe(Long companyId, Long employeeId);
 }

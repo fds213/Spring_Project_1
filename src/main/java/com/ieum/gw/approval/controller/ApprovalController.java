@@ -41,7 +41,12 @@ public class ApprovalController {
     @ResponseBody
     public Map<String, Object> submit(@AuthenticationPrincipal LoginUser user, @RequestBody ApprovalSubmitDTO dto) {
         return Map.of("success", true, "data", service.submit(user,dto));
-//        return service.submit(user, dto);
+    }
+
+    @GetMapping(value = "/api/box")
+    @ResponseBody
+    public Map<String, Object> box(@AuthenticationPrincipal LoginUser user){
+        return Map.of("success", true, "data", service.box(user));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
@@ -50,4 +55,6 @@ public class ApprovalController {
         String message = (e.getMessage() != null ? e.getMessage() : "요청을 처리하지 못했습니다.");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
     }
+
+
 }

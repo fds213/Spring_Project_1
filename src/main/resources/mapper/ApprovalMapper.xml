@@ -77,5 +77,84 @@
           AND ad.document_type = 'DOC_EQUIPMENT' AND ad.status_code = 'APPROVED'
     </select>
 
+    <!-- ===== 결재함 조회 ===== -->
+
+    <!-- 결재함에 보이는 문서 (임시저장 제외): 내가 기안했거나, 내가 이미 처리(승인·반려)했거나, 지금 내 순번인 문서.
+         내 순번이 아직 안 온 2차 결재자에게는 보이지 않는다. 서브쿼리 별칭은 rs -->
+    <sql id="boxRelated">
+        ad.company_id = #{companyId} AND ad.status_code != 'DRAFT'
+        AND (ad.author_employee_id = #{employeeId}
+             OR EXISTS (SELECT 1 FROM approval_step rs
+                        WHERE rs.company_id = ad.company_id AND rs.approval_document_id = ad.approval_document_id
+                          AND rs.approver_employee_id = #{employeeId} AND rs.status_code != 'WAITING')
+             OR (<include refid="boxMyTurn"/>))
+    </sql>
+
+    <!-- 내 순번: 문서 진행 중, 내 단계 WAITING, 내 앞 단계가 모두 APPROVED -->
+    <sql id="boxMyTurn">
+        ad.status_code = 'IN_PROGRESS'
+        AND EXISTS (SELECT 1 FROM approval_step ms
+                    WHERE ms.company_id = ad.company_id AND ms.approval_document_id = ad.approval_document_id
+                      AND ms.approver_employee_id = #{employeeId} AND ms.status_code = 'WAITING'
+                      AND NOT EXISTS (SELECT 1 FROM approval_step ps
+                                      WHERE ps.company_id = ms.company_id AND ps.approval_document_id = ms.approval_document_id
+                                        AND ps.step_no &lt; ms.step_no AND ps.status_code != 'APPROVED'))
+    </sql>
+
+    <!-- fields: 컬럼 앞에 f_ 를 붙여 ApprovalFieldsDTO에 담는다 -->
+    <resultMap id="boxDocumentMap" type="com.ieum.gw.approval.dto.ApprovalBoxDTO" autoMapping="true">
+        <id property="approvalDocumentId" column="approval_document_id"/>
+        <association property="fields" javaType="com.ieum.gw.approval.dto.ApprovalFieldsDTO" columnPrefix="f_" autoMapping="true"/>
+    </resultMap>
+
+    <select id="selectBoxDocuments" resultMap="boxDocumentMap">
+        SELECT ad.approval_document_id, ad.document_type, ad.title, ad.status_code,
+               TO_CHAR(ad.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS submitted_at,
+               e.employee_name, d.department_name, lr.requested_days, b.branch_name,
+               CASE WHEN <include refid="boxMyTurn"/> THEN 1 ELSE 0 END AS my_turn,
+               (SELECT MIN(x.leave_type) FROM leave_request_day x
+                 WHERE x.company_id = ad.company_id AND x.approval_document_id = ad.approval_document_id) AS f_leave_type,
+               (SELECT TO_CHAR(MIN(x.leave_date), 'YYYY-MM-DD') FROM leave_request_day x
+                 WHERE x.company_id = ad.company_id AND x.approval_document_id = ad.approval_document_id) AS f_from_date,
+               (SELECT TO_CHAR(MAX(x.leave_date), 'YYYY-MM-DD') FROM leave_request_day x
+                 WHERE x.company_id = ad.company_id AND x.approval_document_id = ad.approval_document_id) AS f_to_date,
+               lr.reason AS f_reason,
+               er.asset_type AS f_asset_type, er.quantity AS f_quantity, er.branch_id AS f_branch_id, er.purpose AS f_purpose
+        FROM approval_document ad
+                 JOIN employee e ON e.company_id = ad.company_id AND e.employee_id = ad.author_employee_id
+                 LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+                 LEFT JOIN leave_request lr ON lr.company_id = ad.company_id AND lr.approval_document_id = ad.approval_document_id
+                 LEFT JOIN equipment_request er ON er.company_id = ad.company_id AND er.approval_document_id = ad.approval_document_id
+                 LEFT JOIN branch b ON b.company_id = er.company_id AND b.branch_id = er.branch_id
+        WHERE <include refid="boxRelated"/>
+        ORDER BY ad.submitted_at DESC, ad.approval_document_id DESC
+    </select>
+
+    <select id="selectBoxSteps" resultType="com.ieum.gw.approval.dto.ApprovalBoxStepDTO">
+        SELECT s.approval_document_id, s.approver_employee_id, e.employee_name, s.status_code
+        FROM approval_step s
+                 JOIN approval_document ad ON ad.company_id = s.company_id AND ad.approval_document_id = s.approval_document_id
+                 JOIN employee e ON e.company_id = s.company_id AND e.employee_id = s.approver_employee_id
+        WHERE <include refid="boxRelated"/>
+        ORDER BY s.approval_document_id, s.step_no
+    </select>
+
+    <!-- 처리한 사람은 계정 ID로 저장돼 있어 계정 → 사원 순으로 이름을 찾는다 -->
+    <select id="selectBoxHistory" resultType="com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO">
+        SELECT h.approval_document_id, TO_CHAR(h.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
+               e.employee_name, h.action_code, h.opinion
+        FROM approval_history h
+                 JOIN approval_document ad ON ad.company_id = h.company_id AND ad.approval_document_id = h.approval_document_id
+                 LEFT JOIN user_account ua ON ua.company_id = h.company_id AND ua.user_account_id = h.actor_account_id
+                 LEFT JOIN employee e ON e.company_id = ua.company_id AND e.employee_id = ua.employee_id
+        WHERE <include refid="boxRelated"/>
+        ORDER BY h.approval_document_id, h.created_at, h.approval_history_id
+    </select>
+
+    <select id="countWaitingForMe" resultType="int">
+        SELECT COUNT(*)
+        FROM approval_document ad
+        WHERE ad.company_id = #{companyId} AND <include refid="boxMyTurn"/>
+    </select>
 
 </mapper>
