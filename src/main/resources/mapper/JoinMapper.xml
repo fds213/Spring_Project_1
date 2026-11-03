@@ -264,4 +264,26 @@
 	       AND company_id = #{companyId}
 	       AND status_code = 'REQUESTED'
 	</update>
+	
+	<!-- 신청 반려 (대기 중일 때만) -->
+	<update id="rejectRequest">
+		UPDATE account_request
+		   SET status_code         = 'REJECTED',
+		       reviewer_account_id = #{reviewerId},
+		       reviewed_at         = <include refid="now"/>,
+		       updated_at          = <include refid="now"/>
+		 WHERE account_request_id = #{requestId}
+		   AND company_id = #{companyId}
+		   AND status_code = 'REQUESTED'
+	</update>
+
+	<!-- 반려된 신청의 계정도 반려 (대기 중일 때만) -->
+	<update id="rejectAccount">
+		UPDATE user_account
+		   SET status_code = 'REJECTED',
+		       updated_at  = <include refid="now"/>
+		 WHERE user_account_id = #{userAccountId}
+		   AND company_id = #{companyId}
+		   AND status_code = 'REQUESTED'
+	</update>
 </mapper>
