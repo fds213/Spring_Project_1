@@ -122,4 +122,20 @@
 		<foreach collection="roleCodes" item="role" open="(" separator="," close=")">#{role}</foreach>
 		ORDER BY d.sort_order, d.department_name, e.employee_name, e.employee_id
 	</select>
+	
+		<!-- 다른 모듈용: 사용 중 계정 수 (관리자 포함, 좌석 계산 기준) -->
+	<select id="countAccountsInUse" resultType="int">
+		SELECT COUNT(*) FROM user_account
+		WHERE company_id = #{companyId} AND status_code = 'ACTIVE'
+	</select>
+	
+	<!-- 다른 모듈용: 직원 ID → 이름·부서명 (퇴사자 포함, 부서 없으면 null) -->
+	<select id="listEmployeeNamesWithDept" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+		SELECT e.employee_id, e.employee_name, d.department_name
+		FROM employee e
+		LEFT JOIN department d ON d.department_id = e.department_id
+		WHERE e.company_id = #{companyId}
+		  AND e.employee_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
 </mapper>

@@ -187,6 +187,29 @@ public class EmployeeService {
 		}
 		return dao.listAssignableEmployees(companyId, List.of(roleCodes));
 	}
+	
+	/** 사용 중(ACTIVE) 계정 수. 관리자 포함. 좌석 한도와 비교하는 기준 (가입 승인·결제 인원 공통) */
+	public int countAccountsInUse(Long companyId) {
+		if (companyId == null) {
+			return 0;
+		}
+		return dao.countAccountsInUse(companyId);
+	}
+	
+	/**
+	 * 직원 ID → 이름·부서명 (퇴사자 포함, 부서 없으면 departmentName null). 다른 업체 직원은 빠진다.
+	 * ID는 중복을 빼고 1000개 이하로 넘긴다 (Oracle IN 제한).
+	 */
+	public Map<Long, EmployeeOptionDTO> getEmployeeNamesWithDept(Long companyId, List<Long> employeeIds) {
+		Map<Long, EmployeeOptionDTO> map = new LinkedHashMap<>();   // 빈 목록이어도 get(null) 안전
+		if (companyId == null || employeeIds == null || employeeIds.isEmpty()) {
+			return map;
+		}
+		for (EmployeeOptionDTO e : dao.listEmployeeNamesWithDept(companyId, employeeIds)) {
+			map.put(e.getEmployeeId(), e);
+		}
+		return map;
+	}
 
 	/** (id, name) 목록 → Map */
 	private Map<Long, String> toMap(List<IdNameDTO> rows) {
