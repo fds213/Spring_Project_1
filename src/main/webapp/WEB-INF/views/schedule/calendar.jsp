@@ -27,8 +27,6 @@
               <strong id="schMonthLabel"></strong>
               <button type="button" class="btn" id="schNext" aria-label="다음 달">&gt;</button>
               <button type="button" class="btn" id="schToday">오늘</button>
-              <%-- 일정 추가: 누르면 팝업(아래 schDialog)이 뜬다. 날짜 칸을 두 번 눌러도 그 날짜로 뜬다 --%>
-              <button type="button" class="btn btn-primary" id="schAdd">+ 일정 추가</button>
             </div>
             <div class="sch-filters" id="schFilters">
               <label><input type="checkbox" data-scope="PERSONAL" checked> <span class="sch-chip chip-personal">개인</span></label>
@@ -45,17 +43,15 @@
           <header class="info-card-head">
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
             <h2 id="schDayTitle">-</h2>
-            <span class="sch-day-count" id="schDayCount"></span>
+            <%-- 일정 추가: 고른 날짜로 팝업(아래 schDialog)을 연다. 날짜 칸을 두 번 눌러도 그 날짜로 뜬다 --%>
+            <button type="button" class="btn btn-primary sch-day-add" id="schAddDay">+ 일정 추가</button>
           </header>
           <ul class="sch-day-list" id="schDayList"></ul>
-          <div class="bill-actions" style="padding: 0 16px 16px;">
-            <button type="button" class="btn" id="schAddDay">+ 이 날짜에 일정 추가</button>
-          </div>
         </section>
       </div>
     </section>
 
-    <%-- 일정 추가 팝업: 위의 "+ 일정 추가" 버튼, 오른쪽 "+ 이 날짜에 일정 추가", 날짜 칸 두 번 누르기로 연다 --%>
+    <%-- 일정 추가 팝업: 오른쪽 날짜 칸 위 "+ 일정 추가"(고른 날짜로), 날짜 칸 두 번 누르기로 연다 --%>
     <dialog class="modal" id="schDialog" aria-labelledby="schDialogTitle">
       <h2 id="schDialogTitle">일정 추가</h2>
       <form class="leave-form" id="schForm" novalidate style="padding: 8px 0 0;">
