@@ -3,6 +3,7 @@ package com.ieum.gw.employee.service;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -156,25 +157,35 @@ public class EmployeeService {
 		return dao.getWorkBranchId(companyId, employeeId);
 	}
 
-	/** 직원 ID → 이름 (퇴사자 포함). 다른 업체 직원은 빠진다 */
+	/** 직원 ID → 이름 (퇴사자 포함). 다른 업체 직원은 빠진다 
+	 * ID는 중복을 빼고 1000개 이하로 넘긴다 (Oracle IN 제한, 중복도 개수에 셈).
+	 */
 	public Map<Long, String> getEmployeeNames(Long companyId, List<Long> employeeIds) {
 		if (companyId == null || employeeIds == null || employeeIds.isEmpty()) {
-			return Map.of();        // 빈 목록이면 IN () 문법 오류라 SQL을 부르지 않는다
+			return new LinkedHashMap<>();  
 		}
 		return toMap(dao.listEmployeeNames(companyId, employeeIds));
 	}
 
-	/** 계정 ID → 직원 이름. 사원이 없는 계정·다른 업체 계정은 빠진다 */
+	/** 계정 ID → 직원 이름. 사원이 없는 계정·다른 업체 계정은 빠진다 
+	 *  ID는 중복을 빼고 1000개 이하로 넘긴다 (Oracle IN 제한, 중복도 개수에 셈).
+	 * */
 	public Map<Long, String> getAccountNames(Long companyId, List<Long> accountIds) {
 		if (companyId == null || accountIds == null || accountIds.isEmpty()) {
-			return Map.of();
+			return new LinkedHashMap<>();
 		}
 		return toMap(dao.listAccountNames(companyId, accountIds));
 	}
 
-	/** 담당자로 고를 수 있는 재직자 (ID·이름·부서명) */
-	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId) {
-		return dao.listAssignableEmployees(companyId);
+	/**
+	 * 담당자로 고를 수 있는 사람: 재직 + 계정 ACTIVE + 역할이 roleCodes 중 하나.
+	 * 예) listAssignableEmployees(companyId, "ROLE_IT", "ROLE_ADMIN")
+	 */
+	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId, String... roleCodes) {
+		if (companyId == null || roleCodes == null || roleCodes.length == 0) {
+			return new ArrayList<>();
+		}
+		return dao.listAssignableEmployees(companyId, List.of(roleCodes));
 	}
 
 	/** (id, name) 목록 → Map */

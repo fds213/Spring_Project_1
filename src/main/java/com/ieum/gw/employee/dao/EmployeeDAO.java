@@ -83,7 +83,7 @@ public class EmployeeDAO {
 	}
 
     /** 담당자로 고를 수 있는 재직자 */
-	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId) {
-		return mapper.listAssignableEmployees(companyId);
+	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId, List<String> roleCodes) {
+		return mapper.listAssignableEmployees(companyId, roleCodes);
 	}
 }

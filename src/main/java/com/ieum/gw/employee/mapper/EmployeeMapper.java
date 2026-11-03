@@ -37,5 +37,6 @@ public interface EmployeeMapper {
 
 	List<IdNameDTO> listAccountNames(@Param("companyId") Long companyId, @Param("ids") List<Long> ids);
 
-	List<EmployeeOptionDTO> listAssignableEmployees(@Param("companyId") Long companyId);
+	List<EmployeeOptionDTO> listAssignableEmployees(@Param("companyId") Long companyId,
+			@Param("roleCodes") List<String> roleCodes);
 }
