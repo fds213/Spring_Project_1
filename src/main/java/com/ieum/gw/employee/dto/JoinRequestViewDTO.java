@@ -1,5 +1,7 @@
 package com.ieum.gw.employee.dto;
 
+import java.time.LocalDateTime;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -19,4 +21,7 @@ public class JoinRequestViewDTO {
 	private String companyName;
 	private String employeeNo;
 	private Long userAccountId;
+	private LocalDateTime requestedAt;
+	private Long departmentId;
+	private Long jobGradeId;
 }

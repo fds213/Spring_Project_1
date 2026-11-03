@@ -51,4 +51,13 @@ public interface JoinMapper {
 
 	int cancelAccount(@Param("userAccountId") Long userAccountId, @Param("companyId") Long companyId);
 
+	List<JoinRequestViewDTO> listWaitingRequests(@Param("companyId") Long companyId);
+
+	JoinRequestViewDTO lockRequest(@Param("companyId") Long companyId, @Param("requestId") Long requestId);
+
+	int activateAccount(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId,
+			@Param("employeeId") Long employeeId);
+
+	int approveRequest(@Param("companyId") Long companyId, @Param("requestId") Long requestId,
+			@Param("reviewerId") Long reviewerId);
 }

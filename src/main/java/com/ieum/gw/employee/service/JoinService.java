@@ -22,6 +22,7 @@ import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.dao.EmployeeDAO;
 import com.ieum.gw.employee.dao.JoinDAO;
 import com.ieum.gw.employee.dto.AccountDTO;
+import com.ieum.gw.employee.dto.EmployeeDTO;
 import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpenFormDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
@@ -109,7 +110,7 @@ public class JoinService {
         board.put("nextEmpNo", nextEmpNo);
         board.put("canApprove", canApprove);
         board.put("readOnly", readOnly);
-        board.put("requests", List.of());
+        board.put("requests", waitingRequests(companyId, admin, headDept));
         return board;
     }
 
@@ -274,6 +275,60 @@ public class JoinService {
         return getMyRequest(code, key);
     }
     
+    /** 가입 승인 (POST /employee/api/join/requests/{reqId}/approve) */
+    @Transactional
+    public Map<String, Object> approveRequest(LoginUser user, Long requestId) {
+        Long companyId = user.getCompanyId();
+
+        // ① 권한: 관리자 or 부서장
+        boolean admin = isAdmin(user);
+        String headDept = requireApprover(user, admin);
+
+        // ② 신청서 잡기 (FOR UPDATE) → 없으면 400, 대기 중 아니면 409
+        JoinRequestViewDTO req = dao.lockRequest(companyId, requestId);
+        if (req == null) {
+            throw new IllegalArgumentException("없는 가입 요청입니다");
+        }
+        if (!"REQUESTED".equals(req.getRequestStatus())) {
+            throw new IllegalStateException("이미 처리된 가입 요청입니다");
+        }
+        // 부서장은 자기 부서 신청만
+        if (!admin && !req.getDepartmentName().equals(headDept)) {
+            throw new AccessDeniedException("자기 부서 가입 요청만 처리할 수 있습니다");
+        }
+
+        // ③ 사번 발급 (번호표 기계 잠금 → 같은 업체 승인은 한 줄로 섬)
+        String employeeNo = employeeService.issueEmployeeNo(companyId);
+
+        // ④ 좌석 확인 (운영 업체는 한도 없음)
+        CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
+        if (usage != null) {
+            int limit = subscriptionService.getSeatLimit(companyId);
+            if (dao.countActiveAccounts(companyId) >= limit) {
+                throw new IllegalStateException("인원이 가득 차서 승인할 수 없습니다");
+            }
+        }
+
+        // ⑤ 사원 만들기 + 첫 연차
+        EmployeeDTO emp = employeeService.createJoinedEmployee(companyId, employeeNo,
+                req.getRequestName(), req.getDepartmentId(), req.getJobGradeId());
+
+        // ⑥ 계정 연결·사용 시작 → 0행이면 막기
+        int rows = dao.activateAccount(companyId, req.getUserAccountId(), emp.getEmployeeId());
+        if (rows == 0) {
+            throw new IllegalStateException("이미 처리된 가입 요청입니다");
+        }
+
+        // ⑦ 신청서 승인 완료 (처리한 사람 = 로그인 계정)
+        dao.approveRequest(companyId, requestId, user.getUserAccountId());
+
+        // ⑧ 화면에 줄 값
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", req.getRequestName());
+        result.put("empNo", employeeNo);
+        return result;
+    }
+    
     /** 내 신청 취소 (POST /join/api/companies/{code}/requests/{key}/delete, 로그인 없음) */
     @Transactional
     public void cancelMyRequest(String companyCode, String requestKey) {
@@ -299,6 +354,7 @@ public class JoinService {
         dao.cancelAccount(view.getUserAccountId(), view.getCompanyId());
     }
     
+    /** 내 신청 보기 (GET /join/api/companies/{code}/requests/{key}, 로그인 없음) */
     public Map<String, Object> getMyRequest(String companyCode, String requestKey) {
         if (companyCode == null || requestKey == null) {
             return null;
@@ -309,7 +365,7 @@ public class JoinService {
         if (request == null || "CANCELED".equals(request.getRequestStatus())) {
             return null;
         }
-        
+
         String status = request.getRequestStatus();   // DB 상태 꺼내 두기
         String state;                                 // 화면에 줄 상태
         String reason = null;                         // 끝난 이유
@@ -375,6 +431,25 @@ public class JoinService {
         return headDept;
     }
     
+    /** 현황판용 대기 목록. 관리자는 전부, 부서장은 자기 부서만 */
+    private List<Map<String, Object>> waitingRequests(Long companyId, boolean admin, String headDept) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (JoinRequestViewDTO r : dao.listWaitingRequests(companyId)) {
+            if (!admin && !r.getDepartmentName().equals(headDept)) {
+                continue;
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("reqId", r.getAccountRequestId());
+            m.put("name", r.getRequestName());
+            m.put("dept", r.getDepartmentName());
+            m.put("rank", r.getGradeName());
+            m.put("email", r.getEmail());
+            m.put("requestAt", r.getRequestedAt() == null ? null : r.getRequestedAt().toString());
+            list.add(m);
+        }
+        return list;
+    }
+
     /** 요청 키 → SHA-256 16진수 64자 (REQUEST_KEY_HASH에 저장·검색) */
     private String sha256(String text) {
         try {

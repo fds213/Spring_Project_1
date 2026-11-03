@@ -101,4 +101,20 @@ public class JoinDAO {
     public int cancelAccount(Long userAccountId, Long companyId) {
     	return mapper.cancelAccount(userAccountId, companyId);
     }
+    
+    public List<JoinRequestViewDTO> listWaitingRequests(Long companyId){
+    	return mapper.listWaitingRequests(companyId);
+    }
+    
+    public JoinRequestViewDTO lockRequest(Long companyId, Long requestId) { 
+    	return mapper.lockRequest(companyId, requestId);
+    }
+    
+    public int activateAccount(Long companyId,Long userAccountId,Long employeeId) {
+		return mapper.activateAccount(companyId, userAccountId, employeeId);
+    }
+    
+    public int approveRequest(Long companyId,Long requestId, Long reviewerId) {
+    	return mapper.approveRequest(companyId, requestId, reviewerId);
+    }
 }
