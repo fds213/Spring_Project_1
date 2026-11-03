@@ -7,7 +7,7 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
-public class AuthEmpDTO {
+public class AuthEmpDTO implements java.io.Serializable  {
 
 	private String compcode;
 	private String empnum;
