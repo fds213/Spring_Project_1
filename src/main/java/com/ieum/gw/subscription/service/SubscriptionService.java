@@ -1,6 +1,7 @@
 package com.ieum.gw.subscription.service;
 
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
+import com.ieum.gw.subscription.dto.CompanyBillingDTO;
 import com.ieum.gw.subscription.dto.CompanyDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
@@ -41,6 +42,20 @@ public class SubscriptionService {
             return null;
         }
         return ServicePeriods.toUsage(period, subscriptionDAO.getEmailVerifiedAt(companyId), now);
+    }
+
+    /**
+     * 헤더의 이용 상태 띠와 읽기 전용 표시에 쓰는 값(layout.tag의 companyBilling). 이용 결제 화면과 같은 계산이다.
+     *
+     * @return 이용 기간이 하나도 없는 업체는 null(띠를 보이지 않는다)
+     */
+    public CompanyBillingDTO getCompanyBilling(Long companyId) {
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        ServicePeriodDTO period = ServicePeriods.pick(subscriptionDAO.listPeriods(companyId), now);
+        if (period == null) {
+            return null;
+        }
+        return ServicePeriods.toBilling(period, now);
     }
 
     /**

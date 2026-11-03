@@ -13,6 +13,7 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ieum.gw.subscription.dto.CompanyBillingDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -133,5 +134,38 @@ class ServicePeriodsTest {
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), now));
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 4, 23, 59)));
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 5, 0, 0)), "만료 뒤에도 마지막 기간은 유료");
+    }
+
+    @Test
+    @DisplayName("헤더 값: 체험 11/13 0시 만료면 마지막 날은 11/12이고, 그날은 0일 남음, 11/13 0시부터 만료")
+    void billingTrialBoundary() {
+        ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
+
+        CompanyBillingDTO fourDaysLeft = ServicePeriods.toBilling(trial, at("2026-11-08T09:00"));
+        assertEquals("TRIAL", fourDaysLeft.getStatus());
+        assertEquals("2026.11.12", fourDaysLeft.getEndDate());
+        assertEquals(4, fourDaysLeft.getDaysLeft());
+
+        CompanyBillingDTO lastDay = ServicePeriods.toBilling(trial, at("2026-11-12T23:59:59"));
+        assertEquals("TRIAL", lastDay.getStatus());
+        assertEquals(0, lastDay.getDaysLeft());
+
+        CompanyBillingDTO expired = ServicePeriods.toBilling(trial, at("2026-11-13T00:00"));
+        assertEquals("EXPIRED", expired.getStatus());
+        assertEquals("2026.11.12", expired.getEndDate());
+        assertEquals(0, expired.getDaysLeft());
+    }
+
+    @Test
+    @DisplayName("헤더 값: 유료 중이면 PAID, 유료 기간이 끝나면 체험과 같이 EXPIRED")
+    void billingPaid() {
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12);
+
+        CompanyBillingDTO using = ServicePeriods.toBilling(paid, at("2026-12-01T23:59"));
+        assertEquals("PAID", using.getStatus());
+        assertEquals("2026.12.01", using.getEndDate());
+        assertEquals(0, using.getDaysLeft());
+
+        assertEquals("EXPIRED", ServicePeriods.toBilling(paid, at("2026-12-02T00:00")).getStatus());
     }
 }
