@@ -28,6 +28,27 @@ class EmployeeLookupTest {
 		FakeDao() {
 			super(null); // 진짜 Mapper는 안 씀
 		}
+		@Override
+		public int countAccountsInUse(Long companyId) {
+			calls++;
+			lastCompanyId = companyId;
+			return 5;
+		}
+
+		@Override
+		public List<EmployeeOptionDTO> listEmployeeNamesWithDept(Long companyId, List<Long> ids) {
+			calls++;
+			lastCompanyId = companyId;
+			List<EmployeeOptionDTO> rows = new ArrayList<>();
+			for (Long id : ids) {
+				EmployeeOptionDTO e = new EmployeeOptionDTO();
+				e.setEmployeeId(id);
+				e.setEmployeeName("직원" + id);
+				e.setDepartmentName("개발팀");
+				rows.add(e);
+			}
+			return rows;
+		}
 
 		@Override
 		public List<IdNameDTO> listEmployeeNames(Long companyId, List<Long> ids) {
@@ -109,5 +130,28 @@ class EmployeeLookupTest {
 		assertEquals(1, fake.calls);
 		assertEquals(11L, fake.lastCompanyId);
 		assertEquals(List.of("ROLE_IT", "ROLE_ADMIN"), fake.lastRoles);
+	}
+	
+	@Test
+	@DisplayName("이름·부서 조회는 빈 목록이면 DB를 부르지 않고, 있으면 직원 ID로 이름·부서를 꺼낼 수 있다")
+	void namesWithDept() {
+		Map<Long, EmployeeOptionDTO> empty = service.getEmployeeNamesWithDept(11L, List.of());
+		assertEquals(0, fake.calls);
+		assertNull(empty.get(null));
+
+		Map<Long, EmployeeOptionDTO> found = service.getEmployeeNamesWithDept(11L, List.of(101L, 105L));
+		assertEquals(11L, fake.lastCompanyId);
+		assertEquals("직원105", found.get(105L).getEmployeeName());
+		assertEquals("개발팀", found.get(105L).getDepartmentName());
+	}
+
+	@Test
+	@DisplayName("사용 중 계정 수는 업체가 없으면 0, 있으면 업체 ID를 그대로 넘긴다")
+	void accountsInUse() {
+		assertEquals(0, service.countAccountsInUse(null));
+		assertEquals(0, fake.calls);
+
+		assertEquals(5, service.countAccountsInUse(11L));
+		assertEquals(11L, fake.lastCompanyId);
 	}
 }

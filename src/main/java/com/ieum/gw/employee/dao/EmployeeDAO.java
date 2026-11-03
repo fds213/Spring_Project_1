@@ -86,4 +86,14 @@ public class EmployeeDAO {
 	public List<EmployeeOptionDTO> listAssignableEmployees(Long companyId, List<String> roleCodes) {
 		return mapper.listAssignableEmployees(companyId, roleCodes);
 	}
+	
+    /** 사용 중(ACTIVE) 계정 수 */
+    public int countAccountsInUse(Long companyId) {
+        return mapper.countAccountsInUse(companyId);
+    }
+    
+    /** 직원 ID → 이름·부서명 (퇴사자 포함) */
+    public List<EmployeeOptionDTO> listEmployeeNamesWithDept(Long companyId, List<Long> ids) {
+        return mapper.listEmployeeNamesWithDept(companyId, ids);
+    }
 }
