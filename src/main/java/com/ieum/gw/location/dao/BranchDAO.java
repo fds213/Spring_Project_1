@@ -3,6 +3,7 @@ package com.ieum.gw.location.dao;
 import java.util.List;
 import org.springframework.stereotype.Repository;
 import com.ieum.gw.location.dto.BranchDTO;
+import com.ieum.gw.location.dto.BranchDetailDTO;
 import com.ieum.gw.location.mapper.BranchMapper;
 import lombok.RequiredArgsConstructor;
 
@@ -14,5 +15,9 @@ public class BranchDAO {
 
     public List<BranchDTO> selectActiveBranches(Long companyId) {
         return mapper.selectActiveBranches(companyId);
+    }
+
+    public List<BranchDetailDTO> selectBranchDetails(Long companyId) {
+        return mapper.selectBranchDetails(companyId);
     }
 }

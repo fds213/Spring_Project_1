@@ -9,4 +9,13 @@
            AND use_yn = 'Y'
          ORDER BY branch_name, branch_id
     </select>
+
+    <!-- 사용 중지 지점의 기존 자산·티켓 표시를 유지한다. 새 선택 목록으로 쓰지 않는다. -->
+    <select id="selectBranchDetails" resultType="com.ieum.gw.location.dto.BranchDetailDTO">
+        SELECT branch_id AS branchId, branch_name AS branchName, address,
+               detail_address AS detailAddress, use_yn AS useYn
+          FROM branch
+         WHERE company_id = #{companyId}
+         ORDER BY branch_name, branch_id
+    </select>
 </mapper>

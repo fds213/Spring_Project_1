@@ -1,6 +1,7 @@
 package com.ieum.gw.location.service;
 
 import com.ieum.gw.location.dto.BranchDTO;
+import com.ieum.gw.location.dto.BranchDetailDTO;
 import com.ieum.gw.location.dao.BranchDAO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,5 +28,18 @@ public class BranchService {
             throw new IllegalArgumentException("업체 정보가 필요합니다.");
         }
         return dao.selectActiveBranches(companyId);
+    }
+
+    /**
+     * 기존 자산·티켓의 이름과 주소를 표시할 때 호출한다. 사용 중지한 지점도 포함한다.
+     * 입력 업체 ID는 호출한 모듈이 인증 정보에서 가져오며, SQL에서도 같은 업체만 읽는다.
+     * 새 접수·장비 신청 선택 목록에는 기존 getBranches를 사용한다.
+     */
+    @Transactional(readOnly = true)
+    public List<BranchDetailDTO> getBranchDetails(Long companyId) {
+        if (companyId == null || companyId <= 0) {
+            throw new IllegalArgumentException("업체 정보가 필요합니다.");
+        }
+        return dao.selectBranchDetails(companyId);
     }
 }
