@@ -1,4 +1,4 @@
-package com.ieum.gw.location.mapper;
+package com.ieum.gw.location.dao;
 
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;

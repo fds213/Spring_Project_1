@@ -1,4 +1,4 @@
-package com.ieum.gw.approval.mapper;
+package com.ieum.gw.approval.dao;
 
 import com.ieum.gw.approval.dto.ApprovalBoxDTO;
 import com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO;

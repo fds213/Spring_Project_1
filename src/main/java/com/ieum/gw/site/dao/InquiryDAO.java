@@ -3,7 +3,6 @@ package com.ieum.gw.site.dao;
 import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.site.dto.PublicInquiryDTO;
-import com.ieum.gw.site.mapper.InquiryMapper;
 
 import lombok.RequiredArgsConstructor;
 

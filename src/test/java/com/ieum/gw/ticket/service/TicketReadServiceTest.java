@@ -37,7 +37,7 @@ class TicketReadServiceTest {
             new XMLMapperBuilder(in, config, "mapper/TicketReadMapper.xml", config.getSqlFragments()).parse();
         }
         for (String id : List.of("countMyTicket", "selectMyComments", "selectMyHistory")) {
-            var bound = config.getMappedStatement("com.ieum.gw.ticket.mapper.TicketReadMapper." + id)
+            var bound = config.getMappedStatement("com.ieum.gw.ticket.dao.TicketReadMapper." + id)
                     .getBoundSql(Map.of("companyId", 7L, "employeeId", 9L, "itTicketId", 13L));
             String sql = bound.getSql().replaceAll("\\s+", " ").toLowerCase();
             assertTrue(sql.contains("where t.company_id = ? and t.requester_employee_id = ? and t.it_ticket_id = ?"));

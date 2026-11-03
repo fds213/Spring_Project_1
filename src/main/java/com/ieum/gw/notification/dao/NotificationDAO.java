@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.notification.dto.NotificationDTO;
 import com.ieum.gw.notification.dto.NotificationSaveDTO;
-import com.ieum.gw.notification.mapper.NotificationMapper;
 
 import lombok.RequiredArgsConstructor;
 

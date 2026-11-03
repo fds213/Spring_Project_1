@@ -125,7 +125,7 @@ class TicketServiceTest {
             assertNotNull(in);
             new XMLMapperBuilder(in, config, "mapper/TicketMapper.xml", config.getSqlFragments()).parse();
         }
-        String prefix = "com.ieum.gw.ticket.mapper.TicketMapper.";
+        String prefix = "com.ieum.gw.ticket.dao.TicketMapper.";
         String insert = config.getMappedStatement(prefix + "insertEquipmentTicket")
                 .getBoundSql(Map.of()).getSql().replaceAll("\\s+", " ");
         assertTrue(insert.contains("IGNORE_ROW_ON_DUPKEY_INDEX(IT_TICKET (EQUIPMENT_DOCUMENT_ID))"));

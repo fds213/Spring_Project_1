@@ -1,4 +1,4 @@
-package com.ieum.gw.attendance.mapper;
+package com.ieum.gw.attendance.dao;
 
 import java.math.BigDecimal;
 import java.util.List;

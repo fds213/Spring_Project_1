@@ -2,7 +2,6 @@ package com.ieum.gw.ticket.dao;
 
 import org.springframework.stereotype.Repository;
 import com.ieum.gw.ticket.dto.EquipmentTicketDTO;
-import com.ieum.gw.ticket.mapper.TicketMapper;
 import lombok.RequiredArgsConstructor;
 
 @Repository

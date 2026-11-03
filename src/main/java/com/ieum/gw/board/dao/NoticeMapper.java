@@ -1,4 +1,4 @@
-package com.ieum.gw.board.mapper;
+package com.ieum.gw.board.dao;
 
 import java.util.List;
 

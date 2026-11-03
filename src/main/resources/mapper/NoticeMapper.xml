@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.board.mapper.NoticeMapper">
+<mapper namespace="com.ieum.gw.board.dao.NoticeMapper">
 
 	<!-- 공지 목록·개수가 같이 쓰는 조건:
 	     우리 업체의 공지 게시판(BOARD_NOTICE) 글 중 지우지 않았고 보이는 글.

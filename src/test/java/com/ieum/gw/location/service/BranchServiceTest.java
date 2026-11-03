@@ -63,7 +63,7 @@ class BranchServiceTest {
             assertNotNull(in);
             new XMLMapperBuilder(in, config, "mapper/BranchMapper.xml", config.getSqlFragments()).parse();
         }
-        var sql = config.getMappedStatement("com.ieum.gw.location.mapper.BranchMapper.selectActiveBranches")
+        var sql = config.getMappedStatement("com.ieum.gw.location.dao.BranchMapper.selectActiveBranches")
                 .getBoundSql(Map.of("companyId", 7L));
         String text = sql.getSql().replaceAll("\\s+", " ").toLowerCase();
         assertTrue(text.contains("where company_id = ?"));
@@ -71,7 +71,7 @@ class BranchServiceTest {
         assertTrue(text.contains("order by branch_name, branch_id"));
         assertEquals("companyId", sql.getParameterMappings().get(0).getProperty());
 
-        var details = config.getMappedStatement("com.ieum.gw.location.mapper.BranchMapper.selectBranchDetails")
+        var details = config.getMappedStatement("com.ieum.gw.location.dao.BranchMapper.selectBranchDetails")
                 .getBoundSql(Map.of("companyId", 7L));
         String detailSql = details.getSql().replaceAll("\\s+", " ").toLowerCase();
         assertTrue(detailSql.contains("where company_id = ?"));

@@ -1,6 +1,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.employee.mapper.EmployeeMapper">
+<mapper namespace="com.ieum.gw.employee.dao.EmployeeMapper">
 
     <select id="listActiveEmp" resultType="com.ieum.gw.employee.dto.EmpSummaryDTO">
         SELECT e.company_id, e.employee_id, e.employee_name, e.department_id, e.job_grade_id,

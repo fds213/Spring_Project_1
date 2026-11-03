@@ -3,7 +3,6 @@ package com.ieum.gw.common.dao;
 import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.common.dto.AttachmentDTO;
-import com.ieum.gw.common.mapper.AttachmentMapper;
 
 import lombok.RequiredArgsConstructor;
 

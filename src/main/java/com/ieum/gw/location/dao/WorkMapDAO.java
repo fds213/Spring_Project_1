@@ -6,7 +6,6 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.location.dto.MapMarkerDTO;
 import com.ieum.gw.location.dto.MapMarkerSaveDTO;
-import com.ieum.gw.location.mapper.WorkMapMapper;
 
 import lombok.RequiredArgsConstructor;
 

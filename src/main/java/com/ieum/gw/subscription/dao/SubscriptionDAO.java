@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.subscription.dto.CompanyDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
-import com.ieum.gw.subscription.mapper.SubscriptionMapper;
 
 import lombok.RequiredArgsConstructor;
 

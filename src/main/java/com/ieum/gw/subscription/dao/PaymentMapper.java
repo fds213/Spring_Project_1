@@ -1,4 +1,4 @@
-package com.ieum.gw.subscription.mapper;
+package com.ieum.gw.subscription.dao;
 
 import java.time.LocalDateTime;
 import java.util.List;

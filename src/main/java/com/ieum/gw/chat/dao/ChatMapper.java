@@ -1,4 +1,4 @@
-package com.ieum.gw.chat.mapper;
+package com.ieum.gw.chat.dao;
 
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
