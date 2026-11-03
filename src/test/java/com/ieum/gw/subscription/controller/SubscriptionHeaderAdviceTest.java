@@ -1,9 +1,13 @@
 package com.ieum.gw.subscription.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +22,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import com.ieum.gw.common.dto.AuthEmpDTO;
 import com.ieum.gw.common.dto.LoginUser;
+import com.ieum.gw.subscription.dao.SubscriptionDAO;
 import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 import com.ieum.gw.subscription.service.SubscriptionService;
 
 /** 언제 이용 상태를 읽는지 확인한다. 값 계산은 ServicePeriodsTest, 헤더에 실제로 보이는지는 Tomcat에서 본다 */
@@ -65,6 +71,26 @@ class SubscriptionHeaderAdviceTest {
                 new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities()));
     }
 
+    // 가짜 DAO의 이용 기간으로 실제 SubscriptionService가 값을 만든다
+    private static SubscriptionHeaderAdvice adviceWith(ServicePeriodDTO... periods) {
+        SubscriptionDAO dao = new SubscriptionDAO(null) {
+            @Override
+            public List<ServicePeriodDTO> listPeriods(Long companyId) {
+                return List.of(periods);
+            }
+        };
+        return new SubscriptionHeaderAdvice(new SubscriptionService(dao, null));
+    }
+
+    private static ServicePeriodDTO period(boolean trial, int startsDaysAgo, int endsDaysAgo) {
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Seoul"));
+        ServicePeriodDTO p = new ServicePeriodDTO();
+        p.setTrial(trial);
+        p.setStartsAt(now.minusDays(startsDaysAgo));
+        p.setEndsAt(now.minusDays(endsDaysAgo));
+        return p;
+    }
+
     @AfterEach
     void clear() {
         SecurityContextHolder.clearContext();
@@ -108,5 +134,42 @@ class SubscriptionHeaderAdviceTest {
         service.error = new IllegalStateException("DB 오류");
 
         assertNull(advice.companyBilling(request(BROWSER_ACCEPT)));
+    }
+
+    @Test
+    @DisplayName("유료가 끝난 업체: 만료이면서 유료라 화면이 체험 만료와 가를 수 있다")
+    void paidExpiredScreen() {
+        loginAs(7L);
+        SubscriptionHeaderAdvice paidExpired = adviceWith(period(true, 60, 46), period(false, 50, 20));
+
+        CompanyBillingDTO billing = paidExpired.companyBilling(request(BROWSER_ACCEPT));
+
+        assertEquals("EXPIRED", billing.getStatus());
+        assertTrue(billing.isPaid());
+    }
+
+    @Test
+    @DisplayName("체험이 끝난 업체: 만료이고 유료가 아니다")
+    void trialExpiredScreen() {
+        loginAs(7L);
+
+        CompanyBillingDTO billing = adviceWith(period(true, 60, 46)).companyBilling(request(BROWSER_ACCEPT));
+
+        assertEquals("EXPIRED", billing.getStatus());
+        assertFalse(billing.isPaid());
+    }
+
+    @Test
+    @DisplayName("체험 중과 유료 중: 상태와 유료 여부가 그대로 간다")
+    void usingScreen() {
+        loginAs(7L);
+
+        CompanyBillingDTO trial = adviceWith(period(true, 3, -11)).companyBilling(request(BROWSER_ACCEPT));
+        assertEquals("TRIAL", trial.getStatus());
+        assertFalse(trial.isPaid());
+
+        CompanyBillingDTO paid = adviceWith(period(true, 3, -11), period(false, 1, -29)).companyBilling(request(BROWSER_ACCEPT));
+        assertEquals("PAID", paid.getStatus());
+        assertTrue(paid.isPaid());
     }
 }

@@ -136,6 +136,7 @@ final class ServicePeriods {
     static CompanyBillingDTO toBilling(ServicePeriodDTO period, LocalDateTime now) {
         CompanyBillingDTO billing = new CompanyBillingDTO();
         billing.setStatus(statusOf(period, now));
+        billing.setPaid(!period.isTrial());
         billing.setEndDate(lastDay(period.getEndsAt()).format(HEADER_DATE));
         billing.setDaysLeft(daysLeft(period, now));
         return billing;

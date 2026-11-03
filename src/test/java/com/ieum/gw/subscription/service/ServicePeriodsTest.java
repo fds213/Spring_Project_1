@@ -244,6 +244,34 @@ class ServicePeriodsTest {
     }
 
     @Test
+    @DisplayName("헤더 값: 만료의 체험과 유료는 상태가 같아 paid로 가른다")
+    void billingExpiredTrialOrPaid() {
+        ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12);
+
+        CompanyBillingDTO trialExpired = ServicePeriods.toBilling(trial, at("2026-11-13T00:00"));
+        assertEquals("EXPIRED", trialExpired.getStatus());
+        assertFalse(trialExpired.isPaid());
+
+        // 체험 중 결제한 업체의 유료 기간이 끝나면 체험이 아니라 유료 기간을 본다
+        LocalDateTime afterPaid = at("2026-12-02T00:00");
+        CompanyBillingDTO paidExpired = ServicePeriods.toBilling(ServicePeriods.pick(List.of(trial, paid), afterPaid), afterPaid);
+        assertEquals("EXPIRED", paidExpired.getStatus());
+        assertTrue(paidExpired.isPaid());
+        assertEquals("2026.12.01", paidExpired.getEndDate());
+        assertEquals(0, paidExpired.getDaysLeft());
+    }
+
+    @Test
+    @DisplayName("헤더 값: 체험 중은 paid가 false, 유료 중은 true")
+    void billingPaidFlagWhileUsing() {
+        assertFalse(ServicePeriods.toBilling(
+                period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5), at("2026-11-08T09:00")).isPaid());
+        assertTrue(ServicePeriods.toBilling(
+                period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12), at("2026-11-08T09:00")).isPaid());
+    }
+
+    @Test
     @DisplayName("운영자 요약: 체험 중 결제하면 유료 기간을 보고, 체험 마지막 날은 그대로 남는다")
     void companyPeriodPaidOverTrial() {
         CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(List.of(
