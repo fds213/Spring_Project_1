@@ -133,7 +133,7 @@
     const a = d.actions || {};
     const blocks = [];
     const row = h('div', 'inq-actions');
-    if (a.assignSelf) row.append(writeBtn('나에게 배정', 'btn btn-primary', b => post(d, 'assign', {}, b, '나에게 배정했습니다. 이어서 처리 시작을 누르세요')));
+    if (a.assignSelf) row.append(writeBtn('나에게 배정', 'btn btn-primary', b => post(d, 'assign', {}, b, '나에게 배정했습니다. 이어서 처리 시작을 누르세요', ['assignee'])));
     if (a.start) row.append(writeBtn('처리 시작', 'btn btn-primary', b => post(d, 'start', {}, b, '처리를 시작했습니다')));
     if (a.assign) {
       const sel = keep(pickSelect('담당자', '담당자 고르기', (d.assignees || []).map(p => [person(p), p.employeeId]), d.assignee && d.assignee.employeeId), d.id, 'assignee');

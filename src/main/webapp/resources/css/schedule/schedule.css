@@ -15,7 +15,8 @@
 }
 
 /* ---------- 보기 필터: 체크박스 대신 눌렀다 떼는 칩 ---------- */
-#view-schedule .sch-filters { gap: 6px; }
+/* 폭이 좁아 칩이 달력 툴바 아래 줄로 내려가도 카드 끝·요일 줄에 붙지 않게 여백 */
+#view-schedule .sch-filters { gap: 6px; padding: 0 0 4px 16px; }
 #view-schedule .sch-filters label { position: relative; gap: 0; }
 #view-schedule .sch-filters input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 #view-schedule .sch-filters .sch-chip {
