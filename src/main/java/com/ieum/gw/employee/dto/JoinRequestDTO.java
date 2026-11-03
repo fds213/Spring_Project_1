@@ -15,4 +15,5 @@ public class JoinRequestDTO {
 	private String requestName;
 	private Long departmentId;
 	private Long jobGradeId;
+	private String requestKeyHash;
 }

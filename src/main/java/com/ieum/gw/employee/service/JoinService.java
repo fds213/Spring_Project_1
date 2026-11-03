@@ -1,5 +1,8 @@
 package com.ieum.gw.employee.service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -8,7 +11,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -104,7 +109,7 @@ public class JoinService {
         board.put("nextEmpNo", nextEmpNo);
         board.put("canApprove", canApprove);
         board.put("readOnly", readOnly);
-        board.put("requests", List.of());   // 가입 요청 목록은 ②-2에서 채운다
+        board.put("requests", List.of());
         return board;
     }
 
@@ -240,41 +245,52 @@ public class JoinService {
             throw new IllegalStateException("이미 승인 대기 중이거나 계정이 있는 이메일입니다");
         }
 
-        // ⑤ 계정 저장: 사원 없음, ROLE_EMP, REQUESTED (로그인 안 됨)
+     // ⑤ 계정 저장: 사원 없음, ROLE_EMP, REQUESTED (로그인 안 됨)
         AccountDTO acc = new AccountDTO();
         acc.setCompanyId(companyId);
         acc.setEmail(email);
-        acc.setPasswordHash(employeeService.hashPassword(password));   // 72바이트 검사 포함
+        acc.setPasswordHash(employeeService.hashPassword(password)); // 72바이트 검사 포함
         acc.setRoleCode("ROLE_EMP");
         acc.setStatusCode("REQUESTED");
-        employeeDAO.insertAccount(acc);                               // acc.userAccountId 채워짐
+        try {
+            employeeDAO.insertAccount(acc); // acc.userAccountId 채워짐
+        } catch (DuplicateKeyException e) {
+            // 같은 이메일로 동시에 신청하면 ④를 함께 통과할 수 있음 → 고유 제약에서 걸린 것도 같은 안내로
+            throw new IllegalStateException("이미 승인 대기 중이거나 계정이 있는 이메일입니다");
+        }
 
-        // ⑥ 요청 저장
+        // ⑥ 요청 저장. 신청자에게는 키를, DB에는 키의 해시만
+        String key = UUID.randomUUID().toString();
         JoinRequestDTO req = new JoinRequestDTO();
         req.setCompanyId(companyId);
         req.setUserAccountId(acc.getUserAccountId());
         req.setRequestName(name);
         req.setDepartmentId(deptId);
         req.setJobGradeId(gradeId);
-        dao.insertRequest(req);                                       // req.accountRequestId 채워짐
+        req.setRequestKeyHash(sha256(key));
+        dao.insertRequest(req);
 
-        // ⑦ 저장한 요청을 보기 모양으로
-        return getMyRequest(code, req.getAccountRequestId());
+        // ⑦ 저장한 요청을 보기 모양으로 (번호 대신 키로 찾기)
+        return getMyRequest(code, key);
     }
     
+    /** 내 신청 취소 (POST /join/api/companies/{code}/requests/{key}/delete, 로그인 없음) */
     @Transactional
-    public void cancelMyRequest(String companyCode, Long requestId) {
+    public void cancelMyRequest(String companyCode, String requestKey) {
         // ① 코드 정리
-        String code = companyCode == null ? "" : companyCode.trim().toLowerCase();
+        if (companyCode == null || requestKey == null) {
+            throw new IllegalStateException("취소할 수 있는 신청이 없습니다");
+        }
+        String code = companyCode.trim().toLowerCase();
 
-        // ② 내 신청 찾기 → 없거나 대기 중이 아니면 막기
-        JoinRequestViewDTO view = dao.getRequestView(code, requestId);
+        // ② 키로 내 신청 찾기 → 없거나 대기 중이 아니면 막기
+        JoinRequestViewDTO view = dao.getRequestView(code, sha256(requestKey));
         if (view == null || !"REQUESTED".equals(view.getRequestStatus())) {
             throw new IllegalStateException("취소할 수 있는 신청이 없습니다");
         }
 
-        // ③ 요청 취소 → 바뀐 행이 0이면 막기
-        int rows = dao.cancelRequest(requestId, view.getCompanyId());
+        // ③ 요청 취소 (실제 번호는 찾은 행에서) → 바뀐 행이 0이면 막기
+        int rows = dao.cancelRequest(view.getAccountRequestId(), view.getCompanyId());
         if (rows == 0) {
             throw new IllegalStateException("이미 처리된 신청입니다");
         }
@@ -283,14 +299,13 @@ public class JoinService {
         dao.cancelAccount(view.getUserAccountId(), view.getCompanyId());
     }
     
-    public Map<String, Object> getMyRequest(String companyCode, Long requestId) {
-        if (companyCode == null) {
+    public Map<String, Object> getMyRequest(String companyCode, String requestKey) {
+        if (companyCode == null || requestKey == null) {
             return null;
         }
         String code = companyCode.trim().toLowerCase();
-        
-        JoinRequestViewDTO request = dao.getRequestView(code, requestId);
-        
+
+        JoinRequestViewDTO request = dao.getRequestView(code, sha256(requestKey));
         if (request == null || "CANCELED".equals(request.getRequestStatus())) {
             return null;
         }
@@ -309,7 +324,7 @@ public class JoinService {
         }
         
         Map<String, Object> view = new LinkedHashMap<>();
-        view.put("reqId", request.getAccountRequestId());
+        view.put("reqId", requestKey);
         view.put("state", state);
         view.put("reason", reason);
         view.put("companyCode", request.getCompanyCode());
@@ -358,5 +373,20 @@ public class JoinService {
             throw new AccessDeniedException("가입 승인은 업체 관리자와 부서장만 할 수 있습니다");
         }
         return headDept;
+    }
+    
+    /** 요청 키 → SHA-256 16진수 64자 (REQUEST_KEY_HASH에 저장·검색) */
+    private String sha256(String text) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = md.digest(text.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : bytes) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("해시를 만들 수 없습니다", e);
+        }
     }
 }

@@ -44,11 +44,11 @@ public interface JoinMapper {
 	int countLiveEmail(@Param("companyId") Long companyId, @Param("email") String email);
 
 	int insertRequest(JoinRequestDTO dto);
-	
-	JoinRequestViewDTO getRequestView(@Param("companyCode") String companyCode,@Param("requestId") Long requestId);
-	
-	int cancelRequest(@Param("requestId") Long requestId,@Param("companyId") Long companyId);
-	
+
+	JoinRequestViewDTO getRequestView(@Param("companyCode") String companyCode, @Param("keyHash") String keyHash);
+
+	int cancelRequest(@Param("requestId") Long requestId, @Param("companyId") Long companyId);
+
 	int cancelAccount(@Param("userAccountId") Long userAccountId, @Param("companyId") Long companyId);
-	
+
 }
