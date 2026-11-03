@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.location.mapper.WorkMapMapper">
+
+	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<!-- 우리 업체의 공통 지도들. 첫 마커를 동시에 저장해 줄이 둘 생겨도 마커는 모두 보이게 '종류'로 찾는다 -->
+	<sql id="commonMaps">
+		SELECT work_map_id FROM work_map
+		 WHERE company_id = #{companyId} AND map_type = 'MAP_COMMON'
+	</sql>
+
+	<!-- 공통 지도 번호: 여러 줄이면 가장 작은 번호 -->
+	<select id="selectCommonMapId" resultType="long">
+		SELECT MIN(work_map_id)
+		  FROM work_map
+		 WHERE company_id = #{companyId}
+		   AND map_type = 'MAP_COMMON'
+	</select>
+
+	<!-- 공통 지도 줄 만들기. 번호·등록일은 DB 기본값을 쓴다 -->
+	<insert id="insertCommonMap">
+		INSERT INTO work_map (company_id, map_name, map_type, owner_employee_id)
+		VALUES (#{companyId}, '공통 지도', 'MAP_COMMON', #{ownerId})
+	</insert>
+
+	<!-- 공통 지도의 마커 전체: 최근에 고친 것부터 -->
+	<select id="selectCommonMarkers" resultType="com.ieum.gw.location.dto.MapMarkerDTO">
+		SELECT m.map_marker_id  AS id,
+		       m.title          AS title,
+		       m.address        AS address,
+		       m.detail_address AS detailAddress,
+		       m.latitude       AS lat,
+		       m.longitude      AS lng,
+		       m.description    AS description,
+		       TO_CHAR(m.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+		  FROM map_marker m
+		 WHERE m.company_id = #{companyId}
+		   AND m.work_map_id IN (<include refid="commonMaps"/>)
+		 ORDER BY m.updated_at DESC, m.map_marker_id DESC
+	</select>
+
+	<!-- 새 마커 번호 -->
+	<select id="selectNextMarkerId" resultType="long">
+		SELECT sq_map_marker.NEXTVAL FROM dual
+	</select>
+
+	<!-- 마커 저장. 지점·자산·티켓 연결 칸은 추가 기능이라 비워 둔다 -->
+	<insert id="insertMarker">
+		INSERT INTO map_marker
+			(map_marker_id, company_id, work_map_id, title, address, detail_address, latitude, longitude, description)
+		VALUES
+			(#{markerId}, #{companyId}, #{mapId}, #{m.title}, #{m.address}, #{m.detailAddress, jdbcType=VARCHAR},
+			 #{m.lat}, #{m.lng}, #{m.description, jdbcType=CLOB})
+	</insert>
+
+	<!-- 마커 고치기: 우리 업체 공통 지도의 마커만 -->
+	<update id="updateMarker">
+		UPDATE map_marker
+		   SET title          = #{m.title},
+		       address        = #{m.address},
+		       detail_address = #{m.detailAddress, jdbcType=VARCHAR},
+		       latitude       = #{m.lat},
+		       longitude      = #{m.lng},
+		       description    = #{m.description, jdbcType=CLOB},
+		       updated_at     = <include refid="now"/>
+		 WHERE company_id = #{companyId}
+		   AND map_marker_id = #{markerId}
+		   AND work_map_id IN (<include refid="commonMaps"/>)
+	</update>
+
+	<!-- 마커 지우기: 우리 업체 공통 지도의 마커만. 지울 표시 칸이 없는 표라 실제로 지운다 -->
+	<delete id="deleteMarker">
+		DELETE FROM map_marker
+		 WHERE company_id = #{companyId}
+		   AND map_marker_id = #{markerId}
+		   AND work_map_id IN (<include refid="commonMaps"/>)
+	</delete>
+
+</mapper>
