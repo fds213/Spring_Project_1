@@ -81,7 +81,7 @@ function firmDetail(d) {
     ['업체 코드', d.companyCode],
     ['이용 상태', d.state.label],
     ['이용 인원', `${d.users}명`],
-    ['월 이용료', won(d.total)],
+    ['월 기준 이용료', won(d.total)],
     ['이메일', d.email],
     // TODO(ACC-06): 인증 메일을 붙여 인증 전 로그인을 막으면 '대기 (로그인 불가)'로 되돌린다
     ['이메일 인증', d.emailVerified ? '완료' : '대기'],
@@ -124,7 +124,7 @@ function drawFirms() {
       inqCell('업체', titleBtn(o.company, isOpen), small(o.companyCode)),
       inqCell('관리자', span(o.adminName), small(o.adminNo)),
       inqCell('이용 인원', span(`${o.users}명`)),
-      inqCell('월 이용료', span(won(o.total))),
+      inqCell('월 기준 이용료', span(won(o.total))),
       inqCell('상태', span(o.state.label, `status status-${o.state.status.toLowerCase()}`)),
       inqCell('가입일', span(when(o.at))));
     // 숫자 열은 신청 현황 표처럼 오른쪽 정렬

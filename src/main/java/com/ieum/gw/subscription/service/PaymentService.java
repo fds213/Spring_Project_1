@@ -1,5 +1,6 @@
 package com.ieum.gw.subscription.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -20,10 +21,12 @@ import com.ieum.gw.subscription.dao.PaymentDAO;
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
 import com.ieum.gw.subscription.dto.BillingDTO;
 import com.ieum.gw.subscription.dto.BillingPaymentDTO;
+import com.ieum.gw.subscription.dto.BillingPlanDTO;
 import com.ieum.gw.subscription.dto.CompanyDTO;
 import com.ieum.gw.subscription.dto.ConfirmFormDTO;
 import com.ieum.gw.subscription.dto.FailFormDTO;
 import com.ieum.gw.subscription.dto.OrderFormDTO;
+import com.ieum.gw.subscription.dto.OrderPurpose;
 import com.ieum.gw.subscription.dto.OrderResultDTO;
 import com.ieum.gw.subscription.dto.OrderStatus;
 import com.ieum.gw.subscription.dto.PaymentOrderDTO;
@@ -36,13 +39,13 @@ import com.ieum.gw.subscription.dto.TossPaymentDTO;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 토스 테스트 결제 1회(월간, 인원 × 4,000원, 요구분석서 3장 범위 표).
+ * 토스 테스트 결제: 첫 결제(월간·연간)와 유료 이용 중 연장(SUB-03).
  * 주문 만들기 → 토스 결제창(브라우저) → 승인 확인(토스에 승인 요청·응답 검증) → 승인 기록 → 이용 기간 반영.
  * 결제 성공 화면으로 돌아온 것만으로는 아무것도 바꾸지 않는다(PAY-02). 토스 호출이 트랜잭션 밖이어야 해서 이 클래스에는
  * 트랜잭션을 붙이지 않고, 저장은 PaymentRecordService에 맡긴다.
  *
- * 업체 관리자만 쓴다. 구독 권한 위임은 이번 제외, 연간·연장은 핵심 뒤 추가, 만료 후 재구매는 이번 제외라
- * 유료 기간이 한 번도 없는 업체(체험 중·체험 만료)의 첫 결제만 받는다.
+ * 업체 관리자만 쓴다. 구독 권한 위임은 이번 제외다. 이번 제외인 월간→연간 전환(SUB-05)·연장 때 인원 변경(SUB-07)·
+ * 만료 후 재구매 때문에, 연장은 지금 요금제·지금 인원 그대로이고 유료가 끝난 업체는 결제할 수 없다.
  */
 @Service
 @RequiredArgsConstructor
@@ -56,7 +59,11 @@ public class PaymentService {
     private static final int MAX_PAYMENT_KEY = 200; // 토스 paymentKey 제한, PAYMENT.PAYMENT_KEY
     private static final String ROLE_ADMIN = "ROLE_ADMIN";
     private static final String PLAN_MONTHLY = "MONTHLY";
+    private static final String PLAN_ANNUAL = "ANNUAL";
     private static final String MODE_FIRST = "FIRST";
+    private static final String MODE_EXTEND = "EXTEND";
+    private static final int FIRST_ANNUAL_PCT = 10; // 첫 연간 할인(요구분석서 3.5)
+    private static final int RENEW_ANNUAL_PCT = 20; // 연간 연장 할인. 10%에 더하는 것이 아니라 총 20%다(요구분석서 3.5)
     private static final String TOSS_DONE = "DONE";
     private static final String TOSS_CURRENCY = "KRW";
     private static final String TOSS_USER_CANCEL = "PAY_PROCESS_CANCELED"; // 구매자가 결제창을 닫았다. 실패가 아니다
@@ -80,11 +87,12 @@ public class PaymentService {
         CompanyDTO company = subscriptionDAO.getCompany(companyId);
         LocalDate lastDay = ServicePeriods.lastDay(period.getEndsAt());
         boolean paid = !period.isTrial();
+        String mode = modeOf(periods, period, now);
 
         BillingDTO billing = new BillingDTO();
         billing.setStatus(ServicePeriods.statusOf(period, now));
         billing.setPaid(paid);
-        billing.setPlan(paid ? PLAN_MONTHLY : null);
+        billing.setPlan(paid ? period.getPlan() : null);
         billing.setCompany(company.getCompanyName());
         billing.setCompanyCode(company.getCompanyCode());
         billing.setUsers(period.getPurchasedSeats());
@@ -101,8 +109,9 @@ public class PaymentService {
             }
         }
         billing.setServiceFrom(paid ? day(period.getStartsAt().toLocalDate()) : null);
-        billing.setCanPay(!hasPaidPeriod(periods));
-        billing.setMode(MODE_FIRST);
+        billing.setCanPay(mode != null);
+        billing.setMode(mode);
+        billing.setPlans(offers(mode, period));
 
         List<PaymentRowDTO> rows = paymentDAO.listPayments(companyId);
         List<BillingPaymentDTO> payments = new ArrayList<>();
@@ -131,24 +140,37 @@ public class PaymentService {
     /** 금액 미리 보기. 저장하지 않는다 */
     public QuoteDTO quote(LoginUser user, String plan, int users) {
         requireAdmin(user);
-        requireMonthly(plan);
+        requirePlan(plan);
         requireSeatRange(users);
-        SubscriptionPlanDTO monthly = monthlyPlan();
-        int months = monthly.getDurationMonths();
-        long unitPrice = monthly.getMonthlyUnitPrice();
-        LocalDate today = LocalDate.now(SEOUL);
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        List<ServicePeriodDTO> periods = subscriptionDAO.listPeriods(user.getCompanyId());
+        ServicePeriodDTO current = ServicePeriods.pick(periods, now);
+        String mode = requireMode(periods, current, now);
+        boolean extend = MODE_EXTEND.equals(mode);
+        if (extend) {
+            requireSameAsNow(current, plan, users);
+        }
+        SubscriptionPlanDTO row = planRow(plan);
+        int months = row.getDurationMonths();
+        long unitPrice = row.getMonthlyUnitPrice();
+        int pct = discountPct(plan, mode);
+        LocalDate from = extend ? current.getEndsAt().toLocalDate() : now.toLocalDate();
+        LocalDateTime endsAt = extend
+                ? ServicePeriods.extendedEndsAt(from, current.getBillingAnchorDate(), months)
+                : ServicePeriods.paidEndsAt(from, months);
 
         QuoteDTO quote = new QuoteDTO();
-        quote.setPlan(PLAN_MONTHLY);
-        quote.setMode(MODE_FIRST);
+        quote.setPlan(plan);
+        quote.setMode(mode);
         quote.setUsers(users);
         quote.setMonths(months);
-        quote.setAmount(totalAmount(users, unitPrice, months));
-        quote.setFormula(String.format(Locale.KOREA, "%,d명 × %,d원 × %d개월", users, unitPrice, months));
-        quote.setPct(0);
-        quote.setWhy("월간은 할인 없음");
-        quote.setFrom(day(today));
-        quote.setTo(day(ServicePeriods.lastDay(ServicePeriods.paidEndsAt(today, months))));
+        quote.setAmount(totalAmount(users, unitPrice, months, pct));
+        quote.setFormula(String.format(Locale.KOREA, "%,d명 × %,d원 × %d개월", users, unitPrice, months)
+                + (pct > 0 ? " × " + (100 - pct) + "%" : ""));
+        quote.setPct(pct);
+        quote.setWhy(discountReason(pct));
+        quote.setFrom(day(from));
+        quote.setTo(day(ServicePeriods.lastDay(endsAt)));
         return quote;
     }
 
@@ -159,30 +181,38 @@ public class PaymentService {
      */
     public OrderResultDTO createOrder(LoginUser user, OrderFormDTO form) {
         requireAdmin(user);
-        requireMonthly(form.getPlan());
+        requirePlan(form.getPlan());
         Long companyId = user.getCompanyId();
         List<ServicePeriodDTO> periods = subscriptionDAO.listPeriods(companyId);
         if (periods.isEmpty()) {
             throw new BillingException(404, "이 업체의 이용 기간이 없습니다.");
         }
-        if (hasPaidPeriod(periods)) {
-            throw new BillingException(409, "이미 유료로 바뀐 업체입니다. 연장은 아직 제공하지 않습니다.");
-        }
         PaymentOrderDTO approved = paymentDAO.getConfirmedOrder(companyId);
-        if (approved != null) {
+        // 이미 유료인 업체의 첫 결제 주문은 반영할 수 없다(applyOrder가 거절). 운영자 몫으로 두고 연장은 막지 않는다
+        boolean stuckFirst = approved != null && approved.getPurposeCode() == OrderPurpose.PP_FIRST && hasPaidPeriod(periods);
+        if (approved != null && !stuckFirst) {
             // 승인됐는데 저장이 실패한 채 화면을 떠난 주문: 또 결제하면 이중 결제이니 그 주문을 먼저 반영한다
             recordService.applyOrder(approved);
             throw new BillingException(409, "이미 승인된 결제를 반영했습니다. 이용 기간을 확인해 주세요.");
         }
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        ServicePeriodDTO current = ServicePeriods.pick(periods, now);
+        String mode = requireMode(periods, current, now);
+        boolean extend = MODE_EXTEND.equals(mode);
         if (form.getUsers() == null) {
             throw new BillingException(400, "이용 인원을 입력해 주세요.");
         }
         int seats = form.getUsers();
         requireSeatRange(seats);
-        requireSeatsCoverAccounts(seats, companyId);
+        if (extend) {
+            requireSameAsNow(current, form.getPlan(), seats);
+        } else {
+            requireSeatsCoverAccounts(seats, companyId);
+        }
 
-        SubscriptionPlanDTO plan = monthlyPlan();
-        long amount = totalAmount(seats, plan.getMonthlyUnitPrice(), plan.getDurationMonths());
+        SubscriptionPlanDTO plan = planRow(form.getPlan());
+        int pct = discountPct(form.getPlan(), mode);
+        long amount = totalAmount(seats, plan.getMonthlyUnitPrice(), plan.getDurationMonths(), pct);
         if (form.getAmount() == null || form.getAmount() != amount) {
             throw new BillingException(409, "결제 금액이 바뀌었습니다. 금액을 확인하고 다시 진행해 주세요.");
         }
@@ -196,15 +226,18 @@ public class PaymentService {
         order.setExternalOrderNo("ieum-" + UUID.randomUUID().toString().replace("-", ""));
         order.setBuyerAccountId(user.getUserAccountId());
         order.setSubscriptionPlanId(plan.getSubscriptionPlanId());
+        order.setPurposeCode(extend ? OrderPurpose.PP_RENEW : OrderPurpose.PP_FIRST);
         order.setSeatCount(seats);
         order.setMonthlyUnitPrice(plan.getMonthlyUnitPrice());
+        order.setDiscountRate(BigDecimal.valueOf(pct, 2));
         order.setTotalAmount(amount);
-        order.setPricedAt(LocalDateTime.now(SEOUL));
+        order.setPricedAt(now);
         recordService.saveNewOrder(order);
 
         OrderResultDTO result = new OrderResultDTO();
         result.setOrderNo(order.getExternalOrderNo());
-        result.setOrderName("이음 월간 이용 " + seats + "명");
+        result.setOrderName("이음 " + (PLAN_ANNUAL.equals(form.getPlan()) ? "연간" : "월간")
+                + (extend ? " 연장 " : " 이용 ") + seats + "명");
         result.setAmount(amount);
         result.setClientKey(tossClient.getClientKey());
         return result;
@@ -257,10 +290,12 @@ public class PaymentService {
                     order.getExternalOrderNo(), form.getAmount(), order.getTotalAmount());
             throw new BillingException(400, "결제 금액이 주문과 다릅니다. 처음부터 다시 결제해 주세요.");
         }
-        if (hasPaidPeriod(subscriptionDAO.listPeriods(companyId))) {
-            throw new BillingException(409, "이미 유료로 바뀐 업체입니다. 이 결제는 진행하지 않았습니다.");
+        if (order.getPurposeCode() == OrderPurpose.PP_FIRST) {
+            if (hasPaidPeriod(subscriptionDAO.listPeriods(companyId))) {
+                throw new BillingException(409, "이미 유료로 바뀐 업체입니다. 이 결제는 진행하지 않았습니다.");
+            }
+            requireSeatsCoverAccounts(order.getSeatCount(), companyId); // 주문 뒤 계정이 늘었을 수 있다. 결제 시점 기준이다(PAY-01)
         }
-        requireSeatsCoverAccounts(order.getSeatCount(), companyId); // 주문 뒤 계정이 늘었을 수 있다. 결제 시점 기준이다(PAY-01)
 
         TossPaymentDTO toss = askToss(order, form.getPaymentKey());
         verify(order, toss);
@@ -338,10 +373,72 @@ public class PaymentService {
         }
     }
 
-    private static void requireMonthly(String plan) {
-        if (!PLAN_MONTHLY.equals(plan)) {
-            throw new BillingException(400, "지금은 월간 요금제만 결제할 수 있습니다.");
+    private static void requirePlan(String plan) {
+        if (!PLAN_MONTHLY.equals(plan) && !PLAN_ANNUAL.equals(plan)) {
+            throw new BillingException(400, "요금제를 확인해 주세요.");
         }
+    }
+
+    // 결제 구분. 유료 기간이 없으면 첫 결제, 지금 유료 이용 중이면 연장이다. 유료가 끝난 뒤 재구매는 이번 제외라 null이다
+    private static String modeOf(List<ServicePeriodDTO> periods, ServicePeriodDTO current, LocalDateTime now) {
+        if (!hasPaidPeriod(periods)) {
+            return MODE_FIRST;
+        }
+        return !current.isTrial() && now.isBefore(current.getEndsAt()) ? MODE_EXTEND : null;
+    }
+
+    private static String requireMode(List<ServicePeriodDTO> periods, ServicePeriodDTO current, LocalDateTime now) {
+        String mode = modeOf(periods, current, now);
+        if (mode == null) {
+            throw new BillingException(409, "유료 기간이 끝난 업체의 재구매는 아직 제공하지 않습니다.");
+        }
+        return mode;
+    }
+
+    // 연장은 지금 요금제·지금 인원 그대로다. 월간→연간 전환(SUB-05)과 연장 때 인원 변경(SUB-07)은 이번 제외다
+    private static void requireSameAsNow(ServicePeriodDTO current, String plan, int seats) {
+        if (!plan.equals(current.getPlan())) {
+            throw new BillingException(409, "연장은 지금 요금제로만 할 수 있습니다.");
+        }
+        if (seats != current.getPurchasedSeats()) {
+            throw new BillingException(409, "연장은 지금 인원(" + current.getPurchasedSeats() + "명) 그대로만 할 수 있습니다.");
+        }
+    }
+
+    // 고를 수 있는 요금제: 첫 결제는 월간·연간, 연장은 지금 요금제만. 요금제 행이 없는 것은 뺀다
+    private List<BillingPlanDTO> offers(String mode, ServicePeriodDTO current) {
+        List<BillingPlanDTO> offers = new ArrayList<>();
+        if (mode == null) {
+            return offers;
+        }
+        List<String> plans = MODE_EXTEND.equals(mode) ? List.of(current.getPlan()) : List.of(PLAN_MONTHLY, PLAN_ANNUAL);
+        for (String plan : plans) {
+            SubscriptionPlanDTO row = findPlan(plan);
+            if (row != null) {
+                BillingPlanDTO offer = new BillingPlanDTO();
+                offer.setPlan(plan);
+                offer.setMonths(row.getDurationMonths());
+                offer.setPct(discountPct(plan, mode));
+                offer.setAmountPerUser(totalAmount(1, row.getMonthlyUnitPrice(), row.getDurationMonths(), offer.getPct()));
+                offers.add(offer);
+            }
+        }
+        return offers;
+    }
+
+    // 할인율(%). 월간은 없고, 연간은 첫 결제 10%, 연장 20%다(요구분석서 3.5)
+    private static int discountPct(String plan, String mode) {
+        if (!PLAN_ANNUAL.equals(plan)) {
+            return 0;
+        }
+        return MODE_EXTEND.equals(mode) ? RENEW_ANNUAL_PCT : FIRST_ANNUAL_PCT;
+    }
+
+    private static String discountReason(int pct) {
+        if (pct == RENEW_ANNUAL_PCT) {
+            return "연간 연장 할인";
+        }
+        return pct == FIRST_ANNUAL_PCT ? "첫 연간 할인" : "월간은 할인 없음";
     }
 
     private static void requireSeatRange(int seats) {
@@ -364,21 +461,29 @@ public class PaymentService {
     }
 
     private SubscriptionPlanDTO monthlyPlan() {
-        SubscriptionPlanDTO plan = paymentDAO.getMonthlyPlan();
-        if (plan == null) {
-            logger.error("월간 요금제 행(SUBSCRIPTION_PLAN.PLAN_MONTHLY)이 없음");
+        return planRow(PLAN_MONTHLY);
+    }
+
+    private SubscriptionPlanDTO planRow(String plan) {
+        SubscriptionPlanDTO row = findPlan(plan);
+        if (row == null) {
+            logger.error("요금제 행(SUBSCRIPTION_PLAN)이 없음: {}", plan);
             throw new BillingException(503, "요금제 정보가 없습니다. 운영자에게 문의해 주세요.");
         }
-        return plan;
+        return row;
+    }
+
+    private SubscriptionPlanDTO findPlan(String plan) {
+        return PLAN_ANNUAL.equals(plan) ? paymentDAO.getYearlyPlan() : paymentDAO.getMonthlyPlan();
     }
 
     private static boolean hasPaidPeriod(List<ServicePeriodDTO> periods) {
         return periods.stream().anyMatch(p -> !p.isTrial());
     }
 
-    /** 결제 금액: 인원 × 1인 월 단가 × 개월. 부가세는 따로 계산하지 않는다(요구분석서 3.5) */
-    static long totalAmount(int seats, long monthlyUnitPrice, int months) {
-        return seats * monthlyUnitPrice * months;
+    /** 결제 금액: 인원 × 1인 월 단가 × 개월 × (100 − 할인율)%. 원 미만은 버리고, 부가세는 따로 계산하지 않는다(요구분석서 3.5) */
+    static long totalAmount(int seats, long monthlyUnitPrice, int months, int discountPct) {
+        return seats * monthlyUnitPrice * months * (100 - discountPct) / 100;
     }
 
     private static BillingPaymentDTO toPayment(PaymentRowDTO row) {

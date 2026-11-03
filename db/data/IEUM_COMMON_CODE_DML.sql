@@ -271,7 +271,7 @@ BEGIN
     VALUES ('PLAN_MONTHLY', 'PLAN_TYPE', '월간', '1인 월 4,000원을 기준으로 달력 1개월을 구매하는 요금제', 'Y', 1);
     -- 원본 시트 84행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('PLAN_YEARLY', 'PLAN_TYPE', '연간', '달력 1년의 이용 기간을 구매하는 요금제', 'N', 2);
+    VALUES ('PLAN_YEARLY', 'PLAN_TYPE', '연간', '달력 1년의 이용 기간을 구매하는 요금제', 'Y', 2);
     -- ORDER_STATUS : 주문 상태
     -- 원본 시트 85행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -635,7 +635,7 @@ BEGIN
     VALUES ('PP_FIRST', 'PAYMENT_PURPOSE', '최초 유료 전환', '무료 체험 업체가 유료 이용을 시작하는 결제', 'Y', 1);
     -- 원본 시트 197행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('PP_RENEW', 'PAYMENT_PURPOSE', '기간 연장', '기존 유료 이용 기간을 연장하는 결제', 'N', 2);
+    VALUES ('PP_RENEW', 'PAYMENT_PURPOSE', '기간 연장', '기존 유료 이용 기간을 연장하는 결제', 'Y', 2);
     -- 원본 시트 198행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('PP_CAPACITY', 'PAYMENT_PURPOSE', '인원 증설', '현재 이용 기간의 인원 한도를 늘리는 결제', 'N', 3);

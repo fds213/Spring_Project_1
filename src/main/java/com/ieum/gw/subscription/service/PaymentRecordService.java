@@ -1,10 +1,12 @@
 package com.ieum.gw.subscription.service;
 
 import java.time.DateTimeException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ieum.gw.subscription.dao.PaymentDAO;
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
+import com.ieum.gw.subscription.dto.OrderPurpose;
 import com.ieum.gw.subscription.dto.OrderStatus;
 import com.ieum.gw.subscription.dto.PaymentDTO;
 import com.ieum.gw.subscription.dto.PaymentOrderDTO;
@@ -97,9 +100,11 @@ public class PaymentRecordService {
     /**
      * 승인을 기록한 주문을 이용 기간에 반영한다. 업체 행을 잠그고 주문을 다시 읽어, 같은 주문은 한 번만 반영하고
      * 다른 주문이 거의 동시에 승인돼도 유료 기간이 겹쳐 생기지 않는다(AGENTS.md '트랜잭션·동시 처리').
-     * 체험 기간은 그대로 두고 그 위에 유료 기간을 만든다(ServicePeriods.pick이 유료로 본다). 남은 체험은 더하지 않는다(PAY-02).
+     * 첫 결제: 체험 기간은 그대로 두고 그 위에 유료 기간을 만든다(ServicePeriods.pick이 유료로 본다). 남은 체험은 더하지 않는다(PAY-02).
+     * 연장: 지금 만료 시각에 새 기간을 이어 붙이고 최초 기준일을 물려받는다(SUB-03). 주문 뒤 만료된 다음 승인됐으면 승인 시각부터 다시 센다.
+     * 연장 두 건이 모두 승인되면 잠금 순서대로 차례로 이어 붙는다. 둘 다 돈을 냈으니 둘 다 기간을 준다.
      *
-     * @throws BillingException 이 주문 말고 이미 유료 기간이 있을 때. 주문은 ORD_CONFIRMED로 남는다
+     * @throws BillingException 첫 결제 주문인데 이미 유료 기간이 있을 때. 주문은 ORD_CONFIRMED로 남는다
      */
     @Transactional
     public void applyOrder(PaymentOrderDTO confirmed) {
@@ -114,25 +119,34 @@ public class PaymentRecordService {
             throw new IllegalStateException("승인 기록이 없는 주문입니다: orderNo=" + order.getExternalOrderNo());
         }
         List<ServicePeriodDTO> periods = subscriptionDAO.listPeriods(companyId);
-        if (periods.stream().anyMatch(p -> !p.isTrial())) {
+        boolean renew = order.getPurposeCode() == OrderPurpose.PP_RENEW;
+        if (!renew && periods.stream().anyMatch(p -> !p.isTrial())) {
             logger.error("이미 유료인 업체의 다른 주문이 승인됨, 반영하지 않음: companyId={}, orderNo={}",
                     companyId, order.getExternalOrderNo());
             throw new BillingException(409, "이미 유료로 바뀐 업체라 이 결제는 반영하지 않았습니다. 운영자에게 문의해 주세요.");
         }
 
         LocalDateTime now = LocalDateTime.now(SEOUL);
-        ServicePeriodDTO current = ServicePeriods.pick(periods, now);
+        // 연장은 유료 기간만 본다. 시연 업체처럼 체험이 유료보다 늦게 끝나도 체험 만료에 잇거나 유료 만료를 놓치지 않게
+        ServicePeriodDTO current = ServicePeriods.pick(renew ? paidOnly(periods) : periods, now);
         PaymentDTO payment = paymentDAO.getApprovedPayment(companyId, order.getPaymentOrderId());
         LocalDateTime startsAt = payment.getApprovedAt();
+        LocalDate anchor = startsAt.toLocalDate();
+        LocalDateTime endsAt = ServicePeriods.paidEndsAt(anchor, order.getDurationMonths());
+        if (renew && startsAt.isBefore(current.getEndsAt())) {
+            startsAt = current.getEndsAt();
+            anchor = current.getBillingAnchorDate();
+            endsAt = ServicePeriods.extendedEndsAt(startsAt.toLocalDate(), anchor, order.getDurationMonths());
+        }
 
         ServicePeriodDTO paid = new ServicePeriodDTO();
         paid.setCompanyId(companyId);
         paid.setSubscriptionPlanId(order.getSubscriptionPlanId());
         paid.setSourceOrderId(order.getPaymentOrderId());
         paid.setStartsAt(startsAt);
-        paid.setEndsAt(ServicePeriods.paidEndsAt(startsAt.toLocalDate(), order.getDurationMonths()));
+        paid.setEndsAt(endsAt);
         paid.setPurchasedSeats(order.getSeatCount());
-        paid.setBillingAnchorDate(startsAt.toLocalDate());
+        paid.setBillingAnchorDate(anchor);
         subscriptionDAO.insertPaidPeriod(paid);
 
         SubscriptionChangeDTO change = new SubscriptionChangeDTO();
@@ -140,6 +154,7 @@ public class PaymentRecordService {
         change.setPaymentId(payment.getPaymentId());
         change.setPaymentOrderId(order.getPaymentOrderId());
         change.setServicePeriodId(paid.getServicePeriodId());
+        change.setChangeType(order.getPurposeCode());
         if (current != null) {
             change.setBeforeSeats(ServicePeriods.seatLimitOf(current));
             change.setBeforeEndsAt(current.getEndsAt());
@@ -152,6 +167,10 @@ public class PaymentRecordService {
         if (paymentDAO.markOrderApplied(companyId, order.getPaymentOrderId(), now) == 0) {
             throw new IllegalStateException("주문을 반영 완료로 바꾸지 못했습니다: orderNo=" + order.getExternalOrderNo());
         }
+    }
+
+    private static List<ServicePeriodDTO> paidOnly(List<ServicePeriodDTO> periods) {
+        return periods.stream().filter(p -> !p.isTrial()).collect(Collectors.toList());
     }
 
     // 토스 승인 시각을 한국 시간으로 바꾼다. 없거나 알아볼 수 없으면 지금 시각으로 본다

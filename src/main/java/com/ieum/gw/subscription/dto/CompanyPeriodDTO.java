@@ -13,6 +13,7 @@ import lombok.ToString;
 public class CompanyPeriodDTO {
     private String status;          // TRIAL(체험 중) / PAID(유료) / EXPIRED(만료)
     private boolean paid;           // 지금(만료면 마지막) 기간이 유료면 true. 만료의 체험·유료를 이것으로 가른다
+    private String plan;            // 그 기간의 요금제 MONTHLY / ANNUAL. 체험은 null
     private int seats;              // 그 기간의 구매 인원. 체험은 신청 인원
     private LocalDate firstDay;     // 그 기간의 첫날
     private LocalDate lastDay;      // 그 기간의 마지막 날(다음 날 0시에 만료)
