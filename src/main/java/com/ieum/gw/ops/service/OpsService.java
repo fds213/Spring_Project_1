@@ -185,7 +185,7 @@ public class OpsService {
         application.setAdminNo(orNoValue(row.getAdminNo()));
         application.setStatus(period.getStatus());
         application.setPaid(period.isPaid());
-        application.setPlan(period.isPaid() ? "MONTHLY" : null);
+        application.setPlan(period.getPlan());
         application.setPaidAt(stat == null ? null : iso(stat.getPaidAt()));
         application.setServiceFrom(period.isPaid() ? day(period.getFirstDay()) : null);
         application.setEnd(day(period.getLastDay()));

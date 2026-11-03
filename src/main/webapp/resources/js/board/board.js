@@ -184,12 +184,53 @@ function liveSearch(inputId, formId, state, reload) {
   byId(formId).addEventListener('submit', e => { e.preventDefault(); clearTimeout(timer); run(); });
 }
 
-// 실패 안내: 볼 수 없거나 없는 글(404)이면 목록으로 돌려보낸다
+// 실패 안내: 볼 수 없거나 없는 글(404)이면 목록으로 돌려보낸다.
+// 화면을 옮기면 이 화면의 안내는 바로 사라지므로, toastAndGo(util.js)로 옮겨 간 목록에서 안내를 띄운다
 function failTo(listHash, fallback) {
   return xhr => {
-    toast(apiMessage(xhr, fallback));
-    if (xhr.status === 404) location.href = listHash;
+    if (xhr.status === 404) toastAndGo(apiMessage(xhr, fallback), listHash);
+    else toast(apiMessage(xhr, fallback));
   };
+}
+
+// 글을 열지 못했을 때(지워진 글·볼 수 없는 글·수정할 수 없는 글): 목록으로 튕기지 않고 그 자리에 안내와 버튼 하나를 보인다.
+// 튕기면 안내가 사라지고, 뒤로 가기를 누르면 이 주소로 돌아와 다시 튕겨서 뒤로 갈 수 없었다.
+// 안내 칸은 처음 한 번만 만들어 다른 화면(.view)들 뒤에 붙인다. 위에는 게시판 이름을 두어 어느 게시판인지 알 수 있게 한다
+function showMissing(key, title, desc, href, label) {
+  let sec = byId('view-board-missing');
+  if (!sec) {
+    sec = el('section', { class: 'view', id: 'view-board-missing' });
+    const views = document.querySelectorAll('.view');
+    views[views.length - 1].after(sec);
+  }
+  const head = el('div', { class: 'page-head' });
+  head.append(el('h1', {}, LIST_OF[key].title()));
+  const box = el('div', { class: 'board-missing', role: 'status' });
+  box.append(el('strong', { class: 'board-missing-title' }, title));
+  if (desc) box.append(el('p', { class: 'board-missing-desc' }, desc));
+  box.append(el('a', { class: 'btn btn-primary', href }, label));
+  sec.replaceChildren(head, box);
+  showSub('view-board-missing');
+}
+// 게시판마다 안내 글자 (다른 안내와 같이 '~습니다'로 쓰고, 공지·게시글에 맞춰 따로 적어 둔다)
+// title: 위에 보일 게시판 이름. 부서 게시판은 목록 제목에 부서 이름이 들어갈 수 있어 그 글자를 쓴다
+const LIST_OF = {
+  notice: {
+    path: '/board/notice', label: '공지 목록으로', title: () => '공지사항',
+    notFound: '공지를 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 공지입니다.',
+    loadFail: '공지를 불러오지 못했습니다', noEdit: '이 공지는 수정할 수 없습니다', noWrite: '공지를 쓸 수 없습니다', view: '공지 보기',
+  },
+  'board-dept': {
+    path: '/board/dept', label: '게시판 목록으로', title: () => byId('bListTitle')?.textContent.trim() || '부서 게시판',
+    notFound: '게시글을 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 게시글입니다.',
+    loadFail: '게시글을 불러오지 못했습니다', noEdit: '이 게시글은 수정할 수 없습니다', noWrite: '게시글을 쓸 수 없습니다', view: '게시글 보기',
+  },
+};
+// 글 보기·작성 화면을 열지 못한 응답을 안내로 바꾼다. 404는 '없거나 볼 수 없는 글', 그 밖(서버 오류 등)은 '불러오지 못함'
+function showOpenFailed(xhr, key) {
+  const t = LIST_OF[key];
+  if (xhr.status === 404) showMissing(key, t.notFound, t.notFoundDesc, pageHref(t.path), t.label);
+  else showMissing(key, t.loadFail, apiMessage(xhr, '잠시 뒤 다시 열어 주세요.'), pageHref(t.path), t.label);
 }
 
 
@@ -275,14 +316,14 @@ liveSearch('searchInput', 'searchForm', listState, loadList);
 // ---------- 2. 상세 ----------
 let current = null; // 열려 있는 공지 (상세 응답)
 
-// 볼 수 없는 공지(다른 부서 공지)와 없는 공지는 서버가 같은 말로 답한다 (다른 부서에 그런 공지가 있는지 드러내지 않게)
-const NOTICE_NOT_FOUND = '없는 공지이거나 볼 수 없는 공지입니다';
+// 볼 수 없는 공지(다른 부서 공지)와 없는 공지는 서버가 같은 404로 답하고, 화면도 같은 안내를 보인다
+// (다른 부서에 그런 공지가 있는지 드러내지 않게. showOpenFailed 참고)
 
 function openDetail(id) {
   const live = ticket();
   api.get(`/board/api/notices/${enc(id)}`)
     .done(n => { if (live()) { renderDetail(n); showSub('view-notice-detail'); } })
-    .fail(xhr => { if (live()) { toast(apiMessage(xhr, NOTICE_NOT_FOUND)); location.replace(pageHref('/board/notice')); } });
+    .fail(xhr => { if (live()) showOpenFailed(xhr, 'notice'); });
 }
 
 function renderDetail(n) {
@@ -767,12 +808,14 @@ function validate(title, content) {
   if (content.length > CONTENT_MAX) return { field: 'content', message: `내용은 ${CONTENT_MAX}자까지 쓸 수 있습니다` };
   return null;
 }
-// 작성 화면을 열지 못했을 때: 안내하고, 수정 권한이 없으면 그 글로, 나머지(읽기 전용·권한 없음·없는 글)는 목록으로
-// 게시판 키 → 화면 주소 (formOpenFailed가 쓴다)
-const BOARD_PATH = { notice: '/board/notice', 'board-dept': '/board/dept' };
+// 작성 화면을 열지 못했을 때: 그 자리에 안내를 보인다 (목록으로 튕기지 않는다. showMissing 참고)
+// - 403(읽기 전용 업체·쓸 권한 없음·수정 권한 없음): 서버가 보낸 이유를 보이고, 수정이면 [글 보기], 새 글이면 목록으로
+// - 404(없거나 볼 수 없는 글)와 그 밖의 오류: 글 보기와 같은 안내
 function formOpenFailed(xhr, id, key) {
-  toast(apiMessage(xhr));
-  location.replace(id && xhr.status === 403 ? pageHref(`${BOARD_PATH[key]}/view/${id}`) : pageHref(BOARD_PATH[key]));
+  const t = LIST_OF[key];
+  if (xhr.status !== 403) { showOpenFailed(xhr, key); return; }
+  if (id) showMissing(key, t.noEdit, apiMessage(xhr), pageHref(`${t.path}/view/${id}`), t.view);
+  else showMissing(key, t.noWrite, apiMessage(xhr), pageHref(t.path), t.label);
 }
 // 저장 버튼: 보내는 동안 막고 "저장 중…"
 function setSaving(btnId, on, label) {
@@ -877,7 +920,7 @@ byId('noticeForm')?.addEventListener('submit', e => {
       const msg = apiMessage(xhr);
       if (xhr.status === 409) byId('fPinnedError').textContent = msg; // 고정 5개가 꽉 참
       else if (xhr.status === 413) noticeFiles.error(msg);             // 파일이 너무 큼
-      else if (xhr.status === 404) { toast(msg); formState.leaving = true; location.href = pageHref('/board/notice'); }
+      else if (xhr.status === 404) { formState.leaving = true; toastAndGo(msg, pageHref('/board/notice')); } // 저장하는 사이 지워진 공지
       else toast(msg);
     });
 });
@@ -896,7 +939,6 @@ byId('btnCancel')?.addEventListener('click', async () => {
 //   (서버가 로그인한 사람의 부서와 글의 부서를 비교한다)
 // - 쓰기: 부서원 누구나. 수정·삭제는 글쓴이 본인만 (서버가 mine으로 알려 준다)
 // - 댓글: 부서원 누구나 등록, 본인 댓글만 삭제 (댓글 수정은 없음), 500자까지
-const NOT_FOUND = '없는 글이거나 볼 수 없는 글입니다';
 
 function routeBoard(action, id) {
   if (action === 'view') return openBoardDetail(id);
@@ -949,7 +991,7 @@ function openBoardDetail(id) {
   const live = ticket();
   api.get(`/board/api/dept/posts/${enc(id)}`)
     .done(p => { if (live()) { renderBoardDetail(p); showSub('view-board-detail'); } })
-    .fail(xhr => { if (live()) { toast(apiMessage(xhr, NOT_FOUND)); location.replace(pageHref('/board/dept')); } });
+    .fail(xhr => { if (live()) showOpenFailed(xhr, 'board-dept'); });
 }
 
 function renderBoardDetail(p) {
@@ -1072,7 +1114,7 @@ byId('bForm')?.addEventListener('submit', e => {
       setSaving('bBtnSave', false, '저장');
       const msg = apiMessage(xhr);
       if (xhr.status === 413) boardFiles.error(msg); // 파일이 너무 큼
-      else if (xhr.status === 404) { toast(msg); boardFormState.leaving = true; location.href = pageHref('/board/dept'); }
+      else if (xhr.status === 404) { boardFormState.leaving = true; toastAndGo(msg, pageHref('/board/dept')); } // 저장하는 사이 지워진 글
       else toast(msg);
     });
 });

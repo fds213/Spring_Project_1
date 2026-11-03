@@ -165,7 +165,7 @@ function drawStatus() {
       cell('신청 시각', '', node('span', when(o.at))),
       cell('업체', '', ...company),
       cell('인원', 'num', node('span', `${o.users}명`)),
-      cell('월 이용료', 'num', node('span', won(o.total))),
+      cell('월 기준 이용료', 'num', node('span', won(o.total))),
       cell('관리자', '', node('span', o.adminName), node('small', o.adminNo, 'cell-sub')),
       cell('상태', '', node('span', APP_STATUS[o.status], `status status-${o.status.toLowerCase()}`), node('small', statusSub, 'cell-sub')),
     );

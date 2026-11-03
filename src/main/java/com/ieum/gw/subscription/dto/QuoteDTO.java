@@ -9,14 +9,14 @@ import lombok.ToString;
 @Setter
 @ToString
 public class QuoteDTO {
-    private String plan;    // MONTHLY
-    private String mode;    // FIRST(첫 결제)
+    private String plan;    // MONTHLY / ANNUAL
+    private String mode;    // FIRST(첫 결제) / EXTEND(연장)
     private int users;
     private int months;
     private long amount;
-    private String formula; // "3명 × 4,000원 × 1개월"
+    private String formula; // "3명 × 4,000원 × 12개월 × 90%"
     private int pct;        // 할인율(%)
     private String why;     // 할인 설명
-    private String from;    // 오늘 결제하면 시작하는 날
+    private String from;    // 오늘 결제하면 시작하는 날. 연장은 지금 만료일 다음 날
     private String to;      // 오늘 결제하면 마지막으로 쓰는 날
 }

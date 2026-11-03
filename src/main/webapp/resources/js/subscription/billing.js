@@ -1,11 +1,11 @@
 // 업체 관리 > 이용 결제 (views/subscription/billing.jsp). 요구분석서 PAY-01·02, SUB-01·03.
 // 자동 결제는 없고 업체 관리자가 직접 결제한다. 금액과 기간은 서버가 계산한다(견적 API).
 // - 체험 중이거나 체험이 끝난 뒤: 첫 결제. 인원을 정하고, 결제한 날부터 유료 이용
-// - 유료 이용 중: 연장. 지금 인원 그대로 만료일 다음 날부터 이어진다(서버가 아직 mode=EXTEND를 주지 않는다, 아래 참고)
+// - 유료 이용 중: 연장. 지금 요금제·지금 인원 그대로 만료일 다음 날부터 이어진다
 // 순서: 1. 요금제 선택 → 2. 결제(주문을 만들고 토스 결제창 열기) → 결제창이 이 화면으로 돌아옴
 //       → 서버가 토스 승인을 확인 → 3. 결제 완료. 돌아온 것만으로는 유료가 되지 않는다(PAY-02).
-// 지금은 첫 결제 월간만 된다(요구분석서 3장 범위 표). 연간·연장은 '핵심 뒤 추가'에서 서버와 같이 연다.
-// 이번 범위에서 빠진 것: 인원 증설, 월간→연간 전환, 결제 안내 메일, 만료 후 재구매.
+// 고를 수 있는 요금제는 서버가 준다(s.plans). 첫 결제는 월간·연간, 연장은 지금 요금제만이다.
+// 이번 범위에서 빠진 것: 인원 증설, 월간→연간 전환, 연장 때 인원 변경, 결제 안내 메일, 만료 후 재구매.
 
 const BILL_STATUS = { TRIAL: '체험 중', PAID: '이용 중', EXPIRED: '읽기 전용' };
 const BILL_PLAN = { MONTHLY: '월간', ANNUAL: '연간' };
@@ -27,7 +27,7 @@ const fillDetail = (id, rows) => document.getElementById(id).replaceChildren(...
   const dd = document.createElement('dd'); dd.textContent = v;
   return [dt, dd];
 }));
-const checkedPlan = () => document.querySelector('input[name="payPlan"]:checked').value;
+const checkedPlan = () => document.querySelector('input[name="payPlan"]:checked')?.value;
 
 // 화면을 열 때. 토스 결제창이 돌아온 주소면 그 처리부터 한다
 function startBilling() {
@@ -128,6 +128,7 @@ function renderBillSteps(mode, shown) {
   document.getElementById('billConfirm').hidden = !billConfirming;
   if (billConfirming) return;
   if (billStep === 1) {
+    drawPlanPick(s);
     // 인원은 첫 결제 때만 정한다. 연장은 지금 인원 그대로
     const users = document.getElementById('payUsers');
     const extend = mode === 'EXTEND';
@@ -161,6 +162,33 @@ function renderBillSteps(mode, shown) {
   }
 }
 
+// 요금제 칸: 서버가 준 목록으로 그린다. 다시 그려도 고른 값을 유지한다
+function drawPlanPick(s) {
+  const was = checkedPlan() || s.plan;
+  const span = (cls, text) => {
+    const el = document.createElement('span');
+    el.className = cls;
+    el.textContent = text;
+    return el;
+  };
+  const box = document.getElementById('planPick');
+  box.replaceChildren(box.querySelector('legend'), ...s.plans.map(p => {
+    const label = document.createElement('label');
+    label.className = 'plan-opt';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'payPlan';
+    input.value = p.plan;
+    input.checked = p.plan === was;
+    label.append(input,
+      span('plan-opt-name', BILL_PLAN[p.plan]),
+      span('plan-opt-price', `1인 ${won(p.amountPerUser)} / ${p.months === 12 ? '년' : '월'}`),
+      span('plan-opt-note', `${p.months}개월 · ${p.pct ? `${p.pct}% 할인` : '할인 없음'}`));
+    return label;
+  }));
+  if (!checkedPlan() && s.plans.length) box.querySelector('input').checked = true;
+}
+
 const validUsers = n => Number.isInteger(n) && n >= 1 && n <= billState.maxUsers;
 
 // 1단계: 요금제 가격과 금액·기간. 인원을 바꾸는 동안 다시 계산한다 (서버 견적)
@@ -172,7 +200,6 @@ function renderPayPreview() {
   api.get('/subscription/api/quote', { plan: checkedPlan(), users })
     .done(q => {
       if (my !== billQuoteSeq) return;
-      document.getElementById('planPriceMONTHLY').textContent = `${won(q.amount)} / 월`;
       fillDetail('payPreview', [
         ['결제 금액', ok ? `${won(q.amount)} (${q.formula})` : '-'],
         ['이용 기간', `${ymd(q.from)} ~ ${ymd(q.to)}${q.mode === 'EXTEND' ? ' (지금 만료일 다음 날부터 이어서)' : ' (결제한 날부터)'}`],
@@ -189,9 +216,7 @@ document.getElementById('payUsers')?.addEventListener('input', () => {
   clearTimeout(billQuoteDelay);
   billQuoteDelay = setTimeout(() => { if (billState) renderPayPreview(); }, 250);
 });
-document.querySelectorAll('input[name="payPlan"]').forEach(r => r.addEventListener('change', () => {
-  if (billState) renderPayPreview();
-}));
+document.getElementById('planPick')?.addEventListener('change', () => { if (billState) renderPayPreview(); });
 
 // 1 → 2단계: 인원을 확인하고, 결제할 견적을 정한다 (서버 견적)
 document.getElementById('btnPayNext')?.addEventListener('click', () => {
@@ -220,7 +245,15 @@ document.getElementById('btnPayNext')?.addEventListener('click', () => {
       document.getElementById('billAgree').checked = false; // 결제할 때마다 다시 동의한다
       drawBilling();
     })
-    .fail(xhr => { document.getElementById('payUsersError').textContent = apiMessage(xhr); })
+    .fail(xhr => {
+      // 다른 창에서 결제해 연장으로 바뀌었거나 유료가 끝났다: 최신 상태로 다시 그린다
+      if (xhr.status === 409) {
+        renderBilling();
+        showToast(apiMessage(xhr));
+        return;
+      }
+      document.getElementById('payUsersError').textContent = apiMessage(xhr);
+    })
     .always(() => { btn.disabled = false; });
 });
 document.getElementById('btnPayBack')?.addEventListener('click', () => { billStep = 1; if (billState) drawBilling(); });

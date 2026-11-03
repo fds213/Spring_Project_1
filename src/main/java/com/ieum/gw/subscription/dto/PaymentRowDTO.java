@@ -13,8 +13,8 @@ import lombok.ToString;
 @ToString
 public class PaymentRowDTO {
     private String orderNo;         // 주문 번호
-    private String kind;            // FIRST(첫 결제)
-    private String plan;            // MONTHLY
+    private String kind;            // FIRST(첫 결제) / EXTEND(연장)
+    private String plan;            // MONTHLY / ANNUAL
     private Integer durationMonths;
     private Integer seatCount;
     private Long totalAmount;

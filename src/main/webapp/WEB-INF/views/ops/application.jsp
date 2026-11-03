@@ -29,7 +29,7 @@
           <%-- 열 너비 고정: 걸러진 행이 없어도 제목 줄 위치가 그대로다 --%>
           <colgroup><col style="width: 14%"><col style="width: 26%"><col style="width: 10%"><col style="width: 14%"><col style="width: 18%"><col style="width: 18%"></colgroup>
           <thead>
-            <tr><th>신청 시각</th><th>업체</th><th class="num">인원</th><th class="num">월 이용료</th><th>관리자</th><th>상태</th></tr>
+            <tr><th>신청 시각</th><th>업체</th><th class="num">인원</th><th class="num">월 기준 이용료</th><th>관리자</th><th>상태</th></tr>
           </thead>
           <tbody id="appList"></tbody>
         </table>

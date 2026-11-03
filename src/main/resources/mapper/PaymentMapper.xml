@@ -11,17 +11,25 @@
           AND use_yn = 'Y'
     </select>
 
-    <!-- 주문 1행 (첫 결제, 상태는 기본값 ORD_CREATED). 주문 번호 겹침은 고유 제약 UQ_21_01이 막는다 -->
+    <!-- 쓰는 중인 연간 요금제. 단가는 1인 월 단가이고 할인은 주문에 남긴다 -->
+    <select id="getYearlyPlan" resultType="com.ieum.gw.subscription.dto.SubscriptionPlanDTO">
+        SELECT subscription_plan_id, duration_months, monthly_unit_price
+        FROM subscription_plan
+        WHERE plan_code = 'PLAN_YEARLY'
+          AND use_yn = 'Y'
+    </select>
+
+    <!-- 주문 1행 (첫 결제 또는 연장, 상태는 기본값 ORD_CREATED). 주문 번호 겹침은 고유 제약 UQ_21_01이 막는다 -->
     <insert id="insertOrder" parameterType="com.ieum.gw.subscription.dto.PaymentOrderDTO">
         <selectKey keyProperty="paymentOrderId" resultType="long" order="BEFORE">
             SELECT SQ_PAYMENT_ORDER.NEXTVAL FROM dual
         </selectKey>
         INSERT INTO payment_order
             (payment_order_id, company_id, external_order_no, buyer_account_id, subscription_plan_id,
-             purpose_code, seat_count, monthly_unit_price, total_amount, priced_at)
+             purpose_code, seat_count, monthly_unit_price, discount_rate, total_amount, priced_at)
         VALUES
             (#{paymentOrderId}, #{companyId}, #{externalOrderNo}, #{buyerAccountId}, #{subscriptionPlanId},
-             'PP_FIRST', #{seatCount}, #{monthlyUnitPrice}, #{totalAmount}, #{pricedAt})
+             #{purposeCode}, #{seatCount}, #{monthlyUnitPrice}, #{discountRate}, #{totalAmount}, #{pricedAt})
     </insert>
 
     <!-- 이 업체의 주문. 업체는 로그인 사용자에서만 꺼낸다 -->
@@ -41,8 +49,8 @@
 
     <sql id="orderSelect">
         SELECT o.payment_order_id, o.company_id, o.external_order_no, o.buyer_account_id,
-               o.subscription_plan_id, o.status_code, o.seat_count, o.monthly_unit_price,
-               o.total_amount, o.priced_at, p.duration_months
+               o.subscription_plan_id, o.purpose_code, o.status_code, o.seat_count, o.monthly_unit_price,
+               o.discount_rate, o.total_amount, o.priced_at, p.duration_months
         FROM payment_order o
         JOIN subscription_plan p ON p.subscription_plan_id = o.subscription_plan_id
     </sql>
@@ -127,7 +135,7 @@
             (company_id, payment_id, payment_order_id, service_period_id, change_type,
              before_seats, after_seats, before_ends_at, after_ends_at, applied_at)
         VALUES
-            (#{companyId}, #{paymentId}, #{paymentOrderId}, #{servicePeriodId}, 'PP_FIRST',
+            (#{companyId}, #{paymentId}, #{paymentOrderId}, #{servicePeriodId}, #{changeType},
              #{beforeSeats, jdbcType=INTEGER}, #{afterSeats}, #{beforeEndsAt, jdbcType=TIMESTAMP}, #{afterEndsAt}, #{appliedAt})
     </insert>
 

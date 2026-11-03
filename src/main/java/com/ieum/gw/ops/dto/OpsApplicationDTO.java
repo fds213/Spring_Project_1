@@ -24,7 +24,7 @@ public class OpsApplicationDTO {
     private String adminNo;
     private String status;        // TRIAL / PAID / EXPIRED
     private boolean paid;         // 지금(만료면 마지막) 기간이 유료면 true
-    private String plan;          // MONTHLY. 유료가 아니면 null
+    private String plan;          // MONTHLY / ANNUAL. 유료가 아니면 null
     private String paidAt;        // 첫 승인 시각. 없으면 null
     private String serviceFrom;   // 유료 기간 첫날. 유료가 아니면 null
     private String end;           // 지금(만료면 마지막) 기간의 마지막 날
