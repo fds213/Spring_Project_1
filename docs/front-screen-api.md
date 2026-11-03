@@ -30,6 +30,7 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/approval/list` | `approval/list` |
 | `/ticket/new` | `ticket/new` |
 | `/ticket/mine` | `ticket/mine` |
+| `/ticket/admin/list` | `ticket/admin/list` (IT 담당·업체 관리자) |
 | `/asset/mine` | `asset/mine` |
 | `/attendance/my` | `attendance/my` |
 | `/attendance/leave` | `attendance/leave` |

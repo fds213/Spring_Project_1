@@ -36,7 +36,7 @@ function openTicketNewView() {
   api.get('/ticket/api/form-options')
     .done(o => {
       itNew.opts = o;
-      itEl('ticketAsset').replaceChildren(new Option('(해당 없음)', ''), ...o.assets.map(a => new Option(`${a.name} (${a.serial})`, a.id)));
+      itEl('ticketAsset').replaceChildren(new Option('(해당 없음)', ''), ...o.assets.map(a => new Option(assetLabel(a), a.id)));
       itEl('ticketBranch').replaceChildren(...o.branches.map(b => new Option(b.name, b.id)));
       syncTicketBranch();
     })
@@ -47,8 +47,9 @@ function openTicketNewView() {
 // 실제 장애가 난 곳이 다르면 사원이 바꿔 접수한다
 function syncTicketBranch() {
   const o = itNew.opts || { assets: [], defaultBranchId: '' };
-  const asset = o.assets.find(a => a.id === itEl('ticketAsset').value);
-  const want = asset ? asset.branchId : o.defaultBranchId;
+  // 서버의 ID 는 숫자, select 값은 글자라서 글자로 맞춰 비교한다
+  const asset = o.assets.find(a => String(a.id) === itEl('ticketAsset').value);
+  const want = String(asset ? asset.branchId : o.defaultBranchId ?? '');
   if ([...itEl('ticketBranch').options].some(x => x.value === want)) itEl('ticketBranch').value = want;
   itEl('ticketBranchHint').textContent = asset ? '고른 자산이 있는 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요' : '근무 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요';
 }
@@ -70,7 +71,8 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   if (!branchId) { err.textContent = '접수 지점을 골라 주세요'; return; }
   const btn = itEl('ticketForm').querySelector('[type="submit"]');
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/ticket/api/tickets', { type, title, body, branchId, assetId: itEl('ticketAsset').value })
+  const assetId = itEl('ticketAsset').value;
+  api.post('/ticket/api/tickets', { type, title, body, branchId: Number(branchId), assetId: assetId ? Number(assetId) : null })
     .done(t => {
       itEl('ticketForm').reset();
       err.textContent = '';
@@ -131,7 +133,7 @@ document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.addEvent
 function ticketDetail(t) {
   const info = itNode('dl', 'detail');
   [['번호', t.id], ['구분', TICKET_TYPE[t.type] || '-'], ['접수 지점', t.branchName],
-    ['관련 자산', t.asset ? `${t.asset.name} (${t.asset.serial})` : '-'], ['제목', t.title], ['내용', t.body]]
+    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', t.body]]
     .forEach(([k, v]) => info.append(itNode('dt', '', k), itNode('dd', '', v)));
 
   const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', itNode('span', '', `${whenFull(h.at)} · ${h.name} · ${h.text}`))));
@@ -143,6 +145,14 @@ function ticketDetail(t) {
     itNode('section', 'info-card', itNode('header', 'info-card-head', itNode('h2', '', '처리 이력')), log,
       itNode('header', 'info-card-head', itNode('h2', '', '댓글')), comments)];
 
+  // 처리 완료된 티켓: 해결 결과를 보고 확인하면 종료된다(요청서. 다시 요청은 이번 범위가 아니다)
+  if (t.canClose) {
+    const ok = itButton('확인(종료)', 'btn btn-primary');
+    ok.addEventListener('click', () => closeTicket(t, ok));
+    parts[1].prepend(itNode('header', 'info-card-head', itNode('h2', '', '처리 결과 확인')),
+      itNode('p', 'muted inq-body', '처리 이력의 해결 결과를 확인해 주세요. 확인하면 종료됩니다.'),
+      itNode('div', 'inq-body', itNode('div', 'inq-actions', ok)));
+  }
   if (t.canComment) {
     // 완료되면 더 쓰지 않는다. 처리 중에도 사원이 추가로 알릴 것이 있으면 댓글로 남긴다
     const box = itNode('textarea', 'inq-text');
@@ -162,6 +172,15 @@ function itButton(label, cls) {
   b.type = 'button';
   b.dataset.write = '';
   return b;
+}
+
+// 확인(종료): ticket 모듈 담당이 확정한 규격(11/3). 서버가 canClose 를 준 처리 완료 티켓에만 보인다.
+// POST /ticket/api/tickets/{id}/close { version }. 그사이 상태가 바뀌었으면 409
+function closeTicket(t, btn) {
+  btn.disabled = true;
+  api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/close`, { version: t.version })
+    .done(() => { showToast(`${t.id} 종료했습니다`); loadTicketMine(); })
+    .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
 }
 
 function addComment(id, bodyRaw, btn) {
@@ -192,7 +211,7 @@ function renderAssetMine() {
 
   itEl('assetList').replaceChildren(...(assets.length ? assets.map(a => itNode('tr', '',
     itCell('장비', itNode('span', '', a.name)),
-    itCell('일련번호', itNode('span', '', a.serial)),
+    itCell('일련번호', itNode('span', '', a.serial || '-')),
     itCell('배치 지점', itNode('span', '', a.branchName)),
     itCell('지급일', itNode('span', '', ymd(a.assignedAt))),
     itCell('지급 티켓', itNode('span', '', a.ticketId || '-')))) : [emptyRow(5, '지급된 장비가 없습니다')]));
