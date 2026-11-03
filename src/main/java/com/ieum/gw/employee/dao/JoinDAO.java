@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
+import com.ieum.gw.employee.dto.JoinRequestDTO;
+import com.ieum.gw.employee.dto.JoinRequestViewDTO;
 import com.ieum.gw.employee.mapper.JoinMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -82,5 +84,21 @@ public class JoinDAO {
     
     public int countLiveEmail(Long companyId, String email) {
     	return mapper.countLiveEmail(companyId, email);
+    }
+    
+    public int insertRequest(JoinRequestDTO dto) {
+        return mapper.insertRequest(dto);
+    }
+    
+    public JoinRequestViewDTO getRequestView(String companyCode, Long requestId) {
+    	return mapper.getRequestView(companyCode, requestId);
+    }
+    
+    public int cancelRequest(Long requestId, Long companyId) {
+    	return mapper.cancelRequest(requestId, companyId);
+    }
+    
+    public int cancelAccount(Long userAccountId, Long companyId) {
+    	return mapper.cancelAccount(userAccountId, companyId);
     }
 }

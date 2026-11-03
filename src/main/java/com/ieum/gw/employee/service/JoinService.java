@@ -14,10 +14,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ieum.gw.common.dto.LoginUser;
+import com.ieum.gw.employee.dao.EmployeeDAO;
 import com.ieum.gw.employee.dao.JoinDAO;
+import com.ieum.gw.employee.dto.AccountDTO;
 import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpenFormDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
+import com.ieum.gw.employee.dto.JoinRequestDTO;
+import com.ieum.gw.employee.dto.JoinRequestFormDTO;
+import com.ieum.gw.employee.dto.JoinRequestViewDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.service.SubscriptionService;
 
@@ -35,7 +40,9 @@ public class JoinService {
     private static final Set<Integer> OPEN_MINUTES = Set.of(10, 30, 60, 180, 1440); 
 
     private final JoinDAO dao;
-    private final SubscriptionService subscriptionService; // 인원 한도·이용 상태 (준원님)
+    private final SubscriptionService subscriptionService; // 인원 한도·이용 상태
+    private final EmployeeService employeeService; // 비밀번호 해시, 사번 발급 (같은 모듈)
+    private final EmployeeDAO employeeDAO;         // 계정 저장 (insertAccount)
 
     /** 가입 승인 화면에 보낼 내용 (GET /employee/api/join) */
     public Map<String, Object> getBoard(LoginUser user) {
@@ -169,24 +176,12 @@ public class JoinService {
         }
         String code = companyCode.trim().toLowerCase();
 
-        // ② 업체 찾기
-        JoinCompanyDTO company = dao.findCompanyByCode(code);
+        // ②~④ 가입을 받는 업체인가 (없음·만료·인증 전은 acceptingCompany가 null)
+        JoinCompanyDTO company = acceptingCompany(code);
         if (company == null) {
             return null;
         }
         Long companyId = company.getCompanyId();
-
-        // ③ 이용 상태: 기간이 없거나(운영 업체) 끝났으면 받지 않음
-        CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
-        if (usage == null || usage.isExpired()) {
-            return null;
-        }
-
-        // ④ 이메일 인증 전 업체 거절 (준원님 요청: 인증 메일이 아직 없어 주석)
-        // TODO(ACC-06): 인증 메일이 붙으면 주석을 푼다
-        // if (!usage.isEmailVerified()) {
-        //     return null;
-        // }
 
         // ⑤ 열린 부서 이름만 모으기
         List<String> depts = new ArrayList<>();
@@ -204,7 +199,152 @@ public class JoinService {
         result.put("ranks", dao.listGradeNames(companyId));
         return result;
     }
+    
+    /** 가입 승인 요청 (POST /join/api/companies/{code}/requests, 로그인 없음) */
+    @Transactional
+    public Map<String, Object> requestJoin(String companyCode, JoinRequestFormDTO form) {
+        // ① 업체가 가입을 받나
+        String code = companyCode == null ? "" : companyCode.trim().toLowerCase();
+        JoinCompanyDTO company = acceptingCompany(code);
+        if (company == null) {
+            throw new IllegalArgumentException("가입을 받을 수 없는 업체 코드입니다");
+        }
+        Long companyId = company.getCompanyId();
 
+        // ② 입력 확인
+        String name = form.getName() == null ? "" : form.getName().trim();
+        if (name.isEmpty() || name.length() > 100) {
+            throw new IllegalArgumentException("이름을 확인해 주세요");
+        }
+        String email = form.getEmail() == null ? "" : form.getEmail().trim().toLowerCase();
+        if (!email.contains("@") || email.length() > 254) {
+            throw new IllegalArgumentException("이메일 형식을 확인해 주세요");
+        }
+        String password = form.getPassword();
+        if (password == null || password.length() < 8) {
+            throw new IllegalArgumentException("비밀번호는 8자 이상으로 정해 주세요");
+        }
+
+        // ③ 부서(지금 열려 있나)·직급
+        Long deptId = dao.findOpenDeptId(companyId, form.getDept());
+        if (deptId == null) {
+            throw new IllegalArgumentException("가입이 닫혔거나 없는 부서입니다");
+        }
+        Long gradeId = dao.findGradeId(companyId, form.getRank());
+        if (gradeId == null) {
+            throw new IllegalArgumentException("없는 직급입니다");
+        }
+
+        // ④ 이메일 중복 (대기 중이거나 쓰는 계정)
+        if (dao.countLiveEmail(companyId, email) > 0) {
+            throw new IllegalStateException("이미 승인 대기 중이거나 계정이 있는 이메일입니다");
+        }
+
+        // ⑤ 계정 저장: 사원 없음, ROLE_EMP, REQUESTED (로그인 안 됨)
+        AccountDTO acc = new AccountDTO();
+        acc.setCompanyId(companyId);
+        acc.setEmail(email);
+        acc.setPasswordHash(employeeService.hashPassword(password));   // 72바이트 검사 포함
+        acc.setRoleCode("ROLE_EMP");
+        acc.setStatusCode("REQUESTED");
+        employeeDAO.insertAccount(acc);                               // acc.userAccountId 채워짐
+
+        // ⑥ 요청 저장
+        JoinRequestDTO req = new JoinRequestDTO();
+        req.setCompanyId(companyId);
+        req.setUserAccountId(acc.getUserAccountId());
+        req.setRequestName(name);
+        req.setDepartmentId(deptId);
+        req.setJobGradeId(gradeId);
+        dao.insertRequest(req);                                       // req.accountRequestId 채워짐
+
+        // ⑦ 저장한 요청을 보기 모양으로
+        return getMyRequest(code, req.getAccountRequestId());
+    }
+    
+    @Transactional
+    public void cancelMyRequest(String companyCode, Long requestId) {
+        // ① 코드 정리
+        String code = companyCode == null ? "" : companyCode.trim().toLowerCase();
+
+        // ② 내 신청 찾기 → 없거나 대기 중이 아니면 막기
+        JoinRequestViewDTO view = dao.getRequestView(code, requestId);
+        if (view == null || !"REQUESTED".equals(view.getRequestStatus())) {
+            throw new IllegalStateException("취소할 수 있는 신청이 없습니다");
+        }
+
+        // ③ 요청 취소 → 바뀐 행이 0이면 막기
+        int rows = dao.cancelRequest(requestId, view.getCompanyId());
+        if (rows == 0) {
+            throw new IllegalStateException("이미 처리된 신청입니다");
+        }
+
+        // ④ 계정도 취소
+        dao.cancelAccount(view.getUserAccountId(), view.getCompanyId());
+    }
+    
+    public Map<String, Object> getMyRequest(String companyCode, Long requestId) {
+        if (companyCode == null) {
+            return null;
+        }
+        String code = companyCode.trim().toLowerCase();
+        
+        JoinRequestViewDTO request = dao.getRequestView(code, requestId);
+        
+        if (request == null || "CANCELED".equals(request.getRequestStatus())) {
+            return null;
+        }
+        
+        String status = request.getRequestStatus();   // DB 상태 꺼내 두기
+        String state;                                 // 화면에 줄 상태
+        String reason = null;                         // 끝난 이유
+
+        if ("REQUESTED".equals(status)) {
+            state = "WAITING";
+        } else if ("APPROVED".equals(status)) {
+            state = "APPROVED";
+        } else {
+            state = "ENDED";
+            reason = "REJECTED";
+        }
+        
+        Map<String, Object> view = new LinkedHashMap<>();
+        view.put("reqId", request.getAccountRequestId());
+        view.put("state", state);
+        view.put("reason", reason);
+        view.put("companyCode", request.getCompanyCode());
+        view.put("companyName", request.getCompanyName());
+        view.put("name", request.getRequestName());
+        view.put("dept", request.getDepartmentName());
+        view.put("rank", request.getGradeName());
+        view.put("email", request.getEmail());
+        view.put("depts", List.of(request.getDepartmentName()));
+        view.put("ranks", request.getGradeName() == null ? List.of() : List.of(request.getGradeName()));
+        view.put("empNo", request.getEmployeeNo());
+        return view;
+    }
+
+    private JoinCompanyDTO acceptingCompany(String code) {
+    	JoinCompanyDTO company = dao.findCompanyByCode(code);
+        if (company == null) {
+            return null;
+        }
+        Long companyId = company.getCompanyId();
+
+        // ③ 이용 상태: 기간이 없거나(운영 업체) 끝났으면 받지 않음
+        CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
+        if (usage == null || usage.isExpired()) {
+            return null;
+        }
+
+        // ④ 이메일 인증 전 업체 거절 (준원님 요청: 인증 메일이 아직 없어 주석)
+        // TODO(ACC-06): 인증 메일이 붙으면 주석을 푼다
+        // if (!usage.isEmailVerified()) {
+        //     return null;
+        // }
+        return company;
+    }
+    
     //  ---------- 권한 ----------
 
     private boolean isAdmin(LoginUser user) {

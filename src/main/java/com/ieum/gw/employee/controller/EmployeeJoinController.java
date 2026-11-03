@@ -13,9 +13,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.dto.JoinOpenFormDTO;
+import com.ieum.gw.employee.dto.JoinRequestFormDTO;
 import com.ieum.gw.employee.service.JoinService;
 
 import lombok.RequiredArgsConstructor;
@@ -87,6 +89,45 @@ public class EmployeeJoinController {
                     .body(Map.of("message", "가입을 받을 수 없는 업체 코드입니다"));
         }
         return ResponseEntity.ok(Map.of("success", true, "data", result));   //  성공
+    }
+    
+ // ① 가입 신청
+    @PostMapping("/join/api/companies/{code}/requests")
+    @ResponseBody
+    public Map<String, Object> requestJoin(@PathVariable String code,
+                                           @RequestBody JoinRequestFormDTO form) {
+        Map<String, Object> view = joinService.requestJoin(code, form);
+        return Map.of("success", true, "data", view);
+    }
+
+    // ② 내 신청 보기 (없으면 404)
+    @GetMapping("/join/api/companies/{code}/requests/{reqId}")
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> myRequest(@PathVariable String code,
+                                                         @PathVariable Long reqId) {
+        Map<String, Object> view = joinService.getMyRequest(code, reqId);
+        if (view == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("message", "신청을 찾을 수 없습니다"));
+        }
+        return ResponseEntity.ok(Map.of("success", true, "data", view));
+    }
+
+    // ③ 내 신청 취소
+    @PostMapping("/join/api/companies/{code}/requests/{reqId}/delete")
+    @ResponseBody
+    public Map<String, Object> cancelRequest(@PathVariable String code,
+                                             @PathVariable Long reqId) {
+        joinService.cancelMyRequest(code, reqId);
+        return Map.of("success", true);
+    }
+
+    // ④ 409 처리기
+    @ExceptionHandler(IllegalStateException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    @ResponseBody
+    public Map<String, Object> conflict(IllegalStateException e) {
+        return Map.of("message", e.getMessage());
     }
 
     // ---------- 오류 응답 ----------
