@@ -398,7 +398,7 @@ body.site .btn-outline-light:hover { background: rgba(255, 255, 255, 0.12); }
   .inq-strip > div { padding: 12px 4px; }
   .inq-strip > div + div { border-left: 0; border-top: 1px solid var(--line); }
   .hero { padding: 56px 0 64px; }
-  .hero .wrap, .pricing, .two-col { grid-template-columns: 1fr; }
+  .hero .wrap, .pricing { grid-template-columns: 1fr; }
   .hero h1 { font-size: 36px; }
   .device { transform: none; }
   .device-wrap { margin: 0 auto; }

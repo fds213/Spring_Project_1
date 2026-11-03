@@ -6,7 +6,7 @@
 	<!-- 연차: 부여 행·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
 
 	<!-- employee_id 도 읽는다. 입사일만 읽으면 입사일이 빈 직원은 모든 칸이 비어 MyBatis 가 결과 전체를 null 로 주고, '없는 직원'과 구분되지 않는다 -->
-	<select id="selectEmployeeCareer" resultType="com.ieum.gw.attendance.dto.EmployeeCareerDTO">
+	<select id="selectEmployeeHire" resultType="com.ieum.gw.attendance.dto.EmployeeHireDTO">
 		SELECT employee_id, TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date
 		FROM employee
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}

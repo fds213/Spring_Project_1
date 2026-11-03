@@ -1,7 +1,5 @@
-// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 날짜 계산, 알림(toast).
+// 화면에서 같이 쓰는 작은 도구: 날짜·금액 표시, 알림(toast), 목록·상세 칸 만들기.
 // common.js 다음, 각 모듈 JS 앞에 불린다. 각 JSP 의 scripts 조각이 불러오고, 알림을 쓰려면 <div class="toast" id="toast" hidden>이 있어야 한다.
-const DAY_MS = 86400000;
-
 const pad2 = n => String(n).padStart(2, '0');
 // 2026.10.29
 const ymd = iso => { const d = new Date(iso); return `${d.getFullYear()}.${pad2(d.getMonth() + 1)}.${pad2(d.getDate())}`; };

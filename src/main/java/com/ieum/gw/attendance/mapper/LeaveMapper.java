@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ieum.gw.attendance.dto.ApprovalStepDTO;
-import com.ieum.gw.attendance.dto.EmployeeCareerDTO;
+import com.ieum.gw.attendance.dto.EmployeeHireDTO;
 import com.ieum.gw.attendance.dto.LeaveCycleDTO;
 import com.ieum.gw.attendance.dto.LeaveRequestDTO;
 import com.ieum.gw.attendance.dto.LeaveSlotDTO;
@@ -15,7 +15,7 @@ import com.ieum.gw.attendance.dto.LeaveSlotDTO;
 @Mapper
 public interface LeaveMapper {
 
-    EmployeeCareerDTO selectEmployeeCareer(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+    EmployeeHireDTO selectEmployeeHire(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
     // 연차 부여 행 (직원마다 입사일부터 하나)
     LeaveCycleDTO selectCycleOn(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("day") String day);
