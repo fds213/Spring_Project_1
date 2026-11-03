@@ -7,6 +7,8 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
+import com.ieum.gw.employee.dto.JoinRequestDTO;
+import com.ieum.gw.employee.dto.JoinRequestViewDTO;
 import com.ieum.gw.employee.mapper.JoinMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -70,5 +72,33 @@ public class JoinDAO {
     /** 직급 목록 */
     public List<String> listGradeNames(Long companyId){
     	return mapper.listGradeNames(companyId);
+    }
+    
+    public Long findOpenDeptId(Long companyId, String deptName) {
+    	return mapper.findOpenDeptId(companyId, deptName);
+    }
+    
+    public Long findGradeId(Long companyId, String gradeName) {
+    	return mapper.findGradeId(companyId, gradeName);
+    }
+    
+    public int countLiveEmail(Long companyId, String email) {
+    	return mapper.countLiveEmail(companyId, email);
+    }
+    
+    public int insertRequest(JoinRequestDTO dto) {
+        return mapper.insertRequest(dto);
+    }
+    
+    public JoinRequestViewDTO getRequestView(String companyCode, String keyHash) {
+        return mapper.getRequestView(companyCode, keyHash);
+    }
+    
+    public int cancelRequest(Long requestId, Long companyId) {
+    	return mapper.cancelRequest(requestId, companyId);
+    }
+    
+    public int cancelAccount(Long userAccountId, Long companyId) {
+    	return mapper.cancelAccount(userAccountId, companyId);
     }
 }

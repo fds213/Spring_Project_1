@@ -8,6 +8,8 @@ import org.apache.ibatis.annotations.Param;
 
 import com.ieum.gw.employee.dto.JoinCompanyDTO;
 import com.ieum.gw.employee.dto.JoinOpeningDTO;
+import com.ieum.gw.employee.dto.JoinRequestDTO;
+import com.ieum.gw.employee.dto.JoinRequestViewDTO;
 
 @Mapper
 public interface JoinMapper {
@@ -30,8 +32,23 @@ public interface JoinMapper {
 	int closeDept(@Param("companyId") Long companyId, @Param("deptName") String deptName);
 
 	int closeAll(@Param("companyId") Long companyId);
-	
+
 	JoinCompanyDTO findCompanyByCode(@Param("companyCode") String companyCode);
-	
+
 	List<String> listGradeNames(@Param("companyId") Long companyId);
+
+	Long findOpenDeptId(@Param("companyId") Long companyId, @Param("deptName") String deptName);
+
+	Long findGradeId(@Param("companyId") Long companyId, @Param("gradeName") String gradeName);
+
+	int countLiveEmail(@Param("companyId") Long companyId, @Param("email") String email);
+
+	int insertRequest(JoinRequestDTO dto);
+
+	JoinRequestViewDTO getRequestView(@Param("companyCode") String companyCode, @Param("keyHash") String keyHash);
+
+	int cancelRequest(@Param("requestId") Long requestId, @Param("companyId") Long companyId);
+
+	int cancelAccount(@Param("userAccountId") Long userAccountId, @Param("companyId") Long companyId);
+
 }
