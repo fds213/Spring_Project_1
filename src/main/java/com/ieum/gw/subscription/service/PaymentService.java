@@ -118,6 +118,16 @@ public class PaymentService {
         return billing;
     }
 
+    /** 업체의 결제 이력, 최신순(운영자 화면). 사람을 확인하지 않으니 ROLE_OPS만 통과하는 /ops/**에서만 부른다 */
+    public List<PaymentRowDTO> listPaymentRows(Long companyId) {
+        return paymentDAO.listPayments(companyId);
+    }
+
+    /** 1인 월 이용료(운영자 화면의 월 이용료 계산). 요금제 행이 없으면 BillingException(503) */
+    public long monthlyUnitPrice() {
+        return monthlyPlan().getMonthlyUnitPrice();
+    }
+
     /** 금액 미리 보기. 저장하지 않는다 */
     public QuoteDTO quote(LoginUser user, String plan, int users) {
         requireAdmin(user);

@@ -1,6 +1,7 @@
 // 이음 운영자: 신청 현황 (views/ops/application.jsp). 페이지가 열리면 openApplicationView()를 부른다.
 // 신청 = 소개 사이트의 무료 체험 신청, 업체 하나에 한 줄.
 // 체험 중(TRIAL) → 결제하면 바로 결제 완료(PAID, 운영자 승인 없음: 요구분석서 PAY-02) → 체험·이용 기간이 끝나면 읽기 전용(EXPIRED).
+// 새 신청(isNew) = 신청한 지 24시간 안인 업체. 서버가 정하고 읽음은 저장하지 않는다.
 // 메뉴의 새 신청 배지(data-badge="application")는 common.js 가 GET /badges 로 채운다.
 
 const APP_STATUS = { TRIAL: '체험 중', PAID: '결제 완료', EXPIRED: '읽기 전용' };
@@ -25,8 +26,8 @@ function buildDetail(o) {
     ['업체명', o.company],
     ['이용 인원', `${o.users}명`],
     ['이메일', o.email],
-    // 계정은 신청할 때 바로 생기고, 이메일 인증 전에는 로그인할 수 없다 (ACC-06)
-    ['이메일 인증', !o.emailVerified ? `대기 (인증 메일 ${whenFull(o.verifySentAt || o.at)} 발송, 인증 전 로그인 불가)` : o.verifiedAt ? `완료 (${whenFull(o.verifiedAt)})` : '완료'],
+    // TODO(ACC-06): 인증 메일을 붙여 인증 전 로그인을 막으면 발송 시각과 '인증 전 로그인 불가'를 함께 보인다
+    ['이메일 인증', !o.emailVerified ? '대기' : o.verifiedAt ? `완료 (${whenFull(o.verifiedAt)})` : '완료'],
   ]);
 
   // 카드 제목이 '최초 관리자 계정'이라 항목 이름은 짧게 둔다. 비밀번호는 서버도 해시로만 가지므로 보여 주지 않는다
@@ -35,11 +36,13 @@ function buildDetail(o) {
     ['사번', o.adminNo],
   ]);
 
-  const payText = o.paid ? `결제 완료 (첫 결제 ${ymd(o.paidAt)})` : o.failedPayments ? `미결제 · 실패 ${o.failedPayments}회` : '미결제';
+  const payText = o.paid ? (o.paidAt ? `결제 완료 (첫 결제 ${ymd(o.paidAt)})` : '결제 완료')
+    : o.paidAt ? `승인됨, 이용 기간 반영 대기 (${whenFull(o.paidAt)})`
+    : o.failedPayments ? `미결제 · 실패 ${o.failedPayments}회` : '미결제';
   fill('pay', [
     ['신청번호', o.no],
     ['신청 시각', whenFull(o.at)],
-    ['체험 기간', `${ymd(o.at)} ~ ${ymd(o.trialEnd)}`],
+    ['체험 기간', o.trialEnd ? `${ymd(o.at)} ~ ${ymd(o.trialEnd)}` : '체험 기간 없음'],
     ['월 기준 이용료', won(o.total)],
     ['결제 상태', payText],
     ...(o.paid ? [
@@ -109,14 +112,12 @@ function toggleDetail(row, o) {
   slide.classList.add('open');
 }
 
-// 이 화면을 열 때 받은 새 신청. 바로 읽음으로 바꾸지만(배지는 없어짐), 이 화면을 떠나기 전까지는 새 신청으로 보여 준다
-let seenNew = new Set();
 // 고른 요약 카드: 'all', 'new', 또는 상태 코드
 let appFilter = 'all';
 
 function drawStatus() {
   const orders = appItems;
-  const newSignup = o => seenNew.has(o.no) || o.isNew;
+  const newSignup = o => o.isNew;
   const count = (id, n) => { document.getElementById(id).textContent = `${n}건`; };
   count('cntAll', orders.length);
   count('cntNew', orders.filter(newSignup).length);
@@ -182,14 +183,6 @@ document.querySelectorAll('#appFilters .card-filter').forEach(b => b.addEventLis
   drawStatus();
 }));
 
-// 신청 현황을 열면 새 신청을 본 것으로 한다: 이번에는 목록에 새 신청으로 표시하고, 메뉴 배지는 지운다.
-// 이 화면이 받은 새 신청만 읽음으로 한다 (그 사이에 들어온 신청은 새 신청으로 남는다)
-function markAllRead() {
-  const nos = [...seenNew];
-  if (!nos.length) return;
-  api.post('/ops/api/applications/read', { nos }).always(() => IEUM.refreshBadges());
-}
-
 // 신청 현황 화면을 열 때 (JSP 페이지가 열리면 부른다)
 function openApplicationView() {
   appFilter = 'all';
@@ -197,9 +190,7 @@ function openApplicationView() {
   api.get('/ops/api/applications')
     .done(items => {
       appItems = items;
-      seenNew = new Set(items.filter(o => o.isNew).map(o => o.no));
       drawStatus();
-      markAllRead();
     })
     .fail(xhr => showToast(apiMessage(xhr, '신청 목록을 불러오지 못했습니다')));
 }
