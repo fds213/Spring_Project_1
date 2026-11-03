@@ -58,7 +58,7 @@ function eaFillSelects() {
   fill('eaAppr1', false);
   fill('eaAppr2', true);
   eaEl('eaEquipBranch').replaceChildren(...o.branches.map(b => new Option(b.name, b.id)));
-  eaEl('eaEquipKind').replaceChildren(...o.equipKinds.map(k => new Option(assetTypeName(k), k)));
+  eaEl('eaEquipKind').replaceChildren(...o.equipKinds.map(k => new Option(k, k)));
 }
 
 // 양식에 따라 보이는 입력칸과 안내를 바꾼다. 입력해 둔 값은 지우지 않는다
@@ -241,13 +241,13 @@ document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.addEventListene
 
 const eaDraftTitle = d => (d.form === 'LEAVE'
   ? (d.fields.from ? ` · ${eaSpan(d.fields)}` : '')
-  : (d.fields.kind ? ` · ${assetTypeName(d.fields.kind)} ${d.fields.qty || ''}대` : ''));
+  : (d.fields.kind ? ` · ${d.fields.kind} ${d.fields.qty || ''}대` : ''));
 
 // 문서 내용 줄: 양식마다 다르다
 function eaDocRows(d) {
   const f = d.fields;
   if (d.form === 'LEAVE') return [['구분', EA_LEAVE_KIND[f.kind]], ['기간', `${eaSpan(f)} (${d.days}일)`], ['사유', f.reason || '-']];
-  return [['장비', `${assetTypeName(f.kind)} ${f.qty}대`], ['수령 지점', d.branchName], ['사유', f.reason],
+  return [['장비', `${f.kind} ${f.qty}대`], ['수령 지점', d.branchName], ['사유', f.reason],
     ...(d.ticketId ? [['지급 티켓', `${d.ticketId} (내 티켓에서 처리 상태를 봅니다)`]] : [])];
 }
 
@@ -288,7 +288,7 @@ function eaDraftDetail(d) {
   const f = d.fields;
   const rows = d.form === 'LEAVE'
     ? [['구분', EA_LEAVE_KIND[f.kind] || '-'], ['기간', eaSpan(f) || '-'], ['사유', f.reason || '-']]
-    : [['장비', f.kind ? `${assetTypeName(f.kind)} ${f.qty || ''}대` : '-'], ['수령 지점', d.branchName || '-'], ['사유', f.reason || '-']];
+    : [['장비', f.kind ? `${f.kind} ${f.qty || ''}대` : '-'], ['수령 지점', d.branchName || '-'], ['사유', f.reason || '-']];
   [['양식', EA_FORMS[d.form]], ...rows, ['결재선', d.lineNames.join(' → ') || '-'], ['저장', whenFull(d.savedAt)]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
   const resume = eaButton('이어서 쓰기', 'btn btn-primary', true);

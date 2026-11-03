@@ -80,7 +80,7 @@ function pickSelect(label, first, options, selected) {
 }
 // 자산 한 줄 이름: '노트북 1 (SN-123)'. 제조 일련번호(serial)가 없으면 이름만
 const assetLabel = a => (a.serial ? `${a.name} (${a.serial})` : a.name);
-// 공통 코드 이름표: 키는 공통 코드(common.code enum) 그대로. 티켓 화면(내 티켓·내 장비·티켓 처리)과 전자결재가 같이 쓴다
+// 공통 코드 이름표: 키는 공통 코드(common.code enum) 그대로. 티켓 화면(내 티켓·내 장비·티켓 처리)이 같이 쓴다
 const TICKET_TYPE = { TK_INCIDENT: '장애', TK_QUESTION: '문의', TK_EQUIPMENT: '장비 지급' };
 // 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려. TICKET_CLASS 는 상태 배지 색(status-*)
 const TICKET_STATUS = { RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려' };
