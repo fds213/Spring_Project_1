@@ -75,6 +75,15 @@
         ORDER BY starts_at, service_period_id
     </select>
 
+    <!-- 모든 업체의 이용 기간 (운영자 화면). 지금 기간·마지막 기간은 Service가 고른다 -->
+    <select id="listAllPeriods" resultType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
+        SELECT service_period_id, company_id,
+               CASE WHEN period_type = 'PD_TRIAL' THEN 1 ELSE 0 END AS trial,
+               starts_at, ends_at, purchased_seats, billing_anchor_date
+        FROM service_period
+        ORDER BY company_id, starts_at, service_period_id
+    </select>
+
     <!-- 업체 이메일 인증 시각 (비어 있으면 인증 전) -->
     <select id="getEmailVerifiedAt" resultType="java.time.LocalDateTime">
         SELECT email_verified_at

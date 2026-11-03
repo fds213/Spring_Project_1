@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -95,6 +96,27 @@ final class ServicePeriods {
         billing.setEndDate(lastDay(period.getEndsAt()).format(HEADER_DATE));
         billing.setDaysLeft(daysLeft(period, now));
         return billing;
+    }
+
+    /** 운영자 화면의 이용 기간 요약. 이용 기간이 하나도 없으면 null */
+    static CompanyPeriodDTO toCompanyPeriod(List<ServicePeriodDTO> periods, LocalDateTime now) {
+        ServicePeriodDTO period = pick(periods, now);
+        if (period == null) {
+            return null;
+        }
+        CompanyPeriodDTO summary = new CompanyPeriodDTO();
+        summary.setStatus(statusOf(period, now));
+        summary.setPaid(!period.isTrial());
+        summary.setSeats(period.getPurchasedSeats());
+        summary.setFirstDay(period.getStartsAt().toLocalDate());
+        summary.setLastDay(lastDay(period.getEndsAt()));
+        summary.setDaysLeft(daysLeft(period, now));
+        for (ServicePeriodDTO p : periods) {
+            if (p.isTrial()) {
+                summary.setTrialLastDay(lastDay(p.getEndsAt()));
+            }
+        }
+        return summary;
     }
 
     static int seatLimitOf(ServicePeriodDTO period) {

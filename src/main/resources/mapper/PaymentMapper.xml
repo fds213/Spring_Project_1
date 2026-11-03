@@ -139,7 +139,7 @@
                pl.duration_months, o.seat_count, o.total_amount, o.discount_rate,
                CASE WHEN p.status_code = 'PAY_APPROVED' THEN 1 ELSE 0 END AS approved,
                NVL(p.approved_at, p.created_at) AS paid_at,
-               sp.starts_at, sp.ends_at
+               sp.starts_at, sp.ends_at, p.failure_message AS reason
         FROM payment p
         JOIN payment_order o ON o.company_id = p.company_id AND o.payment_order_id = p.payment_order_id
         JOIN subscription_plan pl ON pl.subscription_plan_id = o.subscription_plan_id
