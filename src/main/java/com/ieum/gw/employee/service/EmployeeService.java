@@ -132,7 +132,7 @@ public class EmployeeService {
     }
 
     /** 평문 비밀번호를 BCrypt로. 72바이트를 넘으면 BCrypt가 뒤를 무시하므로 거절한다 */
-    private String hashPassword(String rawPassword) {
+    String hashPassword(String rawPassword) {
         if (rawPassword == null || rawPassword.isEmpty()) {
             throw new IllegalArgumentException("비밀번호를 입력해 주세요");
         }

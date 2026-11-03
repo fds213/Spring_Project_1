@@ -209,11 +209,24 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    @DisplayName("헤더 값: 체험 중 결제한 업체는 겹친 체험 기간이 아니라 유료 기간으로 보여 준다")
+    void companyBillingPicksPaidOverTrial() {
+        FakeDAO dao = new FakeDAO();
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        dao.periods.add(period(20, true, now.minusDays(10), now.plusDays(4), 5));
+        dao.periods.add(period(20, false, now.minusDays(2), now.plusDays(28), 25));
+        SubscriptionService service = new SubscriptionService(dao, codes("ieum0001"));
+
+        assertEquals("PAID", service.getCompanyBilling(20L).getStatus());
+    }
+
+    @Test
     @DisplayName("이용 기간이 없는 업체(이음 운영 업체): 이용 상태는 null, 인원 한도는 예외")
     void companyWithoutPeriod() {
         SubscriptionService service = new SubscriptionService(new FakeDAO(), codes("ieum0001"));
 
         assertNull(service.getCompanyUsage(1L));
+        assertNull(service.getCompanyBilling(1L));
         assertThrows(IllegalStateException.class, () -> service.getSeatLimit(1L));
     }
 }

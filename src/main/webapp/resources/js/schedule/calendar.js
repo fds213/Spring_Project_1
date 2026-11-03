@@ -7,7 +7,7 @@
 const SCOPE_LABEL = { PERSONAL: '개인', DEPT: '부서', COMPANY: '전사' };
 const SCH_LEAVE_LABEL = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
 const SCH_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-const SCH_SHOW_MAX = 3; // 달력 칸에 보이는 일정 수. 나머지는 "+n"
+const SCH_SHOW_MAX = 3; // 달력 칸에 보이는 일정 수. 나머지는 "+n개 더"
 const SCH_TITLE_MAX = 40;
 const SCH_MEMO_MAX = 200;
 
@@ -21,6 +21,8 @@ const schState = {
   selected: '', // 선택한 날짜 'YYYY-MM-DD'
   show: { PERSONAL: true, DEPT: true, COMPANY: true, LEAVE: true },
   data: null,   // 서버에서 받은 그달 것
+  jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
+  jumpTimer: null,
 };
 const schMonthParam = () => `${schState.month.y}-${pad2(schState.month.m + 1)}`;
 
@@ -68,7 +70,23 @@ function drawSchedule() {
   const first = new Date(y, m, 1);
   const days = new Date(y, m + 1, 0).getDate();
   const cells = [];
-  for (let i = 0; i < first.getDay(); i++) cells.push(schNode('div', 'sch-cell is-blank'));
+  // 앞뒤 달의 날짜로 빈칸을 채운다 (연한 회색). 누르면 그 달로 넘어가 그 날짜를 고른다
+  const otherDay = date => {
+    const cell = schNode('button', 'sch-cell is-other', schNode('span', 'sch-num', String(date.getDate())));
+    cell.type = 'button';
+    cell.setAttribute('aria-label', `${date.getMonth() + 1}월 ${date.getDate()}일 (다른 달)`);
+    cell.addEventListener('click', () => {
+      schState.month = { y: date.getFullYear(), m: date.getMonth() };
+      schState.selected = schDayKey(date);
+      // 방금 앞뒤 달 칸을 눌러 달력이 바뀌었다고 잠깐 적어 둔다 (빠르게 한 번 더 누르면 이 날짜로 팝업을 연다)
+      schState.jumped = schState.selected;
+      clearTimeout(schState.jumpTimer);
+      schState.jumpTimer = setTimeout(() => { schState.jumped = ''; }, 500);
+      renderSchedule();
+    });
+    return cell;
+  };
+  for (let i = first.getDay(); i > 0; i--) cells.push(otherDay(new Date(y, m, 1 - i)));
   const todayKey = schDayKey(new Date());
   for (let d = 1; d <= days; d++) {
     const date = new Date(y, m, d);
@@ -81,11 +99,12 @@ function drawSchedule() {
     cell.setAttribute('aria-label', `${m + 1}월 ${d}일${items.length ? `, 일정 ${items.length}건` : ''}`);
     cell.append(schNode('span', 'sch-num', String(d)));
     items.slice(0, SCH_SHOW_MAX).forEach(it => cell.append(schNode('span', `sch-chip chip-${it.type.toLowerCase()}`, it.title)));
-    if (items.length > SCH_SHOW_MAX) cell.append(schNode('span', 'sch-more', `+${items.length - SCH_SHOW_MAX}`));
+    if (items.length > SCH_SHOW_MAX) cell.append(schNode('span', 'sch-more', `+${items.length - SCH_SHOW_MAX}개 더`));
     cell.addEventListener('click', () => { schState.selected = key; drawSchedule(); });
     cell.addEventListener('dblclick', () => { schState.selected = key; drawSchedule(); openAddDialog(key); }); // 두 번 누르면 그 날짜로 추가 팝업
     cells.push(cell);
   }
+  for (let d = 1; cells.length % 7 !== 0; d++) cells.push(otherDay(new Date(y, m + 1, d)));
   schEl('schGrid').replaceChildren(...cells);
 
   renderDayPanel();
@@ -97,18 +116,28 @@ function renderDayPanel() {
   const d = schFromKey(schState.selected);
   schEl('schDayTitle').textContent = `${d.getMonth() + 1}월 ${d.getDate()}일 (${SCH_WEEKDAYS[d.getDay()]})`;
   const items = schItemsOn(schState.selected);
+  // 개수('2건')는 날짜 제목 바로 뒤에 둔다. JSP에 두지 않고 여기서 한 번 만든다
+  let count = schEl('schDayCount');
+  if (!count) {
+    count = schNode('span', 'sch-day-count');
+    count.id = 'schDayCount';
+    schEl('schDayTitle').after(count);
+  }
+  count.textContent = items.length ? `${items.length}건` : '';
   schEl('schDayList').replaceChildren(...(items.length ? items.map(it => {
+    // 구분 칩 + (제목, 그 아래 메모) + 삭제
+    const body = schNode('div', 'sch-item-body', schNode('span', 'sch-title', it.title));
+    if (it.schedule && it.schedule.memo) body.append(schNode('small', 'sch-memo', it.schedule.memo));
     const li = schNode('li', '', schNode('span', `sch-chip chip-${it.type.toLowerCase()}`, it.type === 'HOLIDAY' ? '휴일' : it.type === 'LEAVE' ? '연차' : SCOPE_LABEL[it.type]),
-      schNode('span', 'sch-title', it.title));
-    if (it.schedule && it.schedule.memo) li.append(schNode('small', 'cell-sub', it.schedule.memo));
+      body);
     if (it.schedule && it.schedule.canDelete) {
-      const del = schNode('button', 'btn', '삭제');
+      const del = schNode('button', 'sch-del', '삭제');
       del.type = 'button';
       del.addEventListener('click', () => deleteSchedule(it.schedule.id, del));
       li.append(del);
     }
     return li;
-  }) : [schNode('li', 'muted', '이 날짜에는 일정이 없습니다')]));
+  }) : [schNode('li', 'empty-box', '이 날짜에는 일정이 없습니다')]));
 
   // 구분 선택지는 쓸 수 있는 것만 (서버가 정해 보낸다). 부서 일정은 내 부서 이름을 함께 보여 준다
   const scope = schEl('schScope');
@@ -132,7 +161,6 @@ function openAddDialog(dateKey) {
   if (!dlg.open) dlg.showModal();
   schEl('schTitle').focus();
 }
-schEl('schAdd').addEventListener('click', () => openAddDialog(schState.selected));
 schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
 schEl('schCancel').addEventListener('click', () => schEl('schDialog').close());
 
@@ -152,6 +180,14 @@ const schMoveMonth = step => {
   schState.selected = now.getFullYear() === d.getFullYear() && now.getMonth() === d.getMonth() ? schDayKey(now) : schDayKey(d);
   renderSchedule();
 };
+// 앞뒤 달 칸을 두 번 빠르게 누르면, 첫 클릭에 달력이 새로 그려져 두 번째 클릭이 새 달의 다른 칸에 떨어진다.
+// 그 두 번째 클릭은 칸에 닿기 전에(capture) 막고, 처음 누른 날짜로 추가 팝업을 연다
+['click', 'dblclick'].forEach(type => schEl('schGrid').addEventListener(type, e => {
+  if (!schState.jumped || e.detail < 2) return;
+  e.stopPropagation();
+  if (type === 'dblclick') openAddDialog(schState.jumped);
+}, true));
+
 schEl('schPrev').addEventListener('click', () => schMoveMonth(-1));
 schEl('schNext').addEventListener('click', () => schMoveMonth(1));
 schEl('schToday').addEventListener('click', openScheduleView);

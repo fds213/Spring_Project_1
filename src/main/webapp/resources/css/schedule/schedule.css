@@ -1,0 +1,84 @@
+/* 일정 화면 (schedule/calendar.jsp) 전용 모양. common.css의 일정 규칙을 이 화면 안(#view-schedule)에서만 덮어쓴다.
+   색·간격은 common.css 변수만 쓴다. */
+
+/* 왼쪽 달력과 오른쪽 날짜 목록의 높이를 맞춘다 */
+#view-schedule .sch-layout { align-items: stretch; }
+
+/* 오른쪽 날짜 카드 제목 줄: 날짜 · 개수(날짜 바로 옆) · [+ 일정 추가](오른쪽 끝) */
+#view-schedule .info-card-head .sch-day-add { flex: none; height: 32px; padding: 0 12px; margin-left: auto; }
+
+/* 고른 날짜에 일정이 없을 때: 빈 카드 가운데 안내 (common.css에 같은 규칙이 들어오기 전에도 같은 모양) */
+#view-schedule .sch-day-list li.empty-box {
+  display: grid; place-items: center; min-height: 120px; margin-top: 4px; padding: 0;
+  border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sub);
+  font-size: 13px; color: var(--text-muted);
+}
+
+/* ---------- 보기 필터: 체크박스 대신 눌렀다 떼는 칩 ---------- */
+#view-schedule .sch-filters { gap: 6px; }
+#view-schedule .sch-filters label { position: relative; gap: 0; }
+#view-schedule .sch-filters input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+#view-schedule .sch-filters .sch-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px;
+  font-size: 12px; font-weight: 500; line-height: 1.4; transition: opacity .12s, background-color .12s;
+}
+#view-schedule .sch-filters .sch-chip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+#view-schedule .sch-filters label:has(input:not(:checked)) .sch-chip { background: var(--bg-sub); color: var(--text-muted); }
+#view-schedule .sch-filters label:has(input:focus-visible) .sch-chip { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- 달력: 얇은 줄로 나뉜 한 장짜리 표 ---------- */
+#view-schedule .sch-week { padding: 4px 16px 0; font-weight: 500; }
+#view-schedule .sch-grid {
+  margin: 0 16px 16px; padding: 0; gap: 1px;
+  background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
+#view-schedule .sch-cell {
+  min-height: 108px; padding: 6px 6px 8px; gap: 3px;
+  border: 0; border-radius: 0; background: var(--bg); transition: background-color .1s;
+}
+/* 마우스를 올린 칸은 회색, 고른 칸은 마우스를 올려도 파랑 (고른 칸은 hover 규칙에서 뺀다) */
+#view-schedule .sch-cell:hover:not(.is-selected) { background: var(--bg-sub); }
+#view-schedule .sch-cell.is-selected { box-shadow: none; background: var(--accent-bg); }
+#view-schedule .sch-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#view-schedule .sch-cell.is-other { background: color-mix(in srgb, var(--bg-sub) 40%, var(--bg)); } /* 흰색과 회색 사이 */
+#view-schedule .sch-cell.is-other .sch-num { color: var(--text-muted); font-weight: 400; opacity: .6; }
+#view-schedule .sch-num { align-self: flex-start; padding: 0 3px; font-size: 13px; }
+#view-schedule .sch-cell.is-today .sch-num { padding: 0; width: 24px; height: 24px; }
+
+/* 칸 안 일정: 왼쪽 색 줄이 있는 막대 */
+#view-schedule .sch-cell .sch-chip {
+  padding: 2px 6px; border-left: 3px solid currentColor; border-radius: 3px;
+  font-size: 11px; font-weight: 500; line-height: 1.45;
+}
+#view-schedule .sch-more { padding-left: 4px; font-size: 11px; font-weight: 500; color: var(--text-sub); }
+
+/* ---------- 오른쪽: 고른 날짜의 목록 ---------- */
+#view-schedule .sch-day-count { font-size: 13px; font-weight: 500; color: var(--accent); }
+#view-schedule .sch-day-list li { align-items: flex-start; flex-wrap: nowrap; gap: 10px; padding: 12px 0; }
+#view-schedule .sch-day-list .sch-chip { margin-top: 1px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+#view-schedule .sch-item-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+#view-schedule .sch-item-body .sch-title { font-size: 14px; font-weight: 500; color: var(--text); }
+#view-schedule .sch-memo { font-size: 12px; line-height: 1.5; color: var(--text-muted); white-space: pre-line; overflow-wrap: anywhere; }
+#view-schedule .sch-del {
+  flex-shrink: 0; padding: 2px 4px; border: 0; background: none; font: inherit; font-size: 12px;
+  color: var(--text-muted); cursor: pointer;
+}
+#view-schedule .sch-del:hover { color: var(--danger); text-decoration: underline; }
+#view-schedule .sch-del:disabled { opacity: .5; cursor: default; }
+
+/* 툴바 버튼 글자가 세로로 쪼개지지 않게 */
+#view-schedule .sch-toolbar .btn { white-space: nowrap; flex-shrink: 0; }
+
+@media (max-width: 600px) {
+  #view-schedule .sch-toolbar { padding: 0 12px 0 0; }
+  #view-schedule .att-month { flex-wrap: wrap; gap: 8px; padding: 12px; }
+  #view-schedule .att-month strong { min-width: 0; white-space: nowrap; }
+  #view-schedule .sch-filters { padding: 0 12px 4px; }
+  #view-schedule .sch-grid { margin: 0 8px 12px; }
+  #view-schedule .sch-week { padding: 4px 8px 0; }
+  #view-schedule .sch-cell { min-height: 68px; padding: 4px 3px; }
+  #view-schedule .sch-cell .sch-chip { border-left-width: 2px; padding: 1px 3px; font-size: 10px; }
+  #view-schedule .sch-more { font-size: 10px; }
+  /* 삭제 버튼: 손가락으로 누르기 쉽게 크게 (글자 크기는 그대로) */
+  #view-schedule .sch-del { min-width: 44px; min-height: 36px; padding: 8px; margin: -8px -8px -8px 0; }
+}
