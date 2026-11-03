@@ -52,6 +52,11 @@ public class SubscriptionDAO {
         return mapper.listPeriods(companyId);
     }
 
+    /** 모든 업체의 이용 기간 (업체·시작 순). 운영자 화면이 쓴다 */
+    public List<ServicePeriodDTO> listAllPeriods() {
+        return mapper.listAllPeriods();
+    }
+
     /** 업체 이메일 인증 시각. 인증 전이면 null */
     public LocalDateTime getEmailVerifiedAt(Long companyId) {
         return mapper.getEmailVerifiedAt(companyId);

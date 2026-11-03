@@ -67,12 +67,25 @@
 
     <!-- 업체의 이용 기간 전부 (체험·유료, 시작 순). 지금 기간·마지막 기간은 Service가 고른다 -->
     <select id="listPeriods" resultType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
-        SELECT service_period_id, company_id,
-               CASE WHEN period_type = 'PD_TRIAL' THEN 1 ELSE 0 END AS trial,
-               starts_at, ends_at, purchased_seats, billing_anchor_date
-        FROM service_period
-        WHERE company_id = #{companyId}
-        ORDER BY starts_at, service_period_id
+        SELECT sp.service_period_id, sp.company_id,
+               CASE WHEN sp.period_type = 'PD_TRIAL' THEN 1 ELSE 0 END AS trial,
+               sp.starts_at, sp.ends_at, sp.purchased_seats, sp.billing_anchor_date,
+               CASE pl.plan_code WHEN 'PLAN_YEARLY' THEN 'ANNUAL' WHEN 'PLAN_MONTHLY' THEN 'MONTHLY' END AS plan
+        FROM service_period sp
+        LEFT JOIN subscription_plan pl ON pl.subscription_plan_id = sp.subscription_plan_id
+        WHERE sp.company_id = #{companyId}
+        ORDER BY sp.starts_at, sp.service_period_id
+    </select>
+
+    <!-- 모든 업체의 이용 기간 (운영자 화면). 지금 기간·마지막 기간은 Service가 고른다 -->
+    <select id="listAllPeriods" resultType="com.ieum.gw.subscription.dto.ServicePeriodDTO">
+        SELECT sp.service_period_id, sp.company_id,
+               CASE WHEN sp.period_type = 'PD_TRIAL' THEN 1 ELSE 0 END AS trial,
+               sp.starts_at, sp.ends_at, sp.purchased_seats, sp.billing_anchor_date,
+               CASE pl.plan_code WHEN 'PLAN_YEARLY' THEN 'ANNUAL' WHEN 'PLAN_MONTHLY' THEN 'MONTHLY' END AS plan
+        FROM service_period sp
+        LEFT JOIN subscription_plan pl ON pl.subscription_plan_id = sp.subscription_plan_id
+        ORDER BY sp.company_id, sp.starts_at, sp.service_period_id
     </select>
 
     <!-- 업체 이메일 인증 시각 (비어 있으면 인증 전) -->

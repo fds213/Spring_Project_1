@@ -26,5 +26,7 @@ public interface SubscriptionMapper {
 
     List<ServicePeriodDTO> listPeriods(@Param("companyId") Long companyId);
 
+    List<ServicePeriodDTO> listAllPeriods();
+
     LocalDateTime getEmailVerifiedAt(@Param("companyId") Long companyId);
 }

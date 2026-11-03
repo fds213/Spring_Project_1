@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -29,10 +30,12 @@ import com.ieum.gw.subscription.dao.PaymentDAO;
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
 import com.ieum.gw.subscription.dto.BillingDTO;
 import com.ieum.gw.subscription.dto.BillingPaymentDTO;
+import com.ieum.gw.subscription.dto.BillingPlanDTO;
 import com.ieum.gw.subscription.dto.CompanyDTO;
 import com.ieum.gw.subscription.dto.ConfirmFormDTO;
 import com.ieum.gw.subscription.dto.FailFormDTO;
 import com.ieum.gw.subscription.dto.OrderFormDTO;
+import com.ieum.gw.subscription.dto.OrderPurpose;
 import com.ieum.gw.subscription.dto.OrderResultDTO;
 import com.ieum.gw.subscription.dto.OrderStatus;
 import com.ieum.gw.subscription.dto.PaymentDTO;
@@ -54,6 +57,7 @@ class PaymentServiceTest {
     private static final Long COMPANY = 10L;
     private static final Long OTHER_COMPANY = 20L;
     private static final String KEY = "pay_key_1";
+    private static final Long YEARLY_PLAN_ID = 2L;
 
     /** 주문·결제·변경 표를 흉내 낸다. 상태 변경은 실제 SQL처럼 조건부다 */
     static class FakePaymentDAO extends PaymentDAO {
@@ -63,6 +67,7 @@ class PaymentServiceTest {
         final List<SubscriptionChangeDTO> changes = new ArrayList<>();
         final SubscriptionDAO periods;
         SubscriptionPlanDTO plan = monthly();
+        SubscriptionPlanDTO yearly = yearly();
         long nextId = 100;
 
         FakePaymentDAO(SubscriptionDAO periods) {
@@ -78,16 +83,29 @@ class PaymentServiceTest {
             return plan;
         }
 
+        static SubscriptionPlanDTO yearly() {
+            SubscriptionPlanDTO plan = new SubscriptionPlanDTO();
+            plan.setSubscriptionPlanId(YEARLY_PLAN_ID);
+            plan.setDurationMonths(12);
+            plan.setMonthlyUnitPrice(4000L);
+            return plan;
+        }
+
         @Override
         public SubscriptionPlanDTO getMonthlyPlan() {
             return plan;
         }
 
         @Override
+        public SubscriptionPlanDTO getYearlyPlan() {
+            return yearly;
+        }
+
+        @Override
         public int insertOrder(PaymentOrderDTO dto) {
             dto.setPaymentOrderId(nextId++);
             dto.setStatusCode(OrderStatus.ORD_CREATED);
-            dto.setDurationMonths(plan.getDurationMonths());
+            dto.setDurationMonths(YEARLY_PLAN_ID.equals(dto.getSubscriptionPlanId()) ? 12 : 1);
             orders.add(dto);
             return 1;
         }
@@ -105,8 +123,10 @@ class PaymentServiceTest {
             c.setCompanyId(o.getCompanyId());
             c.setExternalOrderNo(o.getExternalOrderNo());
             c.setSubscriptionPlanId(o.getSubscriptionPlanId());
+            c.setPurposeCode(o.getPurposeCode());
             c.setStatusCode(o.getStatusCode());
             c.setSeatCount(o.getSeatCount());
+            c.setDiscountRate(o.getDiscountRate());
             c.setTotalAmount(o.getTotalAmount());
             c.setDurationMonths(o.getDurationMonths());
             return c;
@@ -200,12 +220,12 @@ class PaymentServiceTest {
             PaymentOrderDTO o = byId(p.getPaymentOrderId());
             PaymentRowDTO r = new PaymentRowDTO();
             r.setOrderNo(o.getExternalOrderNo());
-            r.setKind("FIRST");
-            r.setPlan("MONTHLY");
+            r.setKind(o.getPurposeCode() == OrderPurpose.PP_FIRST ? "FIRST" : "EXTEND");
+            r.setPlan(YEARLY_PLAN_ID.equals(o.getSubscriptionPlanId()) ? "ANNUAL" : "MONTHLY");
             r.setDurationMonths(o.getDurationMonths());
             r.setSeatCount(o.getSeatCount());
             r.setTotalAmount(o.getTotalAmount());
-            r.setDiscountRate(BigDecimal.ZERO);
+            r.setDiscountRate(o.getDiscountRate());
             r.setApproved(ok);
             r.setPaidAt(ok ? p.getApprovedAt() : LocalDateTime.now(SEOUL));
             for (ServicePeriodDTO sp : periods.listPeriods(COMPANY)) {
@@ -235,6 +255,7 @@ class PaymentServiceTest {
                 throw new IllegalStateException("저장 실패");
             }
             dto.setServicePeriodId(500L + periods.size());
+            dto.setPlan(YEARLY_PLAN_ID.equals(dto.getSubscriptionPlanId()) ? "ANNUAL" : "MONTHLY");
             periods.add(dto);
             return 1;
         }
@@ -423,14 +444,14 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("연간은 아직 주문·견적을 받지 않는다(핵심 뒤 추가)")
-    void monthlyOnly() {
+    @DisplayName("모르는 요금제는 주문·견적을 받지 않는다")
+    void unknownPlan() {
         OrderFormDTO form = new OrderFormDTO();
-        form.setPlan("ANNUAL");
+        form.setPlan("WEEKLY");
         form.setUsers(3);
         form.setAmount(1L);
 
-        assertRejected(400, () -> service.quote(admin(), "ANNUAL", 3));
+        assertRejected(400, () -> service.quote(admin(), "WEEKLY", 3));
         assertRejected(400, () -> service.createOrder(admin(), form));
     }
 
@@ -773,7 +794,9 @@ class PaymentServiceTest {
     @Test
     @DisplayName("이미 유료가 된 뒤에는 새 주문을 만들 수 없다")
     void noOrderAfterPaid() {
-        confirm(order(3));
+        OrderResultDTO paid = order(3);
+        toss.confirmAnswer = done(paid.getOrderNo(), 12000L, offset(LocalDateTime.now(SEOUL)));
+        confirm(paid);
 
         assertRejected(409, () -> order(1));
         assertEquals(1, paidPeriods());
@@ -954,7 +977,8 @@ class PaymentServiceTest {
         assertEquals("PAID", billing.getStatus());
         assertTrue(billing.isPaid());
         assertEquals("MONTHLY", billing.getPlan());
-        assertFalse(billing.isCanPay());
+        assertTrue(billing.isCanPay());
+        assertEquals("EXTEND", billing.getMode());
         assertEquals(3, billing.getUsers());
         assertNotNull(billing.getServiceFrom());
         assertEquals(order.getOrderNo(), billing.getPayments().get(0).getId());
@@ -989,8 +1013,407 @@ class PaymentServiceTest {
     }
 
     @Test
-    @DisplayName("결제 금액 계산: 500명 × 4,000원 × 1개월")
+    @DisplayName("결제 금액 계산: 인원 × 단가 × 개월에 할인을 적용한다")
     void totalAmount() {
-        assertEquals(2_000_000L, PaymentService.totalAmount(500, 4000L, 1));
+        assertEquals(2_000_000L, PaymentService.totalAmount(500, 4000L, 1, 0));
+        assertEquals(43_200L, PaymentService.totalAmount(1, 4000L, 12, 10));
+        assertEquals(38_400L, PaymentService.totalAmount(1, 4000L, 12, 20));
+        assertEquals(460_800L, PaymentService.totalAmount(12, 4000L, 12, 20));
+    }
+
+    // ---------- 연간 ----------
+
+    private static String offset(LocalDateTime at) {
+        return at.atZone(SEOUL).toOffsetDateTime().toString();
+    }
+
+    private OrderResultDTO planOrder(String plan, int seats, long amount) {
+        OrderFormDTO form = new OrderFormDTO();
+        form.setPlan(plan);
+        form.setUsers(seats);
+        form.setAmount(amount);
+        return service.createOrder(admin(), form);
+    }
+
+    private BillingPaymentDTO payAt(OrderResultDTO order, LocalDateTime approvedAt) {
+        toss.confirmAnswer = done(order.getOrderNo(), order.getAmount(), offset(approvedAt));
+        return confirm(order);
+    }
+
+    @Test
+    @DisplayName("첫 연간은 인원 × 4,000원 × 12개월 × 90%이고, 승인일부터 1년이다")
+    void annualFirst() {
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        OrderResultDTO order = planOrder("ANNUAL", 3, 129_600L);
+
+        assertEquals("이음 연간 이용 3명", order.getOrderName());
+        PaymentOrderDTO saved = payments.getOrder(COMPANY, order.getOrderNo());
+        assertEquals(OrderPurpose.PP_FIRST, saved.getPurposeCode());
+        assertEquals(0, new BigDecimal("0.10").compareTo(saved.getDiscountRate()));
+
+        BillingPaymentDTO paid = payAt(order, now);
+
+        assertEquals(10, paid.getPct());
+        assertEquals("ANNUAL", paid.getPlan());
+        assertEquals(12, paid.getMonths());
+        ServicePeriodDTO period = subs.periods.get(1);
+        assertEquals(now.toLocalDate().plusMonths(12).atStartOfDay(), period.getEndsAt());
+        assertEquals(now.toLocalDate(), period.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("연간 금액이 서버 계산과 다르면 주문을 만들지 않는다(할인 없는 금액 포함)")
+    void annualAmountMustMatch() {
+        assertRejected(409, () -> planOrder("ANNUAL", 3, 144_000L));
+        assertTrue(payments.orders.isEmpty());
+    }
+
+    @Test
+    @DisplayName("연간 견적은 할인율과 식을 보여 주고, 기간은 오늘부터 1년이다")
+    void annualQuote() {
+        QuoteDTO quote = service.quote(admin(), "ANNUAL", 3);
+
+        assertEquals("ANNUAL", quote.getPlan());
+        assertEquals("FIRST", quote.getMode());
+        assertEquals(129_600L, quote.getAmount());
+        assertEquals("3명 × 4,000원 × 12개월 × 90%", quote.getFormula());
+        assertEquals(10, quote.getPct());
+        assertEquals(12, quote.getMonths());
+        LocalDate today = LocalDate.now(SEOUL);
+        assertEquals(today.plusMonths(12).minusDays(1).atStartOfDay().toString(), quote.getTo());
+    }
+
+    @Test
+    @DisplayName("연간 요금제 행이 없으면 화면에 월간만 나오고, 연간 주문은 503으로 거절한다")
+    void noYearlyRow() {
+        payments.yearly = null;
+
+        List<BillingPlanDTO> plans = service.getBilling(admin()).getPlans();
+        assertEquals(1, plans.size());
+        assertEquals("MONTHLY", plans.get(0).getPlan());
+        assertRejected(503, () -> service.quote(admin(), "ANNUAL", 3));
+        assertRejected(503, () -> planOrder("ANNUAL", 3, 129_600L));
+    }
+
+    @Test
+    @DisplayName("첫 결제 화면은 월간·연간을 1인 금액과 함께 준다")
+    void plansOnFirst() {
+        BillingDTO billing = service.getBilling(admin());
+
+        assertEquals("FIRST", billing.getMode());
+        assertEquals(2, billing.getPlans().size());
+        assertEquals(4000L, billing.getPlans().get(0).getAmountPerUser());
+        assertEquals(0, billing.getPlans().get(0).getPct());
+        assertEquals(43_200L, billing.getPlans().get(1).getAmountPerUser());
+        assertEquals(10, billing.getPlans().get(1).getPct());
+    }
+
+    // ---------- 만료 전 연장 ----------
+
+    // 유료 이용 중인 업체로 만든다. 지금부터 daysLeft일 뒤 0시에 만료한다
+    private ServicePeriodDTO paidPeriod(String plan, int seats, int daysLeft, LocalDate anchor) {
+        LocalDate today = LocalDate.now(SEOUL);
+        ServicePeriodDTO p = new ServicePeriodDTO();
+        p.setServicePeriodId(400L + subs.periods.size());
+        p.setCompanyId(COMPANY);
+        p.setPlan(plan);
+        p.setEndsAt(today.plusDays(daysLeft).atStartOfDay());
+        // 체험 위에 생긴 유료 기간이다. 체험보다 늦게 시작해야 지금 기간으로 고른다
+        p.setStartsAt(daysLeft > 0 ? LocalDateTime.now(SEOUL).minusHours(1) : p.getEndsAt().minusMonths(1));
+        p.setPurchasedSeats(seats);
+        p.setBillingAnchorDate(anchor);
+        subs.periods.add(p);
+        return p;
+    }
+
+    @Test
+    @DisplayName("월간 연장: 지금 만료일에 1개월을 이어 붙이고 기준일·인원은 그대로다")
+    void monthlyRenew() {
+        LocalDate today = LocalDate.now(SEOUL);
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, today.minusDays(5));
+        LocalDateTime oldEnd = now.getEndsAt();
+
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        assertEquals("이음 월간 연장 5명", order.getOrderName());
+        assertEquals(OrderPurpose.PP_RENEW, payments.getOrder(COMPANY, order.getOrderNo()).getPurposeCode());
+
+        BillingPaymentDTO paid = payAt(order, LocalDateTime.now(SEOUL));
+
+        assertEquals("EXTEND", paid.getKind());
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(oldEnd, added.getStartsAt());
+        LocalDate expected = ServicePeriods.extendedEndsAt(oldEnd.toLocalDate(), today.minusDays(5), 1).toLocalDate();
+        assertEquals(expected.atStartOfDay(), added.getEndsAt());
+        assertEquals(today.minusDays(5), added.getBillingAnchorDate());
+        assertEquals(5, added.getPurchasedSeats());
+        assertEquals(OrderStatus.ORD_APPLIED, status(order));
+
+        SubscriptionChangeDTO change = payments.changes.get(0);
+        assertEquals(OrderPurpose.PP_RENEW, change.getChangeType());
+        assertEquals(oldEnd, change.getBeforeEndsAt());
+        assertEquals(added.getEndsAt(), change.getAfterEndsAt());
+        assertEquals(5, change.getBeforeSeats());
+        assertEquals(5, change.getAfterSeats());
+    }
+
+    @Test
+    @DisplayName("연장한 뒤 이용 결제 화면의 만료일은 새 기간의 끝이고, 또 연장할 수 있다")
+    void billingAfterRenew() {
+        LocalDate anchor = LocalDate.now(SEOUL).minusDays(5);
+        paidPeriod("MONTHLY", 5, 10, anchor);
+        payAt(planOrder("MONTHLY", 5, 20_000L), LocalDateTime.now(SEOUL));
+        LocalDateTime firstEnd = subs.periods.get(subs.periods.size() - 1).getEndsAt();
+
+        BillingDTO billing = service.getBilling(admin());
+        assertEquals("PAID", billing.getStatus());
+        assertEquals(ServicePeriods.lastDay(firstEnd).atStartOfDay().toString(), billing.getEnd());
+        assertEquals("EXTEND", billing.getMode());
+        assertTrue(billing.isCanPay());
+
+        QuoteDTO next = service.quote(admin(), "MONTHLY", 5);
+        assertEquals(firstEnd.toLocalDate().atStartOfDay().toString(), next.getFrom());
+
+        payAt(planOrder("MONTHLY", 5, 20_000L), LocalDateTime.now(SEOUL));
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(firstEnd, added.getStartsAt());
+        assertEquals(anchor, added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("기준일이 31일이면 말일로 맞춘 달 다음에는 31일로 돌아온다(요구분석서 3.6)")
+    void renewKeepsAnchorDay() {
+        LocalDate anchor = LocalDate.of(2026, 1, 31);
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, anchor);
+
+        payAt(planOrder("MONTHLY", 5, 20_000L), LocalDateTime.now(SEOUL));
+
+        YearMonth month = YearMonth.from(now.getEndsAt()).plusMonths(1);
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(month.atEndOfMonth().atStartOfDay(), added.getEndsAt());
+    }
+
+    @Test
+    @DisplayName("연간 연장은 총 20% 할인이고 지금 만료일에 1년을 이어 붙인다")
+    void annualRenew() {
+        LocalDate anchor = LocalDate.now(SEOUL).minusDays(5);
+        ServicePeriodDTO now = paidPeriod("ANNUAL", 10, 30, anchor);
+
+        QuoteDTO quote = service.quote(admin(), "ANNUAL", 10);
+        assertEquals(384_000L, quote.getAmount());
+        assertEquals(20, quote.getPct());
+        assertEquals("10명 × 4,000원 × 12개월 × 80%", quote.getFormula());
+        assertEquals("EXTEND", quote.getMode());
+
+        BillingPaymentDTO paid = payAt(planOrder("ANNUAL", 10, 384_000L), LocalDateTime.now(SEOUL));
+
+        assertEquals(20, paid.getPct());
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(now.getEndsAt(), added.getStartsAt());
+        assertEquals(ServicePeriods.extendedEndsAt(now.getEndsAt().toLocalDate(), anchor, 12), added.getEndsAt());
+    }
+
+    @Test
+    @DisplayName("연장은 지금 요금제·지금 인원만 받는다(SUB-05·07은 이번 제외)")
+    void renewSamePlanAndSeats() {
+        paidPeriod("MONTHLY", 5, 10, LocalDate.now(SEOUL));
+
+        assertRejected(409, () -> service.quote(admin(), "ANNUAL", 5));
+        assertRejected(409, () -> service.quote(admin(), "MONTHLY", 6));
+        assertRejected(409, () -> planOrder("ANNUAL", 5, 192_000L));
+        assertRejected(409, () -> planOrder("MONTHLY", 6, 24_000L));
+        assertTrue(payments.orders.isEmpty());
+
+        List<BillingPlanDTO> plans = service.getBilling(admin()).getPlans();
+        assertEquals(1, plans.size());
+        assertEquals("MONTHLY", plans.get(0).getPlan());
+    }
+
+    @Test
+    @DisplayName("연간 연장 화면은 연간만 20% 금액으로 준다")
+    void plansOnAnnualRenew() {
+        paidPeriod("ANNUAL", 5, 10, LocalDate.now(SEOUL));
+
+        BillingDTO billing = service.getBilling(admin());
+
+        assertEquals("ANNUAL", billing.getPlan());
+        assertEquals(1, billing.getPlans().size());
+        assertEquals("ANNUAL", billing.getPlans().get(0).getPlan());
+        assertEquals(20, billing.getPlans().get(0).getPct());
+        assertEquals(38_400L, billing.getPlans().get(0).getAmountPerUser());
+    }
+
+    @Test
+    @DisplayName("유료가 끝난 업체는 결제할 수 없다(만료 후 재구매는 이번 제외)")
+    void noPayAfterPaidExpired() {
+        paidPeriod("MONTHLY", 5, -1, LocalDate.now(SEOUL));
+        subs.periods.remove(0); // 체험 기간이 더 늦게 끝나면 체험으로 고른다
+
+        BillingDTO billing = service.getBilling(admin());
+        assertEquals("EXPIRED", billing.getStatus());
+        assertFalse(billing.isCanPay());
+        assertNull(billing.getMode());
+        assertTrue(billing.getPlans().isEmpty());
+        assertRejected(409, () -> service.quote(admin(), "MONTHLY", 5));
+        assertRejected(409, () -> planOrder("MONTHLY", 5, 20_000L));
+    }
+
+    @Test
+    @DisplayName("같은 연장 주문을 두 번 확인해도 기간은 한 번만 더한다")
+    void renewConfirmTwice() {
+        paidPeriod("MONTHLY", 5, 10, LocalDate.now(SEOUL));
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        payAt(order, LocalDateTime.now(SEOUL));
+        int count = subs.periods.size();
+
+        confirm(order);
+
+        assertEquals(count, subs.periods.size());
+        assertEquals(1, toss.confirmCalls);
+    }
+
+    @Test
+    @DisplayName("주문 뒤 만료되고 나서 승인되면 승인 시각부터 다시 세고 기준일도 새로 잡는다")
+    void renewApprovedAfterExpiry() {
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, LocalDate.of(2026, 1, 31));
+        subs.periods.remove(0);
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        now.setEndsAt(LocalDateTime.now(SEOUL).minusHours(1));
+
+        LocalDateTime approvedAt = LocalDateTime.now(SEOUL).withNano(0);
+        payAt(order, approvedAt);
+
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(approvedAt, added.getStartsAt());
+        assertEquals(approvedAt.toLocalDate().plusMonths(1).atStartOfDay(), added.getEndsAt());
+        assertEquals(approvedAt.toLocalDate(), added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("유료가 끝나고 체험이 더 남은 업체의 늦은 승인은 체험 만료일이 아니라 승인 시각부터 센다")
+    void renewApprovedWhileOnlyTrialLeft() {
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, LocalDate.of(2026, 1, 31));
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        now.setEndsAt(LocalDateTime.now(SEOUL).minusHours(1));
+        now.setStartsAt(now.getEndsAt().minusMonths(1));
+
+        LocalDateTime approvedAt = LocalDateTime.now(SEOUL).withNano(0);
+        payAt(order, approvedAt);
+
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(approvedAt, added.getStartsAt());
+        assertEquals(approvedAt.toLocalDate(), added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("유료 만료 전에 승인됐으면 체험이 더 남아 있어도 유료 만료 시각에 이어 붙인다")
+    void renewApprovedBeforePaidEndWhileTrialLeft() {
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, LocalDate.of(2026, 1, 15));
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        LocalDateTime end = LocalDateTime.now(SEOUL).minusHours(1).withNano(0);
+        now.setEndsAt(end);
+        now.setStartsAt(end.minusMonths(1));
+
+        payAt(order, end.minusMinutes(1));
+
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(end, added.getStartsAt());
+        assertEquals(LocalDate.of(2026, 1, 15), added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("이미 유료인 업체에 첫 결제 주문이 승인만 된 채 남아 있어도 연장은 막지 않는다")
+    void stuckFirstOrderDoesNotBlockRenew() {
+        LocalDateTime at = LocalDateTime.now(SEOUL);
+        OrderResultDTO first = order(3);
+        PaymentOrderDTO firstRead = payments.getOrder(COMPANY, first.getOrderNo());
+        OrderResultDTO second = order(5);
+        PaymentOrderDTO secondRead = payments.getOrder(COMPANY, second.getOrderNo());
+        PaymentRecordService record = new PaymentRecordService(payments, subs);
+        TossPaymentDTO secondPaid = done(second.getOrderNo(), 20_000L, offset(at));
+        secondPaid.setPaymentKey("pay_key_2");
+        record.recordApproval(firstRead, done(first.getOrderNo(), 12_000L, offset(at)));
+        record.recordApproval(secondRead, secondPaid);
+        record.applyOrder(firstRead);
+
+        OrderResultDTO renew = planOrder("MONTHLY", 3, 12_000L);
+        TossPaymentDTO renewPaid = done(renew.getOrderNo(), 12_000L, offset(at));
+        renewPaid.setPaymentKey("pay_key_3");
+        toss.confirmAnswer = renewPaid;
+        confirm(renew);
+
+        assertEquals(OrderStatus.ORD_APPLIED, status(renew));
+        assertEquals(OrderStatus.ORD_CONFIRMED, status(second));
+        assertEquals(2, paidPeriods());
+    }
+
+    @Test
+    @DisplayName("만료 전에 승인됐으면 반영이 만료 뒤라도 만료 시각에 이어 붙인다")
+    void renewApprovedBeforeExpiryAppliedAfter() {
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, LocalDate.of(2026, 1, 15));
+        subs.periods.remove(0);
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        LocalDateTime end = LocalDateTime.now(SEOUL).minusHours(1).withNano(0);
+        now.setEndsAt(end);
+
+        payAt(order, end.minusMinutes(1));
+
+        ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(end, added.getStartsAt());
+        assertEquals(LocalDate.of(2026, 1, 15), added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("연장 두 건이 모두 승인되면 겹치지 않게 차례로 이어 붙인다. 둘 다 돈을 냈으니 둘 다 기간을 준다")
+    void twoRenewalsBothApproved() {
+        LocalDate anchor = LocalDate.now(SEOUL).minusDays(5);
+        ServicePeriodDTO now = paidPeriod("MONTHLY", 5, 10, anchor);
+        OrderResultDTO first = planOrder("MONTHLY", 5, 20_000L);
+        PaymentOrderDTO firstRead = payments.getOrder(COMPANY, first.getOrderNo());
+        OrderResultDTO second = planOrder("MONTHLY", 5, 20_000L);
+        PaymentOrderDTO secondRead = payments.getOrder(COMPANY, second.getOrderNo());
+        PaymentRecordService record = new PaymentRecordService(payments, subs);
+        String at = offset(LocalDateTime.now(SEOUL));
+        TossPaymentDTO secondPaid = done(second.getOrderNo(), 20_000L, at);
+        secondPaid.setPaymentKey("pay_key_2");
+        record.recordApproval(firstRead, done(first.getOrderNo(), 20_000L, at));
+        record.recordApproval(secondRead, secondPaid);
+
+        record.applyOrder(firstRead);
+        record.applyOrder(secondRead);
+
+        ServicePeriodDTO a = subs.periods.get(subs.periods.size() - 2);
+        ServicePeriodDTO b = subs.periods.get(subs.periods.size() - 1);
+        assertEquals(now.getEndsAt(), a.getStartsAt());
+        assertEquals(a.getEndsAt(), b.getStartsAt());
+        assertEquals(OrderStatus.ORD_APPLIED, status(first));
+        assertEquals(OrderStatus.ORD_APPLIED, status(second));
+    }
+
+    @Test
+    @DisplayName("연장은 인원이 그대로라 사용 중 계정 수와 비교하지 않는다")
+    void renewIgnoresAccountCount() {
+        paidPeriod("MONTHLY", 5, 10, LocalDate.now(SEOUL));
+        employees.active = 7;
+
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        payAt(order, LocalDateTime.now(SEOUL));
+
+        assertEquals(OrderStatus.ORD_APPLIED, status(order));
+    }
+
+    @Test
+    @DisplayName("승인만 기록된 연장 주문이 있으면 새 주문 전에 그것을 먼저 반영한다")
+    void stuckRenewIsApplied() {
+        paidPeriod("MONTHLY", 5, 10, LocalDate.now(SEOUL));
+        OrderResultDTO order = planOrder("MONTHLY", 5, 20_000L);
+        PaymentOrderDTO read = payments.getOrder(COMPANY, order.getOrderNo());
+        new PaymentRecordService(payments, subs).recordApproval(read,
+                done(order.getOrderNo(), 20_000L, offset(LocalDateTime.now(SEOUL))));
+        int count = subs.periods.size();
+
+        assertRejected(409, () -> planOrder("MONTHLY", 5, 20_000L));
+
+        assertEquals(count + 1, subs.periods.size());
+        assertEquals(OrderStatus.ORD_APPLIED, status(order));
     }
 }

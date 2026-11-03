@@ -21,7 +21,7 @@
       <div class="table-wrap table-gap">
         <table class="table table-fixed">
           <colgroup><col style="width: 24%"><col style="width: 18%"><col style="width: 12%"><col style="width: 16%"><col style="width: 14%"><col style="width: 16%"></colgroup>
-          <thead><tr><th>업체</th><th>관리자</th><th class="num">이용 인원</th><th class="num">월 이용료</th><th>상태</th><th>가입일</th></tr></thead>
+          <thead><tr><th>업체</th><th>관리자</th><th class="num">이용 인원</th><th class="num">월 기준 이용료</th><th>상태</th><th>가입일</th></tr></thead>
           <tbody id="firmList"></tbody>
         </table>
       </div>

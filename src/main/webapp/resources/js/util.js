@@ -14,6 +14,21 @@ const won = n => `${n.toLocaleString('ko-KR')}원`;
 function showToast(text) {
   if (window.IEUM && IEUM.toast) IEUM.toast(text);
 }
+// 안내를 남기고 다른 화면으로 옮긴다. 옮기면 이 화면의 알림은 바로 사라지므로, 다음 화면이 열리며 한 번 띄운다
+const NEXT_TOAST_KEY = 'ieum-next-toast';
+function toastAndGo(text, href) {
+  try { sessionStorage.setItem(NEXT_TOAST_KEY, JSON.stringify({ text, at: Date.now() })); } catch { /* 저장소가 막혔으면 안내 없이 옮긴다 */ }
+  location.href = href;
+}
+// util.js 는 레이아웃의 알림 칸과 common.js 다음에 불리므로 여기서 바로 띄울 수 있다.
+// 알림 칸이 없는 화면(계정 생성 join.jsp)은 다음 화면에 넘기고, 로그인 화면을 거치는 등 30초가 지나 열리면 버린다
+try {
+  const next = JSON.parse(sessionStorage.getItem(NEXT_TOAST_KEY));
+  if (next && document.getElementById('toast')) {
+    sessionStorage.removeItem(NEXT_TOAST_KEY);
+    if (Date.now() - next.at < 30000) showToast(next.text);
+  }
+} catch { /* 저장소가 막혔다 */ }
 
 // ---------- 화면 만들기 도구 (여러 모듈의 화면 JS가 같이 쓴다) ----------
 // h(태그, class, ...자식): 요소를 만든다. 글자는 textContent로 들어가므로 사용자가 쓴 글도 그대로 넣어도 된다
@@ -80,6 +95,14 @@ function pickSelect(label, first, options, selected) {
 }
 // 자산 한 줄 이름: '노트북 1 (SN-123)'. 제조 일련번호(serial)가 없으면 이름만
 const assetLabel = a => (a.serial ? `${a.name} (${a.serial})` : a.name);
+// 공통 코드 이름표: 키는 공통 코드(common.code enum) 그대로. 티켓 화면(내 티켓·내 장비·티켓 처리)이 같이 쓴다
+const TICKET_TYPE = { TK_INCIDENT: '장애', TK_QUESTION: '문의', TK_EQUIPMENT: '장비 지급' };
+// 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려. TICKET_CLASS 는 상태 배지 색(status-*)
+const TICKET_STATUS = { RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려' };
+const TICKET_CLASS = { RECEIVED: 'requested', ASSIGNED: 'requested', IN_PROGRESS: 'waiting', RESOLVED: 'paid', CLOSED: 'paid', CANCELED: 'expired', REJECTED: 'failed' };
+const ASSET_TYPE = { AT_LAPTOP: '노트북', AT_DESKTOP: '데스크톱', AT_MONITOR: '모니터', AT_OTHER: '기타 장비', AT_PRINTER: '프린터', AT_NETWORK: '네트워크 장비', AT_TABLET: '태블릿', AT_PHONE: '업무용 전화' };
+// 장비 종류 이름. 이름표에 없는 값은 받은 그대로 보인다
+const assetTypeName = k => ASSET_TYPE[k] || k;
 // 이력·댓글 목록 (bill-history). rows 는 한 줄에 넣을 요소(또는 그 목록)
 const historyList = (rows, emptyText) =>
   h('ul', 'bill-history', ...(rows.length ? rows.map(r => h('li', '', ...[].concat(r))) : [h('li', '', span(emptyText, 'muted'))]));

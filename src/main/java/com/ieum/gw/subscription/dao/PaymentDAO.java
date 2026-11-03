@@ -26,6 +26,11 @@ public class PaymentDAO {
         return mapper.getMonthlyPlan();
     }
 
+    /** 쓰는 중인 연간 요금제. 없으면 null */
+    public SubscriptionPlanDTO getYearlyPlan() {
+        return mapper.getYearlyPlan();
+    }
+
     /** 주문 1행 기록. 성공하면 dto.paymentOrderId에 새 번호 */
     public int insertOrder(PaymentOrderDTO dto) {
         return mapper.insertOrder(dto);

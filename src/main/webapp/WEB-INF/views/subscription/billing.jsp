@@ -41,8 +41,7 @@
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
             <div><h2 id="billPayTitle">결제</h2><p id="billHint"></p></div>
           </header>
-          <%-- 자동 결제 없이 관리자가 직접 결제한다(SUB-03). 이번 범위는 체험 중·체험 만료 업체의 첫 결제(월간)뿐이다.
-               연간·연장은 '핵심 뒤 추가'에서 서버와 같이 연다(요구분석서 3장 범위 표).
+          <%-- 자동 결제 없이 관리자가 직접 결제한다(SUB-03). 체험 중·체험 만료 업체의 첫 결제(월간·연간)와 유료 이용 중 연장이다.
                1. 요금제 선택 → 2. 결제(토스 결제창) → 3. 결제 완료. 서버가 승인을 확인하면 운영자 승인 없이 바로 반영한다(PAY-02) --%>
           <div class="bill-pay" id="billPay">
             <ol class="bill-steps" id="billSteps">
@@ -52,14 +51,9 @@
             </ol>
             <%-- 1. 요금제 선택: 월간·연간과 (첫 결제일 때) 인원 --%>
             <div class="bill-step" id="billStep1">
-              <fieldset class="plan-pick">
+              <%-- 고를 수 있는 요금제는 서버가 준 목록으로 billing.js가 그린다 --%>
+              <fieldset class="plan-pick" id="planPick">
                 <legend>요금제</legend>
-                <label class="plan-opt">
-                  <input type="radio" name="payPlan" value="MONTHLY" checked>
-                  <span class="plan-opt-name">월간</span>
-                  <span class="plan-opt-price" id="planPriceMONTHLY"></span>
-                  <span class="plan-opt-note">1개월 · 할인 없음</span>
-                </label>
               </fieldset>
               <div class="bill-seats" id="payUsersBox">
                 <label for="payUsers">이용 인원</label>

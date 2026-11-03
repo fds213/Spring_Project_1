@@ -467,7 +467,7 @@ byId('btnDelete')?.addEventListener('click', async () => {
   btn.disabled = true;
   // 권한·읽기 전용은 서버가 다시 확인한다
   api.post(`/board/api/notices/${n.id}/delete`)
-    .done(() => { toast('공지를 삭제했습니다'); location.href = pageHref('/board/notice'); })
+    .done(() => toastAndGo('공지를 삭제했습니다', pageHref('/board/notice')))
     .fail(failTo(pageHref('/board/notice')))
     .always(() => { btn.disabled = false; });
 });
@@ -868,9 +868,8 @@ byId('noticeForm')?.addEventListener('submit', e => {
   setSaving('btnSave', true, '저장');
   (editing ? api.post(`/board/api/notices/${editing}`, body) : api.post('/board/api/notices', body))
     .done(r => {
-      toast(editing ? '공지를 수정했습니다' : '공지를 등록했습니다');
       if (!editing) { listState.page = 1; listState.q = ''; listState.tab = 'all'; }
-      location.href = pageHref(`/board/notice/view/${r.id}`);
+      toastAndGo(editing ? '공지를 수정했습니다' : '공지를 등록했습니다', pageHref(`/board/notice/view/${r.id}`));
     })
     .fail(xhr => {
       formState.saving = false;
@@ -998,7 +997,7 @@ byId('bBtnDelete')?.addEventListener('click', async () => {
   const btn = byId('bBtnDelete');
   btn.disabled = true;
   api.post(`/board/api/dept/posts/${p.id}/delete`)
-    .done(() => { toast('게시글을 삭제했습니다'); location.href = pageHref('/board/dept'); })
+    .done(() => toastAndGo('게시글을 삭제했습니다', pageHref('/board/dept')))
     .fail(failTo(pageHref('/board/dept')))
     .always(() => { btn.disabled = false; });
 });
@@ -1065,9 +1064,8 @@ byId('bForm')?.addEventListener('submit', e => {
   setSaving('bBtnSave', true, '저장');
   (editing ? api.post(`/board/api/dept/posts/${editing}`, body) : api.post('/board/api/dept/posts', body))
     .done(r => {
-      toast(editing ? '글을 수정했습니다' : '글을 등록했습니다');
       if (!editing) { boardState.page = 1; boardState.q = ''; }
-      location.href = pageHref(`/board/dept/view/${r.id}`);
+      toastAndGo(editing ? '글을 수정했습니다' : '글을 등록했습니다', pageHref(`/board/dept/view/${r.id}`));
     })
     .fail(xhr => {
       boardFormState.saving = false;

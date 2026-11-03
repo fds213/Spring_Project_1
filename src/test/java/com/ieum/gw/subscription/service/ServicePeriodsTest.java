@@ -14,6 +14,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -30,6 +31,79 @@ class ServicePeriodsTest {
         p.setEndsAt(at(endsAt));
         p.setPurchasedSeats(seats);
         return p;
+    }
+
+    @Test
+    @DisplayName("연장 만료일: 기준일이 없는 달은 말일로 맞추고 다음 달에는 기준일로 돌아온다")
+    void extendedEndsAtKeepsAnchorDay() {
+        LocalDate anchor = LocalDate.of(2027, 1, 31);
+        assertEquals(at("2027-03-31T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2027, 2, 28), anchor, 1));
+        assertEquals(at("2027-04-30T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2027, 3, 31), anchor, 1));
+        assertEquals(at("2027-05-31T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2027, 4, 30), anchor, 1));
+        assertEquals(at("2028-02-29T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2027, 2, 28), anchor, 12));
+    }
+
+    @Test
+    @DisplayName("연장 만료일: 2/29 기준 연간은 평년에 2/28이고 윤년에 2/29로 돌아온다")
+    void extendedEndsAtLeapDay() {
+        LocalDate anchor = LocalDate.of(2028, 2, 29);
+        assertEquals(at("2030-02-28T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2029, 2, 28), anchor, 12));
+        assertEquals(at("2032-02-29T00:00"), ServicePeriods.extendedEndsAt(LocalDate.of(2031, 2, 28), anchor, 12));
+    }
+
+    @Test
+    @DisplayName("바로 이어지는 유료 기간이 있으면 그 끝까지를 만료로 본다. 원본은 바꾸지 않는다")
+    void pickThroughRenewals() {
+        ServicePeriodDTO first = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5);
+        ServicePeriodDTO second = period(false, "2026-12-02T00:00", "2027-01-02T00:00", 5);
+        ServicePeriodDTO third = period(false, "2027-01-02T00:00", "2027-02-02T00:00", 5);
+        first.setBillingAnchorDate(LocalDate.of(2026, 11, 2));
+        first.setPlan("MONTHLY");
+
+        ServicePeriodDTO picked = ServicePeriods.pick(List.of(third, first, second), at("2026-11-20T10:00"));
+
+        assertEquals(at("2027-02-02T00:00"), picked.getEndsAt());
+        assertEquals(at("2026-11-02T14:00"), picked.getStartsAt());
+        assertEquals(5, picked.getPurchasedSeats());
+        assertEquals(LocalDate.of(2026, 11, 2), picked.getBillingAnchorDate());
+        assertEquals("MONTHLY", picked.getPlan());
+        assertEquals(at("2026-12-02T00:00"), first.getEndsAt());
+    }
+
+    @Test
+    @DisplayName("연장해 뒀으면 앞 기간의 마지막 날에도 유료이고, 경계에서 끊기지 않는다")
+    void renewalBoundary() {
+        List<ServicePeriodDTO> periods = List.of(
+                period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5),
+                period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5),
+                period(false, "2026-12-02T00:00", "2027-01-02T00:00", 5));
+
+        for (String now : List.of("2026-12-01T23:59:59", "2026-12-02T00:00", "2027-01-01T23:59:59")) {
+            ServicePeriodDTO picked = ServicePeriods.pick(periods, at(now));
+            assertEquals("PAID", ServicePeriods.statusOf(picked, at(now)), now);
+            assertEquals(at("2027-01-02T00:00"), picked.getEndsAt(), now);
+            assertFalse(ServicePeriods.toUsage(picked, null, at(now)).isExpired(), now);
+        }
+        assertEquals("2027.01.01", ServicePeriods.toBilling(ServicePeriods.pick(periods, at("2026-11-20T10:00")),
+                at("2026-11-20T10:00")).getEndDate());
+        assertEquals(42L, ServicePeriods.daysLeft(ServicePeriods.pick(periods, at("2026-11-20T10:00")), at("2026-11-20T10:00")));
+
+        ServicePeriodDTO after = ServicePeriods.pick(periods, at("2027-01-02T00:00"));
+        assertEquals("EXPIRED", ServicePeriods.statusOf(after, at("2027-01-02T00:00")));
+    }
+
+    @Test
+    @DisplayName("끊어진 기간은 잇지 않고, 체험은 늘리지 않으며, 연장이 없으면 그 기간 그대로다")
+    void pickDoesNotChain() {
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5);
+        ServicePeriodDTO later = period(false, "2026-12-05T10:00", "2027-01-05T00:00", 5);
+        assertSame(paid, ServicePeriods.pick(List.of(paid, later), at("2026-11-20T10:00")));
+
+        ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
+        ServicePeriodDTO afterTrial = period(false, "2026-11-13T00:00", "2026-12-13T00:00", 5);
+        assertSame(trial, ServicePeriods.pick(List.of(trial, afterTrial), at("2026-11-01T10:00")));
+
+        assertSame(paid, ServicePeriods.pick(List.of(paid), at("2026-11-20T10:00")));
     }
 
     @Test
@@ -167,5 +241,48 @@ class ServicePeriodsTest {
         assertEquals(0, using.getDaysLeft());
 
         assertEquals("EXPIRED", ServicePeriods.toBilling(paid, at("2026-12-02T00:00")).getStatus());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 체험 중 결제하면 유료 기간을 보고, 체험 마지막 날은 그대로 남는다")
+    void companyPeriodPaidOverTrial() {
+        CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(List.of(
+                period(true, "2026-11-01T09:00", "2026-11-15T00:00", 5),
+                period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12)), at("2026-11-03T12:00"));
+        assertEquals("PAID", summary.getStatus());
+        assertTrue(summary.isPaid());
+        assertEquals(12, summary.getSeats());
+        assertEquals(LocalDate.parse("2026-11-02"), summary.getFirstDay());
+        assertEquals(LocalDate.parse("2026-12-01"), summary.getLastDay());
+        assertEquals(28, summary.getDaysLeft());
+        assertEquals(LocalDate.parse("2026-11-14"), summary.getTrialLastDay());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 연장한 업체는 요금제와 연장분까지의 마지막 날·남은 일수를 준다")
+    void companyPeriodThroughRenewal() {
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5);
+        paid.setPlan("ANNUAL");
+        ServicePeriodDTO renewed = period(false, "2026-12-02T00:00", "2027-01-02T00:00", 5);
+        renewed.setPlan("ANNUAL");
+
+        CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(
+                List.of(period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5), paid, renewed), at("2026-11-20T10:00"));
+
+        assertEquals("PAID", summary.getStatus());
+        assertEquals("ANNUAL", summary.getPlan());
+        assertEquals(LocalDate.parse("2027-01-01"), summary.getLastDay());
+        assertEquals(42, summary.getDaysLeft());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 끝난 체험은 만료이고 유료가 아니다. 기간이 없으면 null이다")
+    void companyPeriodExpiredTrial() {
+        CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(
+                List.of(period(true, "2026-10-01T09:00", "2026-10-15T00:00", 5)), at("2026-11-03T12:00"));
+        assertEquals("EXPIRED", summary.getStatus());
+        assertFalse(summary.isPaid());
+        assertEquals(0, summary.getDaysLeft());
+        assertNull(ServicePeriods.toCompanyPeriod(List.of(), at("2026-11-03T12:00")));
     }
 }

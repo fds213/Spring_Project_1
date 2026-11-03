@@ -18,6 +18,8 @@ public interface PaymentMapper {
 
     SubscriptionPlanDTO getMonthlyPlan();
 
+    SubscriptionPlanDTO getYearlyPlan();
+
     int insertOrder(PaymentOrderDTO dto);
 
     PaymentOrderDTO getOrder(@Param("companyId") Long companyId, @Param("orderNo") String orderNo);

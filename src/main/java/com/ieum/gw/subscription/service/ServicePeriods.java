@@ -2,11 +2,15 @@ package com.ieum.gw.subscription.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -40,6 +44,17 @@ final class ServicePeriods {
         return approvedDate.plusMonths(months).atStartOfDay();
     }
 
+    /**
+     * 연장한 기간의 만료 시각. 지금 만료일에 달력 개월 수를 더하되, 날짜는 최초 기준일에 맞춘다: 그 달에 기준일이 없으면 말일이고
+     * 다음 달에는 기준일로 돌아온다(요구분석서 3.6). 예: 1/31 시작 → 2/28 만료 → 연장 3/31 만료 → 연장 4/30 만료.
+     *
+     * @param from 지금 만료일(새 기간이 시작하는 날)
+     */
+    static LocalDateTime extendedEndsAt(LocalDate from, LocalDate anchor, int months) {
+        YearMonth month = YearMonth.from(from).plusMonths(months);
+        return month.atDay(Math.min(anchor.getDayOfMonth(), month.lengthOfMonth())).atStartOfDay();
+    }
+
     /** 마지막으로 쓰는 날. 만료 시각이 0시이므로 그 전날이다 */
     static LocalDate lastDay(LocalDateTime endsAt) {
         return endsAt.minusNanos(1).toLocalDate();
@@ -48,6 +63,8 @@ final class ServicePeriods {
     /**
      * 지금 기간(시작 ≤ now < 만료)을 고른다. 겹치면 나중에 시작한 것이다(체험 중 결제하면 유료 기간이 체험 기간 위에 생긴다, PAY-02).
      * 지금 기간이 없으면 이미 끝난 기간 중 가장 늦게 끝난 것, 그것도 없으면 null.
+     * 연장은 새 기간 행을 만드므로, 지금 기간에 바로 이어지는 유료 기간이 있으면 그 끝까지를 endsAt으로 돌려준다(SUB-03).
+     * 그래서 만료 여부·마지막 날·남은 일수는 이 값으로 계산하면 연장분까지 맞다.
      */
     static ServicePeriodDTO pick(List<ServicePeriodDTO> periods, LocalDateTime now) {
         ServicePeriodDTO current = null;
@@ -63,10 +80,37 @@ final class ServicePeriods {
                 }
             }
         }
-        return current != null ? current : last;
+        return current != null ? throughRenewals(current, periods) : last;
     }
 
-    // TODO(최준원): 만료 전 연장(SUB-03, 핵심 뒤 추가)을 만들 때 바로 이어지는 기간의 끝까지 endsAt으로 본다
+    // 지금 기간에 바로 이어지는 유료 기간의 끝까지 늘린 사본. 이어지는 기간이 없으면 지금 기간 그대로다
+    private static ServicePeriodDTO throughRenewals(ServicePeriodDTO current, List<ServicePeriodDTO> periods) {
+        if (current.isTrial()) {
+            return current;
+        }
+        LocalDateTime end = current.getEndsAt();
+        List<ServicePeriodDTO> byStart = new ArrayList<>(periods);
+        byStart.sort(Comparator.comparing(ServicePeriodDTO::getStartsAt));
+        for (ServicePeriodDTO p : byStart) {
+            if (!p.isTrial() && !p.getStartsAt().isAfter(end) && p.getEndsAt().isAfter(end)) {
+                end = p.getEndsAt();
+            }
+        }
+        if (end.equals(current.getEndsAt())) {
+            return current;
+        }
+        ServicePeriodDTO through = new ServicePeriodDTO();
+        through.setServicePeriodId(current.getServicePeriodId());
+        through.setCompanyId(current.getCompanyId());
+        through.setTrial(false);
+        through.setStartsAt(current.getStartsAt());
+        through.setEndsAt(end);
+        through.setPurchasedSeats(current.getPurchasedSeats());
+        through.setBillingAnchorDate(current.getBillingAnchorDate());
+        through.setPlan(current.getPlan());
+        return through;
+    }
+
     static CompanyUsageDTO toUsage(ServicePeriodDTO period, LocalDateTime emailVerifiedAt, LocalDateTime now) {
         CompanyUsageDTO usage = new CompanyUsageDTO();
         usage.setTrial(period.isTrial());
@@ -95,6 +139,28 @@ final class ServicePeriods {
         billing.setEndDate(lastDay(period.getEndsAt()).format(HEADER_DATE));
         billing.setDaysLeft(daysLeft(period, now));
         return billing;
+    }
+
+    /** 운영자 화면의 이용 기간 요약. 이용 기간이 하나도 없으면 null */
+    static CompanyPeriodDTO toCompanyPeriod(List<ServicePeriodDTO> periods, LocalDateTime now) {
+        ServicePeriodDTO period = pick(periods, now);
+        if (period == null) {
+            return null;
+        }
+        CompanyPeriodDTO summary = new CompanyPeriodDTO();
+        summary.setStatus(statusOf(period, now));
+        summary.setPaid(!period.isTrial());
+        summary.setPlan(period.getPlan());
+        summary.setSeats(period.getPurchasedSeats());
+        summary.setFirstDay(period.getStartsAt().toLocalDate());
+        summary.setLastDay(lastDay(period.getEndsAt()));
+        summary.setDaysLeft(daysLeft(period, now));
+        for (ServicePeriodDTO p : periods) {
+            if (p.isTrial()) {
+                summary.setTrialLastDay(lastDay(p.getEndsAt()));
+            }
+        }
+        return summary;
     }
 
     static int seatLimitOf(ServicePeriodDTO period) {

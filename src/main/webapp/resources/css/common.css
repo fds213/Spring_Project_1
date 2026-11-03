@@ -334,8 +334,6 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 /* 사원 관리 > 인사 정보 dialog: 고용 형태 · 재직 상태 · 성별 */
 .hr-info-fields { display: grid; gap: 12px; margin: 4px 0 8px; }
 .org-table td:first-child { width: 96px; }
-.status-requested, .status-approved { background: var(--accent-bg); color: var(--accent); }
-.status-waiting { background: #fff4e5; color: #8a4b08; }
 
 .tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--text-sub); }
 .tabs span { padding-bottom: 9px; cursor: pointer; }
@@ -354,14 +352,17 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 /* 상태 코드: class status-<소문자 코드>, 글자는 서버가 준다 (가이드 9장) */
 .status { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--bg-sub); color: var(--text-sub); white-space: nowrap; }
 .status-paid { background: #e5f4e4; color: #2b6a2f; }
-.status-failed { background: var(--danger-bg); color: var(--danger); }
+.status-failed, .status-st_suspended { background: var(--danger-bg); color: var(--danger); }
 .status-trial { background: var(--accent-bg); color: var(--accent); }
 .status-expired { background: #fff4e5; color: #8a4b08; }
 .status-pending { background: #fff4e5; color: #8a4b08; }
-.status-active, .status-st_active { background: #e5f4e4; color: #2b6a2f; }
+/* 진행 상태 칩(티켓 접수·배정·처리 중, 결재 승인, 계정 승인 대기). .status 보다 뒤에 있어야 색이 먹는다 */
+.status-requested, .status-approved { background: var(--accent-bg); color: var(--accent); }
+.status-waiting { background: #fff4e5; color: #8a4b08; }
+.status-active { background: #e5f4e4; color: #2b6a2f; }
 .status-read { background: #e5f4e4; color: #2b6a2f; }
 .status-rejected, .status-canceled, .status-approval_expired { background: var(--danger-bg); color: var(--danger); }
-.status-retired, .status-st_inactive, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
+.status-retired, .status-spam { background: var(--bg-sub); color: var(--text-muted); }
 /* 사원 관리: 비활성 계정 줄은 흐리게 (관리 버튼은 그대로 또렷하게) */
 .table tr.is-inactive td:not([data-label="관리"]) { color: var(--text-sub); opacity: 0.7; }
 
