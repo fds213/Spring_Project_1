@@ -1,4 +1,4 @@
-﻿-- 개발 DB 초기화 전용. 지정한 프로젝트 테이블 81개·시퀀스 65개와 데이터가 삭제된다.
+-- 개발 DB 초기화 전용. 지정한 프로젝트 테이블 82개·시퀀스 66개와 데이터가 삭제된다.
 -- 팀 공유 DB에는 실행하지 않는다. 이 파일은 재생성하지 않고 삭제만 한다.
 -- 복구가 필요하면 실행 전에 별도 DB 백업을 확보한다. DDL/PURGE는 ROLLBACK 불가.
 SET DEFINE OFF
@@ -37,7 +37,7 @@ BEGIN
            'APPROVAL_FILE', 'POST_FILE', 'TICKET_FILE', 'NOTIFICATION', 'PUBLIC_INQUIRY',
            'PUBLIC_REPLY', 'MAIL_OUTBOX', 'MAIL_ATTEMPT', 'SUPPORT_INQUIRY', 'SUPPORT_REPLY',
            'SUPPORT_GRANT', 'SUPPORT_SCOPE', 'SUPPORT_CONSENT', 'SUPPORT_ACTION', 'ERROR_ARCHIVE',
-           'DATA_PURGE_RUN'
+           'DATA_PURGE_RUN', 'ATTENDANCE_CORRECTION'
        )
        AND (child.OWNER <> USER OR child.TABLE_NAME NOT IN (
            'COMMON_CODE', 'COMPANY', 'DEPARTMENT', 'JOB_GRADE', 'BRANCH',
@@ -56,7 +56,7 @@ BEGIN
            'APPROVAL_FILE', 'POST_FILE', 'TICKET_FILE', 'NOTIFICATION', 'PUBLIC_INQUIRY',
            'PUBLIC_REPLY', 'MAIL_OUTBOX', 'MAIL_ATTEMPT', 'SUPPORT_INQUIRY', 'SUPPORT_REPLY',
            'SUPPORT_GRANT', 'SUPPORT_SCOPE', 'SUPPORT_CONSENT', 'SUPPORT_ACTION', 'ERROR_ARCHIVE',
-           'DATA_PURGE_RUN'
+           'DATA_PURGE_RUN', 'ATTENDANCE_CORRECTION'
        ));
     IF v_external_fk_count > 0 THEN
         RAISE_APPLICATION_ERROR(-20002, '대상 밖 테이블의 참조 FK가 있어 중단한다. 참조 관계를 확인해야 한다.');
@@ -119,6 +119,7 @@ BEGIN
     drop_project_table('ATTENDANCE_EVENT');
     drop_project_table('DEVICE_EMPLOYEE');
     drop_project_table('ATTENDANCE_DEVICE');
+    drop_project_table('ATTENDANCE_CORRECTION');
     drop_project_table('ATTENDANCE');
     drop_project_table('EQUIPMENT_REQUEST');
     drop_project_table('LEAVE_SLOT');
@@ -205,6 +206,7 @@ BEGIN
     drop_project_sequence('SQ_ATTENDANCE_ASSESSMENT');
     drop_project_sequence('SQ_ATTENDANCE_EVENT');
     drop_project_sequence('SQ_ATTENDANCE_DEVICE');
+    drop_project_sequence('SQ_ATTENDANCE_CORRECTION');
     drop_project_sequence('SQ_ATTENDANCE');
     drop_project_sequence('SQ_LEAVE_LEDGER');
     drop_project_sequence('SQ_LEAVE_CYCLE');

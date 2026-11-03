@@ -1,4 +1,4 @@
-﻿-- 기존 팀 DB용 11/02 구조 패치. 테이블/데이터/시퀀스를 삭제하거나 시작 번호를 재설정하지 않는다.
+-- 기존 팀 DB용 11/02 구조 패치. 테이블/데이터/시퀀스를 삭제하거나 시작 번호를 재설정하지 않는다.
 -- 앱 쓰기 작업을 멈추고 IEUM 별도 연결에서 SQL Developer F5 / SQLcl / SQL*Plus로 전체 실행한다.
 -- DDL은 즉시 확정된다. 오류 시 중단하고 오류 원인을 해결한 뒤 재실행한다.
 -- 이미 같은 정의로 존재하는 항목만 건너뛰며, 다른 정의이면 오류로 중단한다.
@@ -191,7 +191,7 @@ BEGIN
 END;
 /
 
--- 4. 프로젝트 시퀀스 65개만 최댓값을 늘린다. NEXTVAL/현재 번호/시작값은 변경하지 않는다.
+-- 4. 프로젝트 시퀀스 65개만 최댓값을 99999로 맞춘다. NEXTVAL/현재 번호/시작값은 변경하지 않는다.
 DECLARE
     v_names SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
         'SQ_COMPANY', 'SQ_DEPARTMENT', 'SQ_JOB_GRADE', 'SQ_BRANCH',
@@ -216,9 +216,11 @@ DECLARE
 BEGIN
     SELECT COUNT(*) INTO v_count FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names));
     IF v_count<>65 THEN RAISE_APPLICATION_ERROR(-20315,'프로젝트 시퀀스 65개를 찾지 못했다. 기존 스키마 상태 확인 필요.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names)) AND LAST_NUMBER>=99999;
+    IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20319,'99999 이상으로 발급될 수 있는 시퀀스가 있어 중단한다. 번호를 초기화하지 말고 확인한다.'); END IF;
     FOR s IN (SELECT SEQUENCE_NAME,MAX_VALUE FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names))) LOOP
-        IF s.MAX_VALUE<9999999999 THEN
-            EXECUTE IMMEDIATE 'ALTER SEQUENCE '||s.SEQUENCE_NAME||' MAXVALUE 9999999999';
+        IF s.MAX_VALUE<>99999 THEN
+            EXECUTE IMMEDIATE 'ALTER SEQUENCE '||s.SEQUENCE_NAME||' MAXVALUE 99999';
         END IF;
     END LOOP;
     DBMS_OUTPUT.PUT_LINE('구조 패치 완료. DDL 변경은 이미 COMMIT됨. 다음으로 11-02_02_DATA_PATCH.sql 실행.');

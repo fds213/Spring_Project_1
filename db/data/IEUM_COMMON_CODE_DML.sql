@@ -1,4 +1,4 @@
--- 2026-11-02: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 224개 INSERT.
+-- 2026-11-02: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 229개 INSERT.
 -- 기존 DB에는 patches/11-02_02_DATA_PATCH.sql을 사용한다. 일부 적재된 DB에 이 파일 전체를 재실행하지 않는다.
 -- 대상: Oracle / COMMON_CODE
 -- 출처: https://docs.google.com/spreadsheets/d/1qBiMeyeUHtTa1W2TPY9VwphQEKBTNFclOThhCXRFbo0/edit
@@ -733,7 +733,19 @@ BEGIN
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('NC_EMAIL', 'NOTIFICATION_CHANNEL', '이메일', '이메일 주소로 전달하는 알림', 'N', 2);
 
-    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 224행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
+    -- CORRECTION_STATUS : 근태 정정 상태 (2026-11-02 추가)
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CORRECTION_STATUS', NULL, '근태 정정 상태', '직원의 근태 정정 요청 처리 상태', 'Y', 0);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_REQUESTED', 'CORRECTION_STATUS', '요청', '직원이 정정을 요청해 처리를 기다리는 상태', 'Y', 1);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_APPROVED', 'CORRECTION_STATUS', '승인', '부서장 또는 업체 관리자가 승인해 근태에 반영한 상태', 'Y', 2);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_REJECTED', 'CORRECTION_STATUS', '반려', '사유와 함께 돌려보낸 상태', 'Y', 3);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_CANCELED', 'CORRECTION_STATUS', '취소', '처리 전에 직원이 직접 취소한 상태', 'Y', 4);
+
+    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 229행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK TO SP_IEUM_COMMON_CODE;
@@ -741,7 +753,7 @@ EXCEPTION
 END;
 /
 
--- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 224)
+-- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 229)
 SELECT COUNT(*) AS TOTAL_COUNT,
        SUM(CASE WHEN USE_YN = 'Y' THEN 1 ELSE 0 END) AS Y_COUNT,
        SUM(CASE WHEN USE_YN = 'N' THEN 1 ELSE 0 END) AS N_COUNT,
