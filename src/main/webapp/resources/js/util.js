@@ -78,6 +78,8 @@ function pickSelect(label, first, options, selected) {
   s.setAttribute('aria-label', label);
   return s;
 }
+// 자산 한 줄 이름: '노트북 1 (SN-123)'. 제조 일련번호(serial)가 없으면 이름만
+const assetLabel = a => (a.serial ? `${a.name} (${a.serial})` : a.name);
 // 이력·댓글 목록 (bill-history). rows 는 한 줄에 넣을 요소(또는 그 목록)
 const historyList = (rows, emptyText) =>
   h('ul', 'bill-history', ...(rows.length ? rows.map(r => h('li', '', ...[].concat(r))) : [h('li', '', span(emptyText, 'muted'))]));
