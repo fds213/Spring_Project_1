@@ -1,7 +1,9 @@
 package com.ieum.gw.subscription.service;
 
 import com.ieum.gw.subscription.dao.SubscriptionDAO;
+import com.ieum.gw.subscription.dto.CompanyBillingDTO;
 import com.ieum.gw.subscription.dto.CompanyDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 import com.ieum.gw.subscription.dto.TrialCompanyDTO;
@@ -12,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * 구독이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
@@ -41,6 +47,50 @@ public class SubscriptionService {
             return null;
         }
         return ServicePeriods.toUsage(period, subscriptionDAO.getEmailVerifiedAt(companyId), now);
+    }
+
+    /**
+     * 헤더의 이용 상태 띠와 읽기 전용 표시에 쓰는 값(layout.tag의 companyBilling). 이용 결제 화면과 같은 계산이다.
+     *
+     * @return 이용 기간이 하나도 없는 업체는 null(띠를 보이지 않는다)
+     */
+    public CompanyBillingDTO getCompanyBilling(Long companyId) {
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        ServicePeriodDTO period = ServicePeriods.pick(subscriptionDAO.listPeriods(companyId), now);
+        if (period == null) {
+            return null;
+        }
+        return ServicePeriods.toBilling(period, now);
+    }
+
+    /**
+     * 모든 업체의 이용 기간 요약(운영자 화면).
+     *
+     * @return 업체 ID → 요약. 이용 기간이 하나도 없는 업체(이음 운영 업체 ieum0000)는 들어 있지 않다
+     */
+    public Map<Long, CompanyPeriodDTO> listCompanyPeriods() {
+        Map<Long, List<ServicePeriodDTO>> byCompany = new HashMap<>();
+        for (ServicePeriodDTO period : subscriptionDAO.listAllPeriods()) {
+            byCompany.computeIfAbsent(period.getCompanyId(), id -> new ArrayList<>()).add(period);
+        }
+        LocalDateTime now = LocalDateTime.now(SEOUL);
+        Map<Long, CompanyPeriodDTO> result = new HashMap<>();
+        byCompany.forEach((companyId, periods) -> {
+            CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(periods, now);
+            if (summary != null) {
+                result.put(companyId, summary);
+            }
+        });
+        return result;
+    }
+
+    /**
+     * 한 업체의 이용 기간 요약(운영자 화면).
+     *
+     * @return 이용 기간이 하나도 없는 업체는 null
+     */
+    public CompanyPeriodDTO getCompanyPeriod(Long companyId) {
+        return ServicePeriods.toCompanyPeriod(subscriptionDAO.listPeriods(companyId), LocalDateTime.now(SEOUL));
     }
 
     /**

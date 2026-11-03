@@ -65,7 +65,7 @@ function employeeCard(d) {
   const list = d.employees;
   // 계정마다 한 줄(왼쪽 이름, 오른쪽 사번·부서): 두 줄로 쓰면 상자에 4명밖에 안 보인다
   const body = list.length
-    ? h('div', 'emp-scroll', h('ul', 'mini-list', ...list.map(e => h('li', 'emp-row', span(e.name), h('span', 'mini-sub', `${e.empNo} · ${e.dept}${e.status !== 'ST_ACTIVE' ? ` · ${e.statusLabel}` : ''}`)))))
+    ? h('div', 'emp-scroll', h('ul', 'mini-list', ...list.map(e => h('li', 'emp-row', span(e.name), h('span', 'mini-sub', `${e.empNo} · ${e.dept}${e.status !== 'ACTIVE' ? ` · ${e.statusLabel}` : ''}`)))))
     : h('p', 'mini-empty', '등록된 계정이 없습니다');
   if (list.length) {
     body.tabIndex = 0;
@@ -83,7 +83,8 @@ function firmDetail(d) {
     ['이용 인원', `${d.users}명`],
     ['월 이용료', won(d.total)],
     ['이메일', d.email],
-    ['이메일 인증', d.emailVerified ? '완료' : '대기 (로그인 불가)'],
+    // TODO(ACC-06): 인증 메일을 붙여 인증 전 로그인을 막으면 '대기 (로그인 불가)'로 되돌린다
+    ['이메일 인증', d.emailVerified ? '완료' : '대기'],
     ['체험 신청', whenFull(d.at)],
     ['신청번호', d.no],
   ]));

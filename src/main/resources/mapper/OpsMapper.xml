@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.ops.mapper.OpsMapper">
+
+    <!-- 업체 + 업체 관리자(업체당 1명, UX_ACCOUNT_ADMIN). 관리자가 빠진 자료도 업체 줄은 보이게 LEFT JOIN -->
+    <sql id="companySelect">
+        SELECT c.company_id, c.company_code, c.company_name, c.trial_email AS email,
+               c.trial_requested_at AS requested_at, c.email_verified_at,
+               e.employee_name AS admin_name, e.employee_no AS admin_no
+        FROM company c
+        LEFT JOIN user_account a ON a.company_id = c.company_id AND a.role_code = 'ROLE_ADMIN'
+        LEFT JOIN employee e ON e.company_id = a.company_id AND e.employee_id = a.employee_id
+    </sql>
+
+    <!-- 모든 업체, 최신 신청 순 (AGENTS.md: 운영자 화면은 신청일·company_id로 정렬) -->
+    <select id="listCompanies" resultType="com.ieum.gw.ops.dto.OpsCompanyRowDTO">
+        <include refid="companySelect" />
+        ORDER BY c.trial_requested_at DESC, c.company_id DESC
+    </select>
+
+    <select id="getCompany" resultType="com.ieum.gw.ops.dto.OpsCompanyRowDTO">
+        <include refid="companySelect" />
+        WHERE c.company_code = #{companyCode}
+    </select>
+
+    <!-- 업체의 계정 목록, 사번 순. 사번이 나오기 전의 가입 요청은 사원 행이 없어 빠진다. 이메일은 화면에 없어 읽지 않는다 -->
+    <select id="listEmployees" resultType="com.ieum.gw.ops.dto.OpsEmployeeDTO">
+        SELECT e.employee_name AS name, e.employee_no AS emp_no, d.department_name AS dept,
+               a.status_code AS status, NVL(cc.code_name, a.status_code) AS status_label
+        FROM user_account a
+        JOIN employee e ON e.company_id = a.company_id AND e.employee_id = a.employee_id
+        LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+        LEFT JOIN common_code cc ON cc.code = a.status_code
+        WHERE a.company_id = #{companyId}
+        ORDER BY e.employee_no
+    </select>
+
+    <!-- 업체별 첫 결제 시각과 실패한 결제 수 -->
+    <select id="listPaymentStats" resultType="com.ieum.gw.ops.dto.OpsPaymentStatDTO">
+        SELECT company_id,
+               MIN(CASE WHEN status_code = 'PAY_APPROVED' THEN approved_at END) AS paid_at,
+               COUNT(CASE WHEN status_code = 'PAY_FAILED' THEN 1 END) AS failed_payments
+        FROM payment
+        GROUP BY company_id
+    </select>
+</mapper>

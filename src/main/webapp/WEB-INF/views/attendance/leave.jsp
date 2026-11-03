@@ -25,7 +25,7 @@
       <div class="cards">
         <div class="card"><small>남은 연차</small><strong id="leaveLeft">-</strong></div>
         <div class="card"><small>이번 기간 부여</small><strong id="leaveGrant">-</strong></div>
-        <div class="card"><small>사용 (승인됨)</small><strong id="leaveUsed">-</strong></div>
+        <div class="card"><small>승인 완료</small><strong id="leaveUsed">-</strong></div>
         <div class="card"><small>승인 대기</small><strong id="leavePending">-</strong></div>
       </div>
       <div class="info-grid info-grid-2 table-gap">
@@ -41,7 +41,6 @@
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg></span>
             <div><h2>휴가 신청 내역</h2><p>전자결재로 신청한 휴가입니다</p></div>
           </header>
-          <p class="bill-note">연차·휴가는 전자결재의 휴가 신청서로 신청합니다. 최종 승인되면 연차가 차감됩니다.</p>
           <ul class="bill-history" id="leaveHistory"></ul>
         </section>
       </div>

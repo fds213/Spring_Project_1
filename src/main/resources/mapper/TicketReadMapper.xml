@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.ticket.mapper.TicketReadMapper">
+    <!-- 부모 티켓과 댓글·이력을 모두 같은 업체·요청자 범위로 읽는다. -->
+    <sql id="myTicket">
+        t.company_id = #{companyId}
+        AND t.requester_employee_id = #{employeeId}
+        AND t.it_ticket_id = #{itTicketId}
+    </sql>
+
+    <select id="countMyTicket" resultType="int">
+        SELECT COUNT(*) FROM it_ticket t
+         WHERE <include refid="myTicket"/>
+    </select>
+
+    <select id="selectMyComments" resultType="com.ieum.gw.ticket.dto.TicketCommentDTO">
+        SELECT c.ticket_comment_id AS ticketCommentId, c.author_employee_id AS authorEmployeeId,
+               c.content, c.created_at AS createdAt
+          FROM ticket_comment c
+          JOIN it_ticket t ON t.company_id = c.company_id AND t.it_ticket_id = c.it_ticket_id
+         WHERE <include refid="myTicket"/>
+         ORDER BY c.created_at, c.ticket_comment_id
+    </select>
+
+    <select id="selectMyHistory" resultType="com.ieum.gw.ticket.dto.TicketHistoryDTO">
+        SELECT h.ticket_history_id AS ticketHistoryId, h.actor_account_id AS actorAccountId,
+               h.before_status AS beforeStatus, h.after_status AS afterStatus,
+               h.before_assignee_id AS beforeAssigneeId, h.after_assignee_id AS afterAssigneeId,
+               h.reason, h.created_at AS createdAt
+          FROM ticket_history h
+          JOIN it_ticket t ON t.company_id = h.company_id AND t.it_ticket_id = h.it_ticket_id
+         WHERE <include refid="myTicket"/>
+         ORDER BY h.created_at, h.ticket_history_id
+    </select>
+</mapper>

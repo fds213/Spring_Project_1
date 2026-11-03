@@ -82,7 +82,7 @@ public class PaymentService {
         boolean paid = !period.isTrial();
 
         BillingDTO billing = new BillingDTO();
-        billing.setStatus(!now.isBefore(period.getEndsAt()) ? "EXPIRED" : paid ? "PAID" : "TRIAL");
+        billing.setStatus(ServicePeriods.statusOf(period, now));
         billing.setPaid(paid);
         billing.setPlan(paid ? PLAN_MONTHLY : null);
         billing.setCompany(company.getCompanyName());
@@ -93,7 +93,7 @@ public class PaymentService {
         billing.setPricePerUser(monthlyPlan().getMonthlyUnitPrice());
         billing.setTrialSeats(ServicePeriods.TRIAL_SEAT_LIMIT);
         billing.setEnd(day(lastDay));
-        billing.setDaysLeft(Math.max(0, ChronoUnit.DAYS.between(now.toLocalDate(), lastDay)));
+        billing.setDaysLeft(ServicePeriods.daysLeft(period, now));
         for (ServicePeriodDTO p : periods) {
             if (p.isTrial()) {
                 billing.setTrialFrom(day(p.getStartsAt().toLocalDate()));
@@ -116,6 +116,16 @@ public class PaymentService {
         billing.setPayments(payments);
         billing.setFailedPayments(failed);
         return billing;
+    }
+
+    /** 업체의 결제 이력, 최신순(운영자 화면). 사람을 확인하지 않으니 ROLE_OPS만 통과하는 /ops/**에서만 부른다 */
+    public List<PaymentRowDTO> listPaymentRows(Long companyId) {
+        return paymentDAO.listPayments(companyId);
+    }
+
+    /** 1인 월 이용료(운영자 화면의 월 이용료 계산). 요금제 행이 없으면 BillingException(503) */
+    public long monthlyUnitPrice() {
+        return monthlyPlan().getMonthlyUnitPrice();
     }
 
     /** 금액 미리 보기. 저장하지 않는다 */

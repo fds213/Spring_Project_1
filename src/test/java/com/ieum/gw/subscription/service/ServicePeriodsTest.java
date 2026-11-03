@@ -13,6 +13,8 @@ import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -133,5 +135,64 @@ class ServicePeriodsTest {
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), now));
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 4, 23, 59)));
         assertEquals(paid, ServicePeriods.pick(List.of(trial, paid), LocalDateTime.of(2026, 12, 5, 0, 0)), "만료 뒤에도 마지막 기간은 유료");
+    }
+
+    @Test
+    @DisplayName("헤더 값: 체험 11/13 0시 만료면 마지막 날은 11/12이고, 그날은 0일 남음, 11/13 0시부터 만료")
+    void billingTrialBoundary() {
+        ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
+
+        CompanyBillingDTO fourDaysLeft = ServicePeriods.toBilling(trial, at("2026-11-08T09:00"));
+        assertEquals("TRIAL", fourDaysLeft.getStatus());
+        assertEquals("2026.11.12", fourDaysLeft.getEndDate());
+        assertEquals(4, fourDaysLeft.getDaysLeft());
+
+        CompanyBillingDTO lastDay = ServicePeriods.toBilling(trial, at("2026-11-12T23:59:59"));
+        assertEquals("TRIAL", lastDay.getStatus());
+        assertEquals(0, lastDay.getDaysLeft());
+
+        CompanyBillingDTO expired = ServicePeriods.toBilling(trial, at("2026-11-13T00:00"));
+        assertEquals("EXPIRED", expired.getStatus());
+        assertEquals("2026.11.12", expired.getEndDate());
+        assertEquals(0, expired.getDaysLeft());
+    }
+
+    @Test
+    @DisplayName("헤더 값: 유료 중이면 PAID, 유료 기간이 끝나면 체험과 같이 EXPIRED")
+    void billingPaid() {
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12);
+
+        CompanyBillingDTO using = ServicePeriods.toBilling(paid, at("2026-12-01T23:59"));
+        assertEquals("PAID", using.getStatus());
+        assertEquals("2026.12.01", using.getEndDate());
+        assertEquals(0, using.getDaysLeft());
+
+        assertEquals("EXPIRED", ServicePeriods.toBilling(paid, at("2026-12-02T00:00")).getStatus());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 체험 중 결제하면 유료 기간을 보고, 체험 마지막 날은 그대로 남는다")
+    void companyPeriodPaidOverTrial() {
+        CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(List.of(
+                period(true, "2026-11-01T09:00", "2026-11-15T00:00", 5),
+                period(false, "2026-11-02T14:00", "2026-12-02T00:00", 12)), at("2026-11-03T12:00"));
+        assertEquals("PAID", summary.getStatus());
+        assertTrue(summary.isPaid());
+        assertEquals(12, summary.getSeats());
+        assertEquals(LocalDate.parse("2026-11-02"), summary.getFirstDay());
+        assertEquals(LocalDate.parse("2026-12-01"), summary.getLastDay());
+        assertEquals(28, summary.getDaysLeft());
+        assertEquals(LocalDate.parse("2026-11-14"), summary.getTrialLastDay());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 끝난 체험은 만료이고 유료가 아니다. 기간이 없으면 null이다")
+    void companyPeriodExpiredTrial() {
+        CompanyPeriodDTO summary = ServicePeriods.toCompanyPeriod(
+                List.of(period(true, "2026-10-01T09:00", "2026-10-15T00:00", 5)), at("2026-11-03T12:00"));
+        assertEquals("EXPIRED", summary.getStatus());
+        assertFalse(summary.isPaid());
+        assertEquals(0, summary.getDaysLeft());
+        assertNull(ServicePeriods.toCompanyPeriod(List.of(), at("2026-11-03T12:00")));
     }
 }

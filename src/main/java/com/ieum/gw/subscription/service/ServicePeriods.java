@@ -2,8 +2,12 @@ package com.ieum.gw.subscription.service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+import com.ieum.gw.subscription.dto.CompanyBillingDTO;
+import com.ieum.gw.subscription.dto.CompanyPeriodDTO;
 import com.ieum.gw.subscription.dto.CompanyUsageDTO;
 import com.ieum.gw.subscription.dto.ServicePeriodDTO;
 
@@ -14,6 +18,8 @@ final class ServicePeriods {
 
     static final int TRIAL_DAYS = 14;
     static final int TRIAL_SEAT_LIMIT = 10; // 체험은 신청 인원과 관계없이 관리자 포함 10명(요구분석서 3장 단순화 ②)
+
+    private static final DateTimeFormatter HEADER_DATE = DateTimeFormatter.ofPattern("yyyy.MM.dd");
 
     private ServicePeriods() {
     }
@@ -69,6 +75,48 @@ final class ServicePeriods {
         usage.setEndsAt(period.getEndsAt());
         usage.setEmailVerified(emailVerifiedAt != null);
         return usage;
+    }
+
+    /** 이용 상태. 끝난 기간은 체험·유료를 가리지 않고 EXPIRED다 */
+    static String statusOf(ServicePeriodDTO period, LocalDateTime now) {
+        if (!now.isBefore(period.getEndsAt())) {
+            return "EXPIRED";
+        }
+        return period.isTrial() ? "TRIAL" : "PAID";
+    }
+
+    /** 마지막 날까지 남은 일수. 0이면 마지막 날이거나 이미 지났다 */
+    static long daysLeft(ServicePeriodDTO period, LocalDateTime now) {
+        return Math.max(0, ChronoUnit.DAYS.between(now.toLocalDate(), lastDay(period.getEndsAt())));
+    }
+
+    static CompanyBillingDTO toBilling(ServicePeriodDTO period, LocalDateTime now) {
+        CompanyBillingDTO billing = new CompanyBillingDTO();
+        billing.setStatus(statusOf(period, now));
+        billing.setEndDate(lastDay(period.getEndsAt()).format(HEADER_DATE));
+        billing.setDaysLeft(daysLeft(period, now));
+        return billing;
+    }
+
+    /** 운영자 화면의 이용 기간 요약. 이용 기간이 하나도 없으면 null */
+    static CompanyPeriodDTO toCompanyPeriod(List<ServicePeriodDTO> periods, LocalDateTime now) {
+        ServicePeriodDTO period = pick(periods, now);
+        if (period == null) {
+            return null;
+        }
+        CompanyPeriodDTO summary = new CompanyPeriodDTO();
+        summary.setStatus(statusOf(period, now));
+        summary.setPaid(!period.isTrial());
+        summary.setSeats(period.getPurchasedSeats());
+        summary.setFirstDay(period.getStartsAt().toLocalDate());
+        summary.setLastDay(lastDay(period.getEndsAt()));
+        summary.setDaysLeft(daysLeft(period, now));
+        for (ServicePeriodDTO p : periods) {
+            if (p.isTrial()) {
+                summary.setTrialLastDay(lastDay(p.getEndsAt()));
+            }
+        }
+        return summary;
     }
 
     static int seatLimitOf(ServicePeriodDTO period) {
