@@ -151,3 +151,22 @@ textarea.input { height: auto; min-height: 320px; padding: 12px; line-height: 1.
   .notice-title { font-size: 19px; }
   .notice-actions { flex-wrap: wrap; }
 }
+
+/* 글을 열지 못했을 때 (지워진 글·볼 수 없는 글·수정할 수 없는 글): 목록으로 튕기지 않고 화면 가운데에 안내 + 버튼 하나.
+   게시판 이름(h1)은 위치 표시가 있어 눈에서는 숨겨진다(common.css). 안내 상자는 남은 높이의 가운데쯤에 둔다 */
+#view-board-missing.on { display: flex; flex-direction: column; min-height: calc(100vh - 200px); }
+.board-missing {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  margin: auto; width: 100%; max-width: 460px; padding: 44px 32px 40px; text-align: center;
+  border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg);
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+  transform: translateY(-6vh); /* 정확히 가운데보다 조금 위가 눈에 편하다 */
+}
+.board-missing::before {
+  content: ''; width: 64px; height: 64px; margin-bottom: 6px; border-radius: 50%; background-color: var(--bg-sub);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23677282' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5'/%3E%3Cpath d='M9.5 13.5l5 5M14.5 13.5l-5 5'/%3E%3C/svg%3E");
+  background-position: center; background-size: 32px 32px; background-repeat: no-repeat;
+}
+.board-missing-title { font-size: 18px; font-weight: 700; color: var(--text); }
+.board-missing-desc { margin: 0 0 10px; font-size: 14px; line-height: 1.6; color: var(--text-sub); word-break: keep-all; }
+.board-missing .btn { min-width: 140px; justify-content: center; }
