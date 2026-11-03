@@ -7,8 +7,8 @@
 //     부서를 지우면 그 부서의 가입 활성화도 꺼진다.
 //   - 이름을 바꿔도 사람은 그대로 그 부서·직급에 있다 (게시판·일정·휴가 기록도 따라간다).
 //   - 직급은 위(낮은 직급)에서 아래(높은 직급) 순서다. 화살표로 순서를 바꾼다.
-//   - 부서 형태 (공통 코드 DEPT_TYPE: IT 부서, 인사 부서, 운영 부서, 없음 = 일반): 부서마다 고른다. IT 부서 사람은 IT 담당 메뉴, 인사 부서
-//     사람은 인사 담당 메뉴를 다음 화면부터 받는다. 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
+//   - 부서 형태 (공통 코드 DEPT_TYPE: IT 부서, 인사 부서, 운영 부서, 없음 = 일반): 부서마다 고른다. 부서를 나누어 보이는 표시이고
+//     메뉴·권한은 주지 않는다(권한은 계정의 역할). 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
 //   - 읽기 전용 업체(이용 기간 끝남): 여기 버튼은 모두 쓰기라 흐리게 보이고(data-write) 서버가 403으로 거절한다.
 // 서버 API ({kind} = depts | ranks, {name}은 서버가 정하는 부서·직급 식별값(이름 또는 id)):
 //   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { inUse, retired, requests },
@@ -135,8 +135,7 @@
       api.post(url('dept', item.name, 'type'), { type })
         .done(r => {
           item.type = r.type;
-          const what = { DEPT_IT: ' 이 부서 직원에게 IT 담당 메뉴가 보입니다', DEPT_HR: ' 이 부서 직원에게 인사 담당 메뉴가 보입니다' }[r.type] || '';
-          showToast(`'${r.name}'의 부서 형태를 ${deptTypeLabel(r.type)}(으)로 바꿨습니다.${what}`);
+          showToast(`'${r.name}'의 부서 형태를 ${deptTypeLabel(r.type)}(으)로 바꿨습니다`);
         })
         .fail(xhr => { sel.value = item.type || ''; showToast(apiMessage(xhr)); })
         .always(() => { sel.disabled = readOnlyUi(); });

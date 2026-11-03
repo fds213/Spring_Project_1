@@ -9,14 +9,13 @@
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
 // 서버는 공통 코드 테이블에서 읽는다.
-// 계정 형태 (ROLE): 한 계정에 하나. IT 담당·인사 담당은 역할이 아니라 소속 부서의 부서 형태로 정한다.
-const ROLE_CODE = { ROLE_OPR: '이음 운영자', ROLE_ADMIN: '업체 관리자', ROLE_USR: '업체 사용자' };
+// 계정 형태 (ROLE): 한 계정에 하나. 서버가 ROLE_* 코드를 그대로 준다. IT 담당·인사 담당도 역할로 정하고 부서 형태와는 상관없다.
+// 사원 관리는 업체 안 사람만 보여서 ROLE_OPS(이음 운영자)는 나오지 않는다
+const ROLE_CODE = { ROLE_ADMIN: '업체 관리자', ROLE_IT: 'IT 담당', ROLE_HR: '인사 담당', ROLE_EMP: '직원' };
 // 부서 형태 (DEPT_TYPE): 부서마다 하나 또는 없음(일반 부서, ''). 부서 관리(org-admin.js)에서 정한다.
-// IT 부서 사람은 IT 담당 메뉴, 인사 부서 사람은 인사 담당 메뉴를 받는다. 운영 부서는 아직 따로 붙는 메뉴가 없다.
+// 부서를 나누어 보이는 표시일 뿐 메뉴·권한은 주지 않는다(권한은 역할).
 const DEPT_TYPE = { DEPT_IT: 'IT 부서', DEPT_HR: '인사 부서', DEPT_OPS: '운영 부서' };
 const deptTypeLabel = type => DEPT_TYPE[type] || '일반';
-// 사원 관리의 담당 표시 (부서 형태가 주는 것)
-const DEPT_DUTY = { DEPT_IT: 'IT 담당', DEPT_HR: '인사 담당' };
 // 고용 형태 (EMP_TYPE), 성별 (GENDER): 사원 관리 > 인사 정보에서 정한다. 성별은 넣지 않아도 된다
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
@@ -133,11 +132,10 @@ function drawEmployees(d) {
   const rows = d.items.map(e => {
     const tr = document.createElement('tr');
     tr.classList.toggle('is-inactive', offStatus(e.status));
-    const duty = DEPT_DUTY[e.deptType] || '';
     tr.append(
       cellOf('이름', whoCell(e)),
       cellOf('부서·직급', `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''} · ${e.rank}`),
-      cellOf('계정 형태', `${ROLE_CODE[e.role] || '-'}${duty && e.role !== 'ROLE_ADMIN' ? ` · ${duty}` : ''}`),
+      cellOf('계정 형태', ROLE_CODE[e.role] || '-'),
       cellOf('인사 정보', hrInfoText(e)),
       cellOf('상태', statusChip(e)),
       cellOf('등록일', ymd(e.at)),
@@ -301,6 +299,7 @@ document.querySelectorAll('#seatDialog button').forEach(b => b.addEventListener(
 // 업체 관리자는 모든 요청을, 부서장은 자기 부서 요청만 본다 (서버가 골라 보낸다).
 let lastEmployees = null; // 사원 관리에서 마지막으로 받은 값 (다시 사용 전에 자리를 본다)
 let lastJoin = null; // 가입 승인에서 마지막으로 받은 값
+let joinWaiting = null; // 마지막으로 그린 승인 대기 수 (바뀌었을 때만 메뉴 배지를 다시 센다)
 let joinPickOpen = false; // 업체 관리자의 부서 목록이 펼쳐져 있다
 const scopeLabel = x => (x.all ? '업체 전체' : x.scope);
 
@@ -494,11 +493,13 @@ function drawJoin(d) {
   $j('joinList').replaceChildren(...rows);
   $j('joinEmpty').hidden = rows.length > 0;
 
-  setJoinBadge(open.length);
+  // 대기 수가 바뀌었으면(승인·반려, 새 요청) 메뉴 배지(common.js, GET /badges)도 15초 기다리지 않고 다시 센다.
+  // 처음 그릴 때는 common.js 가 이미 세었고, 30초마다 다시 그려도 수가 그대로면 묻지 않는다
+  if (joinWaiting !== null && joinWaiting !== open.length && window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
+  joinWaiting = open.length;
 }
 
-// 승인: 붙을 사번을 보여 주는 창. 고를 역할은 없다: 승인된 직원은 모두 업체 사용자(ROLE_USR)이고,
-// IT·인사 담당은 부서의 부서 형태로 정해진다 (공통 코드 시트)
+// 승인: 붙을 사번을 보여 주는 창. 고를 역할은 없다: 승인된 직원은 모두 직원(ROLE_EMP)으로 시작한다
 let approveTarget = null;
 function openApprove(e) {
   const d = lastJoin;
@@ -521,8 +522,7 @@ function openApprove(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`
-    + ({ DEPT_IT: ' IT 부서라 IT 담당 메뉴가 함께 보입니다.', DEPT_HR: ' 인사 부서라 인사 담당 메뉴가 함께 보입니다.' }[e.deptType] || '');
+  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
   if (!dialog.open) dialog.showModal();
 }
 
