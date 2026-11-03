@@ -1,7 +1,7 @@
 <%@ tag language="java" pageEncoding="UTF-8" body-content="scriptless" trimDirectiveWhitespaces="true" %>
 <%@ attribute name="title" required="true" description="페이지 제목" %>
 <%@ attribute name="description" description="검색 결과에 보일 한 줄 설명. 비우면 기본 문구" %>
-<%@ attribute name="current" description="상단 메뉴 강조. 지금은 쓰지 않는다: 소개·체험 신청·문의 헤더를 똑같이 둔다" %>
+<%@ attribute name="current" description="상단 메뉴 강조. site-header.jspf 가 aria-current 에 쓴다(문의 페이지가 넘긴다)" %>
 <%@ attribute name="cta" type="java.lang.Boolean" description="헤더의 '무료 체험' 버튼. 체험 신청 페이지만 false (자기 자신으로 가는 버튼이라)" %>
 <%@ attribute name="fab" type="java.lang.Boolean" description="떠 있는 '도입 문의' 버튼. 소개 페이지만 true" %>
 <%@ attribute name="mainClass" description="본문 main 의 class. 체험 신청은 section, 문의는 inq-page" %>
@@ -12,7 +12,7 @@
   상품 소개·무료 체험 신청·도입 문의처럼 로그인 없이 여는 홈페이지형 틀. 프론트 공통 담당만 고친다.
 
     <ui:site title="2주 무료 체험 신청" cta="false">
-      <jsp:attribute name="scripts"><script src="${pageContext.request.contextPath}/resources/js/trial.js"></script></jsp:attribute>
+      <jsp:attribute name="scripts"><script src="${pageContext.request.contextPath}/resources/js/<화면>.js"></script></jsp:attribute>
       <jsp:body> ...본문(main 안)... </jsp:body>
     </ui:site>
 
@@ -52,7 +52,7 @@
   <c:if test="${fab}">
     <%-- 떠 있는 도입 문의 버튼: 소개 페이지에만. 푸터가 보이면 숨는다 (site.js) --%>
     <a class="fab-inquiry" id="fabInquiry" href="${ctx}/inquiry" aria-label="이음 도입 문의">
-      <span class="fab-mark" aria-hidden="true"><img src="${ctx}/resources/img/logo-mark.png" alt=""></span>
+      <span class="fab-mark" aria-hidden="true"><img src="${ctx}/resources/img/logo-mark.svg" alt=""></span>
       <span class="fab-text" aria-hidden="true"><small>이음</small><strong>도입 문의</strong></span>
     </a>
   </c:if>

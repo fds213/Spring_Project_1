@@ -8,7 +8,7 @@
 <footer class="site-footer">
   <div class="wrap foot-wrap">
     <div class="foot-top">
-    <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word"></a>
+    <a class="brand" href="${ctx}/"><img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark"><img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word"></a>
       <nav class="foot-links" aria-label="사이트 안내">
         <a href="${ctx}/#intro">서비스 소개</a>
         <a href="${ctx}/#features">기능</a>

@@ -1,10 +1,10 @@
 // 인사 관리 > 사원 관리 (views/employee/admin/list.jsp)·가입 승인 (views/employee/join.jsp), 그리고 계정 생성·비밀번호 찾기
-// (views/common/join.jsp, join-password.jsp. 아직 이 파일을 불러오지 않는다: 백엔드 API가 생기면 그 주소에 맞춰 붙인다).
+// (views/common/join.jsp, join-password.jsp). 부서·직급 관리(org-admin.js)도 이 파일의 도구를 쓴다.
 // 계정이 생기는 흐름, 자리 수, 비활성화 규칙은 서버가 정하고 지킨다. 이번 구현 범위(요구분석서 3장 단순화 ①②):
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 브라우저 저장소를 쓰는 곳은 하나뿐이다: 계정 생성을 한 기기가 자기 요청(업체 코드·요청 번호)을 기억하는 MY_JOIN_KEY.
+// 이 파일이 브라우저 저장소를 쓰는 곳은 하나다: 계정 생성을 한 기기가 자기 요청(업체 코드·요청 번호)을 기억하는 MY_JOIN_KEY.
 // 화면을 닫았다 열어도 요청을 이어 보려는 것이다. 쿠키나 페이지에 둔 요청 번호로 바꿔도 된다.
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
@@ -567,33 +567,14 @@ function askConfirm(title, body, okLabel, onOk, danger) {
   if (!dialog.open) dialog.showModal();
 }
 
-// 가입 승인 메뉴의 배지: 내가 처리할 수 있는 승인 대기 요청 수
-function setJoinBadge(count) {
-  const badge = $j('joinCount');
-  if (!badge) return;
-  badge.textContent = count;
-  badge.hidden = !count;
-}
-function refreshJoinBadge() {
-  const badge = $j('joinCount');
-  if (!badge) return;
-  // 이 메뉴가 보이지 않는 계정(업체 관리자·부서장이 아님, 운영자)은 묻지 않는다
-  const item = badge.closest('.nav-item');
-  if (item && (item.hidden || item.closest('[data-mode][hidden]'))) return setJoinBadge(0);
-  api.get('/employee/api/join/count').done(r => setJoinBadge(r.count));
-}
-
-// 사원 관리·가입 승인 중 열려 있는 화면과 배지를 다시 받는다 (상태를 바꾼 뒤에 부른다)
+// 사원 관리·가입 승인 중 열려 있는 화면을 다시 받는다 (상태를 바꾼 뒤에 부른다). 메뉴 배지는 common.js 가 /badges 로 맡는다
 function rerenderStaffViews() {
   if (viewShown('view-hr-employee')) renderEmployees();
-  if (viewShown('view-hr-join')) renderJoin(); else refreshJoinBadge();
+  if (viewShown('view-hr-join')) renderJoin();
 }
-// 새 요청이 들어왔는지 30초마다 본다. 탭이 보일 때만: 가입 승인이 열려 있으면 다시 그리고, 아니면 배지만.
-// 탭으로 돌아오면 바로 한 번
+// 새 요청이 들어왔는지 30초마다 본다. 탭이 보이고 가입 승인이 열려 있을 때만. 탭으로 돌아오면 바로 한 번
 function tickJoin() {
-  const badge = $j('joinCount');
-  if (document.hidden || !badge || badge.parentElement.closest('[hidden]')) return;
-  if (viewShown('view-hr-join')) renderJoin(); else refreshJoinBadge();
+  if (!document.hidden && viewShown('view-hr-join')) renderJoin();
 }
 setInterval(tickJoin, 30000);
 document.addEventListener('visibilitychange', tickJoin);
