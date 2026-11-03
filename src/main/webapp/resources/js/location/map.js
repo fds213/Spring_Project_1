@@ -56,6 +56,7 @@ const mapState = {
   pickPin: null,     // 고른(아직 저장 전) 위치의 회색 핀
   pickCard: null,    // 회색 핀 위 '이 위치에 마커 추가' 말풍선 (CustomOverlay)
   pickSeq: 0,        // 지도 누르기 순번: 주소 응답이 늦게 오면 그사이 새로 누르거나 취소한 것이므로 버린다
+  formSeq: 0,        // 창 안 [주소 찾기] 순번: 창을 닫거나 다른 창을 연 뒤 늦게 온 결과는 버린다
   form: null,        // 창의 값 { id(수정이면), title, address, detailAddress, lat, lng, description }
   confirmedAddress: '', // 위치와 짝이 맞는 주소 (검색·지도로 고른 주소). 창의 주소 칸이 이것과 다르면 저장하지 않는다
   relocating: false, // 수정 중에 지도에서 위치를 다시 고르는 중인지
@@ -72,6 +73,7 @@ function openMapView() {
   mapById('mapForm').addEventListener('submit', e => { e.preventDefault(); mapSave(); });
   mapById('mfCancel').addEventListener('click', () => mapCloseForm());
   mapById('mapDialog').addEventListener('close', () => {
+    mapState.formSeq++; // 찾던 주소 결과는 버린다
     mapById('mfResults').replaceChildren();
     if (!mapState.relocating) mapClearPick();
   });
@@ -125,8 +127,11 @@ function mapInitKakao() {
         mapState.ok = true;
         mapDrawPins(true);
         if (mapState.selectedId !== null) mapFocus(mapState.selectedId);
-        mapById('mfFind').disabled = false;
         mapUpdateMapTools();
+        // 지도가 열리기 전에 수정 창을 열어 두었으면, 이제 주소 칸·버튼 잠금을 풀고 그 위치에 회색 핀을 꽂는다
+        mapUpdateFormTools();
+        const f = mapState.form;
+        if (mapById('mapDialog').open && f && f.lat !== undefined && f.lat !== null) mapShowPick(f.lat, f.lng, true);
       } catch (err) {
         clearTimeout(timer);
         mapFail();
@@ -245,6 +250,7 @@ function mapDetail(m) {
 }
 
 function mapSelect(id, moveMap) {
+  mapState.pickSeq++; // 아직 안 온 지도 누르기 응답은 버린다 (빈 곳을 누르고 바로 핀을 고른 경우)
   mapState.selectedId = id;
   if (id !== null) mapClearPick(); // 기존 마커를 고르면 고르던 새 위치는 접는다
   mapRenderList();
@@ -337,11 +343,13 @@ function mapFocus(id) {
 // ---------- 위치 찾기 (검색) ----------
 
 // 주소로 먼저 찾고, 없으면 장소 이름으로 찾아 box에 결과를 보여 준다. 결과를 누르면 onPick(위치)
-function mapSearchTo(q, box, onPick) {
+// alive를 주면 응답이 왔을 때 물어보고, false면(그사이 창을 닫았거나 다른 창을 열었으면) 결과를 보이지 않는다
+function mapSearchTo(q, box, onPick, alive) {
   if (!q) { showToast('주소나 장소 이름을 입력해 주세요'); return; }
   if (!mapState.ok) { showToast('지도를 불러오지 못해 검색할 수 없어요'); return; }
   const S = kakao.maps.services.Status;
-  const show = items => box.replaceChildren(...items.map(r => {
+  const stale = () => alive && !alive();
+  const show = items => stale() || box.replaceChildren(...items.map(r => {
     const li = mapEl('li');
     const btn = mapButton('', null, () => { box.replaceChildren(); onPick(r); });
     btn.append(mapEl('strong', '', r.label));
@@ -368,7 +376,7 @@ function mapSearchTo(q, box, onPick) {
           sub: p.road_address_name || p.address_name,
           lat: +p.y, lng: +p.x,
         })));
-      } else {
+      } else if (!stale()) {
         // 장소 검색이 오류면 주소 검색 결과와 상관없이 '검색하지 못함'
         box.replaceChildren(mapEl('li', 'map-results-none', st === S.ZERO_RESULT
           ? '검색 결과가 없습니다. 도로명 주소나 다른 이름으로 찾아보세요.'
@@ -394,7 +402,8 @@ function mapPickAt(latLng) {
     }
     const r = res[0];
     const address = r.road_address ? r.road_address.address_name : r.address.address_name;
-    mapOfferPick({ title: r.road_address && r.road_address.building_name ? r.road_address.building_name : '', address, lat, lng }, false);
+    // 누른 곳을 지도 가운데로 옮긴다: 가장자리를 눌렀을 때 말풍선이 지도 밖으로 잘리지 않게
+    mapOfferPick({ title: r.road_address && r.road_address.building_name ? r.road_address.building_name : '', address, lat, lng }, true);
   });
 }
 
@@ -446,6 +455,7 @@ function mapShowPick(lat, lng, moveMap) {
 }
 
 function mapClearPick() {
+  mapState.pickSeq++; // 접은 뒤 늦게 온 응답이 회색 핀을 다시 띄우지 않게
   if (mapState.pickPin) mapState.pickPin.setMap(null);
   if (mapState.pickCard) mapState.pickCard.setMap(null);
 }
@@ -468,17 +478,18 @@ function mapEndRelocate() {
 // ---------- 추가·수정 창 ----------
 
 function mapOpenForm(f) {
+  // 위치를 다시 고르던 중에 다른 마커의 [수정]을 눌렀으면 '위치 고르는 중'을 끝낸다 (안내 띠·다음 클릭이 꼬이지 않게)
+  if (mapState.relocating) mapEndRelocate();
+  mapState.formSeq++; // 앞 창에서 찾던 주소 결과가 이 창에 뜨지 않게
   mapState.form = f;
-  mapState.confirmedAddress = f.address || '';
+  mapState.confirmedAddress = (f.address || '').trim(); // 주소 칸은 앞뒤 빈칸을 빼고 비교하므로 여기도 뺀다
   const editing = f.id !== null && f.id !== undefined;
   mapById('mapDialogTitle').textContent = editing ? '마커 수정' : '마커 추가';
   mapById('mfTitle').value = f.title || '';
   mapById('mfAddress').value = f.address || '';
   mapById('mfDetail').value = f.detailAddress || '';
   mapById('mfDesc').value = f.description || '';
-  mapById('mfRepick').hidden = !mapState.ok;
-  mapById('mfFind').disabled = !mapState.ok;
-  mapById('mfAddress').readOnly = !mapState.ok; // 지도를 못 불러오면 주소를 찾을 수 없으므로 고치지 못하게
+  mapUpdateFormTools();
   mapById('mfResults').replaceChildren();
   mapById('mfError').textContent = '';
   mapUpdateCount();
@@ -489,21 +500,35 @@ function mapOpenForm(f) {
   mapById('mfTitle').focus();
 }
 
+// 창의 지도 관련 버튼: 지도가 열렸을 때만 [지도에서 직접 고르기]·[주소 찾기]·주소 고치기를 쓸 수 있다.
+// 창을 연 뒤에 카카오 지도가 늦게 열려도 여기를 다시 불러 잠금을 푼다
+function mapUpdateFormTools() {
+  const ok = mapState.ok;
+  mapById('mfRepick').hidden = !ok;
+  mapById('mfFind').disabled = !ok;
+  mapById('mfAddress').readOnly = !ok; // 지도를 못 불러오면 주소를 찾을 수 없으므로 고치지 못하게
+}
+
 function mapCloseForm() {
   mapEndRelocate();
   mapById('mapDialog').close();
 }
 
 // 창 안에서 주소 찾기: 고른 결과로 위치와 주소를 바꾸고, 뒤의 회색 핀도 그 자리로 옮긴다
+// 찾기마다 순번을 붙여, 창을 닫거나 다른 창을 연 뒤에 늦게 온 결과는 버린다
 function mapFindInForm() {
+  const seq = ++mapState.formSeq;
+  const alive = () => seq === mapState.formSeq && mapById('mapDialog').open;
   mapSearchTo(mapById('mfAddress').value.trim(), mapById('mfResults'), r => {
-    mapState.form = { ...mapReadForm(), address: r.address, lat: r.lat, lng: r.lng };
-    mapState.confirmedAddress = r.address;
-    mapById('mfAddress').value = r.address;
+    if (!alive()) return;
+    const address = (r.address || '').trim();
+    mapState.form = { ...mapReadForm(), address, lat: r.lat, lng: r.lng };
+    mapState.confirmedAddress = address;
+    mapById('mfAddress').value = address;
     if (!mapById('mfTitle').value.trim() && r.title) mapById('mfTitle').value = r.title;
     mapShowPick(r.lat, r.lng, true);
     mapUpdateAddressNote();
-  });
+  }, alive);
 }
 
 // 주소 칸을 고쳤는데 아직 찾지 않았으면 알려 준다
