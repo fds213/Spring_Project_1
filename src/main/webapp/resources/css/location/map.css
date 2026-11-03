@@ -71,7 +71,30 @@
 .map-bubble strong { display: block; font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .map-bubble small { display: block; margin-top: 1px; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* 고른 위치 위 말풍선: '이 위치에 마커 추가' */
+.map-pick {
+  min-width: 220px; max-width: 280px; padding: 12px 14px; border-radius: 12px;
+  background: var(--bg); box-shadow: 0 6px 20px rgba(15, 23, 42, 0.2); pointer-events: auto; position: relative;
+}
+.map-pick::after {
+  content: ''; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px;
+  background: var(--bg); transform: translateX(-50%) rotate(45deg);
+}
+.map-pick strong { display: block; font-size: 14px; font-weight: 600; color: var(--text); }
+.map-pick small { display: block; margin-top: 2px; font-size: 12px; line-height: 1.5; color: var(--text-sub); white-space: normal; }
+.map-pick-actions { display: flex; gap: 6px; margin-top: 10px; }
+.map-pick-actions .btn { height: 32px; padding: 0 12px; font-size: 13px; }
+.map-bubble { pointer-events: auto; cursor: default; }
+
 /* 팝업 */
+/* .modal p 기본 모양(회색·아래 여백 20px)을 이 창에서는 쓰지 않는다 */
+.map-dialog .map-address-note { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: var(--accent); }
+.map-dialog .form-error { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: var(--danger); }
+.map-dialog .form-error:empty { display: none; }
+.map-dialog .map-address-note[hidden] { display: none; }
+.map-form-results { margin-top: 4px; max-height: 200px; overflow-y: auto; }
+.map-repick { align-self: flex-start; margin-top: 2px; font-size: 13px; }
+.map-repick[hidden] { display: none; }
 .map-dialog { width: min(440px, calc(100% - 32px)); }
 .map-dialog .input-action .btn { height: 42px; }
 .map-textarea { height: auto; min-height: 96px; padding: 10px 12px; resize: vertical; font: inherit; line-height: 1.5; }
@@ -88,3 +111,22 @@
   .map-side { height: auto; min-height: 0; }
   .map-list { max-height: 420px; }
 }
+
+/* 목록에서 찾기 */
+.map-filter { height: 36px; font-size: 13px; }
+.map-filter[hidden] { display: none; }
+.empty-note[hidden] { display: none; }
+
+/* 지도 위 도구: 전체 보기 (왼쪽 위), 빈 지도 안내 (가운데 위) */
+.map-fit {
+  position: absolute; top: 12px; left: 12px; z-index: 2; height: 34px; padding: 0 12px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.15); font-weight: 500;
+}
+.map-fit[hidden] { display: none; }
+.map-empty-hint {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 2; margin: 0;
+  max-width: calc(100% - 120px); padding: 10px 16px; border-radius: 999px;
+  background: rgba(28, 36, 48, 0.82); color: #fff; font-size: 13px; text-align: center;
+  pointer-events: none;
+}
+.map-empty-hint[hidden] { display: none; }
