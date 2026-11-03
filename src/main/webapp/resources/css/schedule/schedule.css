@@ -36,10 +36,11 @@
   min-height: 108px; padding: 6px 6px 8px; gap: 3px;
   border: 0; border-radius: 0; background: var(--bg); transition: background-color .1s;
 }
-#view-schedule .sch-cell:hover:not(.is-blank) { background: var(--bg-sub); }
-#view-schedule .sch-cell.is-selected { box-shadow: none; background: #f1f5fe; }
+/* 마우스를 올린 칸은 회색, 고른 칸은 마우스를 올려도 파랑 (고른 칸은 hover 규칙에서 뺀다) */
+#view-schedule .sch-cell:hover:not(.is-selected) { background: var(--bg-sub); }
+#view-schedule .sch-cell.is-selected { box-shadow: none; background: var(--accent-bg); }
 #view-schedule .sch-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-#view-schedule .sch-cell.is-other { background: #fafbfc; }
+#view-schedule .sch-cell.is-other { background: color-mix(in srgb, var(--bg-sub) 40%, var(--bg)); } /* 흰색과 회색 사이 */
 #view-schedule .sch-cell.is-other .sch-num { color: var(--text-muted); font-weight: 400; opacity: .6; }
 #view-schedule .sch-num { align-self: flex-start; padding: 0 3px; font-size: 13px; }
 #view-schedule .sch-cell.is-today .sch-num { padding: 0; width: 24px; height: 24px; }
@@ -78,4 +79,6 @@
   #view-schedule .sch-cell { min-height: 68px; padding: 4px 3px; }
   #view-schedule .sch-cell .sch-chip { border-left-width: 2px; padding: 1px 3px; font-size: 10px; }
   #view-schedule .sch-more { font-size: 10px; }
+  /* 삭제 버튼: 손가락으로 누르기 쉽게 크게 (글자 크기는 그대로) */
+  #view-schedule .sch-del { min-width: 44px; min-height: 36px; padding: 8px; margin: -8px -8px -8px 0; }
 }
