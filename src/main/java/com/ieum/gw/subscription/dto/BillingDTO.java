@@ -13,7 +13,7 @@ import lombok.ToString;
 public class BillingDTO {
     private String status;        // TRIAL(체험 중) / PAID(유료) / EXPIRED(만료)
     private boolean paid;         // 지금(만료면 마지막) 기간이 유료면 true
-    private String plan;          // 유료일 때 MONTHLY
+    private String plan;          // 유료일 때 MONTHLY / ANNUAL
     private String company;       // 업체명
     private String companyCode;
     private int users;            // 지금 기간의 인원. 체험은 신청 인원
@@ -21,13 +21,14 @@ public class BillingDTO {
     private int maxUsers;         // 한 번에 살 수 있는 인원
     private long pricePerUser;    // 1인 월 단가
     private int trialSeats;       // 체험 중 계정 한도
-    private String end;           // 마지막 날(다음 날 0시에 만료)
+    private String end;           // 마지막 날(다음 날 0시에 만료). 연장한 기간까지 포함한다
     private long daysLeft;        // 마지막 날까지 남은 일수. 0이면 마지막 날이거나 이미 만료
     private String trialFrom;     // 체험 첫날
     private String trialEnd;      // 체험 마지막 날
     private String serviceFrom;   // 유료 기간 첫날. 체험이면 null
-    private boolean canPay;       // 이번 범위에서는 유료 기간이 한 번도 없는 업체만 결제한다
-    private String mode;          // FIRST(첫 결제)
+    private boolean canPay;       // 첫 결제와 유료 이용 중 연장만 된다. 유료가 끝난 뒤 재구매는 이번 제외다
+    private String mode;          // FIRST(첫 결제) / EXTEND(연장). 결제할 수 없으면 null
+    private List<BillingPlanDTO> plans; // 고를 수 있는 요금제. 연장은 지금 요금제만
     private int failedPayments;   // 결제 실패 건수
     private List<BillingPaymentDTO> payments; // 최신순
 }

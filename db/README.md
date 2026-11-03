@@ -11,12 +11,14 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [ddl/IEUM_DDL.sql](ddl/IEUM_DDL.sql) | **신규 빈 스키마**에 테이블·시퀀스·제약·인덱스 생성 |
 | [data/IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) | 신규 DB에 기본 공통 코드 229개 입력 |
 | [data/init_auth_data.sql](data/init_auth_data.sql) | 신규 DB에 시연 업체·직원·계정 입력. 시연 보완 파일도 자동 실행 |
-| [data/IEUM_DEMO_SEED.sql](data/IEUM_DEMO_SEED.sql) | 월간 요금제, 시연 업체 기간·지점·자산·직원 지점 보완. init 또는 데이터 패치에서 호출 |
+| [data/IEUM_DEMO_SEED.sql](data/IEUM_DEMO_SEED.sql) | 월간·연간 요금제, 시연 업체 기간·지점·자산·직원 지점 보완. init 또는 데이터 패치에서 호출 |
 | [patches/11-02_01_SCHEMA_PATCH.sql](patches/11-02_01_SCHEMA_PATCH.sql) | 기존 DB의 11/02 구조 변경. 기존 자료 보존, 같은 정의는 검증 후 유지 |
 | [patches/11-02_02_DATA_PATCH.sql](patches/11-02_02_DATA_PATCH.sql) | 기존 DB의 누락 코드·12개 코드 활성화·시연 자료 보완. 시연 보완과 점검 파일 자동 실행 |
 | [patches/11-02_03_CHECK.sql](patches/11-02_03_CHECK.sql) | 읽기 전용 점검. 전달문 17개 항목 및 지정 코드 12개 조회 |
 | [patches/11-02_04_ATTENDANCE_CORRECTION_PATCH.sql](patches/11-02_04_ATTENDANCE_CORRECTION_PATCH.sql) | 기존 DB에 근태정정 테이블·시퀀스·제약·인덱스·상태 코드 추가, 기존 시퀀스 최댓값 조정. 한 번 실행 |
 | [patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql](patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql) | 근태정정 구조·코드·시퀀스 7개 항목 읽기 전용 점검 |
+| [patches/11-03_01_ANNUAL_RENEW_PATCH.sql](patches/11-03_01_ANNUAL_RENEW_PATCH.sql) | 기존 DB에 연간 요금제 행 추가, 코드 `PLAN_YEARLY`·`PP_RENEW` 활성화. 구조 변경 없음. 다시 실행해도 결과가 같다 |
+| [patches/11-03_02_ANNUAL_RENEW_CHECK.sql](patches/11-03_02_ANNUAL_RENEW_CHECK.sql) | 연간 요금제·코드 3개 항목 읽기 전용 점검 |
 | [dev/IEUM_DDL_reset.sql](dev/IEUM_DDL_reset.sql) | **폐기 가능한 개발 DB 전용. 테이블 82개·시퀀스 66개와 데이터 삭제. 팀 DB 실행 금지** |
 
 ## 현재 팀 DB 상태
@@ -25,9 +27,13 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 
 - 티켓 VERSION, 문의 컬럼 3개, 부서명 UNIQUE, 채팅 읽음 복합 FK와 참조 키 반영.
 - 최신 시퀀스 정책은 기존 65개와 신규 1개 모두 **MAXVALUE 99999 / NOCYCLE**. 기존 시작값·현재 번호는 초기화하지 않는다. 근태정정 패치까지 적용 완료했다.
-- 근태정정 반영 후 공통 코드 229개. 기존 지정 코드 12개와 정정 상태 코드 5개 모두 Y. 팀 DB는 기존 `MSG_IMAGE=Y`를 유지해 Y가 114개이며, 신규 적재 파일은 Y 113개다.
+- 근태정정 반영 후 공통 코드 229개. 기존 지정 코드 12개와 정정 상태 코드 5개 모두 Y. 팀 DB는 기존 `MSG_IMAGE=Y`를 유지해 Y가 114개다. 신규 적재 파일은 11/03 연간·연장 코드 2개를 더해 Y 115개다.
 - PLAN_MONTHLY: 1개월·1인 4,000원·사용 Y. 시연 업체의 직원 지점 NULL 없음.
 - ieum0001: 기존 지점 포함 지점 4개·자산 6개. ieum0002: 지점 3개·자산 5개.
+
+## 연간 요금제·만료 전 연장 (11/03, 팀 DB 미적용)
+
+이미 11/02 패치가 적용된 기존 DB는 `patches/11-03_01_ANNUAL_RENEW_PATCH.sql` 실행 → `patches/11-03_02_ANNUAL_RENEW_CHECK.sql` PASS 확인 → 같은 연결에서 직접 `COMMIT;`한다. 신규 빈 DB는 `IEUM_COMMON_CODE_DML.sql`과 `IEUM_DEMO_SEED.sql`에 들어 있어 실행하지 않는다. 넣기 전에도 앱은 돈다: 이용 결제 화면에 월간만 나오고, 월간 연장은 된다.
 
 ## 신규 빈 개발 DB 실행 순서
 

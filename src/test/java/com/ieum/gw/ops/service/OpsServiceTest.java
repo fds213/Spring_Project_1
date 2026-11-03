@@ -278,7 +278,7 @@ class OpsServiceTest {
     @DisplayName("신청 현황: 유료 업체는 요금제·유료 기간·첫 결제 시각·실패 수를 보낸다")
     void paidApplication() {
         row(2, "ieum0002");
-        period(2, "PAID", true, 12);
+        period(2, "PAID", true, 12).setPlan("ANNUAL");
         OpsPaymentStatDTO stat = new OpsPaymentStatDTO();
         stat.setCompanyId(2L);
         stat.setPaidAt(LocalDateTime.parse("2026-11-02T14:00:00"));
@@ -288,7 +288,7 @@ class OpsServiceTest {
         OpsApplicationDTO application = service.listApplications().get(0);
         assertEquals(2L, application.getNo());
         assertTrue(application.isPaid());
-        assertEquals("MONTHLY", application.getPlan());
+        assertEquals("ANNUAL", application.getPlan());
         assertEquals("2026-11-02T14:00:00", application.getPaidAt());
         assertEquals("2026-11-02T00:00:00", application.getServiceFrom());
         assertEquals("2026-12-01T00:00:00", application.getEnd());
