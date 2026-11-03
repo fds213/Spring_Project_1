@@ -15,14 +15,12 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-ops-inquiry-guest">
-      <%-- 비회원 접수: 소개 사이트 도입 문의(WEB-02). 답변은 메일로 나간다. 발송 성공 뒤에만 "답변 완료" --%>
+      <%-- 비회원 접수: 소개 사이트 도입 문의(WEB-02). 답변 메일(WEB-03)은 메일 기능이 들어온 뒤 붙인다 --%>
       <div class="page-head"><h1>비회원 접수</h1></div>
       <div class="cards" id="guestFilters">
-        <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체 (스팸 제외)</small><strong id="gCntAll">0건</strong></button>
-        <button type="button" class="card card-filter" data-filter="WAIT" aria-pressed="false"><small>답변 대기</small><strong id="gCntWait">0건</strong></button>
-        <button type="button" class="card card-filter" data-filter="FAILED" aria-pressed="false"><small>발송 실패</small><strong id="gCntFailed">0건</strong></button>
-        <button type="button" class="card card-filter" data-filter="DONE" aria-pressed="false"><small>답변 완료</small><strong id="gCntDone">0건</strong></button>
-        <button type="button" class="card card-filter" data-filter="SPAM" aria-pressed="false"><small>스팸 숨김</small><strong id="gCntSpam">0건</strong></button>
+        <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체</small><strong id="gCntAll">0건</strong></button>
+        <button type="button" class="card card-filter" data-filter="IQ_RECEIVED" aria-pressed="false"><small>답변 대기</small><strong id="gCntWait">0건</strong></button>
+        <button type="button" class="card card-filter" data-filter="IQ_ANSWERED" aria-pressed="false"><small>답변 완료</small><strong id="gCntDone">0건</strong></button>
       </div>
       <div class="search-row">
         <input type="search" class="search-input" id="guestSearch" placeholder="이름·이메일·제목·내용·접수번호로 검색" aria-label="비회원 접수 검색" autocomplete="off">

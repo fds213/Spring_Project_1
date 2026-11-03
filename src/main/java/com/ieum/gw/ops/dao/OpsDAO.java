@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.ops.dto.OpsCompanyRowDTO;
 import com.ieum.gw.ops.dto.OpsEmployeeDTO;
+import com.ieum.gw.ops.dto.OpsGuestInquiryDTO;
 import com.ieum.gw.ops.dto.OpsPaymentStatDTO;
 import com.ieum.gw.ops.mapper.OpsMapper;
 
@@ -35,5 +36,15 @@ public class OpsDAO {
     /** 업체별 첫 결제 시각과 실패한 결제 수. 결제 기록이 없는 업체는 들어 있지 않다 */
     public List<OpsPaymentStatDTO> listPaymentStats() {
         return mapper.listPaymentStats();
+    }
+
+    /** 비회원 접수 전체, 최신 접수 순 */
+    public List<OpsGuestInquiryDTO> listGuestInquiries() {
+        return mapper.listGuestInquiries();
+    }
+
+    /** 아직 답하지 않은 비회원 접수 수 */
+    public int countWaitingGuestInquiries() {
+        return mapper.countWaitingGuestInquiries();
     }
 }
