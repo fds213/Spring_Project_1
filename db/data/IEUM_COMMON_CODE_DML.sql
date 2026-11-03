@@ -1,3 +1,5 @@
+-- 2026-11-02: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 229개 INSERT.
+-- 기존 DB에는 patches/11-02_02_DATA_PATCH.sql을 사용한다. 일부 적재된 DB에 이 파일 전체를 재실행하지 않는다.
 -- 대상: Oracle / COMMON_CODE
 -- 출처: https://docs.google.com/spreadsheets/d/1qBiMeyeUHtTa1W2TPY9VwphQEKBTNFclOThhCXRFbo0/edit
 -- 상위공통코드의 null 표기는 실제 NULL로 변환한다.
@@ -7,6 +9,7 @@
 
 SET DEFINE OFF
 SET SERVEROUTPUT ON
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 
 BEGIN
     SAVEPOINT SP_IEUM_COMMON_CODE;
@@ -49,7 +52,7 @@ BEGIN
     VALUES ('EMP_TYPE', NULL, '고용 형태', '직원의 고용 계약 형태', 'N', 0);
     -- 원본 시트 15행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('EMP_REGULAR', 'EMP_TYPE', '정규직', '기간을 정하지 않은 근로계약으로 고용된 직원', 'N', 1);
+    VALUES ('EMP_REGULAR', 'EMP_TYPE', '정규직', '기간을 정하지 않은 근로계약으로 고용된 직원', 'Y', 1);
     -- 원본 시트 16행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('EMP_CONTRACT', 'EMP_TYPE', '계약직', '계약 기간을 정하여 고용된 직원', 'N', 2);
@@ -204,7 +207,7 @@ BEGIN
     VALUES ('TK_EQUIPMENT', 'TICKET_TYPE', '장비 지급', '승인된 장비 신청에 따라 지급을 처리하는 티켓', 'Y', 2);
     -- 원본 시트 64행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('TK_QUESTION', 'TICKET_TYPE', 'IT 문의', '업체 내부 IT 사용 문의를 처리하는 티켓', 'N', 3);
+    VALUES ('TK_QUESTION', 'TICKET_TYPE', 'IT 문의', '업체 내부 IT 사용 문의를 처리하는 티켓', 'Y', 3);
     -- ASSET_STATUS : 자산 상태
     -- 원본 시트 65행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -268,7 +271,7 @@ BEGIN
     VALUES ('PLAN_MONTHLY', 'PLAN_TYPE', '월간', '1인 월 4,000원을 기준으로 달력 1개월을 구매하는 요금제', 'Y', 1);
     -- 원본 시트 84행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('PLAN_YEARLY', 'PLAN_TYPE', '연간', '달력 1년의 이용 기간을 구매하는 요금제', 'N', 2);
+    VALUES ('PLAN_YEARLY', 'PLAN_TYPE', '연간', '달력 1년의 이용 기간을 구매하는 요금제', 'Y', 2);
     -- ORDER_STATUS : 주문 상태
     -- 원본 시트 85행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -379,7 +382,7 @@ BEGIN
     VALUES ('FILE_ATTACHED', 'FILE_STATUS', '업무 연결 완료', '파일이 게시글 등 업무 자료에 연결된 상태', 'Y', 2);
     -- 원본 시트 118행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FILE_REMOVED', 'FILE_STATUS', '연결 해제·삭제 대상', '업무 자료와 연결이 해제되어 정리 대상인 상태', 'N', 3);
+    VALUES ('FILE_REMOVED', 'FILE_STATUS', '연결 해제·삭제 대상', '업무 자료와 연결이 해제되어 정리 대상인 상태', 'Y', 3);
     -- AUTH_PURPOSE : 인증 목적
     -- 원본 시트 119행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -520,7 +523,7 @@ BEGIN
     VALUES ('EV_MEETING', 'EVENT_TYPE', '회의', '회의 또는 협의 일정', 'N', 2);
     -- 원본 시트 162행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('EV_LEAVE', 'EVENT_TYPE', '휴가', '승인된 연차·반차에 연결된 일정', 'N', 3);
+    VALUES ('EV_LEAVE', 'EVENT_TYPE', '휴가', '승인된 연차·반차에 연결된 일정', 'Y', 3);
     -- 원본 시트 163행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('EV_COMPANY', 'EVENT_TYPE', '회사 행사', '업체의 행사 또는 공통 일정', 'N', 4);
@@ -543,35 +546,35 @@ BEGIN
     VALUES ('POST_STATUS', NULL, '게시글 상태', '게시글을 노출하거나 숨기는 상태', 'N', 0);
     -- 원본 시트 169행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('POST_PUBLISHED', 'POST_STATUS', '게시', '권한 있는 사용자가 조회할 수 있는 게시글', 'N', 1);
+    VALUES ('POST_PUBLISHED', 'POST_STATUS', '게시', '권한 있는 사용자가 조회할 수 있는 게시글', 'Y', 1);
     -- 원본 시트 170행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('POST_HIDDEN', 'POST_STATUS', '숨김', '내용을 보존하면서 화면 노출을 중지한 게시글', 'N', 2);
     -- 원본 시트 171행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('POST_REMOVED', 'POST_STATUS', '삭제 처리', '삭제 요청에 따라 조회 대상에서 제외한 게시글', 'N', 3);
+    VALUES ('POST_REMOVED', 'POST_STATUS', '삭제 처리', '삭제 요청에 따라 조회 대상에서 제외한 게시글', 'Y', 3);
     -- FILE_CATEGORY : 첨부 파일 종류
     -- 원본 시트 172행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('FILE_CATEGORY', NULL, '첨부 파일 종류', '파일 내용의 형식에 따른 분류', 'N', 0);
     -- 원본 시트 173행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_IMAGE', 'FILE_CATEGORY', '이미지', '사진 또는 그림 형식의 파일', 'N', 1);
+    VALUES ('FC_IMAGE', 'FILE_CATEGORY', '이미지', '사진 또는 그림 형식의 파일', 'Y', 1);
     -- 원본 시트 174행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_DOCUMENT', 'FILE_CATEGORY', '문서', 'PDF·워드 등 문서 형식의 파일', 'N', 2);
+    VALUES ('FC_DOCUMENT', 'FILE_CATEGORY', '문서', 'PDF·워드 등 문서 형식의 파일', 'Y', 2);
     -- 원본 시트 175행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_SPREADSHEET', 'FILE_CATEGORY', '스프레드시트', '엑셀·CSV 등 표 형식의 파일', 'N', 3);
+    VALUES ('FC_SPREADSHEET', 'FILE_CATEGORY', '스프레드시트', '엑셀·CSV 등 표 형식의 파일', 'Y', 3);
     -- 원본 시트 176행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_PRESENTATION', 'FILE_CATEGORY', '프레젠테이션', '슬라이드 형식의 파일', 'N', 4);
+    VALUES ('FC_PRESENTATION', 'FILE_CATEGORY', '프레젠테이션', '슬라이드 형식의 파일', 'Y', 4);
     -- 원본 시트 177행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_ARCHIVE', 'FILE_CATEGORY', '압축 파일', '여러 파일을 묶은 압축 파일', 'N', 5);
+    VALUES ('FC_ARCHIVE', 'FILE_CATEGORY', '압축 파일', '여러 파일을 묶은 압축 파일', 'Y', 5);
     -- 원본 시트 178행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('FC_OTHER', 'FILE_CATEGORY', '기타 파일', '다른 분류에 속하지 않는 파일', 'N', 6);
+    VALUES ('FC_OTHER', 'FILE_CATEGORY', '기타 파일', '다른 분류에 속하지 않는 파일', 'Y', 6);
     -- INQUIRY_TYPE : 홈페이지 문의 종류
     -- 원본 시트 179행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -632,7 +635,7 @@ BEGIN
     VALUES ('PP_FIRST', 'PAYMENT_PURPOSE', '최초 유료 전환', '무료 체험 업체가 유료 이용을 시작하는 결제', 'Y', 1);
     -- 원본 시트 197행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
-    VALUES ('PP_RENEW', 'PAYMENT_PURPOSE', '기간 연장', '기존 유료 이용 기간을 연장하는 결제', 'N', 2);
+    VALUES ('PP_RENEW', 'PAYMENT_PURPOSE', '기간 연장', '기존 유료 이용 기간을 연장하는 결제', 'Y', 2);
     -- 원본 시트 198행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('PP_CAPACITY', 'PAYMENT_PURPOSE', '인원 증설', '현재 이용 기간의 인원 한도를 늘리는 결제', 'N', 3);
@@ -730,7 +733,19 @@ BEGIN
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('NC_EMAIL', 'NOTIFICATION_CHANNEL', '이메일', '이메일 주소로 전달하는 알림', 'N', 2);
 
-    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 224행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
+    -- CORRECTION_STATUS : 근태 정정 상태 (2026-11-02 추가)
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('CORRECTION_STATUS', NULL, '근태 정정 상태', '직원의 근태 정정 요청 처리 상태', 'Y', 0);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_REQUESTED', 'CORRECTION_STATUS', '요청', '직원이 정정을 요청해 처리를 기다리는 상태', 'Y', 1);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_APPROVED', 'CORRECTION_STATUS', '승인', '부서장 또는 업체 관리자가 승인해 근태에 반영한 상태', 'Y', 2);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_REJECTED', 'CORRECTION_STATUS', '반려', '사유와 함께 돌려보낸 상태', 'Y', 3);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('ACR_CANCELED', 'CORRECTION_STATUS', '취소', '처리 전에 직원이 직접 취소한 상태', 'Y', 4);
+
+    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 229행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK TO SP_IEUM_COMMON_CODE;
@@ -738,7 +753,7 @@ EXCEPTION
 END;
 /
 
--- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 224)
+-- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 229)
 SELECT COUNT(*) AS TOTAL_COUNT,
        SUM(CASE WHEN USE_YN = 'Y' THEN 1 ELSE 0 END) AS Y_COUNT,
        SUM(CASE WHEN USE_YN = 'N' THEN 1 ELSE 0 END) AS N_COUNT,

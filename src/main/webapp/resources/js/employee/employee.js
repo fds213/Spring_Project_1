@@ -1,32 +1,31 @@
 // 인사 관리 > 사원 관리 (views/employee/admin/list.jsp)·가입 승인 (views/employee/join.jsp), 그리고 계정 생성·비밀번호 찾기
-// (views/common/join.jsp, join-password.jsp. 아직 이 파일을 불러오지 않는다: 백엔드 API가 생기면 그 주소에 맞춰 붙인다).
+// (views/common/join.jsp, join-password.jsp). 부서·직급 관리(org-admin.js)도 이 파일의 도구를 쓴다.
 // 계정이 생기는 흐름, 자리 수, 비활성화 규칙은 서버가 정하고 지킨다. 이번 구현 범위(요구분석서 3장 단순화 ①②):
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 브라우저 저장소를 쓰는 곳은 하나뿐이다: 계정 생성을 한 기기가 자기 요청(업체 코드·요청 번호)을 기억하는 MY_JOIN_KEY.
-// 화면을 닫았다 열어도 요청을 이어 보려는 것이다. 쿠키나 페이지에 둔 요청 번호로 바꿔도 된다.
+// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성뿐이다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
+// 승인 뒤 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(ieum-joined-id, 한 번 읽고 지움).
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
 // 서버는 공통 코드 테이블에서 읽는다.
-// 계정 형태 (ROLE): 한 계정에 하나. IT 담당·인사 담당은 역할이 아니라 소속 부서의 부서 형태로 정한다.
-const ROLE_CODE = { ROLE_OPR: '이음 운영자', ROLE_ADMIN: '업체 관리자', ROLE_USR: '업체 사용자' };
+// 계정 형태 (ROLE): 한 계정에 하나. 서버가 ROLE_* 코드를 그대로 준다. IT 담당·인사 담당도 역할로 정하고 부서 형태와는 상관없다.
+// 사원 관리는 업체 안 사람만 보여서 ROLE_OPS(이음 운영자)는 나오지 않는다
+const ROLE_CODE = { ROLE_ADMIN: '업체 관리자', ROLE_IT: 'IT 담당', ROLE_HR: '인사 담당', ROLE_EMP: '직원' };
 // 부서 형태 (DEPT_TYPE): 부서마다 하나 또는 없음(일반 부서, ''). 부서 관리(org-admin.js)에서 정한다.
-// IT 부서 사람은 IT 담당 메뉴, 인사 부서 사람은 인사 담당 메뉴를 받는다. 운영 부서는 아직 따로 붙는 메뉴가 없다.
+// 부서를 나누어 보이는 표시일 뿐 메뉴·권한은 주지 않는다(권한은 역할).
 const DEPT_TYPE = { DEPT_IT: 'IT 부서', DEPT_HR: '인사 부서', DEPT_OPS: '운영 부서' };
 const deptTypeLabel = type => DEPT_TYPE[type] || '일반';
-// 사원 관리의 담당 표시 (부서 형태가 주는 것)
-const DEPT_DUTY = { DEPT_IT: 'IT 담당', DEPT_HR: '인사 담당' };
 // 고용 형태 (EMP_TYPE), 성별 (GENDER): 사원 관리 > 인사 정보에서 정한다. 성별은 넣지 않아도 된다
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
 // 상태 (STATUS): 휴직 중에도 계정은 쓸 수 있어야 해서 두 칸에 나눠 담는다.
-//   계정 상태 status: ST_ACTIVE 사용 중 / ST_INACTIVE 비활성 (계정은 지우지 않고 비활성화만 한다)
+//   계정 상태 status (ACCOUNT_STATUS): ACTIVE 사용 중 / RETIRED 비활성 / REQUESTED 승인 대기 / ST_SUSPENDED 운영 차단 (계정은 지우지 않고 비활성화만 한다)
 //   재직 상태 work:   ST_SERVING 재직 / ST_LEAVE 휴직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
 const WORK_STATUS = { ST_SERVING: '재직', ST_LEAVE: '휴직', ST_RETIRED: '퇴사' };
-const EMP_STATUS = { ST_ACTIVE: '사용 중', ST_INACTIVE: '비활성' };
-// 꺼진 계정 (로그인 불가, 자리 없음)
-const offStatus = s => s === 'ST_INACTIVE';
+const EMP_STATUS = { REQUESTED: '승인 대기', ACTIVE: '사용 중', RETIRED: '비활성', ST_SUSPENDED: '운영 차단' };
+// 꺼진 계정: 비활성·운영 차단 (로그인 불가)
+const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
 
 // ---------- 화면 도구 ----------
 const $j = id => document.getElementById(id);
@@ -133,11 +132,10 @@ function drawEmployees(d) {
   const rows = d.items.map(e => {
     const tr = document.createElement('tr');
     tr.classList.toggle('is-inactive', offStatus(e.status));
-    const duty = DEPT_DUTY[e.deptType] || '';
     tr.append(
       cellOf('이름', whoCell(e)),
       cellOf('부서·직급', `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''} · ${e.rank}`),
-      cellOf('계정 형태', `${ROLE_CODE[e.role] || '-'}${duty && e.role !== 'ROLE_ADMIN' ? ` · ${duty}` : ''}`),
+      cellOf('계정 형태', ROLE_CODE[e.role] || '-'),
       cellOf('인사 정보', hrInfoText(e)),
       cellOf('상태', statusChip(e)),
       cellOf('등록일', ymd(e.at)),
@@ -178,7 +176,7 @@ function setHead(e, on, btn) {
     .done(r => showToast(r.head ? `${r.name}님을 ${r.dept} 부서장으로 지정했습니다. 그 부서의 가입 요청을 승인할 수 있습니다` : `${r.name}님의 부서장 지정을 해제했습니다`));
 }
 
-// mode: 'off' 비활성화 (ST_INACTIVE), 'on' 다시 사용
+// mode: 'off' 비활성화 (RETIRED), 'on' 다시 사용
 let stateTarget = null;
 const STATE_TEXT = {
   off: { title: n => `${n} 계정을 비활성화할까요?`, ok: () => '비활성화',
@@ -301,6 +299,7 @@ document.querySelectorAll('#seatDialog button').forEach(b => b.addEventListener(
 // 업체 관리자는 모든 요청을, 부서장은 자기 부서 요청만 본다 (서버가 골라 보낸다).
 let lastEmployees = null; // 사원 관리에서 마지막으로 받은 값 (다시 사용 전에 자리를 본다)
 let lastJoin = null; // 가입 승인에서 마지막으로 받은 값
+let joinWaiting = null; // 마지막으로 그린 승인 대기 수 (바뀌었을 때만 메뉴 배지를 다시 센다)
 let joinPickOpen = false; // 업체 관리자의 부서 목록이 펼쳐져 있다
 const scopeLabel = x => (x.all ? '업체 전체' : x.scope);
 
@@ -494,11 +493,13 @@ function drawJoin(d) {
   $j('joinList').replaceChildren(...rows);
   $j('joinEmpty').hidden = rows.length > 0;
 
-  setJoinBadge(open.length);
+  // 대기 수가 바뀌었으면(승인·반려, 새 요청) 메뉴 배지(common.js, GET /badges)도 15초 기다리지 않고 다시 센다.
+  // 처음 그릴 때는 common.js 가 이미 세었고, 30초마다 다시 그려도 수가 그대로면 묻지 않는다
+  if (joinWaiting !== null && joinWaiting !== open.length && window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
+  joinWaiting = open.length;
 }
 
-// 승인: 붙을 사번을 보여 주는 창. 고를 역할은 없다: 승인된 직원은 모두 업체 사용자(ROLE_USR)이고,
-// IT·인사 담당은 부서의 부서 형태로 정해진다 (공통 코드 시트)
+// 승인: 붙을 사번을 보여 주는 창. 고를 역할은 없다: 승인된 직원은 모두 직원(ROLE_EMP)으로 시작한다
 let approveTarget = null;
 function openApprove(e) {
   const d = lastJoin;
@@ -521,8 +522,7 @@ function openApprove(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`
-    + ({ DEPT_IT: ' IT 부서라 IT 담당 메뉴가 함께 보입니다.', DEPT_HR: ' 인사 부서라 인사 담당 메뉴가 함께 보입니다.' }[e.deptType] || '');
+  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
   if (!dialog.open) dialog.showModal();
 }
 
@@ -567,38 +567,19 @@ function askConfirm(title, body, okLabel, onOk, danger) {
   if (!dialog.open) dialog.showModal();
 }
 
-// 가입 승인 메뉴의 배지: 내가 처리할 수 있는 승인 대기 요청 수
-function setJoinBadge(count) {
-  const badge = $j('joinCount');
-  if (!badge) return;
-  badge.textContent = count;
-  badge.hidden = !count;
-}
-function refreshJoinBadge() {
-  const badge = $j('joinCount');
-  if (!badge) return;
-  // 이 메뉴가 보이지 않는 계정(업체 관리자·부서장이 아님, 운영자)은 묻지 않는다
-  const item = badge.closest('.nav-item');
-  if (item && (item.hidden || item.closest('[data-mode][hidden]'))) return setJoinBadge(0);
-  api.get('/employee/api/join/count').done(r => setJoinBadge(r.count));
-}
-
-// 사원 관리·가입 승인 중 열려 있는 화면과 배지를 다시 받는다 (상태를 바꾼 뒤에 부른다)
+// 사원 관리·가입 승인 중 열려 있는 화면을 다시 받는다 (상태를 바꾼 뒤에 부른다). 메뉴 배지는 common.js 가 /badges 로 맡는다
 function rerenderStaffViews() {
   if (viewShown('view-hr-employee')) renderEmployees();
-  if (viewShown('view-hr-join')) renderJoin(); else refreshJoinBadge();
+  if (viewShown('view-hr-join')) renderJoin();
 }
-// 새 요청이 들어왔는지 30초마다 본다. 탭이 보일 때만: 가입 승인이 열려 있으면 다시 그리고, 아니면 배지만.
-// 탭으로 돌아오면 바로 한 번
+// 새 요청이 들어왔는지 30초마다 본다. 탭이 보이고 가입 승인이 열려 있을 때만. 탭으로 돌아오면 바로 한 번
 function tickJoin() {
-  const badge = $j('joinCount');
-  if (document.hidden || !badge || badge.parentElement.closest('[hidden]')) return;
-  if (viewShown('view-hr-join')) renderJoin(); else refreshJoinBadge();
+  if (!document.hidden && viewShown('view-hr-join')) renderJoin();
 }
 setInterval(tickJoin, 30000);
 document.addEventListener('visibilitychange', tickJoin);
 
-// ---------- 로그인 화면: 계정 생성 ----------
+// ---------- 계정 생성 화면 (/join, common/join.jsp) ----------
 // 한 양식, 세 상태: 요청(가입이 열린 동안 업체 확인, 입력, 비밀번호, 승인 요청) → 대기("승인 요청을 하였습니다") →
 // 승인(계정이 만들어짐: 사번과 로그인으로 가는 버튼). 이번 범위(단순화 ①)는 직원 이메일 인증 코드 없이 요청한다.
 // 이 기기는 자기 요청을 기억한다(MY_JOIN_KEY).
@@ -608,11 +589,13 @@ const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEma
 let checkedCompany = ''; // 확인으로 맞춘 업체 코드 ('' = 아직)
 let joinNotice = ''; // 지난 요청이 끝난 이유 (반려, 없음). 양식을 고치면 지운다
 
-// 이 기기의 요청 { company, reqId }. 화면 JS가 브라우저 저장소를 쓰는 유일한 곳이다 (맨 위 주석)
+// 이 기기의 요청 { company, reqId } (맨 위 주석)
 const MY_JOIN_KEY = 'ieum-join-mine';
 const loadMyJoin = () => { try { return JSON.parse(localStorage.getItem(MY_JOIN_KEY)); } catch { return null; } };
 const saveMyJoin = v => { try { if (v) localStorage.setItem(MY_JOIN_KEY, JSON.stringify(v)); else localStorage.removeItem(MY_JOIN_KEY); } catch { /* 저장소가 막혔다 */ } };
 const joinReqUrl = mine => `/join/api/companies/${pathPart(mine.company)}/requests/${pathPart(mine.reqId)}`;
+// 승인 요청·취소가 403이면: 이 화면을 연 뒤 같은 브라우저에서 로그인·로그아웃해 보안 확인 값(CSRF)이 바뀐 것이다
+const joinFailText = xhr => (xhr.status === 403 ? '화면을 연 뒤 로그인 상태가 바뀌었습니다. 새로 고친 뒤 다시 해 주세요' : apiMessage(xhr));
 
 // 부서·직급 목록은 확인한 업체의 것. 확인 전에는 안내 한 줄만 있고 꺼져 있다
 function fillSelect(id, list, pick, code) {
@@ -634,8 +617,7 @@ function setCompanyNote(text, ok) {
   note.classList.toggle('is-bad', !!text && !ok);
 }
 
-// 확인: 가입이 열려 있으면 열린 부서와 직급을 불러온다. 아니면 화면에 아무것도 나오지 않는다(닫힌 업체와 없는 코드가 똑같이 보인다).
-// 너무 많이 틀리면 서버가 막고(429) 언제 다시 할 수 있는지 알려 준다
+// 확인: 가입이 열려 있으면 열린 부서와 직급을 불러온다. 아니면 서버의 안내를 보인다(닫힌 업체와 없는 코드는 같은 문구다)
 function checkCompany() {
   const code = $j('joinCompany').value.trim().toLowerCase();
   if (!code) return;
@@ -652,7 +634,7 @@ function checkCompany() {
       // select.js가 드롭다운을 켠 뒤에 (다음 틱에 다시 그린다)
       setTimeout(() => $j('joinDeptBtn')?.focus());
     })
-    .fail(xhr => { if (xhr.status === 429) setCompanyNote(apiMessage(xhr), false); })
+    .fail(xhr => { if ($j('joinCompany').value.trim().toLowerCase() === code) setCompanyNote(apiMessage(xhr), false); })
     .always(() => { btn.disabled = !!$j('btnJoinRequest').dataset.locked; });
 }
 $j('btnJoinCheck')?.addEventListener('click', checkCompany);
@@ -669,10 +651,6 @@ function onCompanyInput() {
   syncRequestButton();
 }
 $j('joinCompany')?.addEventListener('input', onCompanyInput);
-if (joinForm) {
-  setDeptOptions('', [], []);
-  $j('joinDept').disabled = $j('joinRank').disabled = true;
-}
 
 // 승인 요청 버튼: 업체 코드 확인, 이메일, 비밀번호(8자 이상, 두 번 같게)를 마칠 때까지 회색으로 꺼져 있다.
 // 위의 한 줄이 무엇이 남았는지 알려 준다
@@ -687,8 +665,8 @@ function syncRequestButton() {
   b.classList.toggle('btn-primary', on);
   const hint = $j('joinRequestHint');
   hint.hidden = !!b.dataset.locked || on || !!b.dataset.sending;
-  const missing = [!company && '업체 코드 확인', !email && '이메일', !pw && '비밀번호 정하기(8자 이상, 확인과 같게)'].filter(Boolean);
-  hint.textContent = `승인 요청 전에 남은 것: ${missing.join(' · ')}`;
+  const missing = [!company && '업체 코드 확인', !email && '이메일', !pw && '비밀번호 정하기\n(8자 이상, 확인과 같게)'].filter(Boolean);
+  hint.textContent = missing.join(' · ');
 }
 
 function setJoinStatus(text, kind) {
@@ -698,9 +676,8 @@ function setJoinStatus(text, kind) {
   s.hidden = !text;
 }
 
-// 끝난 요청의 이유 (서버의 reason)
+// 끝난 요청의 이유 (서버의 reason): 반려, 승인 뒤 비활성화된 계정(OFF)
 const JOIN_ENDED = {
-  OLD_FLOW: '이전 방식으로 처리된 요청입니다. 다시 승인 요청을 해 주세요.',
   OFF: '사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요.',
   REJECTED: '가입 요청이 반려되었습니다. 업체에 확인한 뒤 내용을 고쳐 다시 승인 요청을 해 주세요.',
   OTHER: '이 요청은 더 진행할 수 없습니다. 다시 승인 요청을 해 주세요.',
@@ -708,7 +685,6 @@ const JOIN_ENDED = {
 
 // 이 기기의 요청을 서버에 물어 양식을 그린다 (계정 생성을 열 때, 승인을 기다리는 동안 5초마다)
 function loadJoinForm() {
-  if (joinForm.hidden) return;
   const mine = loadMyJoin();
   if (!mine) return drawJoinForm(null, null);
   api.get(joinReqUrl(mine))
@@ -792,18 +768,16 @@ $j('joinEmail')?.addEventListener('input', syncRequestButton);
 
 ['joinPw', 'joinPw2'].forEach(id => $j(id)?.addEventListener('input', syncRequestButton));
 
-function showJoin(open) {
-  loginForm.hidden = open;
-  joinForm.hidden = !open;
-  $j('pwForm').hidden = true;
-  if (open) {
-    if (!loadMyJoin()) { $j('joinCompany').value = $j('loginCompany').value; onCompanyInput(); }
-    loadJoinForm();
-    $j('joinCompany').focus();
+// 계정 생성 화면(/join, common/join.jsp)을 열면: 이 기기가 보낸 요청이 있으면 그 상태로 그리고,
+// 없으면 로그인 화면에서 마지막에 쓴 업체 코드를 채워 둔다(login.jsp 의 ieum-last-company)
+if (joinForm) {
+  if (!loadMyJoin()) {
+    try { $j('joinCompany').value = localStorage.getItem('ieum-last-company') || ''; } catch { /* 저장소가 막혔다 */ }
   }
+  onCompanyInput(); // 확인 전: 부서·직급 목록을 비우고 끈다
+  loadJoinForm();
+  $j('joinCompany').focus();
 }
-$j('btnJoin')?.addEventListener('click', () => showJoin(true));
-$j('btnJoinBack')?.addEventListener('click', () => showJoin(false));
 
 // 승인 요청: 모든 칸을 먼저 확인한다. 업체가 지금 받을 수 없으면 서버가 이유를 붙여 거절한다
 $j('btnJoinRequest')?.addEventListener('click', () => {
@@ -828,7 +802,7 @@ $j('btnJoinRequest')?.addEventListener('click', () => {
       saveMyJoin(mine);
       drawJoinForm(mine, v);
     })
-    .fail(xhr => { error.textContent = apiMessage(xhr); })
+    .fail(xhr => { error.textContent = joinFailText(xhr); })
     .always(() => { b.dataset.sending = ''; syncRequestButton(); });
 });
 
@@ -844,10 +818,11 @@ $j('btnJoinCancel')?.addEventListener('click', () => {
   if (!mine) return after();
   whileSending($j('btnJoinCancel'), api.post(`${joinReqUrl(mine)}/delete`))
     .done(after)
-    .fail(xhr => { $j('joinError').textContent = apiMessage(xhr); });
+    .fail(xhr => { $j('joinError').textContent = joinFailText(xhr); });
 });
 
-// 로그인하러 가기 (승인으로 계정이 만들어진 뒤): 업체 코드와 사번을 채운 로그인 양식으로 돌아간다
+// 로그인하러 가기 (승인으로 계정이 만들어진 뒤): 로그인 화면으로 가서 업체 코드와 사번을 채워 둔다.
+// 주소에 사번을 싣지 않고 브라우저 저장소로 넘긴다(login.jsp 가 한 번 읽고 지운다). 비밀번호는 넘기지 않는다
 joinForm?.addEventListener('submit', ev => {
   ev.preventDefault();
   const mine = loadMyJoin();
@@ -856,27 +831,21 @@ joinForm?.addEventListener('submit', ev => {
     .done(x => {
       if (x.state !== 'APPROVED') return drawJoinForm(mine, x);
       saveMyJoin(null);
-      ['joinPw', 'joinPw2', 'joinName', 'joinEmail'].forEach(id => { $j(id).value = ''; });
-      checkedCompany = '';
-      setCompanyNote('', false);
-      setDeptOptions('', [], []);
-      showJoin(false);
-      $j('loginCompany').value = mine.company;
-      $j('loginId').value = x.empNo;
-      $j('loginError').textContent = `계정이 만들어졌습니다. 사번 ${x.empNo}와 요청할 때 정한 비밀번호로 로그인하세요.`;
-      $j('loginError').classList.add('is-ok');
-      $j('loginPw').focus();
+      try {
+        localStorage.setItem('ieum-last-company', mine.company);
+        sessionStorage.setItem('ieum-joined-id', x.empNo);
+      } catch { /* 저장소가 막혔다: 로그인 화면에서 직접 넣는다 */ }
+      location.href = pageHref('/login');
     })
     .fail(xhr => {
       if (xhr.status === 404) drawJoinForm(mine, null);
       else $j('joinError').textContent = apiMessage(xhr);
     });
 });
-$j('loginForm')?.addEventListener('input', () => $j('loginError').classList.remove('is-ok'));
 
-// 승인을 기다리는 동안 5초마다 서버에 다시 묻는다. 계정 생성 양식이 있는 페이지에서만
+// 끝난 요청의 안내는 양식을 고치기 시작하면 지운다. 승인을 기다리는 동안은 5초마다 서버에 다시 묻는다
 joinForm?.addEventListener('input', () => { if (joinNotice && !loadMyJoin()) { joinNotice = ''; setJoinStatus('', ''); } });
-if (joinForm) setInterval(() => { if (!joinForm.hidden && !document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
+if (joinForm) setInterval(() => { if (!document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
 
 // ---------- 로그인 화면: 비밀번호 찾기 ----------
 // 업체 코드 + 사번 → 계정을 만들 때의 이메일로 6자리 코드 → 맞으면 새 비밀번호(8자 이상, 두 번)로 바꾼다. 지금 비밀번호는 보여 주지 않는다

@@ -30,9 +30,14 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/approval/list` | `approval/list` |
 | `/ticket/new` | `ticket/new` |
 | `/ticket/mine` | `ticket/mine` |
+| `/ticket/admin/list` | `ticket/admin/list` (IT 담당·업체 관리자) |
 | `/asset/mine` | `asset/mine` |
 | `/attendance/my` | `attendance/my` |
+| `/attendance/leave` | `attendance/leave` |
+| `/attendance/admin/device` (업체 관리자·인사 담당) | `attendance/admin/device` (근태 단말기: 키 발급, 직원과 단말기 번호 연결) |
+| `/attendance/simulator` (로그인 없이) | `attendance/simulator` (지문 단말기 시뮬레이터. 출퇴근은 단말기 키로 `/api/attendance/**`에 보낸다) |
 | `/schedule/calendar` | `schedule/calendar` |
+| `/notification/list` | `notification/list` (헤더의 종 아이콘) |
 | `/employee/admin/list` | `employee/admin/list` |
 | `/employee/join` | `employee/join` |
 | `/employee/admin/dept` | `employee/admin/dept` |

@@ -3,10 +3,11 @@
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
   소개 사이트: 도입 문의 (GET /inquiry, 로그인 없이 연다).
-  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
+  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다. 입력 확인과 접수(POST /inquiry/api/submit)는 resources/js/site/inquiry.js.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:site title="도입 문의" current="inquiry" mainClass="inq-page">
+  <jsp:attribute name="scripts"><script src="${ctx}/resources/js/site/inquiry.js"></script></jsp:attribute>
   <jsp:body>
       <%-- 입력: 위에 제목·안내, 아래에 폼 (한 줄 구성) --%>
       <div class="wrap inq-layout" id="inqLayout">
@@ -71,7 +72,7 @@
             <div class="inq-agree form-row">
               <div class="agree-line">
                 <label class="check"><input type="checkbox" id="agree" name="agree" required> <span>[필수] 개인정보 수집 및 이용에 동의합니다.</span></label>
-                <button type="button" class="link-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
+                <button type="button" class="terms-btn" id="btnTerms" aria-expanded="false" aria-controls="terms">내용 보기</button>
               </div>
               <table class="terms" id="terms" hidden>
                 <tr><th>수집 항목</th><td>회사명, 이름, 이메일, 휴대전화</td></tr>
@@ -82,6 +83,8 @@
               <span class="field-error"></span>
             </div>
 
+            <%-- 칸과 상관없는 실패(너무 잦은 접수·서버 오류)의 안내. 칸이 틀린 실패는 그 칸 아래에 보인다 --%>
+            <p class="done err" id="inqError" role="alert" hidden></p>
             <div class="inq-submit">
               <button class="btn btn-primary btn-lg" type="submit" id="btnSubmit">문의 접수</button>
             </div>
@@ -91,9 +94,9 @@
 
       <%-- 접수 완료: 위의 안내와 폼을 숨기고 이 화면만 보여준다 (같은 페이지, AJAX 성공 후) --%>
       <div class="wrap inq-done" id="inqDone" hidden tabindex="-1">
-        <img class="done-mark" src="${ctx}/resources/img/logo-mark.png" alt="">
+        <img class="done-mark" src="${ctx}/resources/img/logo-mark.svg" alt="">
         <h2>문의가 접수되었습니다</h2>
-        <p>입력하신 이메일로 접수 내용을 보내 드렸고, 답변도 같은 주소로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
+        <p>답변은 입력하신 이메일로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
         <p class="done-no">접수번호 <strong id="doneNo"></strong></p>
         <dl class="inq-summary" id="summary"></dl>
         <div class="done-actions">

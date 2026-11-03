@@ -31,3 +31,92 @@ jobs:
           cache: maven
       - name: 빌드와 단위 테스트
         run: mvn -B -ntp clean verify
+
+  # 임시 Oracle에 db/ 스크립트를 넣고 Mapper SQL을 EXPLAIN PLAN으로 검사한다. 없는 표·칼럼과 문법 오류를 잡는다.
+  # build와 따로 돌고 필수 검사가 아니다. 값은 이 job 안에서만 쓰는 임시 DB의 비밀번호다.
+  db-check:
+    name: db-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      oracle:
+        image: gvenzl/oracle-xe:21-slim-faststart
+        env:
+          ORACLE_PASSWORD: ci_only_1234
+          APP_USER: ieum
+          APP_USER_PASSWORD: ci_only_1234
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+      - name: DB 스크립트 적용
+        run: bash .github/scripts/apply-db-scripts.sh "${{ job.services.oracle.id }}" XEPDB1 ci_only_1234
+      - name: Mapper SQL 검사
+        env:
+          IEUM_DB_CHECK_URL: jdbc:oracle:thin:@//localhost:1521/XEPDB1
+          IEUM_DB_CHECK_USER: ieum
+          IEUM_DB_CHECK_PASSWORD: ci_only_1234
+        run: mvn -B -ntp -Dtest=MapperSqlCheckIT test
+
+  # 앱을 실제 Tomcat에 올려 뜨는지 보고, JSP 전체 컴파일과 JS 문법 검사를 한다. 단위 테스트는 Spring 설정을 올리지 않아 이것들을 못 잡는다.
+  # build와 따로 돌고 필수 검사가 아니다. 한 검사가 실패해도 할 수 있는 나머지 검사는 끝까지 돈다. 값은 이 job 안에서만 쓰는 임시 DB의 비밀번호다.
+  app-check:
+    name: app-check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      oracle:
+        image: gvenzl/oracle-xe:21-slim-faststart
+        env:
+          ORACLE_PASSWORD: ci_only_1234
+          APP_USER: ieum
+          APP_USER_PASSWORD: ci_only_1234
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '11'
+          cache: maven
+      - name: JS 문법 검사
+        shell: bash
+        run: find src/main/webapp -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: WAR 만들기
+        id: war
+        if: ${{ !cancelled() }}
+        run: mvn -B -ntp -DskipTests package
+      - name: Tomcat 받기
+        id: tomcat
+        if: ${{ !cancelled() && steps.war.outcome == 'success' }}
+        run: bash .github/scripts/get-tomcat.sh "$RUNNER_TEMP/tomcat"
+      - name: JSP 컴파일 검사
+        if: ${{ !cancelled() && steps.tomcat.outcome == 'success' }}
+        run: bash .github/scripts/check-jsp.sh "$RUNNER_TEMP/tomcat" target/gw-1.0.0-SNAPSHOT
+      - name: DB 스크립트 적용
+        id: db
+        if: ${{ !cancelled() && steps.tomcat.outcome == 'success' }}
+        run: bash .github/scripts/apply-db-scripts.sh "${{ job.services.oracle.id }}" XEPDB1 ci_only_1234
+      - name: 앱 기동 검사
+        if: ${{ !cancelled() && steps.db.outcome == 'success' }}
+        run: bash .github/scripts/check-app-boot.sh "$RUNNER_TEMP/tomcat" target/gw-1.0.0-SNAPSHOT localhost:1521/XEPDB1 ci_only_1234

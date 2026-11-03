@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.employee.mapper.JoinMapper">
+
+	<!-- 서울 시각 -->
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+	</sql>
+
+	<!-- ❶ 업체 코드 -->
+	<select id="getCompanyCode" resultType="string">
+		SELECT company_code FROM
+		company WHERE company_id = #{companyId}
+	</select>
+
+	<!-- ❷ 내가 부서장인 부서 이름 (아니면 null) -->
+	<select id="getHeadDeptName" resultType="string">
+		SELECT department_name
+		FROM department
+		WHERE company_id = #{companyId}
+		AND head_employee_id =
+		#{employeeId}
+		AND use_yn = 'Y'
+		AND ROWNUM = 1
+	</select>
+
+	<!-- ❸ 부서 목록 (사용 중인 것만, 정렬 순서대로) -->
+	<select id="listDeptNames" resultType="string">
+		SELECT department_name
+		FROM department
+		WHERE company_id = #{companyId} AND use_yn = 'Y'
+		ORDER BY sort_order, department_id
+	</select>
+
+	<!-- ❹ 지금 가입이 열린 부서 (끝나는 시각이 지금보다 뒤) -->
+	<select id="listOpenings"
+		resultType="com.ieum.gw.employee.dto.JoinOpeningDTO">
+		SELECT d.department_name, d.join_open_until, d.join_opened_by,
+		e.employee_name AS opened_by_name
+		FROM department d
+		LEFT JOIN
+		user_account a ON a.user_account_id = d.join_opened_by
+		LEFT JOIN
+		employee e ON e.employee_id = a.employee_id
+		WHERE d.company_id =
+		#{companyId}
+		AND d.use_yn = 'Y'
+		AND d.join_open_until >
+		<include refid="now" />
+		ORDER BY d.sort_order, d.department_id
+	</select>
+
+	<!-- ❺ 사용 중 계정 수 (관리자 포함) -->
+	<select id="countActiveAccounts" resultType="int">
+		SELECT COUNT(*) FROM
+		user_account
+		WHERE company_id = #{companyId} AND status_code = 'ACTIVE'
+	</select>
+
+	<!-- ❻ 번호표 기계의 마지막 번호 (보기만, 잠그지 않음) -->
+	<select id="peekLastSerial" resultType="java.lang.Integer">
+		SELECT last_serial FROM
+		employee_no_counter WHERE company_id = #{companyId}
+	</select>
+
+	<!-- 가입 열기: 이 부서 줄에 "언제까지, 누가" 적기 -->
+	<update id="openDept">
+		UPDATE department
+		SET join_open_until = #{until},
+		join_opened_by =
+		#{openedBy},
+		updated_at =
+		<include refid="now" />
+		WHERE company_id = #{companyId}
+		AND department_name = #{deptName}
+		AND
+		use_yn = 'Y'
+	</update>
+
+	<!-- 한 부서 끄기: 시각 지우기 -->
+	<update id="closeDept">
+		UPDATE department
+		SET join_open_until = NULL,
+		join_opened_by = NULL,
+		updated_at =
+		<include refid="now" />
+		WHERE company_id = #{companyId}
+		AND department_name = #{deptName}
+	</update>
+
+	<!-- 모두 끄기: 이 업체에서 열려 있던 부서 전부 -->
+	<update id="closeAll">
+		UPDATE department
+		SET join_open_until = NULL,
+		join_opened_by = NULL,
+		updated_at =
+		<include refid="now" />
+		WHERE company_id = #{companyId}
+		AND join_open_until IS NOT NULL
+	</update>
+
+	<!-- 업체 코드로 업체 찾기 (계정 만들기 화면) -->
+	<select id="findCompanyByCode"
+		resultType="com.ieum.gw.employee.dto.JoinCompanyDTO">
+		SELECT company_id, company_name FROM company WHERE
+		company_code =
+		#{companyCode}
+	</select>
+
+	<!-- 직급 목록 (사용 중인 것만, 정렬 순서대로) -->
+	<select id="listGradeNames" resultType="string">
+		SELECT grade_name FROM
+		job_grade
+		WHERE company_id = #{companyId} AND use_yn = 'Y'
+		ORDER BY sort_order, job_grade_id
+	</select>
+
+	<!-- 지금 열려 있는 부서의 ID (이름으로). 닫혔거나 없으면 null -->
+	<select id="findOpenDeptId" resultType="java.lang.Long">
+		SELECT department_id FROM department
+		WHERE company_id = #{companyId}
+		AND department_name = #{deptName}
+		AND use_yn = 'Y'
+		AND join_open_until >
+		<include refid="now" />
+	</select>
+
+	<!-- 직급 ID (이름으로). 없으면 null -->
+	<select id="findGradeId" resultType="java.lang.Long">
+		SELECT job_grade_id FROM
+		job_grade
+		WHERE company_id = #{companyId}
+		AND grade_name = #{gradeName}
+		AND use_yn = 'Y'
+	</select>
+
+	<!-- 이 업체에서 같은 이메일로 대기 중이거나 쓰는 계정 수 (반려·취소된 것은 빼고) -->
+	<select id="countLiveEmail" resultType="int">
+		SELECT COUNT(*) FROM
+		user_account
+		WHERE company_id = #{companyId}
+		AND email = #{email}
+		AND
+		status_code NOT IN ('REJECTED', 'CANCELED')
+	</select>
+
+	<!-- 이 업체에서 같은 이메일의 비활성(RETIRED) 계정 수 -->
+	<select id="countRetiredEmail" resultType="int">
+		SELECT COUNT(*) FROM user_account
+		WHERE company_id = #{companyId}
+		  AND email = #{email}
+		  AND status_code = 'RETIRED'
+	</select>
+
+	<!-- 가입 요청 1줄. 번호를 먼저 뽑아 dto.accountRequestId에 넣음 -->
+	<insert id="insertRequest"
+		parameterType="com.ieum.gw.employee.dto.JoinRequestDTO">
+		<selectKey keyProperty="accountRequestId" resultType="long"
+			order="BEFORE">
+			SELECT SQ_ACCOUNT_REQUEST.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO account_request
+		(account_request_id, company_id,
+		user_account_id, request_name,
+		department_id, job_grade_id,
+		request_key_hash, requested_at)
+		VALUES
+		(#{accountRequestId},
+		#{companyId}, #{userAccountId}, #{requestName},
+		#{departmentId},
+		#{jobGradeId}, #{requestKeyHash},
+		<include refid="now" />
+		)
+	</insert>
+
+	<!-- 요청 1건 보기 (업체 코드 + 요청 키 해시가 둘 다 맞아야) -->
+	<select id="getRequestView"
+		resultType="com.ieum.gw.employee.dto.JoinRequestViewDTO">
+		SELECT r.account_request_id, r.status_code AS
+		request_status,
+		a.status_code AS account_status,
+		r.request_name,
+		d.department_name, g.grade_name,
+		a.email, a.user_account_id,
+		c.company_id, c.company_code,
+		c.company_name, e.employee_no
+		FROM account_request r
+		JOIN company c ON
+		c.company_id = r.company_id
+		JOIN user_account a ON a.user_account_id =
+		r.user_account_id
+		JOIN department d ON d.department_id =
+		r.department_id
+		LEFT JOIN job_grade g ON g.job_grade_id =
+		r.job_grade_id
+		LEFT JOIN employee e ON e.employee_id = a.employee_id
+		WHERE c.company_code = #{companyCode}
+		AND r.request_key_hash = #{keyHash}
+	</select>
+
+	<!-- 요청 취소: 대기 중일 때만. 바뀐 줄 수 (0이면 이미 처리됨) -->
+	<update id="cancelRequest">
+		UPDATE account_request
+		SET status_code = 'CANCELED',
+		canceled_at =
+		<include refid="now" />
+		,
+		updated_at =
+		<include refid="now" />
+		WHERE account_request_id = #{requestId}
+		AND company_id = #{companyId}
+		AND status_code = 'REQUESTED'
+	</update>
+
+	<!-- 그 요청의 계정도 취소 (대기 중일 때만) -->
+	<update id="cancelAccount">
+		UPDATE user_account
+		SET status_code = 'CANCELED',
+		updated_at =
+		<include refid="now" />
+		WHERE user_account_id = #{userAccountId}
+		AND company_id = #{companyId}
+		AND status_code = 'REQUESTED'
+	</update>
+
+    <!-- 가입 현황판: 승인 대기 목록 -->
+	<select id="listWaitingRequests" resultType="com.ieum.gw.employee.dto.JoinRequestViewDTO">
+	    SELECT r.account_request_id, r.status_code AS request_status, r.request_name, r.requested_at,
+	           d.department_name, g.grade_name, a.email, a.user_account_id, r.company_id
+	    FROM account_request r
+	    JOIN user_account a    ON a.user_account_id = r.user_account_id
+	                          AND a.company_id = r.company_id
+	    JOIN department d      ON d.department_id = r.department_id
+	    LEFT JOIN job_grade g  ON g.job_grade_id = r.job_grade_id
+	    WHERE r.company_id = #{companyId}
+	      AND r.status_code = 'REQUESTED'
+	    ORDER BY r.requested_at, r.account_request_id
+	</select>
+	
+		<!-- 승인·반려 전에 신청서 잡기 (동시에 두 번 처리 못 하게) -->
+	<select id="lockRequest" resultType="com.ieum.gw.employee.dto.JoinRequestViewDTO">
+	    SELECT r.account_request_id, r.status_code AS request_status, r.request_name,
+	           r.department_id, r.job_grade_id, r.user_account_id, r.company_id,
+	           d.department_name
+	    FROM account_request r
+	    JOIN department d ON d.department_id = r.department_id
+	    WHERE r.account_request_id = #{requestId}
+	      AND r.company_id = #{companyId}
+	    FOR UPDATE OF r.status_code
+	</select>
+	
+	<!-- 계정에 사원 연결하고 사용 시작 -->
+	<update id="activateAccount">
+	    UPDATE user_account
+	       SET employee_id  = #{employeeId},
+	           status_code  = 'ACTIVE',
+	           activated_at = <include refid="now"/>
+	     WHERE user_account_id = #{userAccountId}
+	       AND company_id = #{companyId}
+	       AND status_code = 'REQUESTED'
+	</update>
+	
+	<!-- 신청 승인 완료 -->
+	<update id="approveRequest">
+	    UPDATE account_request
+	       SET status_code         = 'APPROVED',
+	           reviewer_account_id = #{reviewerId},
+	           reviewed_at         = <include refid="now"/>,
+	           completed_at        = <include refid="now"/>,
+	           updated_at          = <include refid="now"/>
+	     WHERE account_request_id = #{requestId}
+	       AND company_id = #{companyId}
+	       AND status_code = 'REQUESTED'
+	</update>
+	
+	<!-- 신청 반려 (대기 중일 때만) -->
+	<update id="rejectRequest">
+		UPDATE account_request
+		   SET status_code         = 'REJECTED',
+		       reviewer_account_id = #{reviewerId},
+		       reviewed_at         = <include refid="now"/>,
+		       updated_at          = <include refid="now"/>
+		 WHERE account_request_id = #{requestId}
+		   AND company_id = #{companyId}
+		   AND status_code = 'REQUESTED'
+	</update>
+
+	<!-- 반려된 신청의 계정도 반려 (대기 중일 때만) -->
+	<update id="rejectAccount">
+		UPDATE user_account
+		   SET status_code = 'REJECTED',
+		       updated_at  = <include refid="now"/>
+		 WHERE user_account_id = #{userAccountId}
+		   AND company_id = #{companyId}
+		   AND status_code = 'REQUESTED'
+	</update>
+</mapper>

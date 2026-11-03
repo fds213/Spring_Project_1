@@ -3,14 +3,145 @@
 <mapper namespace="com.ieum.gw.employee.mapper.EmployeeMapper">
 
     <select id="listActiveEmp" resultType="com.ieum.gw.employee.dto.EmpSummaryDTO">
-        SELECT company_id, employee_id, employee_name, department_id, job_grade_id
-        FROM employee WHERE company_id = #{companyId}
+        SELECT e.company_id, e.employee_id, e.employee_name, e.department_id, e.job_grade_id,
+        d.department_name, g.grade_name
+        FROM employee e
+        JOIN user_account a ON a.company_id = e.company_id AND a.employee_id = e.employee_id
+        LEFT JOIN department d ON d.company_id = e.company_id AND d.department_id = e.department_id
+        LEFT JOIN job_grade g ON g.company_id = e.company_id AND g.job_grade_id = e.job_grade_id
+        WHERE e.company_id = #{companyId}
         <if test="excludeEmpId != null">
-            AND employee_id &lt;&gt; #{excludeEmpId}
+            AND e.employee_id &lt;&gt; #{excludeEmpId}
         </if>
-        AND employment_status = 'ST_SERVING'
-        ORDER BY employee_name
+        AND e.employment_status = 'ST_SERVING'
+        AND a.status_code = 'ACTIVE'
+        ORDER BY e.employee_name
+    </select>
+    
+	    <!-- 서울 시각 (테이블 기본값과 같은 기준) -->
+    <sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+    <!-- 새 업체의 사번 카운터 (last_serial 기본값 0) -->
+    <insert id="insertNoCounter">
+        INSERT INTO employee_no_counter (company_id) VALUES (#{companyId})
+    </insert>
+
+    <!-- 카운터 행 잠그고 마지막 번호 읽기. 트랜잭션이 끝날 때까지 다른 발급은 대기 -->
+    <select id="lockLastSerial" resultType="java.lang.Integer">
+        SELECT last_serial FROM employee_no_counter
+        WHERE company_id = #{companyId}
+        FOR UPDATE
     </select>
 
+    <!-- 올린 번호 저장 -->
+    <update id="updateLastSerial">
+        UPDATE employee_no_counter
+        SET last_serial = #{lastSerial}, updated_at = <include refid="now"/>
+        WHERE company_id = #{companyId}
+    </update>
 
+    <!-- 사원 1행. 번호를 먼저 뽑아 dto.employeeId에 넣음 -->
+    <insert id="insertEmployee" parameterType="com.ieum.gw.employee.dto.EmployeeDTO">
+        <selectKey keyProperty="employeeId" resultType="long" order="BEFORE">
+            SELECT SQ_EMPLOYEE.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO employee
+            (employee_id, company_id, employee_no, employee_name,
+             department_id, job_grade_id, hire_date, employment_status)
+        VALUES
+            (#{employeeId}, #{companyId}, #{employeeNo}, #{employeeName},
+             #{departmentId}, #{jobGradeId}, #{hireDate}, #{employmentStatus})
+    </insert>
+
+    <!-- 계정 1행. ACTIVE로 만들 때 activated_at도 기록 -->
+    <insert id="insertAccount" parameterType="com.ieum.gw.employee.dto.AccountDTO">
+        <selectKey keyProperty="userAccountId" resultType="long" order="BEFORE">
+            SELECT SQ_USER_ACCOUNT.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO user_account
+            (user_account_id, company_id, employee_id, email, password_hash,
+             role_code, status_code, activated_at)
+        VALUES
+            (#{userAccountId}, #{companyId}, #{employeeId}, #{email}, #{passwordHash},
+             #{roleCode}, #{statusCode},
+             CASE WHEN #{statusCode} = 'ACTIVE' THEN <include refid="now"/> END)
+    </insert>
+
+    <!-- 같은 업체 재직자인가 (사원 재직 + 계정 사용 중) -->
+    <select id="countActiveEmployee" resultType="int">
+        SELECT COUNT(*)
+        FROM employee e
+        JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+        WHERE e.company_id = #{companyId}
+          AND e.employee_id = #{employeeId}
+          AND e.employment_status = 'ST_SERVING'
+          AND a.status_code = 'ACTIVE'
+    </select>
+
+    <!-- 그 사원의 역할이 목록 중 하나인가 -->
+    <select id="countRole" resultType="int">
+        SELECT COUNT(*)
+        FROM user_account
+        WHERE company_id = #{companyId}
+          AND employee_id = #{employeeId}
+          AND role_code IN
+          <foreach collection="roleCodes" item="r" open="(" separator="," close=")">
+              #{r}
+          </foreach>
+    </select>
+    
+    	<!-- 다른 모듈용: 직원의 근무 지점 -->
+	<select id="getWorkBranchId" resultType="java.lang.Long">
+		SELECT branch_id FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
+
+	<!-- 다른 모듈용: 직원 ID → 이름 (퇴사자 포함) -->
+	<select id="listEmployeeNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+		SELECT employee_id AS id, employee_name AS name
+		FROM employee
+		WHERE company_id = #{companyId}
+		  AND employee_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
+	
+		<!-- 다른 모듈용: 계정 ID → 직원 이름 (사원이 연결된 계정만) -->
+	<select id="listAccountNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+		SELECT a.user_account_id AS id, e.employee_name AS name
+		FROM user_account a
+		JOIN employee e ON e.employee_id = a.employee_id AND e.company_id = a.company_id
+		WHERE a.company_id = #{companyId}
+		  AND a.user_account_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
+	
+		<!-- 다른 모듈용: 담당자로 고를 수 있는 사람 (재직 + 계정 사용 중 + 역할) -->
+	<select id="listAssignableEmployees" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+		SELECT e.employee_id, e.employee_name, d.department_name
+		FROM employee e
+		JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+		LEFT JOIN department d ON d.department_id = e.department_id
+		WHERE e.company_id = #{companyId}
+		  AND e.employment_status = 'ST_SERVING'
+		  AND a.status_code = 'ACTIVE'
+		  AND a.role_code IN
+		<foreach collection="roleCodes" item="role" open="(" separator="," close=")">#{role}</foreach>
+		ORDER BY d.sort_order, d.department_name, e.employee_name, e.employee_id
+	</select>
+	
+		<!-- 다른 모듈용: 사용 중 계정 수 (관리자 포함, 좌석 계산 기준) -->
+	<select id="countAccountsInUse" resultType="int">
+		SELECT COUNT(*) FROM user_account
+		WHERE company_id = #{companyId} AND status_code = 'ACTIVE'
+	</select>
+	
+	<!-- 다른 모듈용: 직원 ID → 이름·부서명 (퇴사자 포함, 부서 없으면 null) -->
+	<select id="listEmployeeNamesWithDept" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+		SELECT e.employee_id, e.employee_name, d.department_name
+		FROM employee e
+		LEFT JOIN department d ON d.department_id = e.department_id
+		WHERE e.company_id = #{companyId}
+		  AND e.employee_id IN
+		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+	</select>
 </mapper>

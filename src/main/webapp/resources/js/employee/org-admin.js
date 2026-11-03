@@ -5,20 +5,20 @@
 //   - 부서는 30개, 직급은 15개까지, 하나 이상 남긴다.
 //   - 사용 중 계정이나 아직 열린 가입 요청이 있으면 못 지운다. 비활성 계정만 남았으면 지울 수 있다(계정과 기록은 그대로 남는다).
 //     부서를 지우면 그 부서의 가입 활성화도 꺼진다.
-//   - 이름을 바꿔도 사람은 그대로 그 부서·직급에 있다 (게시판·일정·휴가 기록, 연차 경력도 따라간다).
+//   - 이름을 바꿔도 사람은 그대로 그 부서·직급에 있다 (게시판·일정·휴가 기록도 따라간다).
 //   - 직급은 위(낮은 직급)에서 아래(높은 직급) 순서다. 화살표로 순서를 바꾼다.
-//   - 부서 형태 (공통 코드 DEPT_TYPE: IT 부서, 인사 부서, 운영 부서, 없음 = 일반): 부서마다 고른다. IT 부서 사람은 IT 담당 메뉴, 인사 부서
-//     사람은 인사 담당 메뉴를 다음 화면부터 받는다. 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
+//   - 부서 형태 (공통 코드 DEPT_TYPE: IT 부서, 인사 부서, 운영 부서, 없음 = 일반): 부서마다 고른다. 부서를 나누어 보이는 표시이고
+//     메뉴·권한은 주지 않는다(권한은 계정의 역할). 여러 부서가 같은 형태여도 된다. 이름을 바꾸면 따라가고, 지우면 없어진다.
 //   - 읽기 전용 업체(이용 기간 끝남): 여기 버튼은 모두 쓰기라 흐리게 보이고(data-write) 서버가 403으로 거절한다.
 // 서버 API ({kind} = depts | ranks, {name}은 서버가 정하는 부서·직급 식별값(이름 또는 id)):
-//   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { all, inUse, retired, requests },
-//                                                      type, head (부서만: 부서 형태, 부서장 이름 | null), careerYears (직급만) }] }
+//   GET    /employee/admin/api/{kind}               → { max, items: [{ name, members: { inUse, retired, requests },
+//                                                      type, head (부서만: 부서 형태, 부서장 이름 | null) }] }
 //   POST   /employee/admin/api/{kind}               { name } → { name }                 409: 이미 있음, 개수 초과
 //   POST   /employee/admin/api/{kind}/{name}        { name } → { from, to, mySub }      mySub: 바뀐 내 헤더 표시("부서 · 직급") | null
 //   POST   /employee/admin/api/{kind}/{name}/delete → { name }                          409: 사용 중 계정·가입 요청이 있음, 마지막 하나
 //   POST   /employee/admin/api/{kind}/{name}/move   { dir: -1 | 1 } → { ok }
 //   POST   /employee/admin/api/depts/{name}/type    { type: DEPT_IT | DEPT_HR | DEPT_OPS | '' } → { name, type }
-// 같은 모듈의 employee/employee.js에서 cellOf, writeButton, askConfirm, DEPT_TYPE, deptTypeLabel, viewShown, readOnlyUi를 쓴다.
+// 같은 모듈의 employee/employee.js에서 cellOf, writeButton, askConfirm, DEPT_TYPE, deptTypeLabel, readOnlyUi를 쓴다.
 (() => {
   const ORG = {
     dept: { path: 'depts', word: '부서', topic: '부서는', obj: '부서를', prefix: 'dept' },
@@ -135,8 +135,7 @@
       api.post(url('dept', item.name, 'type'), { type })
         .done(r => {
           item.type = r.type;
-          const what = { DEPT_IT: ' 이 부서 직원에게 IT 담당 메뉴가 보입니다', DEPT_HR: ' 이 부서 직원에게 인사 담당 메뉴가 보입니다' }[r.type] || '';
-          showToast(`'${r.name}'의 부서 형태를 ${deptTypeLabel(r.type)}(으)로 바꿨습니다.${what}`);
+          showToast(`'${r.name}'의 부서 형태를 ${deptTypeLabel(r.type)}(으)로 바꿨습니다`);
         })
         .fail(xhr => { sel.value = item.type || ''; showToast(apiMessage(xhr)); })
         .always(() => { sel.disabled = readOnlyUi(); });
@@ -203,13 +202,6 @@
       tr.append(cellOf('순서', order), cellOf(word, nameCell));
       if (kind === 'dept') tr.append(cellOf('부서 형태', typeSelect(item)));
       tr.append(cellOf('인원', people));
-      if (kind === 'rank') {
-        // 연차 계산에서 이 직급의 이전 경력으로 치는 연수 (서버가 준 careerYears, 새 직급은 0년)
-        const c = document.createElement('span');
-        c.textContent = `${item.careerYears}년`;
-        if (!item.careerYears) c.className = 'muted';
-        tr.append(cellOf('연차 경력', c));
-      }
       if (kind === 'dept') {
         const h = document.createElement('span');
         h.textContent = item.head || '-';

@@ -25,6 +25,8 @@ const COLOR_RE = /^(#[0-9a-f]{3,6}|rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s
 
 function sanitizeHtml(html) {
   const doc = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html');
+  // <form>은 입력칸 이름(name="childNodes" 등)으로 자기 속성을 가려 아래 검사를 건너뛰게 할 수 있다. 내용째 먼저 지운다
+  Document.prototype.querySelectorAll.call(doc, 'form').forEach(f => Element.prototype.remove.call(f));
   const clean = node => {
     [...node.childNodes].forEach(child => {
       if (child.nodeType === Node.TEXT_NODE) return;
@@ -77,6 +79,8 @@ const byId = id => document.getElementById(id);
 const fmtDate = ymd;      // 2026.10.29 (util.js)
 const fmtTime = whenFull; // 2026.10.29 14:05 (util.js)
 const enc = encodeURIComponent;
+// 작성자 표시: 부서가 없는 사람(체험 신청으로 만든 관리자 등)은 이름만
+const writerLabel = x => [x.writerDept, x.writerName].filter(Boolean).join(' ');
 
 
 // 안내는 그룹웨어 토스트(util.js showToast)로
@@ -150,15 +154,15 @@ function renderPager(navId, state, pages, reload) {
   nav.hidden = pages <= 1;
 }
 
-// 목록 한 줄의 제목 칸: 제목 링크 + 댓글 수 [3] + 첨부 + 수정됨
+// 목록 한 줄의 제목 칸: 제목 링크 + 댓글 수 [3] + 첨부 클립 (수정 여부는 글 보기의 수정 시각으로 본다)
 function titleCell(href, row, before) {
   const td = el('td', { 'data-label': '제목' });
   const wrap = el('span');
   if (before) wrap.append(before);
   wrap.append(el('a', { href, class: 'notice-link' }, row.title));
   if (row.commentCount) wrap.append(el('span', { class: 'comment-badge', 'aria-label': `댓글 ${row.commentCount}개` }, `[${row.commentCount}]`));
-  if (row.fileCount) wrap.append(el('span', { class: 'file-tag', 'aria-label': `첨부파일 ${row.fileCount}개` }, '첨부'));
-  if (row.updatedAt) wrap.append(el('span', { class: 'edited-tag' }, '수정됨'));
+  // 첨부가 있으면 회색 클립 아이콘 (모양은 board.css의 .file-tag)
+  if (row.fileCount) wrap.append(el('span', { class: 'file-tag', role: 'img', title: `첨부파일 ${row.fileCount}개`, 'aria-label': `첨부파일 ${row.fileCount}개` }));
   td.append(wrap);
   return td;
 }
@@ -180,12 +184,53 @@ function liveSearch(inputId, formId, state, reload) {
   byId(formId).addEventListener('submit', e => { e.preventDefault(); clearTimeout(timer); run(); });
 }
 
-// 실패 안내: 볼 수 없거나 없는 글(404)이면 목록으로 돌려보낸다
+// 실패 안내: 볼 수 없거나 없는 글(404)이면 목록으로 돌려보낸다.
+// 화면을 옮기면 이 화면의 안내는 바로 사라지므로, toastAndGo(util.js)로 옮겨 간 목록에서 안내를 띄운다
 function failTo(listHash, fallback) {
   return xhr => {
-    toast(apiMessage(xhr, fallback));
-    if (xhr.status === 404) location.href = listHash;
+    if (xhr.status === 404) toastAndGo(apiMessage(xhr, fallback), listHash);
+    else toast(apiMessage(xhr, fallback));
   };
+}
+
+// 글을 열지 못했을 때(지워진 글·볼 수 없는 글·수정할 수 없는 글): 목록으로 튕기지 않고 그 자리에 안내와 버튼 하나를 보인다.
+// 튕기면 안내가 사라지고, 뒤로 가기를 누르면 이 주소로 돌아와 다시 튕겨서 뒤로 갈 수 없었다.
+// 안내 칸은 처음 한 번만 만들어 다른 화면(.view)들 뒤에 붙인다. 위에는 게시판 이름을 두어 어느 게시판인지 알 수 있게 한다
+function showMissing(key, title, desc, href, label) {
+  let sec = byId('view-board-missing');
+  if (!sec) {
+    sec = el('section', { class: 'view', id: 'view-board-missing' });
+    const views = document.querySelectorAll('.view');
+    views[views.length - 1].after(sec);
+  }
+  const head = el('div', { class: 'page-head' });
+  head.append(el('h1', {}, LIST_OF[key].title()));
+  const box = el('div', { class: 'board-missing', role: 'status' });
+  box.append(el('strong', { class: 'board-missing-title' }, title));
+  if (desc) box.append(el('p', { class: 'board-missing-desc' }, desc));
+  box.append(el('a', { class: 'btn btn-primary', href }, label));
+  sec.replaceChildren(head, box);
+  showSub('view-board-missing');
+}
+// 게시판마다 안내 글자 (다른 안내와 같이 '~습니다'로 쓰고, 공지·게시글에 맞춰 따로 적어 둔다)
+// title: 위에 보일 게시판 이름. 부서 게시판은 목록 제목에 부서 이름이 들어갈 수 있어 그 글자를 쓴다
+const LIST_OF = {
+  notice: {
+    path: '/board/notice', label: '공지 목록으로', title: () => '공지사항',
+    notFound: '공지를 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 공지입니다.',
+    loadFail: '공지를 불러오지 못했습니다', noEdit: '이 공지는 수정할 수 없습니다', noWrite: '공지를 쓸 수 없습니다', view: '공지 보기',
+  },
+  'board-dept': {
+    path: '/board/dept', label: '게시판 목록으로', title: () => byId('bListTitle')?.textContent.trim() || '부서 게시판',
+    notFound: '게시글을 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 게시글입니다.',
+    loadFail: '게시글을 불러오지 못했습니다', noEdit: '이 게시글은 수정할 수 없습니다', noWrite: '게시글을 쓸 수 없습니다', view: '게시글 보기',
+  },
+};
+// 글 보기·작성 화면을 열지 못한 응답을 안내로 바꾼다. 404는 '없거나 볼 수 없는 글', 그 밖(서버 오류 등)은 '불러오지 못함'
+function showOpenFailed(xhr, key) {
+  const t = LIST_OF[key];
+  if (xhr.status === 404) showMissing(key, t.notFound, t.notFoundDesc, pageHref(t.path), t.label);
+  else showMissing(key, t.loadFail, apiMessage(xhr, '잠시 뒤 다시 열어 주세요.'), pageHref(t.path), t.label);
 }
 
 
@@ -271,14 +316,14 @@ liveSearch('searchInput', 'searchForm', listState, loadList);
 // ---------- 2. 상세 ----------
 let current = null; // 열려 있는 공지 (상세 응답)
 
-// 볼 수 없는 공지(다른 부서 공지)와 없는 공지는 서버가 같은 말로 답한다 (다른 부서에 그런 공지가 있는지 드러내지 않게)
-const NOTICE_NOT_FOUND = '없는 공지이거나 볼 수 없는 공지입니다';
+// 볼 수 없는 공지(다른 부서 공지)와 없는 공지는 서버가 같은 404로 답하고, 화면도 같은 안내를 보인다
+// (다른 부서에 그런 공지가 있는지 드러내지 않게. showOpenFailed 참고)
 
 function openDetail(id) {
   const live = ticket();
   api.get(`/board/api/notices/${enc(id)}`)
     .done(n => { if (live()) { renderDetail(n); showSub('view-notice-detail'); } })
-    .fail(xhr => { if (live()) { toast(apiMessage(xhr, NOTICE_NOT_FOUND)); location.replace(pageHref('/board/notice')); } });
+    .fail(xhr => { if (live()) showOpenFailed(xhr, 'notice'); });
 }
 
 function renderDetail(n) {
@@ -286,7 +331,7 @@ function renderDetail(n) {
   byId('detailTitle').textContent = n.title;
 
   const who = el('span');
-  who.append(el('strong', {}, `${n.writerDept} ${n.writerName}`));
+  who.append(el('strong', {}, writerLabel(n)));
   const parts = [
     el('span', { class: `scope-tag${n.scope === ALL ? '' : ' is-dept'}` }, noticeScopeLabel(n.scope)),
     who, el('span', {}, `${fmtTime(n.createdAt)} 작성`),
@@ -354,22 +399,23 @@ function renderFilesBox(files, ids) {
   byId(ids.count).textContent = String(files.length);
   byId(ids.images).replaceChildren(...files.filter(isImage).map(f => {
     const b = el('button', { type: 'button', class: 'attach-thumb', 'aria-label': `${f.name} 크게 보기` });
-    const img = el('img', { src: f.url, alt: f.name, loading: 'lazy' });
+    const img = el('img', { src: pageHref(f.url), alt: f.name, loading: 'lazy' });
     b.append(img, el('span', {}, f.name));
     b.addEventListener('click', () => {
-      byId('imageDialogImg').src = f.url;
+      byId('imageDialogImg').src = pageHref(f.url);
       byId('imageDialogImg').alt = f.name;
-      byId('imageDialogDownload').href = f.url;
+      byId('imageDialogDownload').href = pageHref(f.url);
       byId('imageDialogDownload').setAttribute('download', f.name);
       confirmDialog('imageDialog');
     });
     return b;
   }));
+  // 파일 이름을 누르면 다운로드 (아이콘 + 이름 + 회색 크기)
   byId(ids.list).replaceChildren(...files.map(f => {
     const li = el('li');
-    li.append(el('span', { class: 'attach-name' }, f.name), el('small', {}, fmtSize(f.size)));
-    const a = el('a', { class: 'link-btn', href: f.url, download: f.name }, '내려받기');
-    li.append(a);
+    const a = el('a', { class: 'attach-link', href: pageHref(f.url), download: f.name, title: `${f.name} 다운로드` });
+    a.append(el('span', { class: 'attach-icon', 'aria-hidden': 'true' }), el('span', { class: 'attach-name' }, f.name)); // 문서 아이콘은 board.css
+    li.append(a, el('small', {}, fmtSize(f.size)));
     return li;
   }));
 }
@@ -441,7 +487,7 @@ async function deleteCommentAt(url, listHash, onDeleted) {
 // 부적절한 댓글을 정리할 수 있게 모든 댓글을 지울 수 있다 (서버가 canDelete로 알려 준다)
 function renderNoticeComments(n) {
   renderCommentList({ count: 'nCommentCount', empty: 'nCommentEmpty', list: 'nComments' }, n.comments, {
-    name: c => el('strong', {}, `${c.writerDept} ${c.writerName}`),
+    name: c => el('strong', {}, writerLabel(c)),
     onDelete: cid => deleteCommentAt(`/board/api/notices/${n.id}/comments/${cid}`, pageHref('/board/notice'),
       comments => { n.comments = comments; renderNoticeComments(n); }),
   });
@@ -462,7 +508,7 @@ byId('btnDelete')?.addEventListener('click', async () => {
   btn.disabled = true;
   // 권한·읽기 전용은 서버가 다시 확인한다
   api.post(`/board/api/notices/${n.id}/delete`)
-    .done(() => { toast('공지를 삭제했습니다'); location.href = pageHref('/board/notice'); })
+    .done(() => toastAndGo('공지를 삭제했습니다', pageHref('/board/notice')))
     .fail(failTo(pageHref('/board/notice')))
     .always(() => { btn.disabled = false; });
 });
@@ -475,7 +521,7 @@ byId('btnDelete')?.addEventListener('click', async () => {
 const SIZE_MIN = 10;
 const SIZE_MAX = 40;
 const SIZE_BASE = 15;
-const ZWSP = '​'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
+const ZWSP = '\u200B'; // 커서만 있을 때 크기를 바꾸면 그 자리에 넣어 두는 "보이지 않는 글자". 저장할 때 지운다
 const SWATCH_RGB = new Map(['#1f1f1d', '#a32d2d', '#185fa5', '#2b6a2f', '#8a4b08'].map(c => {
   const h = c.slice(1);
   return [c, `rgb(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)})`];
@@ -651,7 +697,7 @@ function makeEditor(areaId) {
   area.addEventListener('drop', e => e.preventDefault());
 
   // 바깥에서 쓰는 것
-  ed.html = () => sanitizeHtml(area.innerHTML.replace(/​/g, '')); // 저장할 서식 글 (걸러진 것)
+  ed.html = () => sanitizeHtml(area.innerHTML.replace(/\u200B/g, '')); // 저장할 서식 글 (걸러진 것)
   ed.text = () => textOf(ed.html());                                    // 서식을 뺀 글자 (글자 수·빈칸 검사)
   ed.set = html => {
     area.innerHTML = html ? sanitizeHtml(html) : '';
@@ -669,7 +715,7 @@ document.addEventListener('selectionchange', () => editors.forEach(ed => ed.onSe
 
 // ---------- 공통: 첨부파일 (공지 · 부서 게시판) ----------
 // 글 하나에 5개까지, 파일당 10MB (AGENTS.md 파일 규칙. 서버가 다시 검사한다)
-// 고른 파일은 data URL로 읽어 두었다가 저장할 때 JSON으로 보낸다. 서버가 파일 받는 방식(FormData·multipart 등)을 정하면 그에 맞춘다
+// 고르는 즉시 서버에 올려(POST /board/api/files, multipart) 파일 번호를 받아 두고, 글을 저장할 때 번호만 보낸다
 const FILE_MAX = 5;
 const FILE_SIZE_MAX = 10 * 1024 * 1024;
 // 첨부할 수 있는 확장자 (팀에서 정한 목록, 서버도 같은 목록으로 막는다):
@@ -680,16 +726,16 @@ const fileSig = files => files.map(f => f.id).join(',');
 // 글쓰기 화면의 "파일 선택" 묶음. ids: { pick, input, info, list, error }
 function makeFilePicker(ids) {
   if (!byId(ids.pick)) return null; // 이 페이지에 없는 게시판
-  const fp = { files: [] };
+  const fp = { files: [], uploading: false };
   fp.render = () => {
     byId(ids.info).textContent = fp.files.length ? `${fp.files.length} / ${FILE_MAX}개` : '선택한 파일 없음';
-    byId(ids.pick).disabled = fp.files.length >= FILE_MAX;
+    byId(ids.pick).disabled = fp.uploading || fp.files.length >= FILE_MAX;
     byId(ids.list).replaceChildren(...fp.files.map(f => {
       const li = el('li');
-      if (isImage(f)) li.append(el('img', { src: f.url || f.data, alt: '', class: 'attach-mini' }));
+      if (isImage(f)) li.append(el('img', { src: f.preview || pageHref(f.url), alt: '', class: 'attach-mini' }));
       li.append(el('span', { class: 'attach-name' }, f.name), el('small', {}, fmtSize(f.size)));
-      const del = el('button', { type: 'button', class: 'link-btn' }, '빼기');
-      del.setAttribute('aria-label', `${f.name} 첨부 빼기`);
+      const del = el('button', { type: 'button', class: 'link-btn' }, '삭제');
+      del.setAttribute('aria-label', `${f.name} 첨부 삭제`);
       del.addEventListener('click', () => {
         fp.files = fp.files.filter(x => x.id !== f.id);
         byId(ids.error).textContent = '';
@@ -708,36 +754,44 @@ function makeFilePicker(ids) {
     e.target.value = ''; // 같은 파일을 다시 골라도 change가 오게
     byId(ids.error).textContent = '';
     const errors = [];
+    const ok = []; // 화면 검사를 통과한 파일만 서버에 올린다 (서버가 형식·크기를 다시 검사한다)
     for (const file of picked) {
-      if (fp.files.length >= FILE_MAX) { errors.push(`첨부파일은 ${FILE_MAX}개까지입니다`); break; }
+      if (fp.files.length + ok.length >= FILE_MAX) { errors.push(`첨부파일은 ${FILE_MAX}개까지입니다`); break; }
       if (!FILE_EXT.test(file.name)) { errors.push(`${file.name}: 이미지·문서 파일만 올릴 수 있습니다`); continue; }
       if (file.size > FILE_SIZE_MAX) {
         errors.push(`${file.name}: 파일당 ${fmtSize(FILE_SIZE_MAX)}까지 올릴 수 있어요`);
         continue;
       }
-      const data = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.onerror = reject;
-        r.readAsDataURL(file);
-      }).catch(() => null);
-      if (!data) { errors.push(`${file.name}: 파일을 읽지 못했습니다`); continue; }
-      fp.files.push({ id: `f${Date.now()}${Math.random().toString(36).slice(2, 6)}`, name: file.name, size: file.size, type: file.type, data });
+      ok.push(file);
     }
     if (errors.length) byId(ids.error).textContent = [...new Set(errors)].join(' / ');
-    fp.render();
+    if (!ok.length) { fp.render(); return; }
+
+    // 서버에 올리기: 이름 "files"로 여러 개를 한 번에. 성공하면 [{ id, name, size, type }]
+    const form = new FormData();
+    ok.forEach(file => form.append('files', file));
+    fp.uploading = true;
+    byId(ids.info).textContent = '올리는 중…';
+    byId(ids.pick).disabled = true;
+    $.ajax({ url: pageHref('/board/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
+      .done(saved => {
+        // 이미지 미리보기는 내 컴퓨터의 파일로 바로 보여 준다 (아직 글에 붙기 전이라 내려받기 주소가 없다)
+        saved.forEach((f, i) => fp.files.push({ ...f, preview: isImage(f) ? URL.createObjectURL(ok[i]) : null }));
+      })
+      .fail(xhr => { byId(ids.error).textContent = apiMessage(xhr, '파일을 올리지 못했습니다'); })
+      .always(() => { fp.uploading = false; fp.render(); });
   });
   return fp;
 }
 
-// 저장할 첨부파일: 이미 올라가 있던 파일은 { id }만, 새로 고른 파일은 내용(data URL)까지 보낸다
-// (서버가 multipart로 받기로 하면 새 파일을 FormData에 담아 보낸다)
-const filesToSend = files => files.map(f => (f.data ? { name: f.name, size: f.size, type: f.type, data: f.data } : { id: f.id }));
+// 저장할 첨부파일: 파일은 고를 때 이미 서버에 올라가 있으므로 번호(id)만 보낸다.
+// 목록에서 뺀 파일은 보내지 않으면 서버가 공지에서 뗀다
+const filesToSend = files => files.map(f => ({ id: f.id }));
 
 // 작성 화면 공통 도구
 function updateCount(input, counter, max) {
   // 에디터(서식 글)는 서식을 뺀 글자 수를 센다
-  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/​/g, '')).length : byId(input).value.length;
+  const len = byId(input).isContentEditable ? textOf(byId(input).innerHTML.replace(/\u200B/g, '')).length : byId(input).value.length;
   byId(counter).textContent = `${len} / ${max}`;
   byId(counter).classList.toggle('is-full', len >= max);
 }
@@ -754,12 +808,14 @@ function validate(title, content) {
   if (content.length > CONTENT_MAX) return { field: 'content', message: `내용은 ${CONTENT_MAX}자까지 쓸 수 있습니다` };
   return null;
 }
-// 작성 화면을 열지 못했을 때: 안내하고, 수정 권한이 없으면 그 글로, 나머지(읽기 전용·권한 없음·없는 글)는 목록으로
-// 게시판 키 → 화면 주소 (formOpenFailed가 쓴다)
-const BOARD_PATH = { notice: '/board/notice', 'board-dept': '/board/dept' };
+// 작성 화면을 열지 못했을 때: 그 자리에 안내를 보인다 (목록으로 튕기지 않는다. showMissing 참고)
+// - 403(읽기 전용 업체·쓸 권한 없음·수정 권한 없음): 서버가 보낸 이유를 보이고, 수정이면 [글 보기], 새 글이면 목록으로
+// - 404(없거나 볼 수 없는 글)와 그 밖의 오류: 글 보기와 같은 안내
 function formOpenFailed(xhr, id, key) {
-  toast(apiMessage(xhr));
-  location.replace(id && xhr.status === 403 ? pageHref(`${BOARD_PATH[key]}/view/${id}`) : pageHref(BOARD_PATH[key]));
+  const t = LIST_OF[key];
+  if (xhr.status !== 403) { showOpenFailed(xhr, key); return; }
+  if (id) showMissing(key, t.noEdit, apiMessage(xhr), pageHref(`${t.path}/view/${id}`), t.view);
+  else showMissing(key, t.noWrite, apiMessage(xhr), pageHref(t.path), t.label);
 }
 // 저장 버튼: 보내는 동안 막고 "저장 중…"
 function setSaving(btnId, on, label) {
@@ -773,7 +829,7 @@ const noticeFiles = makeFilePicker({ pick: 'btnPickFiles', input: 'fFiles', info
 const editorHtml = () => noticeEditor.html();
 
 const formState = { id: null, initial: { title: '', content: '', pinned: false, scope: '', files: '' }, saving: false, leaving: false };
-const formOpen = () => byId('view-notice-form').classList.contains('on');
+const formOpen = () => !!byId('view-notice-form')?.classList.contains('on'); // 부서 게시판 페이지에는 이 화면이 없다
 const formDirty = () => formOpen() && !formState.leaving && !formState.saving &&
   (byId('fTitle').value !== formState.initial.title || editorHtml() !== formState.initial.content ||
    byId('fPinned').checked !== formState.initial.pinned || byId('fScope').value !== formState.initial.scope ||
@@ -794,12 +850,12 @@ function fillForm(res) {
   byId('fScope').disabled = res.scopeLocked;
   byId('fScopeHint').textContent = res.scopeLocked
     ? `부서장은 ${res.myDept} 공지만 쓸 수 있어요. ${res.myDept} 사람만 봅니다.`
-    : '전사 공지는 전 직원이, 부서 공지는 그 부서 사람만 봅니다.';
+    : '같은 업체 직원 모두가 봅니다.';
 
   formState.id = n ? n.id : null;
   formState.saving = false;
   byId('formTitle').textContent = n ? '공지 수정' : '공지 쓰기';
-  byId('formCrumb').textContent = n ? '수정' : '글쓰기';
+  if (byId('formCrumb')) byId('formCrumb').textContent = n ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('fScope').value = n ? n.scope : res.scopes[0];
   byId('fTitle').value = n ? n.title : '';
   noticeEditor.set(n ? n.content : '');
@@ -840,6 +896,7 @@ byId('fScope')?.addEventListener('change', () => { byId('fPinnedError').textCont
 byId('noticeForm')?.addEventListener('submit', e => {
   e.preventDefault();
   if (formState.saving) return; // 두 번 눌러도 한 번만 저장
+  if (noticeFiles.uploading) { toast('파일을 올리는 중입니다. 잠시 뒤 저장해 주세요'); return; }
   clearErrors();
   const title = byId('fTitle').value.trim();
   const content = editorHtml();
@@ -854,9 +911,8 @@ byId('noticeForm')?.addEventListener('submit', e => {
   setSaving('btnSave', true, '저장');
   (editing ? api.post(`/board/api/notices/${editing}`, body) : api.post('/board/api/notices', body))
     .done(r => {
-      toast(editing ? '공지를 수정했습니다' : '공지를 등록했습니다');
       if (!editing) { listState.page = 1; listState.q = ''; listState.tab = 'all'; }
-      location.href = pageHref(`/board/notice/view/${r.id}`);
+      toastAndGo(editing ? '공지를 수정했습니다' : '공지를 등록했습니다', pageHref(`/board/notice/view/${r.id}`));
     })
     .fail(xhr => {
       formState.saving = false;
@@ -864,7 +920,7 @@ byId('noticeForm')?.addEventListener('submit', e => {
       const msg = apiMessage(xhr);
       if (xhr.status === 409) byId('fPinnedError').textContent = msg; // 고정 5개가 꽉 참
       else if (xhr.status === 413) noticeFiles.error(msg);             // 파일이 너무 큼
-      else if (xhr.status === 404) { toast(msg); formState.leaving = true; location.href = pageHref('/board/notice'); }
+      else if (xhr.status === 404) { formState.leaving = true; toastAndGo(msg, pageHref('/board/notice')); } // 저장하는 사이 지워진 공지
       else toast(msg);
     });
 });
@@ -883,7 +939,6 @@ byId('btnCancel')?.addEventListener('click', async () => {
 //   (서버가 로그인한 사람의 부서와 글의 부서를 비교한다)
 // - 쓰기: 부서원 누구나. 수정·삭제는 글쓴이 본인만 (서버가 mine으로 알려 준다)
 // - 댓글: 부서원 누구나 등록, 본인 댓글만 삭제 (댓글 수정은 없음), 500자까지
-const NOT_FOUND = '없는 글이거나 볼 수 없는 글입니다';
 
 function routeBoard(action, id) {
   if (action === 'view') return openBoardDetail(id);
@@ -936,7 +991,7 @@ function openBoardDetail(id) {
   const live = ticket();
   api.get(`/board/api/dept/posts/${enc(id)}`)
     .done(p => { if (live()) { renderBoardDetail(p); showSub('view-board-detail'); } })
-    .fail(xhr => { if (live()) { toast(apiMessage(xhr, NOT_FOUND)); location.replace(pageHref('/board/dept')); } });
+    .fail(xhr => { if (live()) showOpenFailed(xhr, 'board-dept'); });
 }
 
 function renderBoardDetail(p) {
@@ -984,7 +1039,7 @@ byId('bBtnDelete')?.addEventListener('click', async () => {
   const btn = byId('bBtnDelete');
   btn.disabled = true;
   api.post(`/board/api/dept/posts/${p.id}/delete`)
-    .done(() => { toast('게시글을 삭제했습니다'); location.href = pageHref('/board/dept'); })
+    .done(() => toastAndGo('게시글을 삭제했습니다', pageHref('/board/dept')))
     .fail(failTo(pageHref('/board/dept')))
     .always(() => { btn.disabled = false; });
 });
@@ -994,7 +1049,7 @@ byId('bBtnDelete')?.addEventListener('click', async () => {
 const boardEditor = makeEditor('bContent');
 const boardFiles = makeFilePicker({ pick: 'bBtnPickFiles', input: 'bFiles', info: 'bFilesInfo', list: 'bFileList', error: 'bFilesError' });
 const boardFormState = { id: null, initial: { title: '', content: '', files: '' }, saving: false, leaving: false };
-const boardFormOpen = () => byId('view-board-form').classList.contains('on');
+const boardFormOpen = () => !!byId('view-board-form')?.classList.contains('on'); // 공지 페이지에는 이 화면이 없다
 const boardFormDirty = () => boardFormOpen() && !boardFormState.leaving && !boardFormState.saving &&
   (byId('bTitle').value !== boardFormState.initial.title || boardEditor.html() !== boardFormState.initial.content ||
    fileSig(boardFiles.files) !== boardFormState.initial.files);
@@ -1011,7 +1066,7 @@ function fillBoardForm(res) {
   boardFormState.id = p ? p.id : null;
   boardFormState.saving = false;
   byId('bFormTitle').textContent = p ? '글 수정' : '글쓰기';
-  byId('bFormCrumb').textContent = p ? '수정' : '글쓰기';
+  if (byId('bFormCrumb')) byId('bFormCrumb').textContent = p ? '수정' : '글쓰기'; // 위치 표시 칸이 없는 화면도 있다
   byId('bFormSub').textContent = `${res.dept} 게시판에 올라갑니다. ${res.dept} 사람만 볼 수 있어요.`;
   byId('bTitle').value = p ? p.title : '';
   boardEditor.set(p ? p.content : '');
@@ -1051,16 +1106,15 @@ byId('bForm')?.addEventListener('submit', e => {
   setSaving('bBtnSave', true, '저장');
   (editing ? api.post(`/board/api/dept/posts/${editing}`, body) : api.post('/board/api/dept/posts', body))
     .done(r => {
-      toast(editing ? '글을 수정했습니다' : '글을 등록했습니다');
       if (!editing) { boardState.page = 1; boardState.q = ''; }
-      location.href = pageHref(`/board/dept/view/${r.id}`);
+      toastAndGo(editing ? '글을 수정했습니다' : '글을 등록했습니다', pageHref(`/board/dept/view/${r.id}`));
     })
     .fail(xhr => {
       boardFormState.saving = false;
       setSaving('bBtnSave', false, '저장');
       const msg = apiMessage(xhr);
       if (xhr.status === 413) boardFiles.error(msg); // 파일이 너무 큼
-      else if (xhr.status === 404) { toast(msg); boardFormState.leaving = true; location.href = pageHref('/board/dept'); }
+      else if (xhr.status === 404) { boardFormState.leaving = true; toastAndGo(msg, pageHref('/board/dept')); } // 저장하는 사이 지워진 글
       else toast(msg);
     });
 });

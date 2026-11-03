@@ -1,16 +1,9 @@
 // IT 서비스(사원): 장애·문의 접수(ticket-new), 내 티켓(ticket-mine), 내 장비(asset-mine) (요구분석서 3.4 IT 티켓·자산, 지점).
 // 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
-// 장비 지급 신청서(전자결재)가 최종 승인되면 EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
+// 장비 지급 신청서(전자결재)가 최종 승인되면 TK_EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
 
-const TICKET_TYPE = { INCIDENT: '장애', INQUIRY: '문의', EQUIPMENT: '장비 지급' };
-// 티켓 상태 (AGENTS.md): 접수 → 배정 → 처리 중 → 처리 완료 → 종료(요청자 확인), 그 밖에 취소·반려
-const TICKET_STATUS = {
-  RECEIVED: '접수', ASSIGNED: '배정', IN_PROGRESS: '처리 중', RESOLVED: '처리 완료', CLOSED: '종료', CANCELED: '취소', REJECTED: '반려',
-};
-const TICKET_CLASS = {
-  RECEIVED: 'requested', ASSIGNED: 'requested', IN_PROGRESS: 'waiting', RESOLVED: 'paid', CLOSED: 'paid', CANCELED: 'expired', REJECTED: 'failed',
-};
+// 종류·상태 이름표(TICKET_TYPE, TICKET_STATUS, TICKET_CLASS)와 장비 종류(assetTypeName)는 util.js
 // 내 티켓 요약 카드는 세 묶음으로 센다: 접수(접수·배정), 처리 중, 완료(처리 완료·종료·취소·반려)
 const TICKET_GROUP = {
   RECEIVED: 'RECEIVED', ASSIGNED: 'RECEIVED', IN_PROGRESS: 'IN_PROGRESS', RESOLVED: 'DONE', CLOSED: 'DONE', CANCELED: 'DONE', REJECTED: 'DONE',
@@ -36,7 +29,7 @@ function openTicketNewView() {
   api.get('/ticket/api/form-options')
     .done(o => {
       itNew.opts = o;
-      itEl('ticketAsset').replaceChildren(new Option('(해당 없음)', ''), ...o.assets.map(a => new Option(`${a.name} (${a.serial})`, a.id)));
+      itEl('ticketAsset').replaceChildren(new Option('(해당 없음)', ''), ...o.assets.map(a => new Option(assetLabel(a), a.id)));
       itEl('ticketBranch').replaceChildren(...o.branches.map(b => new Option(b.name, b.id)));
       syncTicketBranch();
     })
@@ -47,8 +40,9 @@ function openTicketNewView() {
 // 실제 장애가 난 곳이 다르면 사원이 바꿔 접수한다
 function syncTicketBranch() {
   const o = itNew.opts || { assets: [], defaultBranchId: '' };
-  const asset = o.assets.find(a => a.id === itEl('ticketAsset').value);
-  const want = asset ? asset.branchId : o.defaultBranchId;
+  // 서버의 ID 는 숫자, select 값은 글자라서 글자로 맞춰 비교한다
+  const asset = o.assets.find(a => String(a.id) === itEl('ticketAsset').value);
+  const want = String(asset ? asset.branchId : o.defaultBranchId ?? '');
   if ([...itEl('ticketBranch').options].some(x => x.value === want)) itEl('ticketBranch').value = want;
   itEl('ticketBranchHint').textContent = asset ? '고른 자산이 있는 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요' : '근무 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요';
 }
@@ -62,7 +56,7 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   const body = itEl('ticketBody').value.trim();
   const branchId = itEl('ticketBranch').value;
   // 서버도 같은 검사를 다시 한다. 화면은 먼저 알려 줄 뿐이다
-  if (!['INCIDENT', 'INQUIRY'].includes(type)) { err.textContent = '구분을 골라 주세요'; return; }
+  if (!['TK_INCIDENT', 'TK_QUESTION'].includes(type)) { err.textContent = '구분을 골라 주세요'; return; }
   if (!title) { err.textContent = '제목을 입력해 주세요'; itEl('ticketTitle').focus(); return; }
   if (title.length > TICKET_TITLE_MAX) { err.textContent = `제목은 ${TICKET_TITLE_MAX}자까지 쓸 수 있습니다`; return; }
   if (!body) { err.textContent = '내용을 입력해 주세요'; itEl('ticketBody').focus(); return; }
@@ -70,14 +64,12 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   if (!branchId) { err.textContent = '접수 지점을 골라 주세요'; return; }
   const btn = itEl('ticketForm').querySelector('[type="submit"]');
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/ticket/api/tickets', { type, title, body, branchId, assetId: itEl('ticketAsset').value })
+  const assetId = itEl('ticketAsset').value;
+  api.post('/ticket/api/tickets', { type, title, body, branchId: Number(branchId), assetId: assetId ? Number(assetId) : null })
     .done(t => {
       itEl('ticketForm').reset();
       err.textContent = '';
-      itMine.open = t.id; // 접수하면 방금 만든 티켓이 열린 채로 내 티켓으로 간다
-      itMine.filter = 'all';
-      showToast(`${t.id} 접수했습니다. IT 담당자에게 전달됩니다`);
-      location.href = pageHref('/ticket/mine');
+      toastAndGo(`${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`, pageHref('/ticket/mine'));
     })
     .fail(xhr => { err.textContent = apiMessage(xhr); })
     .always(() => { if (btn) btn.disabled = false; });
@@ -133,18 +125,26 @@ document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.addEvent
 function ticketDetail(t) {
   const info = itNode('dl', 'detail');
   [['번호', t.id], ['구분', TICKET_TYPE[t.type] || '-'], ['접수 지점', t.branchName],
-    ['관련 자산', t.asset ? `${t.asset.name} (${t.asset.serial})` : '-'], ['제목', t.title], ['내용', t.body]]
+    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', text(t.body)]]
     .forEach(([k, v]) => info.append(itNode('dt', '', k), itNode('dd', '', v)));
 
-  const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', itNode('span', '', `${whenFull(h.at)} · ${h.name} · ${h.text}`))));
+  const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', text(`${whenFull(h.at)} · ${h.name} · ${h.text}`))));
   const comments = itNode('ul', 'bill-history', ...(t.comments.length
-    ? t.comments.map(c => itNode('li', '', itNode('span', '', `${whenFull(c.at)} · ${c.name} · ${c.body}`)))
+    ? t.comments.map(c => itNode('li', '', text(`${whenFull(c.at)} · ${c.name} · ${c.body}`)))
     : [itNode('li', '', itNode('span', 'muted', '아직 댓글이 없습니다'))]));
 
   const parts = [itNode('section', 'info-card', itNode('header', 'info-card-head', itNode('h2', '', '접수 내용')), info),
     itNode('section', 'info-card', itNode('header', 'info-card-head', itNode('h2', '', '처리 이력')), log,
       itNode('header', 'info-card-head', itNode('h2', '', '댓글')), comments)];
 
+  // 처리 완료된 티켓: 해결 결과를 보고 확인하면 종료된다(요청서. 다시 요청은 이번 범위가 아니다)
+  if (t.canClose) {
+    const ok = itButton('확인(종료)', 'btn btn-primary');
+    ok.addEventListener('click', () => closeTicket(t, ok));
+    parts[1].prepend(itNode('header', 'info-card-head', itNode('h2', '', '처리 결과 확인')),
+      itNode('p', 'muted inq-body', '처리 이력의 해결 결과를 확인해 주세요. 확인하면 종료됩니다.'),
+      itNode('div', 'inq-body', itNode('div', 'inq-actions', ok)));
+  }
   if (t.canComment) {
     // 완료되면 더 쓰지 않는다. 처리 중에도 사원이 추가로 알릴 것이 있으면 댓글로 남긴다
     const box = itNode('textarea', 'inq-text');
@@ -155,7 +155,7 @@ function ticketDetail(t) {
     send.addEventListener('click', () => addComment(t.id, box.value, send));
     parts[1].append(itNode('div', 'inq-body', box, itNode('div', 'inq-actions', send)));
   }
-  return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1], ...(parts[2] ? [itNode('section', 'info-card', parts[2])] : [])));
+  return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1]));
 }
 
 // 쓰는 버튼: 읽기 전용 업체에서는 누르지 못하게 data-write 를 단다
@@ -164,6 +164,15 @@ function itButton(label, cls) {
   b.type = 'button';
   b.dataset.write = '';
   return b;
+}
+
+// 확인(종료): ticket 모듈 담당이 확정한 규격(11/3). 서버가 canClose 를 준 처리 완료 티켓에만 보인다.
+// POST /ticket/api/tickets/{id}/close { version }. 그사이 상태가 바뀌었으면 409
+function closeTicket(t, btn) {
+  btn.disabled = true;
+  api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/close`, { version: t.version })
+    .done(() => { showToast(`${t.id}번 티켓을 종료했습니다`); loadTicketMine(); })
+    .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
 }
 
 function addComment(id, bodyRaw, btn) {
@@ -192,23 +201,18 @@ function renderAssetMine() {
   itEl('assetCntUse').textContent = `${assets.length}개`;
   itEl('assetCntWait').textContent = `${waiting.length}건`;
 
-  const emptyRow = (cols, label) => {
-    const td = itNode('td', '', label);
-    td.colSpan = cols;
-    return itNode('tr', 'row-empty', td);
-  };
   itEl('assetList').replaceChildren(...(assets.length ? assets.map(a => itNode('tr', '',
     itCell('장비', itNode('span', '', a.name)),
-    itCell('일련번호', itNode('span', '', a.serial)),
+    itCell('일련번호', itNode('span', '', a.serial || '-')),
     itCell('배치 지점', itNode('span', '', a.branchName)),
     itCell('지급일', itNode('span', '', ymd(a.assignedAt))),
     itCell('지급 티켓', itNode('span', '', a.ticketId || '-')))) : [emptyRow(5, '지급된 장비가 없습니다')]));
   itEl('assetWaitList').replaceChildren(...(waiting.length ? waiting.map(t => itNode('tr', '',
     itCell('티켓', itNode('span', '', t.id)),
-    itCell('신청 장비', itNode('span', '', `${t.kind} ${t.qty}대`)),
+    itCell('신청 장비', itNode('span', '', `${assetTypeName(t.kind)} ${t.qty}대`)),
     itCell('수령 지점', itNode('span', '', t.branchName)),
     itCell('상태', itNode('span', `status status-${TICKET_CLASS[t.status]}`, TICKET_STATUS[t.status])))) : [emptyRow(4, '지급을 기다리는 신청이 없습니다')]));
 }
 itEl('btnAssetRequest')?.addEventListener('click', () => {
-  startApprovalWrite('EQUIP'); // 전자결재 장비 지급 신청서로 간다 (util.js)
+  startApprovalWrite('DOC_EQUIPMENT'); // 전자결재 장비 지급 신청서로 간다 (util.js)
 });

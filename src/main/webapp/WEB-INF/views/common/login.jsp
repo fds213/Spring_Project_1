@@ -36,8 +36,8 @@
   <section class="login-screen" id="appOnlyScreen" hidden>
     <div class="login-box app-only">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <h1>IEUM 그룹웨어는 앱에서 사용합니다</h1>
       <p>앱을 설치하면 바탕화면이나 홈 화면의 IEUM 앱에서 바로 로그인할 수 있습니다.</p>
@@ -48,8 +48,8 @@
   <section class="login-screen" id="loginScreen">
     <div class="login-box">
       <div class="login-brand">
-        <img src="${ctx}/resources/img/logo-mark.png" alt="" class="brand-mark">
-        <img src="${ctx}/resources/img/logo-wordmark.png" alt="IEUM" class="brand-word">
+        <img src="${ctx}/resources/img/logo-mark.svg" alt="" class="brand-mark">
+        <img src="${ctx}/resources/img/logo-wordmark.svg" alt="IEUM" class="brand-word">
       </div>
       <form id="loginForm" action="${ctx}/login" method="post" novalidate>
         <sec:csrfInput />
@@ -98,6 +98,18 @@
       var button = document.getElementById('btnLogin');
       var sending = false;
       try { if (!company.value) company.value = localStorage.getItem('ieum-last-company') || ''; } catch (e) { /* 저장소 막힘 */ }
+      // 계정 생성(/join)에서 승인된 뒤 넘어오면 사번을 채우고 안내한다(employee.js 가 넘긴 값, 한 번만 쓴다)
+      try {
+        var joined = sessionStorage.getItem('ieum-joined-id');
+        if (joined) {
+          sessionStorage.removeItem('ieum-joined-id');
+          document.getElementById('loginId').value = joined;
+          error.textContent = '계정이 만들어졌습니다. 사번 ' + joined + '와 요청할 때 정한 비밀번호로 로그인하세요.';
+          error.classList.add('is-ok');
+          form.addEventListener('input', function () { error.classList.remove('is-ok'); }, { once: true });
+          document.getElementById('loginPw').focus();
+        }
+      } catch (e) { /* 저장소 막힘 */ }
       form.addEventListener('submit', function (e) {
         // 두 번 누르거나 Enter와 클릭이 겹쳐도 한 번만 보낸다. 같은 순간 두 번 가면 세션과 CSRF 토큰이
         // 엇갈려 로그인이 풀리거나 403이 난다

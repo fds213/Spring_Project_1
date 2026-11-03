@@ -3,21 +3,23 @@
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
   소개 사이트: 2주 무료 체험 신청 (GET /trial, 로그인 없이 연다).
-  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다.
+  헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다. 단계 넘기기와 신청(POST /trial/api/apply)은 resources/js/site/trial.js.
+  인증 메일은 아직 없다: 신청하면 바로 로그인할 수 있다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:site title="2주 무료 체험 신청" cta="false" mainClass="section" mainStyle="padding-top: 56px">
+  <jsp:attribute name="scripts"><script src="${ctx}/resources/js/site/trial.js"></script></jsp:attribute>
   <jsp:body>
       <div class="wrap" style="max-width: 760px">
         <div class="section-head" style="margin-bottom: 28px">
           <h2>2주 무료 체험 신청</h2>
-          <p class="lead">결제 없이 바로 시작합니다. 신청하면 업체와 관리자 계정이 바로 만들어지고, 이메일 인증을 마치면 로그인할 수 있습니다. 관리자를 포함해 10명까지 써 볼 수 있고, 결제는 체험 중 언제든 그룹웨어 안에서 합니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.</p>
+          <p class="lead">결제 없이 바로 시작합니다. 신청하면 업체와 관리자 계정이 바로 만들어지고, IEUM 앱을 설치해 곧바로 로그인할 수 있습니다. 관리자를 포함해 10명까지 써 볼 수 있고, 결제는 체험 중 언제든 그룹웨어 안에서 합니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.</p>
         </div>
 
         <ol class="stepper" id="stepper">
           <li data-step="1">1. 정보 입력</li>
           <li data-step="2">2. 신청 확인</li>
-          <li data-step="3">3. 이메일 인증</li>
+          <li data-step="3">3. 신청 완료</li>
         </ol>
 
         <%-- 1. 정보 입력 --%>
@@ -29,7 +31,7 @@
             <div class="form-row"><label for="pCode">업체 코드</label><output class="input input-readonly" id="pCode" aria-describedby="pCodeHint"></output><span class="field-hint" id="pCodeHint">자동으로 정해지며, 사번과 함께 로그인할 때 씁니다</span><span class="field-error" id="pCodeError"></span></div>
             <%-- 무료 체험 양식이라 인원은 1~10명만 받는다 (체험 중 계정 한도 = 관리자 포함 10명). 유료 인원은 이용 결제 1단계에서 다시 정한다 --%>
             <div class="form-row"><label for="pUsers">이용 인원</label><input class="input" id="pUsers" type="number" min="1" max="10" value="10" inputmode="numeric" aria-describedby="pUsersHint"><span class="field-hint" id="pUsersHint">관리자 포함 최대 10명 (체험 중 계정 한도)</span><span class="field-error"></span></div>
-            <div class="form-row"><label for="pEmail">담당자 이메일</label><input class="input" id="pEmail" type="email" autocomplete="email" placeholder="name@company.com" aria-describedby="pEmailHint"><span class="field-hint" id="pEmailHint">이 주소로 인증 메일이 갑니다. 인증을 마쳐야 로그인할 수 있습니다</span><span class="field-error"></span></div>
+            <div class="form-row"><label for="pEmail">담당자 이메일</label><input class="input" id="pEmail" type="email" autocomplete="email" placeholder="name@company.com" aria-describedby="pEmailHint"><span class="field-hint" id="pEmailHint">업체 담당자 연락처이자 관리자 계정의 이메일입니다</span><span class="field-error"></span></div>
           </div>
           <h3 style="margin-top: 24px">최초 관리자 계정</h3>
           <p class="note" style="margin-top: -8px">체험이 시작되면 이 계정으로 로그인하고, 직원들이 로그인 화면의 계정 생성으로 요청한 계정을 승인합니다(관리자 포함 10명까지).</p>
@@ -58,10 +60,12 @@
           <p class="note">결제는 체험 중 그룹웨어의 업체 관리 &gt; 이용 결제에서 합니다. 그때 유료로 쓸 인원과 월간·연간을 고르고(1인 월 4,000원, 첫 연간 10% 할인), 결제한 날부터 바로 유료로 바뀌고 10명 제한이 풀립니다. 자동 결제는 없고 만료 전에 직접 연장합니다.</p>
           <div class="form-row" style="margin-top: 16px"><label class="check"><input type="checkbox" id="pAgree"> 시연용 서비스 이용 조건에 동의합니다.</label><span class="field-error"></span></div>
           <div class="actions"><button class="btn btn-lg" type="button" data-go="1">이전</button><button class="btn btn-primary btn-lg" type="submit">무료 체험 시작</button></div>
+          <%-- 칸과 상관없는 실패(업체 코드 소진·서버 오류)의 안내. 칸이 틀린 실패는 1단계 그 칸 아래에 보인다 --%>
+          <p class="done err" id="trialError" role="alert" hidden></p>
         </form>
 
-        <%-- 3. 결과: 신청 완료 + 이메일 인증 안내 (ACC-02·06) --%>
-        <div class="box step" id="step3" hidden aria-live="polite"></div>
+        <%-- 3. 신청 완료: 로그인에 필요한 업체 코드와 관리자 사번을 크게 보인다 (trial.js 가 채운다) --%>
+        <div class="box step" id="step3" hidden aria-live="polite" tabindex="-1"></div>
       </div>
   </jsp:body>
 </ui:site>

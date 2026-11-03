@@ -11,6 +11,7 @@ import java.time.LocalDate;
 @Setter
 @ToString
 public class HolidayDTO {
+    private Long holidayId;        // holiday_id (휴일 관리 화면에서 지울 때)
     private LocalDate holidayDate; // holiday_date
     private String holidayName;    // holiday_name
 }

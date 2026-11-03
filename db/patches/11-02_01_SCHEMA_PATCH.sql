@@ -1,0 +1,228 @@
+-- 기존 팀 DB용 11/02 구조 패치. 테이블/데이터/시퀀스를 삭제하거나 시작 번호를 재설정하지 않는다.
+-- 앱 쓰기 작업을 멈추고 IEUM 별도 연결에서 SQL Developer F5 / SQLcl / SQL*Plus로 전체 실행한다.
+-- DDL은 즉시 확정된다. 오류 시 중단하고 오류 원인을 해결한 뒤 재실행한다.
+-- 이미 같은 정의로 존재하는 항목만 건너뛰며, 다른 정의이면 오류로 중단한다.
+SET DEFINE OFF
+SET SERVEROUTPUT ON
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+
+-- 1. DDL을 시작하기 전에 현재 자료의 충돌을 검사한다.
+DECLARE
+    v_count PLS_INTEGER;
+BEGIN
+    IF SYS_CONTEXT('USERENV','SESSION_USER') <> 'IEUM'
+       OR SYS_CONTEXT('USERENV','CURRENT_SCHEMA') <> 'IEUM' THEN
+        RAISE_APPLICATION_ERROR(-20301,'IEUM 계정/스키마에서 실행해야 한다.');
+    END IF;
+    SELECT COUNT(*) INTO v_count FROM USER_TABLES
+    WHERE TABLE_NAME IN ('DEPARTMENT','CHAT_MEMBER','CHAT_ROOM','CHAT_MESSAGE','IT_TICKET','PUBLIC_INQUIRY','USER_ACCOUNT','COMPANY');
+    IF v_count<>8 THEN RAISE_APPLICATION_ERROR(-20302,'기존 정식 테이블이 부족하다. 신규 빈 DB라면 IEUM_DDL.sql 실행 순서를 사용한다.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM (
+        SELECT COMPANY_ID,DEPARTMENT_NAME FROM DEPARTMENT GROUP BY COMPANY_ID,DEPARTMENT_NAME HAVING COUNT(*)>1
+    );
+    IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20303,'동일 업체의 중복 부서명이 있다. 담당자와 정리한 뒤 실행한다.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM (
+        SELECT LOWER(TRIM(TRIAL_EMAIL)) FROM COMPANY GROUP BY LOWER(TRIM(TRIAL_EMAIL)) HAVING COUNT(*)>1
+    );
+    IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20316,'정규화한 체험 이메일이 중복된다. 업체 자료를 담당자와 확인한다.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM (
+        SELECT COMPANY_ID,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH FROM CHAT_ROOM
+        WHERE ROOM_TYPE='ROOM_DIRECT' GROUP BY COMPANY_ID,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH HAVING COUNT(*)>1
+    );
+    IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20317,'같은 두 직원의 1:1 방이 중복된다. 방/대화 자료를 임의 삭제하지 말고 확인한다.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM USER_TAB_COLUMNS WHERE TABLE_NAME='CHAT_MEMBER' AND COLUMN_NAME='LAST_READ_MESSAGE_ID';
+    IF v_count=1 THEN
+        EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM CHAT_MEMBER m WHERE m.LAST_READ_MESSAGE_ID IS NOT NULL AND NOT EXISTS (SELECT 1 FROM CHAT_MESSAGE msg WHERE msg.COMPANY_ID=m.COMPANY_ID AND msg.CHAT_ROOM_ID=m.CHAT_ROOM_ID AND msg.CHAT_MESSAGE_ID=m.LAST_READ_MESSAGE_ID)' INTO v_count;
+        IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20304,'잘못된 읽음 메시지 참조가 있다. 다른 방/업체 메시지 또는 삭제된 메시지를 확인한다.'); END IF;
+    END IF;
+    SELECT COUNT(*) INTO v_count FROM USER_TAB_COLUMNS WHERE TABLE_NAME='DEPARTMENT' AND COLUMN_NAME='JOIN_OPENED_BY';
+    IF v_count=1 THEN
+        EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM DEPARTMENT d WHERE d.JOIN_OPENED_BY IS NOT NULL AND NOT EXISTS (SELECT 1 FROM USER_ACCOUNT a WHERE a.COMPANY_ID=d.COMPANY_ID AND a.USER_ACCOUNT_ID=d.JOIN_OPENED_BY)' INTO v_count;
+        IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20318,'가입 활성화 계정이 없는 계정 또는 다른 업체를 참조한다. 자료 확인 필요.'); END IF;
+    END IF;
+END;
+/
+
+-- 2. 누락 컬럼과 제약을 순서대로 추가한다.
+DECLARE
+    PROCEDURE ensure_column(p_table VARCHAR2,p_column VARCHAR2,p_base VARCHAR2,p_declaration VARCHAR2,
+        p_char_length NUMBER DEFAULT NULL,p_precision NUMBER DEFAULT NULL,p_nullable VARCHAR2 DEFAULT 'Y') IS
+        v_count NUMBER;v_type VARCHAR2(128);v_len NUMBER;v_used VARCHAR2(1);v_precision NUMBER;v_scale NUMBER;v_nullable VARCHAR2(1);v_default VARCHAR2(32767);
+    BEGIN
+        SELECT COUNT(*) INTO v_count FROM USER_TAB_COLUMNS WHERE TABLE_NAME=p_table AND COLUMN_NAME=p_column;
+        IF v_count=0 THEN
+            EXECUTE IMMEDIATE 'ALTER TABLE '||p_table||' ADD ('||p_column||' '||p_declaration||')';
+        ELSE
+            SELECT DATA_TYPE,CHAR_LENGTH,CHAR_USED,DATA_PRECISION,DATA_SCALE,NULLABLE,DATA_DEFAULT
+            INTO v_type,v_len,v_used,v_precision,v_scale,v_nullable,v_default
+            FROM USER_TAB_COLUMNS WHERE TABLE_NAME=p_table AND COLUMN_NAME=p_column;
+            IF v_type<>p_base OR v_nullable<>p_nullable
+                OR (p_char_length IS NOT NULL AND (v_len<>p_char_length OR NVL(v_used,'?')<>'C'))
+                OR (p_precision IS NOT NULL AND (NVL(v_precision,-1)<>p_precision OR NVL(v_scale,-1)<>0)) THEN
+                RAISE_APPLICATION_ERROR(-20305,'기존 컬럼 정의가 요청과 다름: '||p_table||'.'||p_column);
+            END IF;
+            IF p_table='IT_TICKET' AND p_column='VERSION' AND NVL(TRIM(v_default),'?')<>'0' THEN
+                RAISE_APPLICATION_ERROR(-20306,'IT_TICKET.VERSION 기본값이 0이 아니다. 기존 정의를 확인한다.');
+            END IF;
+            DBMS_OUTPUT.PUT_LINE('유지: '||p_table||'.'||p_column);
+        END IF;
+    END;
+
+    PROCEDURE ensure_unique(p_table VARCHAR2,p_name VARCHAR2,p_columns VARCHAR2) IS
+        v_count NUMBER;v_table VARCHAR2(128);v_type VARCHAR2(1);v_columns VARCHAR2(4000);v_status VARCHAR2(20);v_validated VARCHAR2(20);
+    BEGIN
+        SELECT COUNT(*) INTO v_count FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME=p_name;
+        IF v_count=0 THEN
+            EXECUTE IMMEDIATE 'ALTER TABLE '||p_table||' ADD CONSTRAINT '||p_name||' UNIQUE ('||p_columns||')';
+        ELSE
+            SELECT TABLE_NAME,CONSTRAINT_TYPE,STATUS,VALIDATED INTO v_table,v_type,v_status,v_validated FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME=p_name;
+            SELECT LISTAGG(COLUMN_NAME,',') WITHIN GROUP (ORDER BY POSITION) INTO v_columns FROM USER_CONS_COLUMNS WHERE CONSTRAINT_NAME=p_name;
+            IF v_table<>p_table OR v_type<>'U' OR v_columns<>REPLACE(p_columns,' ','') THEN
+                RAISE_APPLICATION_ERROR(-20307,'기존 UNIQUE 정의가 요청과 다름: '||p_name);
+            END IF;
+            IF v_status<>'ENABLED' OR v_validated<>'VALIDATED' THEN EXECUTE IMMEDIATE 'ALTER TABLE '||p_table||' ENABLE VALIDATE CONSTRAINT '||p_name; END IF;
+        END IF;
+    END;
+
+    PROCEDURE ensure_fk(p_table VARCHAR2,p_name VARCHAR2,p_columns VARCHAR2,p_parent VARCHAR2,p_parent_columns VARCHAR2) IS
+        v_count NUMBER;v_table VARCHAR2(128);v_type VARCHAR2(1);v_columns VARCHAR2(4000);v_parent VARCHAR2(128);v_parent_key VARCHAR2(128);v_owner VARCHAR2(128);v_parent_columns VARCHAR2(4000);v_status VARCHAR2(20);v_validated VARCHAR2(20);
+    BEGIN
+        SELECT COUNT(*) INTO v_count FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME=p_name;
+        IF v_count=0 THEN
+            EXECUTE IMMEDIATE 'ALTER TABLE '||p_table||' ADD CONSTRAINT '||p_name||' FOREIGN KEY ('||p_columns||') REFERENCES '||p_parent||' ('||p_parent_columns||')';
+        ELSE
+            SELECT TABLE_NAME,CONSTRAINT_TYPE,R_CONSTRAINT_NAME,R_OWNER,STATUS,VALIDATED INTO v_table,v_type,v_parent_key,v_owner,v_status,v_validated FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME=p_name;
+            IF v_type<>'R' OR v_owner<>USER THEN RAISE_APPLICATION_ERROR(-20308,'기존 FK 종류/소유자가 다름: '||p_name); END IF;
+            SELECT TABLE_NAME INTO v_parent FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME=v_parent_key;
+            SELECT LISTAGG(COLUMN_NAME,',') WITHIN GROUP (ORDER BY POSITION) INTO v_columns FROM USER_CONS_COLUMNS WHERE CONSTRAINT_NAME=p_name;
+            SELECT LISTAGG(COLUMN_NAME,',') WITHIN GROUP (ORDER BY POSITION) INTO v_parent_columns FROM USER_CONS_COLUMNS WHERE CONSTRAINT_NAME=v_parent_key;
+            IF v_table<>p_table OR v_parent<>p_parent OR v_columns<>REPLACE(p_columns,' ','') OR v_parent_columns<>REPLACE(p_parent_columns,' ','') THEN
+                RAISE_APPLICATION_ERROR(-20309,'기존 FK 컬럼 구성이 다름: '||p_name);
+            END IF;
+            IF v_status<>'ENABLED' OR v_validated<>'VALIDATED' THEN EXECUTE IMMEDIATE 'ALTER TABLE '||p_table||' ENABLE VALIDATE CONSTRAINT '||p_name; END IF;
+        END IF;
+    END;
+BEGIN
+    ensure_column('DEPARTMENT','JOIN_OPEN_UNTIL','TIMESTAMP(6)','TIMESTAMP(6)');
+    ensure_column('DEPARTMENT','JOIN_OPENED_BY','NUMBER','NUMBER(19)',NULL,19);
+    ensure_column('CHAT_MEMBER','LAST_READ_MESSAGE_ID','NUMBER','NUMBER(19)',NULL,19);
+    ensure_column('IT_TICKET','VERSION','NUMBER','NUMBER(10) DEFAULT 0 NOT NULL',NULL,10,'N');
+    ensure_column('PUBLIC_INQUIRY','COMPANY_NAME','VARCHAR2','VARCHAR2(200 CHAR)',200);
+    ensure_column('PUBLIC_INQUIRY','REQUESTER_NAME','VARCHAR2','VARCHAR2(100 CHAR)',100);
+    ensure_column('PUBLIC_INQUIRY','PHONE','VARCHAR2','VARCHAR2(20 CHAR)',20);
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN DEPARTMENT.JOIN_OPEN_UNTIL IS '가입 활성화 종료일시']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN DEPARTMENT.JOIN_OPENED_BY IS '가입 활성화 계정']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN CHAT_MEMBER.LAST_READ_MESSAGE_ID IS '마지막 읽은 메시지 ID']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN IT_TICKET.VERSION IS '동시 수정 감지 버전']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN PUBLIC_INQUIRY.COMPANY_NAME IS '문의 회사명']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN PUBLIC_INQUIRY.REQUESTER_NAME IS '문의자 이름']';
+    EXECUTE IMMEDIATE q'[COMMENT ON COLUMN PUBLIC_INQUIRY.PHONE IS '문의자 휴대전화']';
+    ensure_unique('DEPARTMENT','UQ_03_02','COMPANY_ID,DEPARTMENT_NAME');
+    ensure_unique('CHAT_MESSAGE','UQ_57_03','COMPANY_ID,CHAT_ROOM_ID,CHAT_MESSAGE_ID');
+    ensure_fk('DEPARTMENT','FK_DEPARTMENT_JOIN_OPENER','COMPANY_ID,JOIN_OPENED_BY','USER_ACCOUNT','COMPANY_ID,USER_ACCOUNT_ID');
+    ensure_fk('CHAT_MEMBER','FK_CHAT_MEMBER_LAST_READ','COMPANY_ID,CHAT_ROOM_ID,LAST_READ_MESSAGE_ID','CHAT_MESSAGE','COMPANY_ID,CHAT_ROOM_ID,CHAT_MESSAGE_ID');
+END;
+/
+
+-- 3. 이메일/1:1 채팅 조건부 인덱스 검증 및 보완. 기존 일반 UNIQUE는 새 조건부 인덱스를 만든 뒤 제거한다.
+DECLARE
+    v_count NUMBER;
+    PROCEDURE ensure_function_index(p_name VARCHAR2,p_table VARCHAR2,p_create VARCHAR2,p_expression VARCHAR2,p_column_count NUMBER) IS
+        v_count NUMBER;v_table VARCHAR2(128);v_kind VARCHAR2(40);v_unique VARCHAR2(20);v_status VARCHAR2(20);v_expression VARCHAR2(32767);v_column VARCHAR2(128);
+    BEGIN
+        SELECT COUNT(*) INTO v_count FROM USER_INDEXES WHERE INDEX_NAME=p_name;
+        IF v_count=0 THEN EXECUTE IMMEDIATE p_create; END IF;
+        SELECT TABLE_NAME,INDEX_TYPE,UNIQUENESS,STATUS INTO v_table,v_kind,v_unique,v_status FROM USER_INDEXES WHERE INDEX_NAME=p_name;
+        IF v_table<>p_table OR v_kind NOT LIKE 'FUNCTION%' OR v_unique<>'UNIQUE' OR v_status<>'VALID' THEN
+            RAISE_APPLICATION_ERROR(-20310,'기존 인덱스 정의/상태가 다름: '||p_name);
+        END IF;
+        SELECT COUNT(*) INTO v_count FROM USER_IND_COLUMNS WHERE INDEX_NAME=p_name;
+        IF v_count<>p_column_count THEN RAISE_APPLICATION_ERROR(-20311,'인덱스 컬럼 수가 다름: '||p_name); END IF;
+        SELECT COLUMN_EXPRESSION INTO v_expression FROM USER_IND_EXPRESSIONS WHERE INDEX_NAME=p_name AND COLUMN_POSITION=1;
+        v_expression:=REGEXP_REPLACE(REPLACE(UPPER(v_expression),'"',''),'[[:space:]]','');
+        -- Oracle 메타데이터는 동등한 searched CASE를 simple CASE로 표시할 수도 있다.
+        -- 1:1 방의 정확히 같은 단일 조건에 한해서만 두 표기를 허용한다.
+        IF v_expression<>p_expression AND NOT (
+            p_table='CHAT_ROOM'
+            AND p_expression=q'[CASEWHENROOM_TYPE='ROOM_DIRECT'THENCOMPANY_IDEND]'
+            AND v_expression=q'[CASEROOM_TYPEWHEN'ROOM_DIRECT'THENCOMPANY_IDEND]'
+        ) THEN RAISE_APPLICATION_ERROR(-20312,'인덱스 조건식이 다름: '||p_name); END IF;
+        IF p_column_count=3 THEN
+            SELECT COLUMN_NAME INTO v_column FROM USER_IND_COLUMNS WHERE INDEX_NAME=p_name AND COLUMN_POSITION=2;
+            IF v_column<>'DIRECT_EMPLOYEE_LOW' THEN RAISE_APPLICATION_ERROR(-20313,'1:1 방 작은 직원 ID 컬럼 확인 필요'); END IF;
+            SELECT COLUMN_NAME INTO v_column FROM USER_IND_COLUMNS WHERE INDEX_NAME=p_name AND COLUMN_POSITION=3;
+            IF v_column<>'DIRECT_EMPLOYEE_HIGH' THEN RAISE_APPLICATION_ERROR(-20314,'1:1 방 큰 직원 ID 컬럼 확인 필요'); END IF;
+        END IF;
+    END;
+BEGIN
+    ensure_function_index('UX_COMPANY_EMAIL','COMPANY',
+        'CREATE UNIQUE INDEX UX_COMPANY_EMAIL ON COMPANY (LOWER(TRIM(TRIAL_EMAIL)))',
+        'LOWER(TRIM(TRIAL_EMAIL))',1);
+    SELECT COUNT(*) INTO v_count FROM USER_CONSTRAINTS WHERE TABLE_NAME='CHAT_ROOM' AND CONSTRAINT_NAME='UQ_55_01';
+    IF v_count=1 THEN
+        ensure_function_index('UX_55_TEMP','CHAT_ROOM',
+            q'[CREATE UNIQUE INDEX UX_55_TEMP ON CHAT_ROOM (CASE WHEN ROOM_TYPE='ROOM_DIRECT' THEN COMPANY_ID END,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH)]',
+            q'[CASEWHENROOM_TYPE='ROOM_DIRECT'THENCOMPANY_IDEND]',3);
+        EXECUTE IMMEDIATE 'ALTER TABLE CHAT_ROOM DROP CONSTRAINT UQ_55_01 DROP INDEX';
+        EXECUTE IMMEDIATE 'ALTER INDEX UX_55_TEMP RENAME TO UQ_55_01';
+    ELSE
+        SELECT COUNT(*) INTO v_count FROM USER_INDEXES WHERE INDEX_NAME='UQ_55_01';
+        IF v_count=0 THEN
+            SELECT COUNT(*) INTO v_count FROM USER_INDEXES WHERE INDEX_NAME='UX_55_TEMP';
+            IF v_count=1 THEN
+                ensure_function_index('UX_55_TEMP','CHAT_ROOM',
+                    q'[CREATE UNIQUE INDEX UX_55_TEMP ON CHAT_ROOM (CASE WHEN ROOM_TYPE='ROOM_DIRECT' THEN COMPANY_ID END,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH)]',
+                    q'[CASEWHENROOM_TYPE='ROOM_DIRECT'THENCOMPANY_IDEND]',3);
+                EXECUTE IMMEDIATE 'ALTER INDEX UX_55_TEMP RENAME TO UQ_55_01';
+            ELSE
+                SELECT COUNT(*) INTO v_count FROM USER_INDEXES WHERE INDEX_NAME='UX_CHAT_ROOM_DIRECT';
+                IF v_count=1 THEN
+                    ensure_function_index('UX_CHAT_ROOM_DIRECT','CHAT_ROOM',
+                        q'[CREATE UNIQUE INDEX UX_CHAT_ROOM_DIRECT ON CHAT_ROOM (CASE WHEN ROOM_TYPE='ROOM_DIRECT' THEN COMPANY_ID END,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH)]',
+                        q'[CASEWHENROOM_TYPE='ROOM_DIRECT'THENCOMPANY_IDEND]',3);
+                    EXECUTE IMMEDIATE 'ALTER INDEX UX_CHAT_ROOM_DIRECT RENAME TO UQ_55_01';
+                END IF;
+            END IF;
+        END IF;
+    END IF;
+    ensure_function_index('UQ_55_01','CHAT_ROOM',
+        q'[CREATE UNIQUE INDEX UQ_55_01 ON CHAT_ROOM (CASE WHEN ROOM_TYPE='ROOM_DIRECT' THEN COMPANY_ID END,DIRECT_EMPLOYEE_LOW,DIRECT_EMPLOYEE_HIGH)]',
+        q'[CASEWHENROOM_TYPE='ROOM_DIRECT'THENCOMPANY_IDEND]',3);
+END;
+/
+
+-- 4. 프로젝트 시퀀스 65개만 최댓값을 99999로 맞춘다. NEXTVAL/현재 번호/시작값은 변경하지 않는다.
+DECLARE
+    v_names SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
+        'SQ_COMPANY', 'SQ_DEPARTMENT', 'SQ_JOB_GRADE', 'SQ_BRANCH',
+        'SQ_EMPLOYEE', 'SQ_USER_ACCOUNT', 'SQ_ACCOUNT_REQUEST', 'SQ_EMAIL_VERIFICATION',
+        'SQ_EMAIL_RATE_LIMIT', 'SQ_ACCOUNT_PERMISSION', 'SQ_DEPARTMENT_PERMISSION', 'SQ_DAILY_NOTICE_VIEW',
+        'SQ_SUBSCRIPTION_PLAN', 'SQ_SERVICE_PERIOD', 'SQ_CAPACITY_REQUEST', 'SQ_PAYMENT_ORDER',
+        'SQ_PAYMENT', 'SQ_SUBSCRIPTION_CHANGE', 'SQ_CAPACITY_LIMIT', 'SQ_PAYMENT_REMINDER',
+        'SQ_USAGE_SNAPSHOT', 'SQ_APPROVAL_DOCUMENT', 'SQ_APPROVAL_STEP', 'SQ_APPROVAL_HISTORY',
+        'SQ_LEAVE_REQUEST_DAY', 'SQ_LEAVE_CYCLE', 'SQ_LEAVE_LEDGER', 'SQ_ATTENDANCE',
+        'SQ_ATTENDANCE_DEVICE', 'SQ_ATTENDANCE_EVENT', 'SQ_ATTENDANCE_ASSESSMENT', 'SQ_HOLIDAY',
+        'SQ_OVERTIME_RECORD', 'SQ_ASSET', 'SQ_IT_TICKET', 'SQ_TICKET_COMMENT',
+        'SQ_TICKET_HISTORY', 'SQ_ASSET_ASSIGNMENT', 'SQ_ASSET_HISTORY', 'SQ_CALENDAR_EVENT',
+        'SQ_BOARD', 'SQ_POST', 'SQ_POST_COMMENT', 'SQ_CHAT_ROOM',
+        'SQ_CHAT_MESSAGE', 'SQ_WORK_MAP', 'SQ_MAP_MARKER', 'SQ_MAP_BUNDLE',
+        'SQ_MAP_SHARE_REQUEST', 'SQ_MAP_BUNDLE_GRANT', 'SQ_MAP_MARKER_GRANT', 'SQ_ATTACHMENT',
+        'SQ_NOTIFICATION', 'SQ_PUBLIC_INQUIRY', 'SQ_PUBLIC_REPLY', 'SQ_MAIL_OUTBOX',
+        'SQ_MAIL_ATTEMPT', 'SQ_SUPPORT_INQUIRY', 'SQ_SUPPORT_REPLY', 'SQ_SUPPORT_GRANT',
+        'SQ_SUPPORT_SCOPE', 'SQ_SUPPORT_CONSENT', 'SQ_SUPPORT_ACTION', 'SQ_ERROR_ARCHIVE',
+        'SQ_DATA_PURGE_RUN'
+    );
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names));
+    IF v_count<>65 THEN RAISE_APPLICATION_ERROR(-20315,'프로젝트 시퀀스 65개를 찾지 못했다. 기존 스키마 상태 확인 필요.'); END IF;
+    SELECT COUNT(*) INTO v_count FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names)) AND LAST_NUMBER>=99999;
+    IF v_count>0 THEN RAISE_APPLICATION_ERROR(-20319,'99999 이상으로 발급될 수 있는 시퀀스가 있어 중단한다. 번호를 초기화하지 말고 확인한다.'); END IF;
+    FOR s IN (SELECT SEQUENCE_NAME,MAX_VALUE FROM USER_SEQUENCES WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(v_names))) LOOP
+        IF s.MAX_VALUE<>99999 THEN
+            EXECUTE IMMEDIATE 'ALTER SEQUENCE '||s.SEQUENCE_NAME||' MAXVALUE 99999';
+        END IF;
+    END LOOP;
+    DBMS_OUTPUT.PUT_LINE('구조 패치 완료. DDL 변경은 이미 COMMIT됨. 다음으로 11-02_02_DATA_PATCH.sql 실행.');
+END;
+/

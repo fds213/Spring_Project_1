@@ -14,6 +14,8 @@
     <script>openScheduleView();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 일정 화면만의 모양 (common.css의 일정 규칙을 이 화면에서만 덮어쓴다: 한 장짜리 표 달력, 색 막대, 칩 필터) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/schedule/schedule.css">
     <section class="view on" id="view-schedule">
       <%-- 일정: 개인·부서·전사 일정과 휴일, 본인의 연차를 달력으로 본다 (schedule/calendar.js) --%>
       <div class="page-head"><h1>일정</h1></div>
@@ -28,7 +30,8 @@
             </div>
             <div class="sch-filters" id="schFilters">
               <label><input type="checkbox" data-scope="PERSONAL" checked> <span class="sch-chip chip-personal">개인</span></label>
-              <label><input type="checkbox" data-scope="DEPT" checked> <span class="sch-chip chip-dept">부서</span></label>
+              <%-- 부서 일정은 이번 구현 범위 밖(요구분석서 3장 '핵심 뒤 추가')이라 숨겨 둔다 --%>
+              <label hidden><input type="checkbox" data-scope="DEPT" checked> <span class="sch-chip chip-dept">부서</span></label>
               <label><input type="checkbox" data-scope="COMPANY" checked> <span class="sch-chip chip-company">전사</span></label>
               <label><input type="checkbox" data-scope="LEAVE" checked> <span class="sch-chip chip-leave">내 연차</span></label>
             </div>
@@ -40,19 +43,39 @@
           <header class="info-card-head">
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span>
             <h2 id="schDayTitle">-</h2>
+            <%-- 일정 추가: 고른 날짜로 팝업(아래 schDialog)을 연다. 날짜 칸을 두 번 눌러도 그 날짜로 뜬다
+                 data-write: 체험이 끝난 읽기 전용 업체에서는 흐리게 두고 누르면 안내만 한다(common.js) --%>
+            <button type="button" class="btn btn-primary sch-day-add" id="schAddDay" data-write>+ 일정 추가</button>
           </header>
           <ul class="sch-day-list" id="schDayList"></ul>
-          <form class="leave-form" id="schForm" novalidate>
-            <h3 class="bill-sub">일정 추가</h3>
-            <div class="leave-row"><label for="schScope">구분</label><select class="filter-select" id="schScope"></select></div>
-            <div class="leave-row"><label for="schDate">날짜</label><input class="input" id="schDate" type="date"></div>
-            <div class="leave-row"><label for="schTitle">제목</label><input class="input" id="schTitle" maxlength="40" autocomplete="off"></div>
-            <div class="leave-row"><label for="schMemo">메모</label><input class="input" id="schMemo" maxlength="200" autocomplete="off" placeholder="선택"></div>
-            <p class="form-error" id="schError" role="alert"></p>
-            <div class="bill-actions"><button type="submit" class="btn btn-primary">추가</button></div>
-          </form>
         </section>
       </div>
     </section>
+
+    <%-- 일정 추가 팝업: 오른쪽 날짜 칸 위 "+ 일정 추가"(고른 날짜로), 날짜 칸 두 번 누르기로 연다 --%>
+    <dialog class="modal" id="schDialog" aria-labelledby="schDialogTitle">
+      <h2 id="schDialogTitle">일정 추가</h2>
+      <form class="leave-form" id="schForm" novalidate style="padding: 8px 0 0;">
+        <div class="leave-row"><label for="schScope">구분</label><select class="filter-select" id="schScope"></select></div>
+        <div class="leave-row"><label for="schDate">날짜</label><input class="input" id="schDate" type="date"></div>
+        <div class="leave-row"><label for="schTitle">제목</label><input class="input" id="schTitle" maxlength="40" autocomplete="off"></div>
+        <div class="leave-row"><label for="schMemo">메모</label><input class="input" id="schMemo" maxlength="200" autocomplete="off" placeholder="선택"></div>
+        <p class="form-error" id="schError" role="alert"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="schCancel">취소</button>
+          <button type="submit" class="btn btn-primary" data-write>추가</button>
+        </div>
+      </form>
+    </dialog>
+
+    <%-- 일정 삭제 확인: 공지·지도처럼 지우기 전에 한 번 묻는다 (휴대폰에서 잘못 눌러 바로 지워지지 않게) --%>
+    <dialog class="modal" id="schDeleteDialog" aria-labelledby="schDeleteTitle">
+      <h2 id="schDeleteTitle">일정을 삭제할까요?</h2>
+      <p id="schDeleteText">삭제한 일정은 되돌릴 수 없습니다.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" value="cancel">취소</button>
+        <button type="button" class="btn btn-danger-line" value="ok" data-write>삭제</button>
+      </div>
+    </dialog>
   </jsp:body>
 </ui:layout>
