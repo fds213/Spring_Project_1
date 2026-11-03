@@ -65,6 +65,11 @@ function drawNoOrder() {
 
 function drawBilling() {
   const s = billState;
+  // 헤더는 서버가 이 화면을 열 때(결제 전 값으로) 그렸다. 유료가 되면 체험 띠와 읽기 전용 표시를 여기서도 걷는다
+  if (s.status === 'PAID') {
+    document.querySelector('.trial-bar')?.remove();
+    document.body.classList.remove('is-readonly');
+  }
   const card = (id, v) => { document.getElementById(id).textContent = v; };
   card('billStatus', BILL_STATUS[s.status]);
   card('billPlan', s.paid ? BILL_PLAN[s.plan] || '월간' : '무료 체험');
@@ -321,7 +326,7 @@ function failToss(q) {
     .always(renderBilling);
 }
 
-// 3단계: 방금 반영된 결제. 헤더의 체험·읽기 전용 띠는 다음 페이지부터 바뀐다(서버가 그린다)
+// 3단계: 방금 반영된 결제
 function showPayDone(p) {
   const s = billState;
   document.getElementById('payDoneText').textContent = p.kind === 'EXTEND'
