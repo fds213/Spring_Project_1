@@ -4,6 +4,8 @@ import com.ieum.gw.approval.dto.ApprovalSubmitDTO;
 import com.ieum.gw.approval.service.ApprovalService;
 import com.ieum.gw.common.dto.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -40,5 +42,12 @@ public class ApprovalController {
     public Map<String, Object> submit(@AuthenticationPrincipal LoginUser user, @RequestBody ApprovalSubmitDTO dto) {
         return Map.of("success", true, "data", service.submit(user,dto));
 //        return service.submit(user, dto);
+    }
+
+    @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> handleBadRequest(RuntimeException e) {
+        String message = (e.getMessage() != null ? e.getMessage() : "요청을 처리하지 못했습니다.");
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
     }
 }

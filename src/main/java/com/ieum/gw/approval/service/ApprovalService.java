@@ -1,8 +1,11 @@
 package com.ieum.gw.approval.service;
 
+import com.ieum.gw.approval.dao.ApprovalDAO;
 import com.ieum.gw.approval.dto.ApprovalFieldsDTO;
 import com.ieum.gw.approval.dto.ApprovalSubmitDTO;
 import com.ieum.gw.approval.dto.ApproverDTO;
+import com.ieum.gw.attendance.dto.LeaveDayDTO;
+import com.ieum.gw.attendance.service.AttendanceService;
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.HashMap;
@@ -24,6 +28,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ApprovalService {
     private final EmployeeService eService;
+    private final AttendanceService aService;
+    private final ApprovalDAO dao;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -32,15 +38,26 @@ public class ApprovalService {
         return line.stream().filter(StringUtils::hasText).map(Long::valueOf).collect(Collectors.toList());
     }
 
+    private boolean overlaps(LeaveDayDTO day, LeaveDayDTO p) {
+        return day.getLeaveDate().equals(p.getLeaveDate()) && ("LV_FULL".equals(day.getLeaveType())|| "LV_FULL".equals(p.getLeaveType()) || day.getLeaveType().equals(p.getLeaveType()));
+    }
+
     public Map<String, Object> getFormOptions(Long companyId, Long employeeId) {
         List<ApproverDTO> approvers = eService.listActiveEmp(companyId, employeeId).stream()
                 .map(e -> new ApproverDTO(e.getEmployeeId(), e.getEmployeeName(), e.getDepartmentName(), e.getGradeName()))
                 .collect(Collectors.toList());
 
+        BigDecimal remain = aService.getRemainingLeaveDays(companyId, employeeId);
+        BigDecimal pending = dao.sumPendingLeaveDays(companyId, employeeId);
+        Map<String, BigDecimal> leave = new HashMap<>();
+        leave.put("available", remain.subtract(pending));
+        leave.put("pendingDays", pending);
+
         Map<String, Object> options = new HashMap<>();
         options.put("approvers", approvers);
         options.put("branches", List.of());   // 장비 양식 단계에서 채운다
         options.put("equipKinds", List.of()); // 장비 양식 단계에서 채운다
+        options.put("leave", leave);
 
         return options;
     }
@@ -98,21 +115,35 @@ public class ApprovalService {
             throw new IllegalArgumentException("휴가 기간이 올바르지 않습니다.");
         }
 
+        List<LeaveDayDTO> leaveDays = aService.calculateLeaveDays(user.getCompanyId(), fields.getLeaveType(), from, to);
+
+        if(leaveDays.isEmpty()) throw new IllegalArgumentException("휴가로 쓸 날이 없습니다.");
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for(LeaveDayDTO day : leaveDays) {
+            total = total.add(day.getDeductDays());
+        }
+
+        BigDecimal remain = aService.getRemainingLeaveDays(user.getCompanyId(), user.getEmployeeId());
+        BigDecimal pending = dao.sumPendingLeaveDays(user.getCompanyId(), user.getEmployeeId());
+        BigDecimal available = remain.subtract(pending);
+        List<LeaveDayDTO> pendingDays = dao.selectPendingLeaveDays(user.getCompanyId(), user.getEmployeeId(), from.toString(), to.toString());
 
 
+        if(available.compareTo(total) < 0) throw new IllegalArgumentException("남은 연차가 부족합니다. " + "(남은 연차 " + available.stripTrailingZeros().toPlainString() + "일)");
+
+        if(aService.hasApprovedLeaveOverlap(user.getCompanyId(), user.getEmployeeId(), leaveDays)) throw new IllegalArgumentException("이미 승인된 휴가와 겹칩니다.");
+
+        for(LeaveDayDTO day : leaveDays) {
+            for(LeaveDayDTO p : pendingDays) {
+                if(overlaps(day,p)) throw new IllegalArgumentException("결재 중인 휴가와 겹칩니다.");
+            }
+        }
 
 
-
-
-
-
-
-
-
-
-
-
-
-        return null;
+        return 0L;
     }
+
+
 }
