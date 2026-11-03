@@ -139,3 +139,4 @@ END;
 @@11-02_05_ATTENDANCE_CORRECTION_CHECK.sql
 
 -- 오류와 점검 결과 확인 후 같은 연결에서 직접 COMMIT; 또는 ROLLBACK;
+-- ROLLBACK하면 맨 끝 코드 입력 블록만 다시 실행한다.

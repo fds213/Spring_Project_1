@@ -1,7 +1,7 @@
 -- 2026-11-02 갱신: 신규 빈 스키마 생성용. 삭제·초기화 SQL은 dev/IEUM_DDL_reset.sql로 분리했다.
 -- 기존 팀 DB에는 이 파일을 재실행하지 말고 patches/11-02_01_SCHEMA_PATCH.sql을 사용한다.
 -- 실행 순서: 이 파일 → data/IEUM_COMMON_CODE_DML.sql → data/init_auth_data.sql(내부에서 IEUM_DEMO_SEED.sql 포함).
--- 시퀀스 시작값/증가값은 유지하고 최댓값만 99999로 확대했다. NOCYCLE 유지.
+-- 시퀀스 시작값/증가값은 유지하고 최댓값만 999999999999에서 99999로 축소했다. NOCYCLE 유지.
 -- DDL은 자동 COMMIT된다. 오류 시 이미 성공한 DDL은 되돌아가지 않는다.
 SET DEFINE OFF
 SET SERVEROUTPUT ON
