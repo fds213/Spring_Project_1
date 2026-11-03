@@ -6,12 +6,12 @@
 //   POST /notification/api/{id}/read       → 없거나 남의 알림이면 404
 // util.js 의 h, span, whenFull, showToast 를 쓴다.
 (() => {
-  // 알림 종류(NotificationType)별 아이콘 색과 누르면 갈 화면. 결재는 결재함, 티켓 배정은 티켓 처리, 처리 완료는 요청자의 내 티켓
+  // 알림 종류(NotificationType)별 아이콘 색과 누르면 갈 화면. 결재는 결재함, 티켓 배정은 티켓 처리의 '내 담당' 카드, 처리 완료는 요청자의 내 티켓
   const TYPE = {
     NT_APPROVAL_REQUEST: { cls: 'is-approval', link: '/approval/list' },
     NT_APPROVAL_DONE: { cls: 'is-approval', link: '/approval/list' },
     NT_APPROVAL_REJECT: { cls: 'is-approval', link: '/approval/list' },
-    NT_TICKET_ASSIGNED: { cls: 'is-ticket', link: '/ticket/admin/list' },
+    NT_TICKET_ASSIGNED: { cls: 'is-ticket', link: '/ticket/admin/list?filter=MINE' },
     NT_TICKET_RESOLVED: { cls: 'is-ticket', link: '/ticket/mine' },
   };
   const ICON = {

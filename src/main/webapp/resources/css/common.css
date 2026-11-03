@@ -473,20 +473,9 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .leave-line { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .sch-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
 .sch-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-right: 16px; }
-/* 걸러 보기 버튼은 툴바 오른쪽 끝 (좁아서 줄이 넘어가도 오른쪽) */
-.sch-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; padding: 12px 0 12px 16px; font-size: 13px; }
-.sch-filters label { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
-/* 걸러 보기: 체크 상자는 숨기고 글자(칩)를 눌러 켜고 끈다. 켜면 그 종류 색, 끄면 회색 (체크 상자는 키보드·화면 낭독용으로 남김) */
-.sch-filters input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
-/* 모양은 툴바의 다른 버튼(.btn)과 같게: 높이 32px, 모서리, 테두리, 글자 크기 */
-.sch-filters .sch-chip {
-  display: inline-flex; align-items: center; height: 32px; padding: 0 12px;
-  border: 1px solid var(--line); border-radius: var(--radius); font-size: 13px; font-weight: 600; line-height: 1;
-  transition: background 0.15s, color 0.15s;
-}
-.sch-filters input:not(:checked) + .sch-chip { background: var(--bg-sub); color: var(--text-muted); font-weight: 400; }
-.sch-filters label:hover .sch-chip { filter: brightness(0.97); }
-.sch-filters input:focus-visible + .sch-chip { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 걸러 보기 칩 모양은 일정 화면 전용 schedule/schedule.css 가 정한다 */
+.sch-filters { display: flex; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+.sch-filters label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
 .sch-week, .sch-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .sch-week { padding: 0 16px; font-size: 12px; color: var(--text-sub); text-align: center; }
 .sch-week span { padding: 6px 0; }
@@ -717,6 +706,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .btn-danger-line:hover:not(:disabled) { background: var(--danger-bg); }
 /* 고르기 칸(util.js pickSelect: 티켓 담당자·장비, 자산 지급 직원) */
 .ta-assignee { width: auto; min-width: 180px; flex: 1 1 180px; }
+/* 세로로 쌓는 처리 칸(지급할 장비) 안에서는 늘어나지 않게: flex-basis 가 높이로 먹는다 */
+.inq-body > .ta-assignee { flex: none; }
 .inq-body { display: flex; flex-direction: column; gap: 12px; padding: 14px 18px; }
 .inq-body + .inq-body { border-top: 1px solid var(--line); }
 .inq-text { width: 100%; min-height: 96px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); font: inherit; color: var(--text); resize: vertical; }
