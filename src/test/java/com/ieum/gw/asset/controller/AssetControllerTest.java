@@ -84,6 +84,15 @@ class AssetControllerTest {
     }
 
     @Test
+    @DisplayName("내 장비 화면 주소는 asset/mine JSP를 연다")
+    void opensMyAssetsScreen() throws Exception {
+        var result = mvc.perform(get("/asset/mine")).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals("asset/mine", result.getModelAndView().getViewName());
+        assertEquals(0, dao.reads);
+    }
+
+    @Test
     @DisplayName("현재 지급 자산은 로그인 정보로 조회하고 날짜와 빈 제조 일련번호를 JSON으로 보낸다")
     void assignedAssets() throws Exception {
         var result = mvc.perform(get("/asset/api/assets/assigned").param("companyId", "99")
@@ -113,7 +122,7 @@ class AssetControllerTest {
         assertEquals(200, result.getResponse().getStatus());
         var item = body(result).get("data").get(0);
         assertEquals(19L, item.get("assetAssignmentId").asLong());
-        assertEquals("2026-11-01T18:00", item.get("returnedAt").asText());
+        assertEquals("2026-11-01T18:00:00", item.get("returnedAt").asText());
         assertNull(item.get("employeeId"));
     }
 

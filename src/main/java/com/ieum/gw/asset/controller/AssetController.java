@@ -24,6 +24,11 @@ public class AssetController {
     private static final Logger logger = LoggerFactory.getLogger(AssetController.class);
     private final AssetService assetService;
 
+    @GetMapping("/asset/mine")
+    public String mine() {
+        return "asset/mine";
+    }
+
     // 지급 대기 티켓을 합치는 /asset/api/assets 응답은 티켓 연동 뒤 연결한다.
     @GetMapping("/asset/api/assets/assigned")
     @ResponseBody

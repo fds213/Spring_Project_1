@@ -2,7 +2,6 @@ package com.ieum.gw.asset.dto;
 
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,8 +12,8 @@ public class AssetAssignmentDTO {
     private Long assetAssignmentId;
     private Long assetId;
     private Long itTicketId;
-    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonSerialize(using = AssetDateTimeSerializer.class)
     private LocalDateTime issuedAt;
-    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonSerialize(using = AssetDateTimeSerializer.class)
     private LocalDateTime returnedAt;
 }
