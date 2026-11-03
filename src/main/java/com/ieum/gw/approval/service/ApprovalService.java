@@ -8,6 +8,7 @@ import com.ieum.gw.common.code.AssetType;
 import com.ieum.gw.common.dto.LoginUser;
 import com.ieum.gw.employee.service.EmployeeService;
 import com.ieum.gw.location.service.BranchService;
+import com.ieum.gw.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +39,7 @@ public class ApprovalService {
     private final AttendanceService aService;
     private final ApprovalDAO dao;
     private final BranchService bService;
+    private final NotificationService nService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -273,6 +275,9 @@ public class ApprovalService {
         history.setApprovalDocumentId(documentId);
         history.setCompanyId(user.getCompanyId());
         dao.insertHistory(history);
+
+        nService.notifyApprovalRequest(user.getCompanyId(), approverIds.get(0), documentId, title);
+
 
         return documentId;
     }

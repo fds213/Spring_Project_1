@@ -36,6 +36,7 @@ import com.ieum.gw.employee.dto.EmpSummaryDTO;
 import com.ieum.gw.employee.service.EmployeeService;
 import com.ieum.gw.location.dto.BranchDTO;
 import com.ieum.gw.location.service.BranchService;
+import com.ieum.gw.notification.service.NotificationService;
 
 class ApprovalServiceTest {
 
@@ -198,11 +199,26 @@ class ApprovalServiceTest {
         }
     }
 
+    /** 결재 요청 알림을 저장하지 않고 받은 값만 적어 두는 가짜 알림 */
+    static class FakeNotification extends NotificationService {
+        final List<List<Object>> requests = new ArrayList<>();
+
+        FakeNotification() {
+            super(null);
+        }
+
+        @Override
+        public void notifyApprovalRequest(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
+            requests.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
+        }
+    }
+
     private final FakeEmployee employee = new FakeEmployee();
     private final FakeAttendance attendance = new FakeAttendance();
     private final FakeDao dao = new FakeDao();
     private final FakeBranch branch = new FakeBranch();
-    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch);
+    private final FakeNotification notification = new FakeNotification();
+    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification);
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();
@@ -706,6 +722,39 @@ class ApprovalServiceTest {
     @DisplayName("장비: 사용 목적은 글자 수로 센다(이모지 1000자는 티켓과 같이 받는다)")
     void countsPurposeByCharacters() {
         assertDoesNotThrow(() -> service.submit(user(), equipment("AT_LAPTOP", 1, "10", "😀".repeat(1000))));
+    }
+
+    // ---------- 알림 ----------
+
+    @Test
+    @DisplayName("알림: 휴가를 상신하면 1단계 결재자에게만 결재 요청 알림을 한 번 보낸다")
+    void notifiesFirstApproverOnLeave() {
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setLine(List.of("1002", "1001"));
+
+        service.submit(user(), dto);
+
+        assertEquals(List.of(List.of(COMPANY_ID, 1002L, FakeDao.NEW_DOCUMENT_ID, "휴가 신청서 - 2026-11-10 ~ 2026-11-11")),
+                notification.requests);
+    }
+
+    @Test
+    @DisplayName("알림: 장비를 상신해도 1단계 결재자에게 문서 제목으로 알린다")
+    void notifiesFirstApproverOnEquipment() {
+        service.submit(user(), validEquipment());
+
+        assertEquals(List.of(List.of(COMPANY_ID, 1001L, FakeDao.NEW_DOCUMENT_ID, "장비 지급 신청서 - 노트북")),
+                notification.requests);
+    }
+
+    @Test
+    @DisplayName("알림: 검사에서 거절되면 알림을 보내지 않는다")
+    void noNotificationWhenRejected() {
+        attendance.remaining = BigDecimal.ONE;
+
+        rejectedMessage(validLeave());
+
+        assertTrue(notification.requests.isEmpty());
     }
 
     // ---------- 다른 모듈에 주는 조회 ----------
