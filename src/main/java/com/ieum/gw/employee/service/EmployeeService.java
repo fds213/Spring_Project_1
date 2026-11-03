@@ -115,7 +115,25 @@ public class EmployeeService {
         result.setEmployeeNo(employeeNo);
         return result;
     }
+    
+    /** 가입 승인으로 사원 만들기 + 첫 연차 (JoinService에서 사용, 같은 트랜잭션) */
+    EmployeeDTO createJoinedEmployee(Long companyId, String employeeNo, String name,
+                                     Long departmentId, Long jobGradeId) {
+        LocalDate today = LocalDate.now(SEOUL);
 
+        EmployeeDTO emp = new EmployeeDTO();
+        emp.setCompanyId(companyId);
+        emp.setEmployeeNo(employeeNo);
+        emp.setEmployeeName(name);
+        emp.setDepartmentId(departmentId);
+        emp.setJobGradeId(jobGradeId);
+        emp.setHireDate(today);
+        emp.setEmploymentStatus("ST_SERVING");
+        dao.insertEmployee(emp);                      // emp.employeeId 채워짐
+
+        attendanceService.grantInitialLeave(companyId, emp.getEmployeeId(), today);
+        return emp;
+    }
     /**
      * 업체의 다음 사번을 발급한다. 카운터 행을 잠그고(FOR UPDATE) 번호를 하나 올린다.
      * 호출한 트랜잭션이 끝날 때까지 같은 업체의 다른 발급은 기다리므로 번호가 겹치지 않는다.

@@ -43,6 +43,8 @@ public interface JoinMapper {
 
 	int countLiveEmail(@Param("companyId") Long companyId, @Param("email") String email);
 
+	int countRetiredEmail(@Param("companyId") Long companyId, @Param("email") String email);
+	
 	int insertRequest(JoinRequestDTO dto);
 
 	JoinRequestViewDTO getRequestView(@Param("companyCode") String companyCode, @Param("keyHash") String keyHash);
@@ -51,4 +53,18 @@ public interface JoinMapper {
 
 	int cancelAccount(@Param("userAccountId") Long userAccountId, @Param("companyId") Long companyId);
 
+	List<JoinRequestViewDTO> listWaitingRequests(@Param("companyId") Long companyId);
+
+	JoinRequestViewDTO lockRequest(@Param("companyId") Long companyId, @Param("requestId") Long requestId);
+
+	int activateAccount(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId,
+			@Param("employeeId") Long employeeId);
+
+	int approveRequest(@Param("companyId") Long companyId, @Param("requestId") Long requestId,
+			@Param("reviewerId") Long reviewerId);
+	
+	int rejectRequest(@Param("companyId") Long companyId, @Param("requestId") Long requestId,
+			@Param("reviewerId") Long reviewerId);
+
+	int rejectAccount(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId);
 }

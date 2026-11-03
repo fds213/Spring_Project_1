@@ -51,6 +51,22 @@ public class EmployeeJoinController {
 	public Map<String, Object> board(@AuthenticationPrincipal LoginUser loginUser) {
 		return Map.of("success", true, "data", joinService.getBoard(loginUser));
 	}
+	
+	/** 가입 승인 (관리자·부서장). 사번 발급 + 계정 사용 시작 */
+	@PostMapping("/employee/api/join/requests/{reqId}/approve")
+	@ResponseBody
+	public Map<String, Object> approve(@PathVariable Long reqId, @AuthenticationPrincipal LoginUser loginUser) {
+		Map<String, Object> result = joinService.approveRequest(loginUser, reqId);
+		return Map.of("success", true, "data", result);
+	}
+	
+	/** 가입 반려 (관리자·부서장) */
+	@PostMapping("/employee/api/join/requests/{reqId}/reject")
+	@ResponseBody
+	public Map<String, Object> reject(@PathVariable Long reqId, @AuthenticationPrincipal LoginUser loginUser) {
+		Map<String, Object> result = joinService.rejectRequest(loginUser, reqId);
+		return Map.of("success", true, "data", result);
+	}
 
 	/** 가입 열기 (employee.js 가입 활성화). 관리자는 고른 부서들, 부서장은 자기 부서 */
 	@PostMapping("/employee/api/join/openings")
@@ -115,6 +131,8 @@ public class EmployeeJoinController {
 		return Map.of("success", true);
 	}
 
+	// ---------- 오류 응답 ----------
+
 	// ④ 409 처리기
 	@ExceptionHandler(IllegalStateException.class)
 	@ResponseStatus(HttpStatus.CONFLICT)
@@ -123,7 +141,6 @@ public class EmployeeJoinController {
 		return Map.of("message", e.getMessage());
 	}
 
-	// ---------- 오류 응답 ----------
 
 	/** 관리자·부서장이 아님 → 403 { message } */
 	@ExceptionHandler(AccessDeniedException.class)
