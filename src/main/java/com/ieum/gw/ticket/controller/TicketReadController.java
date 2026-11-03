@@ -23,6 +23,16 @@ public class TicketReadController {
     private static final Logger logger = LoggerFactory.getLogger(TicketReadController.class);
     private final TicketReadService ticketReadService;
 
+    @GetMapping("/ticket/new")
+    public String newTicket() {
+        return "ticket/new";
+    }
+
+    @GetMapping("/ticket/mine")
+    public String mine() {
+        return "ticket/mine";
+    }
+
     @GetMapping("/ticket/api/tickets/{itTicketId}/comments")
     @ResponseBody
     public Map<String, Object> comments(@AuthenticationPrincipal LoginUser user, @PathVariable Long itTicketId) {

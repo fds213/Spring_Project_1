@@ -99,6 +99,16 @@ class TicketReadControllerTest {
     }
 
     @Test
+    @DisplayName("내 티켓·접수 화면 주소는 각각의 JSP를 연다")
+    void opensTicketScreens() throws Exception {
+        var mine = mvc.perform(get("/ticket/mine")).andReturn();
+        assertEquals("ticket/mine", mine.getModelAndView().getViewName());
+        var form = mvc.perform(get("/ticket/new")).andReturn();
+        assertEquals("ticket/new", form.getModelAndView().getViewName());
+        assertEquals(0, dao.ownershipReads);
+    }
+
+    @Test
     @DisplayName("내 티켓 댓글은 인증 정보로 조회하며 작성자 ID·내용·시각을 응답한다")
     void readsComments() throws Exception {
         var result = mvc.perform(get(urls("13").get(0)).param("companyId", "99")

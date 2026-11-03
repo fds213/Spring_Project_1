@@ -2,7 +2,6 @@ package com.ieum.gw.ticket.dto;
 
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,6 +12,6 @@ public class TicketCommentDTO {
     private Long ticketCommentId;
     private Long authorEmployeeId;
     private String content;
-    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonSerialize(using = TicketDateTimeSerializer.class)
     private LocalDateTime createdAt;
 }

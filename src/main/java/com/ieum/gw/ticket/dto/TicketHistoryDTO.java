@@ -2,7 +2,6 @@ package com.ieum.gw.ticket.dto;
 
 import java.time.LocalDateTime;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,6 +16,6 @@ public class TicketHistoryDTO {
     private Long beforeAssigneeId;
     private Long afterAssigneeId;
     private String reason;
-    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonSerialize(using = TicketDateTimeSerializer.class)
     private LocalDateTime createdAt;
 }
