@@ -1,4 +1,4 @@
-package com.ieum.gw.schedule.mapper;
+package com.ieum.gw.schedule.dao;
 
 import java.time.LocalDateTime;
 import java.util.List;

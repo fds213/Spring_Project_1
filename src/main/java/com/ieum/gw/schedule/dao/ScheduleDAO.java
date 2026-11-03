@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.schedule.dto.ScheduleDTO;
 import com.ieum.gw.schedule.dto.ScheduleLeaveDTO;
-import com.ieum.gw.schedule.mapper.ScheduleMapper;
 
 import lombok.RequiredArgsConstructor;
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.attendance.mapper.LeaveMapper">
+<mapper namespace="com.ieum.gw.attendance.dao.LeaveMapper">
 
 	<!-- 연차: 부여 행·사용 내역(leave_cycle·leave_slot·leave_ledger)은 근태가 쓰고, 휴가 신청서·결재선은 전자결재 자료를 읽기만 한다 -->
 

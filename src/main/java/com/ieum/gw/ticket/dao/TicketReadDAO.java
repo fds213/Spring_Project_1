@@ -4,7 +4,6 @@ import java.util.List;
 import org.springframework.stereotype.Repository;
 import com.ieum.gw.ticket.dto.TicketCommentDTO;
 import com.ieum.gw.ticket.dto.TicketHistoryDTO;
-import com.ieum.gw.ticket.mapper.TicketReadMapper;
 import lombok.RequiredArgsConstructor;
 
 @Repository

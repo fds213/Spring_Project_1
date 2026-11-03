@@ -50,8 +50,8 @@
   - 운영 플랫폼: `site`(상품 홈페이지·체험 신청·도입 문의 접수), `subscription`(업체·업체 코드·이용 상태·결제·구독·증설), `ops`(운영자 화면: 업체·신청 현황·문의 답변·오류 로그·결제 복구·삭제 업체 관리자 재발급), `support`(이음 장애 문의·운영자 지원 허가)
   - 공통: `common`(인증·권한·파일 저장·메일 발송·만료 읽기 전용 검사)
 - 체험 신청은 `site`가 흐름만 맡는다. 업체 생성은 `subscription`, 관리자 계정·사번 발급은 `employee`의 Service를 불러 한 트랜잭션으로 묶는다.
-- 모듈 안 구조: `controller`, `service`, `dao`, `mapper`, `dto`. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
-- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.approval.mapper.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
+- 모듈 안 구조: `controller`, `service`, `dao`, `dto`. Mapper 인터페이스는 `dao` 패키지에 DAO와 함께 둔다. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.approval.dao.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
 - 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. URL은 아래 'URL·요청 방식'을 따른다.
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
@@ -115,7 +115,7 @@
 ## DB·MyBatis
 
 - MyBatis는 Mapper 인터페이스 방식으로 쓰고, 호출은 Service → DAO → Mapper 순서로 한다(수업 ToyProject와 같은 구조).
-  - Mapper(`mapper` 패키지)는 `@Mapper`를 붙인 인터페이스다. SQL 하나에 메서드 하나를 두고, 메서드 이름은 Mapper XML의 `id`와 같게 한다.
+  - Mapper(`dao` 패키지)는 `@Mapper`를 붙인 인터페이스다. SQL 하나에 메서드 하나를 두고, 메서드 이름은 Mapper XML의 `id`와 같게 한다.
   - DAO(`dao` 패키지)는 `@Repository` 클래스다. Mapper를 주입받아 감싸고, Service는 DAO만 호출한다. Service나 Controller가 Mapper를 직접 부르지 않는다.
   - `SqlSessionTemplate`에 `"namespace.id"` 문자열을 넘기는 방식은 쓰지 않는다.
   - 공통 설정(담당 1)은 `root-context.xml`에서 `@Mapper`가 붙은 인터페이스만 Mapper로 등록한다(`<mybatis-spring:scan base-package="com.ieum.gw" annotation="org.apache.ibatis.annotations.Mapper" />`). 그래서 `@Mapper`를 빼먹으면 Mapper가 등록되지 않는다.

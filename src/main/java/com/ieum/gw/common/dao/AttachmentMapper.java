@@ -1,4 +1,4 @@
-package com.ieum.gw.common.mapper;
+package com.ieum.gw.common.dao;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.schedule.mapper.ScheduleMapper">
+<mapper namespace="com.ieum.gw.schedule.dao.ScheduleMapper">
 
 	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
 	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>

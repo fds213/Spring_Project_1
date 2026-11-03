@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.notification.mapper.NotificationMapper">
+<mapper namespace="com.ieum.gw.notification.dao.NotificationMapper">
 
     <!-- 받는 사원의 계정. 사원 하나에 계정은 많아야 하나다(UQ_07_01). 없으면 null -->
     <select id="findAccountId" resultType="java.lang.Long">

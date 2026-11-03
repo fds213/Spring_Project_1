@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.ops.mapper.OpsMapper">
+<mapper namespace="com.ieum.gw.ops.dao.OpsMapper">
 
     <!-- 업체 + 업체 관리자(업체당 1명, UX_ACCOUNT_ADMIN). 관리자가 빠진 자료도 업체 줄은 보이게 LEFT JOIN -->
     <sql id="companySelect">

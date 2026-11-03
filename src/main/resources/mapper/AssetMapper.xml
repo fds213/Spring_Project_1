@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.asset.mapper.AssetMapper">
+<mapper namespace="com.ieum.gw.asset.dao.AssetMapper">
     <!-- 목록과 홈 건수에서 업체·사원·회수 여부·사용 중 조건을 함께 쓴다. -->
     <sql id="myAssets">
           FROM asset a

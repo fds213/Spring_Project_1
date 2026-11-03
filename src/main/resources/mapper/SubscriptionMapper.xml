@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.subscription.mapper.SubscriptionMapper">
+<mapper namespace="com.ieum.gw.subscription.dao.SubscriptionMapper">
 
     <!-- 이 이메일로 만든 업체 수 (만료·자료 삭제된 업체 포함, ACC-01) -->
     <select id="countTrialEmail" resultType="int">

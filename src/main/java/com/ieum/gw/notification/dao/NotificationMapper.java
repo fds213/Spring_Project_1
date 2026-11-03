@@ -1,4 +1,4 @@
-package com.ieum.gw.notification.mapper;
+package com.ieum.gw.notification.dao;
 
 import java.util.List;
 

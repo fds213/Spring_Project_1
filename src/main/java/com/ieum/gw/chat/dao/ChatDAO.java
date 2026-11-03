@@ -2,7 +2,6 @@ package com.ieum.gw.chat.dao;
 
 import com.ieum.gw.chat.dto.ChatMessageDTO;
 import com.ieum.gw.chat.dto.ChatRoomDTO;
-import com.ieum.gw.chat.mapper.ChatMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 

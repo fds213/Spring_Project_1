@@ -27,7 +27,7 @@ import com.ieum.gw.attendance.dto.LeaveCycleDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.LeaveRequestDTO;
 import com.ieum.gw.attendance.dto.LeaveSlotDTO;
-import com.ieum.gw.attendance.mapper.LeaveMapper;
+import com.ieum.gw.attendance.dao.LeaveMapper;
 import com.ieum.gw.attendance.service.HolidayService;
 import com.ieum.gw.attendance.service.LeaveService;
 

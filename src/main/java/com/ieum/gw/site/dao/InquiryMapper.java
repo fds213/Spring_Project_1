@@ -1,4 +1,4 @@
-package com.ieum.gw.site.mapper;
+package com.ieum.gw.site.dao;
 
 import org.apache.ibatis.annotations.Mapper;
 

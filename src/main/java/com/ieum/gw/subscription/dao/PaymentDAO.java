@@ -11,7 +11,6 @@ import com.ieum.gw.subscription.dto.PaymentOrderDTO;
 import com.ieum.gw.subscription.dto.PaymentRowDTO;
 import com.ieum.gw.subscription.dto.SubscriptionChangeDTO;
 import com.ieum.gw.subscription.dto.SubscriptionPlanDTO;
-import com.ieum.gw.subscription.mapper.PaymentMapper;
 
 import lombok.RequiredArgsConstructor;
 

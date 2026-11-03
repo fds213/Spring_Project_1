@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import com.ieum.gw.board.dto.NoticeCommentDTO;
 import com.ieum.gw.board.dto.NoticeDTO;
 import com.ieum.gw.board.dto.NoticeFileDTO;
-import com.ieum.gw.board.mapper.NoticeMapper;
 
 import lombok.RequiredArgsConstructor;
 

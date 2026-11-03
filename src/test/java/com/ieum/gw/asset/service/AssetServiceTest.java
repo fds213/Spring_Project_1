@@ -87,7 +87,7 @@ class AssetServiceTest {
         String[] names = {"selectMyAssets", "countMyAssets"};
         String[] scopes = new String[2];
         for (int i = 0; i < names.length; i++) {
-            var bound = config.getMappedStatement("com.ieum.gw.asset.mapper.AssetMapper." + names[i])
+            var bound = config.getMappedStatement("com.ieum.gw.asset.dao.AssetMapper." + names[i])
                     .getBoundSql(Map.of("companyId", 7L, "employeeId", 9L));
             String sql = bound.getSql().replaceAll("\\s+", " ").toLowerCase();
             assertTrue(sql.contains("aa.company_id = a.company_id"));
@@ -101,7 +101,7 @@ class AssetServiceTest {
         }
         assertEquals(scopes[0], scopes[1]);
 
-        var history = config.getMappedStatement("com.ieum.gw.asset.mapper.AssetMapper.selectMyAssignments")
+        var history = config.getMappedStatement("com.ieum.gw.asset.dao.AssetMapper.selectMyAssignments")
                 .getBoundSql(Map.of("companyId", 7L, "employeeId", 9L, "assetId", 13L));
         String historySql = history.getSql().replaceAll("\\s+", " ").toLowerCase();
         assertTrue(historySql.contains("where company_id = ? and employee_id = ? and asset_id = ?"));

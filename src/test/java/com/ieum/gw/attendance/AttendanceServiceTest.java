@@ -26,7 +26,7 @@ import com.ieum.gw.attendance.dto.HolidayDTO;
 import com.ieum.gw.attendance.dto.LeaveDayDTO;
 import com.ieum.gw.attendance.dto.PunchDTO;
 import com.ieum.gw.attendance.dto.TodayAttendanceDTO;
-import com.ieum.gw.attendance.mapper.AttendanceMapper;
+import com.ieum.gw.attendance.dao.AttendanceMapper;
 import com.ieum.gw.attendance.service.AttendanceException;
 import com.ieum.gw.attendance.service.AttendanceService;
 import com.ieum.gw.attendance.service.HolidayService;

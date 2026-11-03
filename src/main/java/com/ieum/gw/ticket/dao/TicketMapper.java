@@ -1,4 +1,4 @@
-package com.ieum.gw.ticket.mapper;
+package com.ieum.gw.ticket.dao;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;

@@ -4,7 +4,6 @@ import java.util.List;
 import org.springframework.stereotype.Repository;
 import com.ieum.gw.asset.dto.AssetDTO;
 import com.ieum.gw.asset.dto.AssetAssignmentDTO;
-import com.ieum.gw.asset.mapper.AssetMapper;
 import lombok.RequiredArgsConstructor;
 
 @Repository

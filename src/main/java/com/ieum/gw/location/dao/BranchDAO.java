@@ -4,7 +4,6 @@ import java.util.List;
 import org.springframework.stereotype.Repository;
 import com.ieum.gw.location.dto.BranchDTO;
 import com.ieum.gw.location.dto.BranchDetailDTO;
-import com.ieum.gw.location.mapper.BranchMapper;
 import lombok.RequiredArgsConstructor;
 
 /** 지점 SQL 호출을 Service와 분리한다. */
