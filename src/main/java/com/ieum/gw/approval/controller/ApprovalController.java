@@ -1,5 +1,6 @@
 package com.ieum.gw.approval.controller;
 
+import com.ieum.gw.approval.dto.ApprovalDecisionDTO;
 import com.ieum.gw.approval.dto.ApprovalSubmitDTO;
 import com.ieum.gw.approval.service.ApprovalService;
 import com.ieum.gw.common.dto.LoginUser;
@@ -49,12 +50,24 @@ public class ApprovalController {
         return Map.of("success", true, "data", service.box(user));
     }
 
+    @PostMapping(value = "/api/documents/{documentId}/approve")
+    @ResponseBody
+    public Map<String, Object> approve(@RequestBody ApprovalDecisionDTO dto, @PathVariable long documentId, @AuthenticationPrincipal LoginUser user) {
+        return Map.of("success", true, "data", service.approve(user, dto, documentId));
+    }
+
+    @PostMapping(value = "/api/documents/{documentId}/reject")
+    @ResponseBody
+    public Map<String, Object> reject(@RequestBody ApprovalDecisionDTO dto, @PathVariable long documentId, @AuthenticationPrincipal LoginUser user) {
+        return Map.of("success", true, "data", service.reject(user, dto, documentId));
+    }
+
+
+
     @ExceptionHandler({IllegalArgumentException.class, IllegalStateException.class})
     @ResponseBody
     public ResponseEntity<Map<String, Object>> handleBadRequest(RuntimeException e) {
         String message = (e.getMessage() != null ? e.getMessage() : "요청을 처리하지 못했습니다.");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
     }
-
-
 }

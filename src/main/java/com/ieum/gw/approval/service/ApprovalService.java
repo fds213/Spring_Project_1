@@ -335,4 +335,13 @@ public class ApprovalService {
         }
         return box;
     }
+
+    public ApprovalDecisionResultDTO approve(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
+
+        return null;
+    }
+
+    public ApprovalDecisionResultDTO reject(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
+        return null;
+    }
 }
