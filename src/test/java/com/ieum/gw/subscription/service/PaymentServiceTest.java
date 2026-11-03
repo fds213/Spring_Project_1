@@ -14,6 +14,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -213,6 +214,7 @@ class PaymentServiceTest {
             for (PaymentDTO p : failed) {
                 rows.add(row(p, false));
             }
+            rows.sort(Comparator.comparing(PaymentRowDTO::getPaidAt).reversed()); // 실제 SQL처럼 최신순
             return rows;
         }
 
@@ -766,6 +768,9 @@ class PaymentServiceTest {
         assertEquals(OrderStatus.ORD_CONFIRMED, status(order));
         assertEquals(1, payments.approved.size());
         assertEquals(0, paidPeriods());
+        BillingDTO unapplied = service.getBilling(admin());
+        assertFalse(unapplied.isPaid());
+        assertNotNull(unapplied.getLastPaidDate()); // 반영 전이어도 승인된 결제의 날짜는 있다
 
         confirm(order);
 
@@ -962,14 +967,15 @@ class PaymentServiceTest {
         assertEquals(today.plusDays(12).atStartOfDay().toString(), billing.getEnd());
         assertEquals("가나상사", billing.getCompany());
         assertNull(billing.getServiceFrom());
+        assertNull(billing.getLastPaidDate());
     }
 
     @Test
-    @DisplayName("결제 뒤 화면 값: 유료이고 더 결제할 수 없으며 이력에 방금 결제가 있다")
+    @DisplayName("결제 뒤 화면 값: 유료이고 연장할 수 있으며 이력에 방금 결제가 있다")
     void billingAfterPaid() {
+        LocalDateTime approvedAt = LocalDateTime.now(SEOUL);
         OrderResultDTO order = order(3);
-        toss.confirmAnswer = done(order.getOrderNo(), 12000L,
-                LocalDateTime.now(SEOUL).atZone(SEOUL).toOffsetDateTime().toString());
+        toss.confirmAnswer = done(order.getOrderNo(), 12000L, approvedAt.atZone(SEOUL).toOffsetDateTime().toString());
         confirm(order);
 
         BillingDTO billing = service.getBilling(admin());
@@ -980,7 +986,8 @@ class PaymentServiceTest {
         assertTrue(billing.isCanPay());
         assertEquals("EXTEND", billing.getMode());
         assertEquals(3, billing.getUsers());
-        assertNotNull(billing.getServiceFrom());
+        assertEquals(approvedAt.toLocalDate().atStartOfDay().toString(), billing.getServiceFrom());
+        assertEquals(approvedAt.toLocalDate().atStartOfDay().toString(), billing.getLastPaidDate());
         assertEquals(order.getOrderNo(), billing.getPayments().get(0).getId());
         assertEquals(0, billing.getFailedPayments());
     }
@@ -997,6 +1004,7 @@ class PaymentServiceTest {
         assertEquals(1, billing.getFailedPayments());
         assertEquals("FAILED", billing.getPayments().get(0).getResult());
         assertNull(billing.getPayments().get(0).getFrom());
+        assertNull(billing.getLastPaidDate());
     }
 
     @Test
@@ -1167,6 +1175,8 @@ class PaymentServiceTest {
         BillingDTO billing = service.getBilling(admin());
         assertEquals("PAID", billing.getStatus());
         assertEquals(ServicePeriods.lastDay(firstEnd).atStartOfDay().toString(), billing.getEnd());
+        assertEquals(anchor.atStartOfDay().toString(), billing.getServiceFrom());
+        assertEquals(LocalDate.now(SEOUL).atStartOfDay().toString(), billing.getLastPaidDate());
         assertEquals("EXTEND", billing.getMode());
         assertTrue(billing.isCanPay());
 
@@ -1177,6 +1187,60 @@ class PaymentServiceTest {
         ServicePeriodDTO added = subs.periods.get(subs.periods.size() - 1);
         assertEquals(firstEnd, added.getStartsAt());
         assertEquals(anchor, added.getBillingAnchorDate());
+    }
+
+    @Test
+    @DisplayName("구독 현황의 결제일은 마지막으로 승인된 결제의 날짜다. 그 뒤 실패한 결제는 세지 않는다")
+    void lastPaidDateSkipsFailure() {
+        LocalDate today = LocalDate.now(SEOUL);
+        paidPeriod("MONTHLY", 5, 10, today.minusDays(5));
+        payAt(planOrder("MONTHLY", 5, 20_000L), today.minusDays(2).atTime(10, 0));
+        payAt(planOrder("MONTHLY", 5, 20_000L), today.minusDays(1).atTime(10, 0));
+        OrderResultDTO rejected = planOrder("MONTHLY", 5, 20_000L);
+        toss.confirmError = new TossApiException(403, "REJECT_CARD_PAYMENT", "거절");
+        assertThrows(BillingException.class, () -> confirm(rejected));
+
+        BillingDTO billing = service.getBilling(admin());
+
+        assertEquals(today.minusDays(1).atStartOfDay().toString(), billing.getLastPaidDate());
+        assertEquals(1, billing.getFailedPayments());
+    }
+
+    @Test
+    @DisplayName("구독 현황의 구독 시작일은 연장분으로 넘어가도 처음 시작한 날이다")
+    void serviceFromKeepsFirstDay() {
+        LocalDate today = LocalDate.now(SEOUL);
+        LocalDate anchor = today.minusDays(35);
+        subs.periods.clear();
+        ServicePeriodDTO first = paidPeriod("MONTHLY", 5, -5, anchor);
+        first.setStartsAt(anchor.atStartOfDay());
+        ServicePeriodDTO renewed = paidPeriod("MONTHLY", 5, 25, anchor);
+        renewed.setStartsAt(first.getEndsAt());
+
+        BillingDTO billing = service.getBilling(admin());
+
+        assertEquals("PAID", billing.getStatus());
+        assertEquals(anchor.atStartOfDay().toString(), billing.getServiceFrom());
+        assertEquals(today.plusDays(24).atStartOfDay().toString(), billing.getEnd());
+    }
+
+    @Test
+    @DisplayName("구독 현황의 구독 시작일은 연장한 유료가 모두 끝난 뒤에도 처음 시작한 날이다")
+    void serviceFromAfterExpired() {
+        LocalDate today = LocalDate.now(SEOUL);
+        LocalDate anchor = today.minusDays(70);
+        subs.periods.clear();
+        ServicePeriodDTO first = paidPeriod("MONTHLY", 5, -40, anchor);
+        first.setStartsAt(anchor.atStartOfDay());
+        ServicePeriodDTO renewed = paidPeriod("MONTHLY", 5, -10, anchor);
+        renewed.setStartsAt(first.getEndsAt());
+
+        BillingDTO billing = service.getBilling(admin());
+
+        assertEquals("EXPIRED", billing.getStatus());
+        assertTrue(billing.isPaid());
+        assertEquals(anchor.atStartOfDay().toString(), billing.getServiceFrom());
+        assertNull(billing.getLastPaidDate());
     }
 
     @Test

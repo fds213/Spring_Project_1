@@ -108,7 +108,8 @@ public class PaymentService {
                 billing.setTrialEnd(day(ServicePeriods.lastDay(p.getEndsAt())));
             }
         }
-        billing.setServiceFrom(paid ? day(period.getStartsAt().toLocalDate()) : null);
+        // 시작 시각이 아니라 기준일이다: 연장분으로 넘어가도 처음 시작한 날이 그대로 보인다. 만료 뒤에 승인된 연장은 그날로 바뀐다(applyOrder)
+        billing.setServiceFrom(paid ? day(period.getBillingAnchorDate()) : null);
         billing.setCanPay(mode != null);
         billing.setMode(mode);
         billing.setPlans(offers(mode, period));
@@ -116,14 +117,18 @@ public class PaymentService {
         List<PaymentRowDTO> rows = paymentDAO.listPayments(companyId);
         List<BillingPaymentDTO> payments = new ArrayList<>();
         int failed = 0;
+        LocalDateTime lastPaid = null;
         for (PaymentRowDTO row : rows) {
             payments.add(toPayment(row));
             if (!row.isApproved()) {
                 failed++;
+            } else if (lastPaid == null || row.getPaidAt().isAfter(lastPaid)) {
+                lastPaid = row.getPaidAt();
             }
         }
         billing.setPayments(payments);
         billing.setFailedPayments(failed);
+        billing.setLastPaidDate(lastPaid == null ? null : day(lastPaid.toLocalDate()));
         return billing;
     }
 
@@ -369,7 +374,7 @@ public class PaymentService {
     private static void requireAdmin(LoginUser user) {
         boolean admin = user.getAuthorities().stream().anyMatch(a -> ROLE_ADMIN.equals(a.getAuthority()));
         if (!admin) {
-            throw new BillingException(403, "결제는 업체 관리자만 할 수 있습니다.");
+            throw new BillingException(403, "이용 결제는 업체 관리자만 쓸 수 있습니다.");
         }
     }
 
