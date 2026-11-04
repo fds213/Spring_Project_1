@@ -28,9 +28,10 @@ public class TicketService {
      * @param branchId            수령 지점
      * @param assetType           장비 종류 코드(AT_LAPTOP·AT_DESKTOP·AT_MONITOR·AT_OTHER)
      * @param purpose             사용 목적
+     * @return 신규 생성했거나 정보 일치를 확인한 기존 지급 티켓 ID
      */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long approvalDocumentId,
+    public Long createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long approvalDocumentId,
                                       Long branchId, String assetType, String purpose) {
         requireId(companyId);
         requireId(requesterEmployeeId);
@@ -45,16 +46,21 @@ public class TicketService {
         // 회사·요청자·지점은 결재 Service가 검증한 값이며, 업체별 복합 FK로도 검사한다.
         // 원본 장비 문서 고유 제약에 해당하는 중복만 SQL에서 건너뛴다.
         int inserted = dao.insertEquipmentTicket(companyId, requesterEmployeeId, approvalDocumentId, branchId, purpose);
-        if (inserted == 1) {
-            return;
-        }
-        if (inserted == 0) {
-            EquipmentTicketDTO existing = dao.selectEquipmentTicket(companyId, approvalDocumentId);
-            if (existing != null && Objects.equals(requesterEmployeeId, existing.getRequesterEmployeeId())
-                    && Objects.equals(branchId, existing.getBranchId()) && Objects.equals(purpose, existing.getContent())) {
-                return;
-            }
-        }
+        
+        if (inserted == 1 || inserted == 0) {
+			EquipmentTicketDTO ticket = dao.selectEquipmentTicket(companyId, approvalDocumentId);
+			
+			if (ticket != null 
+					&& ticket.getItTicketId() != null
+					&& ticket.getItTicketId() > 0
+					&& Objects.equals(requesterEmployeeId, ticket.getRequesterEmployeeId())
+					&& Objects.equals(branchId, ticket.getBranchId())
+					&& Objects.equals(purpose, ticket.getContent())) {
+				
+				return ticket.getItTicketId();
+			}
+		}
+        
         throw new IllegalStateException("같은 결재 문서의 지급 티켓 정보를 확인해 주세요.");
     }
 
