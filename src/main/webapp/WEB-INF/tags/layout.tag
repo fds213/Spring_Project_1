@@ -18,7 +18,8 @@
 
   이 틀이 쓰는 서버 값 (백엔드와 확정, 가이드 9장):
   - loginUser: Spring Security principal (저장소 com.ieum.gw.dto.LoginUser). 저장소에 있는 name, empnum 만 읽는다
-  - loginInfo (request 속성, 없어도 됨): companyName, deptName, rankName. 담당 1이 @ControllerAdvice 등으로 넣으면 헤더에 보인다.
+  - loginInfo (request 속성, 없어도 됨): companyName, deptName, rankName, headDeptName(내가 부서장인 부서, 아니면 null).
+    사원 모듈이 @ControllerAdvice 등으로 넣으면 헤더(회사명·부서·직급)와 사이드바(부서장의 가입 승인 메뉴)에 쓰인다.
     없으면 업체명은 비우고 부서·직급 자리에 사번을 보여준다 (LoginUser 에 없는 값을 읽으면 화면이 500 오류로 깨지므로 따로 받는다)
   - 역할: ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN, ROLE_OPS(이음 운영자) 중 한 사람에 하나
     (hasRole 은 ROLE_ 접두사를 붙여 찾는다)

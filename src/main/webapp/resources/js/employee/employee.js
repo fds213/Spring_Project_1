@@ -34,7 +34,7 @@ const pathPart = encodeURIComponent; // 주소에 넣는 값
 const dotJoin = (...parts) => parts.filter(Boolean).join(' · ');
 // 화면이 지금 보이는지 (view 섹션에 class on이 있고, hidden 요소 안에 있지 않다)
 const viewShown = id => { const v = $j(id); return !!v && v.classList.contains('on') && !v.closest('[hidden]'); };
-// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 403으로 한다)
+// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 409로 한다: 공통 검사 ReadOnlyInterceptor)
 const readOnlyUi = () => document.body.classList.contains('is-readonly');
 const hhmm = iso => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const minsUntil = iso => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000));
