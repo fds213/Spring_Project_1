@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.AssetAllocationMapper">
+    <select id="detail" resultType="com.ieum.gw.dto.AssetAllocationDTO">
+        SELECT asset_id, asset_name, asset_no, serial_no, asset_type, status_code AS status, branch_id, version
+        FROM asset WHERE company_id = #{companyId} AND asset_id = #{assetId}
+    </select>
+    <select id="lock" resultType="com.ieum.gw.dto.AssetAllocationDTO">
+        SELECT company_id, asset_id, asset_type, status_code AS status, branch_id, version FROM asset
+        WHERE company_id = #{companyId} AND asset_id = #{assetId} FOR UPDATE
+    </select>
+    <select id="openAssignments" resultType="long">
+        SELECT asset_assignment_id FROM asset_assignment
+        WHERE company_id = #{companyId} AND asset_id = #{assetId} AND returned_at IS NULL
+    </select>
+    <update id="issue">
+        UPDATE asset SET status_code = #{targetStatus}, version = version + 1, branch_id = #{targetBranchId},
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId} AND asset_id = #{assetId} AND status_code = #{status} AND version = #{version}
+    </update>
+    <insert id="insertAssignment">
+        <selectKey keyProperty="assignmentId" resultType="long" order="BEFORE">
+            SELECT SQ_ASSET_ASSIGNMENT.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO asset_assignment (asset_assignment_id, company_id, asset_id, employee_id, it_ticket_id, issued_by, issued_at)
+        VALUES (#{assignmentId}, #{companyId}, #{assetId}, #{employeeId}, #{ticketId,jdbcType=NUMERIC}, #{actorAccountId},
+            CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP))
+    </insert>
+    <!-- 처리 종류(상태가 아님)는 DB의 ASSET_ACTION 공통 코드이며 이 Mapper에서만 저장한다. -->
+    <insert id="insertIssueHistory">
+        INSERT INTO asset_history (company_id,asset_id,asset_assignment_id,action_code,actor_account_id,from_branch_id,to_branch_id,description)
+        VALUES (#{companyId},#{assetId},#{assignmentId},'AA_ISSUE',#{actorAccountId},#{branchId,jdbcType=NUMERIC},#{targetBranchId},#{note})
+    </insert>
+    <update id="returnAssignment">
+        UPDATE asset_assignment SET returned_by = #{actorAccountId},
+            returned_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId} AND asset_id = #{assetId}
+          AND asset_assignment_id = #{assignmentId} AND returned_at IS NULL
+    </update>
+    <update id="release">
+        UPDATE asset SET status_code = #{targetStatus}, version = version + 1, updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId} AND asset_id = #{assetId} AND status_code = #{status} AND version = #{version}
+    </update>
+    <insert id="insertReturnHistory">
+        INSERT INTO asset_history (company_id,asset_id,asset_assignment_id,action_code,actor_account_id,from_branch_id,to_branch_id,description)
+        VALUES (#{companyId},#{assetId},#{assignmentId},'AA_RETURN',#{actorAccountId},#{branchId,jdbcType=NUMERIC},#{targetBranchId,jdbcType=NUMERIC},#{note})
+    </insert>
+    <select id="stock" resultType="com.ieum.gw.dto.AssetDTO">
+        SELECT a.asset_id,a.asset_no,a.asset_name,a.asset_type,a.serial_no,a.branch_id FROM asset a
+        WHERE a.company_id = #{companyId} AND a.asset_type = #{assetType} AND a.status_code = #{status}
+          AND NOT EXISTS (SELECT 1 FROM asset_assignment aa
+              WHERE aa.company_id = a.company_id AND aa.asset_id = a.asset_id AND aa.returned_at IS NULL)
+        ORDER BY a.asset_no,a.asset_id
+    </select>
+</mapper>
