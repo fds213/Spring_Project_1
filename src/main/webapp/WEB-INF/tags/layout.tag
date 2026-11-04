@@ -22,7 +22,7 @@
     없으면 업체명은 비우고 부서·직급 자리에 사번을 보여준다 (LoginUser 에 없는 값을 읽으면 화면이 500 오류로 깨지므로 따로 받는다)
   - 역할: ROLE_EMP, ROLE_IT, ROLE_HR, ROLE_ADMIN, ROLE_OPS(이음 운영자) 중 한 사람에 하나
     (hasRole 은 ROLE_ 접두사를 붙여 찾는다)
-  - companyBilling (request 속성, 업체 직원만): status(TRIAL / PAID / EXPIRED), endDate("2026.11.08"), daysLeft(0 = 마지막 날)
+  - companyBilling (request 속성, 업체 직원만): status(TRIAL / PAID / EXPIRED), paid(지금, 만료면 마지막 기간이 유료면 true), endDate("2026.11.08"), daysLeft(0 = 마지막 날)
   - todayPunch (request 속성, 업체 직원만): inTime("08:52"), outTime(없으면 비움)
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -31,6 +31,8 @@
 <sec:authorize access="hasRole('OPS')" var="isOps" />
 <sec:authorize access="hasRole('ADMIN')" var="isAdmin" />
 <c:set var="readOnly" value="${not isOps and companyBilling.status eq 'EXPIRED'}" />
+<%-- 유료 기간이 끝난 업체. 만료 뒤 재구매는 이번 제외라 결제를 안내하지 않는다(띠: header.jspf, 쓰기 안내: common.js) --%>
+<c:set var="paidExpired" value="${readOnly and companyBilling.paid}" />
 <!doctype html>
 <html lang="ko">
 <head>
@@ -51,8 +53,8 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
 </head>
-<%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 체험이 끝나 결제하지 않은 업체(쓰기 동작을 흐리게) --%>
-<body data-ctx="${ctx}" data-mode="${isOps ? 'OPS' : 'EMPLOYEE'}" data-admin="${isAdmin}"${readOnly ? ' class="is-readonly"' : ''}>
+<%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 체험·유료 기간이 끝난 업체(쓰기 동작을 흐리게) --%>
+<body data-ctx="${ctx}" data-mode="${isOps ? 'OPS' : 'EMPLOYEE'}" data-admin="${isAdmin}" data-paid-expired="${paidExpired}"${readOnly ? ' class="is-readonly"' : ''}>
   <div class="app-shell">
     <%@ include file="/WEB-INF/views/common/header.jspf" %>
     <div class="app-body">
