@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.InputStream;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -17,6 +18,8 @@ import org.apache.ibatis.reflection.ParamNameResolver;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import com.ieum.gw.dao.ApprovalDAO;
 
 class ApprovalMapperTest {
     private Configuration configuration() throws Exception {
@@ -84,6 +87,60 @@ class ApprovalMapperTest {
         assertEquals(List.of("APPROVED", 1L, 10L, "IN_PROGRESS"), boundValues(config, sql, parameters));
         assertTrue(sql.getSql().contains("finished_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)"));
         assertTrue(sql.getSql().contains("AND status_code = ?"));
+    }
+
+    @Test
+    @DisplayName("반려 UPDATE는 사유·결재자·순번과 WAITING·IN_PROGRESS 조건을 바인딩한다")
+    void bindsRejectionUpdates() throws Exception {
+        Configuration config = configuration();
+        var method = ApprovalMapper.class.getMethod("rejectStep", Long.class, Long.class,
+                Integer.class, long.class, String.class);
+        Object parameters = new ParamNameResolver(config, method)
+                .getNamedParams(new Object[] {1L, 100L, 1, 10L, "일정 조정 필요"});
+        BoundSql sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.rejectStep")
+                .getBoundSql(parameters);
+        assertEquals(List.of("REJECTED", "일정 조정 필요", 1L, 10L, 100L, 1, "WAITING"),
+                boundValues(config, sql, parameters));
+        assertTrue(sql.getSql().contains("processed_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)"));
+        assertTrue(sql.getSql().contains("AND status_code = ?"));
+
+        var documentMethod = ApprovalMapper.class.getMethod("rejectDocument", Long.class, long.class);
+        parameters = new ParamNameResolver(config, documentMethod).getNamedParams(new Object[] {1L, 10L});
+        sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.rejectDocument").getBoundSql(parameters);
+        assertEquals(List.of("REJECTED", 1L, 10L, "IN_PROGRESS"), boundValues(config, sql, parameters));
+        assertTrue(sql.getSql().contains("finished_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)"));
+        assertTrue(sql.getSql().contains("AND status_code = ?"));
+    }
+
+    @Test
+    @DisplayName("반려 DAO는 업체·결재자·순번·문서·사유를 빠짐없이 Mapper에 전달한다")
+    void rejectionDaoForwardsAllArguments() {
+        List<Object> received = new ArrayList<>();
+        ApprovalMapper mapper = (ApprovalMapper) Proxy.newProxyInstance(
+                ApprovalMapper.class.getClassLoader(), new Class<?>[] {ApprovalMapper.class},
+                (proxy, method, args) -> {
+                    assertEquals("rejectStep", method.getName());
+                    received.addAll(Arrays.asList(args));
+                    return 1;
+                });
+        assertEquals(1, new ApprovalDAO(mapper).rejectStep(1L, 100L, 2, 10L, "일정 조정 필요"));
+        assertEquals(List.of(1L, 100L, 2, 10L, "일정 조정 필요"), received);
+    }
+
+    @Test
+    @DisplayName("휴가 반영 조회는 업체·문서로 한정하고 저장된 날짜 ID·구분·차감 일수를 날짜순으로 읽는다")
+    void selectsSavedLeaveDays() throws Exception {
+        Configuration config = configuration();
+        var method = ApprovalMapper.class.getMethod("selectLeaveDays", Long.class, long.class);
+        Object parameters = new ParamNameResolver(config, method).getNamedParams(new Object[] {1L, 10L});
+        var statement = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.selectLeaveDays");
+        BoundSql sql = statement.getBoundSql(parameters);
+        assertEquals(List.of(1L, 10L), boundValues(config, sql, parameters));
+        String query = sql.getSql().replaceAll("\\s+", " ").trim();
+        assertTrue(query.contains("leave_request_day_id, leave_date, leave_type, deduct_days"));
+        assertTrue(query.contains("WHERE company_id = ? AND approval_document_id = ?"));
+        assertTrue(query.contains("ORDER BY leave_date ASC"));
+        assertEquals(com.ieum.gw.dto.LeaveDayDTO.class, statement.getResultMaps().get(0).getType());
     }
 
     private List<Object> boundValues(Configuration config, BoundSql sql, Object parameters) {

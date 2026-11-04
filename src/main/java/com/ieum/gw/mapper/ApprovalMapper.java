@@ -51,4 +51,10 @@ public interface ApprovalMapper {
     int approveStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
 
     int approveDocument(Long companyId, long documentId);
+
+    int rejectStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
+
+    int rejectDocument(Long companyId, long documentId);
+
+    List<LeaveDayDTO> selectLeaveDays(Long companyId, long documentId);
 }

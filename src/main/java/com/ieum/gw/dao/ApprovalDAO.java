@@ -89,4 +89,17 @@ public class ApprovalDAO {
     public int approveDocument(Long companyId, long documentId) {
         return mapper.approveDocument(companyId, documentId);
     }
+
+    public int rejectStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion) {
+        return mapper.rejectStep(companyId, employeeId, stepNo, documentId, opinion);
+    }
+
+    public int rejectDocument(Long companyId, long documentId) {
+        return mapper.rejectDocument(companyId, documentId);
+    }
+
+
+    public List<LeaveDayDTO> selectLeaveDays(Long companyId, long documentId) {
+        return mapper.selectLeaveDays(companyId, documentId);
+    }
 }

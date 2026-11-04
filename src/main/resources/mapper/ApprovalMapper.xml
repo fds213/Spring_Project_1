@@ -211,4 +211,45 @@
 
     </update>
 
+
+    <update id="rejectStep">
+        <bind name="rejected" value="@com.ieum.gw.code.ApprovalStepStatus@REJECTED.name()"/>
+        <bind name="waiting" value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+
+        UPDATE approval_step
+        SET
+        status_code = #{rejected},
+        opinion = #{opinion,jdbcType=VARCHAR},
+        processed_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+        updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND approver_employee_id = #{employeeId}
+        AND step_no = #{stepNo}
+        AND status_code = #{waiting}
+    </update>
+
+    <update id="rejectDocument">
+        <bind name="rejected" value="@com.ieum.gw.code.ApprovalDocumentStatus@REJECTED.name()"/>
+        <bind name="inProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+
+        UPDATE approval_document
+        SET
+            status_code = #{rejected},
+            finished_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND status_code = #{inProgress}
+
+    </update>
+
+    <select id="selectLeaveDays" resultType="com.ieum.gw.dto.LeaveDayDTO">
+        SELECT leave_request_day_id, leave_date, leave_type, deduct_days
+        FROM leave_request_day
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{documentId}
+        ORDER BY leave_date ASC
+    </select>
+
 </mapper>

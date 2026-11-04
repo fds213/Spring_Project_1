@@ -229,9 +229,11 @@ class ApprovalServiceTest {
         }
     }
 
-    /** 결재 요청 알림을 저장하지 않고 받은 값만 적어 두는 가짜 알림 */
+    /** 결재 알림을 저장하지 않고 받은 값만 적어 두는 가짜 알림 */
     static class FakeNotification extends NotificationService {
         final List<List<Object>> requests = new ArrayList<>();
+        final List<List<Object>> done = new ArrayList<>();
+        final List<List<Object>> rejected = new ArrayList<>();
 
         FakeNotification() {
             super(null);
@@ -241,6 +243,16 @@ class ApprovalServiceTest {
         public void notifyApprovalRequest(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
             requests.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
         }
+
+        @Override
+        public void notifyApprovalDone(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
+            done.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
+        }
+
+        @Override
+        public void notifyApprovalRejected(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
+            rejected.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
+        }
     }
 
     private final FakeEmployee employee = new FakeEmployee();
@@ -248,7 +260,8 @@ class ApprovalServiceTest {
     private final FakeDao dao = new FakeDao();
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
-    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification);
+    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
+            new ScheduleService(null, null));
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();

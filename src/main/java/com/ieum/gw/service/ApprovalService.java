@@ -53,6 +53,7 @@ public class ApprovalService {
     private final ApprovalDAO dao;
     private final BranchService bService;
     private final NotificationService nService;
+    private final ScheduleService sService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -116,6 +117,21 @@ public class ApprovalService {
         // 진행 중인 문서가 아니면 409
         if(!ApprovalDocumentStatus.IN_PROGRESS.name().equals(doc.getStatusCode())) throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리되었거나 결재할 수 없는 문서입니다.");
         return doc;
+    }
+
+    @NonNull
+    private ApprovalDecisionResultDTO createResponse(LoginUser user, ApprovalDocumentDTO doc, ApprovalHistoryDTO history) {
+        ApprovalDecisionResultDTO response = new ApprovalDecisionResultDTO();
+
+        String authorName = eService.getEmployeeNames(
+                user.getCompanyId(),
+                List.of(doc.getAuthorEmployeeId())
+        ).get(doc.getAuthorEmployeeId());
+
+        response.setEmployeeName(authorName);
+        response.setDocumentType(doc.getDocumentType());
+        response.setStatusCode(history.getAfterStatus());
+        return response;
     }
 
     private boolean overlaps(LeaveDayDTO day, LeaveDayDTO p) {
@@ -421,6 +437,26 @@ public class ApprovalService {
             // 마지막 결재자: 문서를 APPROVED로 변경
             result = dao.approveDocument(user.getCompanyId(), documentId);
             if(result!=1) throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+
+            if (ApprovalDocumentType.DOC_LEAVE.name().equals(doc.getDocumentType())) {
+                List<LeaveDayDTO> days =
+                        dao.selectLeaveDays(user.getCompanyId(), documentId);
+
+                aService.useLeave(
+                        user.getCompanyId(),
+                        doc.getAuthorEmployeeId(),
+                        user.getUserAccountId(),
+                        days
+                );
+
+                sService.addLeaveEvents(
+                        user.getCompanyId(),
+                        doc.getAuthorEmployeeId(),
+                        days
+                );
+            }
+
+            nService.notifyApprovalDone(user.getCompanyId(), doc.getAuthorEmployeeId(), documentId, doc.getTitle());
         }
 
         // 이력 저장
@@ -438,19 +474,9 @@ public class ApprovalService {
         history.setCompanyId(user.getCompanyId());
         dao.insertHistory(history);
 
-        ApprovalDecisionResultDTO response = new ApprovalDecisionResultDTO();
-
-        String authorName = eService.getEmployeeNames(
-                user.getCompanyId(),
-                List.of(doc.getAuthorEmployeeId())
-        ).get(doc.getAuthorEmployeeId());
-
-        response.setEmployeeName(authorName);
-        response.setDocumentType(doc.getDocumentType());
-        response.setStatusCode(history.getAfterStatus());
-
-        return response;
+        return createResponse(user, doc, history);
     }
+
 
 
 
@@ -458,8 +484,40 @@ public class ApprovalService {
     public ApprovalDecisionResultDTO reject(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
 
         // 행 잠금 슛
-        ApprovalDocumentDTO doc = dao.lockDocument(user.getCompanyId(), documentId);
+        ApprovalDocumentDTO doc = lockInDocument(user, documentId);
+        List<ApprovalStepDTO> steps = dao.selectDocumentSteps(user.getCompanyId(), documentId);
+        ApprovalStepDTO approver = requireCurrentApprover(user, steps);
 
-        return null;
+        String opinion = validateOpinion(dto.getOpinion());
+
+        if (!StringUtils.hasText(opinion)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "반려 사유를 입력해 주세요."
+            );
+        }
+
+        int result = dao.rejectStep(user.getCompanyId(), user.getEmployeeId(), approver.getStepNo(),documentId, opinion);
+        if(result!=1) throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+
+
+        // 반려는 조건없이 REJECTED
+        result = dao.rejectDocument(user.getCompanyId(), documentId);
+        if(result!=1) throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+
+        nService.notifyApprovalRejected(user.getCompanyId(), doc.getAuthorEmployeeId(), documentId, doc.getTitle());
+
+        // 이력 저장
+        ApprovalHistoryDTO history = new ApprovalHistoryDTO();
+        history.setActionCode(ApprovalAction.APR_REJECT.name());
+        history.setBeforeStatus(doc.getStatusCode());
+        history.setAfterStatus(ApprovalDocumentStatus.REJECTED.name());
+        history.setOpinion(opinion);
+        history.setActorAccountId(user.getUserAccountId());
+        history.setApprovalDocumentId(documentId);
+        history.setCompanyId(user.getCompanyId());
+        dao.insertHistory(history);
+
+        return createResponse(user, doc, history);
     }
 }
