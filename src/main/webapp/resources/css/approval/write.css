@@ -1,0 +1,96 @@
+/* 기안 작성 화면 (/approval/write, approval/write.jsp + js/approval/approval.js) 전용 스타일. 색·둥글기는 common.css 변수를 쓴다 */
+
+/* 넓은 작성 칸 + 좁은 안내 칸. 한글이 낱자에서 끊기지 않게("0.5일입니/다") 단어 단위로 줄을 바꾼다 */
+#view-approval-write { word-break: keep-all; overflow-wrap: anywhere; }
+.ea-write { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.ea-form { display: flex; flex-direction: column; gap: 22px; padding: 20px 22px 18px; }
+
+/* 1. 양식 탭: 카드 머리줄에 붙은 밑줄 탭 (아래 구분 버튼과 모양을 달리해 "문서 종류"임이 보이게) */
+.ea-tabs { display: flex; gap: 24px; padding: 0 22px; border-bottom: 1px solid var(--line); }
+.ea-tab { position: relative; height: 54px; padding: 0 2px; border: 0; background: none; color: var(--text-muted); font: inherit; font-size: 15px; font-weight: 500; cursor: pointer; }
+.ea-tab:hover { color: var(--text); }
+.ea-tab[aria-selected="true"] { color: var(--text); font-weight: 700; }
+.ea-tab[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+.ea-tab:focus-visible, .ea-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 2. 묶음(휴가 내용·장비 내용·결재선)과 한 줄 */
+.ea-group { display: flex; flex-direction: column; gap: 12px; }
+.ea-line-group { padding-top: 18px; border-top: 1px solid var(--line); }
+.ea-group-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
+.ea-group-title span { font-weight: 400; color: var(--text-muted); }
+.ea-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; font-size: 13px; }
+.ea-row-top { align-items: start; }
+.ea-row-top > label { padding-top: 10px; }
+.ea-row-sub { margin-top: -6px; }
+/* 신청 일수가 아직 없으면(날짜를 고르기 전) 줄째 숨겨 기간과 사유 사이가 벌어지지 않게 */
+.ea-row-sub:has(.ea-days:empty) { display: none; }
+.ea-row > label, .ea-label { color: var(--text-sub); }
+.ea-row .input, .ea-row .filter-select { width: 100%; min-width: 0; }
+.ea-row .ea-qty { width: 120px; }
+
+/* 구분 버튼 (연차·오전 반차·오후 반차) */
+.ea-seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.ea-seg button { height: 36px; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--text-sub); font: inherit; font-size: 13px; cursor: pointer; }
+.ea-seg button:hover { border-color: #c5cfdc; }
+.ea-seg button[aria-checked="true"] { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+
+/* 기간 한 줄 + 신청 일수 */
+.ea-range { display: flex; align-items: center; gap: 8px; }
+.ea-range .input { flex: 1; min-width: 0; }
+.ea-range > span { flex: none; color: var(--text-muted); }
+.ea-range .input:disabled { background: var(--bg-sub); color: var(--text-muted); }
+.ea-days { margin: 0; font-size: 12px; color: var(--text-sub); }
+.ea-days:empty { display: none; }
+.ea-days strong { color: var(--text); }
+.ea-days.is-over strong, .ea-days.is-over em { color: var(--danger); }
+.ea-days em { font-style: normal; }
+
+.ea-count { margin: 4px 0 0; text-align: right; font-size: 11px; color: var(--text-muted); }
+.ea-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
+.ea-hint.is-warn { color: var(--danger); }
+
+/* 3. 결재선: 나 → 1단계 → 2단계 */
+.ea-line { display: flex; align-items: center; gap: 8px; }
+.ea-line .filter-select { flex: 1; min-width: 0; }
+/* 기안자(나): 버튼처럼 보이지 않게 동그란 이름표로 */
+.ea-me { flex: none; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-sub); }
+.ea-me-dot { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: var(--accent-bg); color: var(--accent); font-size: 12px; font-weight: 700; }
+.ea-arrow { flex: none; color: var(--text-muted); }
+
+/* 4. 아래 버튼 줄 */
+.ea-form .form-error:empty { display: none; }
+.ea-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ea-summary { flex: 1; min-width: 0; margin: 0 8px 0 0; font-size: 13px; color: var(--text-sub); }
+.ea-summary strong { color: var(--text); font-weight: 600; }
+.ea-summary.is-todo { color: var(--text-muted); }
+.ea-actions .btn { height: 40px; padding: 0 18px; font-size: 14px; }
+
+/* 5. 오른쪽: 남은 연차 큰 숫자 + 안내 */
+.ea-side { display: flex; flex-direction: column; gap: 16px; }
+.ea-left { padding: 18px 20px; gap: 2px; }
+.ea-left small { font-size: 12px; color: var(--text-sub); }
+.ea-left strong { font-size: 28px; font-weight: 700; color: var(--text); }
+.ea-left strong .unit { margin-left: 3px; font-size: 14px; font-weight: 500; color: var(--text-sub); }
+.ea-left-sub { font-size: 12px; color: var(--text-muted); }
+.ea-guide h2 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 16px 20px 0; font-size: 14px; font-weight: 600; }
+.ea-guide-list { margin: 0; padding: 10px 20px 18px 36px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+
+/* 좁은 화면: 한 칸으로, 남은 연차를 위로 */
+@media (max-width: 1000px) {
+  .ea-write { grid-template-columns: minmax(0, 1fr); }
+  .ea-side { order: -1; }
+}
+@media (max-width: 560px) {
+  .ea-form { padding: 16px; }
+  .ea-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .ea-row-sub > span:first-child { display: none; }
+  .ea-row-sub { margin-top: -2px; }
+  .ea-row-top > label { padding-top: 0; }
+  .ea-line { flex-wrap: wrap; }
+  .ea-line .filter-select { flex-basis: 100%; }
+  .ea-arrow { display: none; }
+  .ea-actions { flex-wrap: wrap; }
+  .ea-summary { flex-basis: 100%; margin: 0 0 4px; }
+  .ea-actions .btn { flex: 1; justify-content: center; }
+  .ea-tabs { padding: 0 16px; gap: 18px; }
+}
