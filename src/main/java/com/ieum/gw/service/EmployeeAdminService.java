@@ -180,7 +180,11 @@ public class EmployeeAdminService {
             // ⑦ 부서장이었으면 그 칸도 비운다 (#111 리뷰)
             dao.clearHeadOf(companyId, t.getEmployeeId());
             // shortcut: 이 사람이 결재할 차례였던 휴가 자동 반려는 결재 모듈 메서드가 생기면 연결, 그 전까지 0
-        } else {
+        	} else {
+            // 본인 계정은 스스로 켤 수 없다 (#127 리뷰: 꺼진 인사 담당이 기존 세션으로 자기를 되살리던 것)
+            if (t.getEmployeeId().equals(user.getEmployeeId())) {
+                throw new IllegalStateException("본인 계정은 다시 사용으로 바꿀 수 없습니다");
+            }
             // ⑤ 퇴사자는 인사 정보에서 재직 상태를 먼저 바꿔야 한다
             if ("ST_RETIRED".equals(t.getEmploymentStatus())) {
                 throw new IllegalStateException("퇴사 처리된 사원입니다. 인사 정보에서 재직 상태를 먼저 바꿔 주세요");
