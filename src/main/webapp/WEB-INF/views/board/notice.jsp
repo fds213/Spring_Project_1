@@ -142,7 +142,8 @@
         </div>
         <div class="bill-actions">
           <button type="button" class="btn" id="btnCancel">취소</button>
-          <button type="submit" class="btn btn-primary" id="btnSave">저장</button>
+          <%-- data-write: 읽기 전용 업체에서는 저장을 누르기 전에 화면이 먼저 막고 안내한다(common.js) --%>
+          <button type="submit" class="btn btn-primary" id="btnSave" data-write>저장</button>
         </div>
       </form>
     </section>
