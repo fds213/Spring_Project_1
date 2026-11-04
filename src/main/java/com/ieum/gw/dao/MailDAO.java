@@ -1,8 +1,11 @@
 package com.ieum.gw.dao;
 
+import java.time.LocalDate;
+
 import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.code.MailStatus;
+import com.ieum.gw.code.MailType;
 import com.ieum.gw.dto.MailMessageDTO;
 import com.ieum.gw.mapper.MailMapper;
 
@@ -27,5 +30,15 @@ public class MailDAO {
     /** 이번 시도 이력. updateResult 다음에 부른다(순번이 그 시도 횟수다) */
     public int insertAttempt(Long mailOutboxId, boolean sent, String error) {
         return mapper.insertAttempt(mailOutboxId, sent ? "Y" : "N", error);
+    }
+
+    /** 실패했거나 staleMinutes분 넘게 대기로 멈춘 기록을 다시 대기로 되돌린다. 바뀐 행 수를 돌려준다(0이면 보내면 안 된다) */
+    public int claimRetry(Long mailOutboxId, int staleMinutes) {
+        return mapper.claimRetry(mailOutboxId, staleMinutes);
+    }
+
+    /** 그날(day 0시부터) 이 주소로 기록된 이 종류의 메일 수 */
+    public int countForRecipient(MailType mailType, String recipientEmail, LocalDate day) {
+        return mapper.countForRecipient(mailType.name(), recipientEmail, day.atStartOfDay());
     }
 }

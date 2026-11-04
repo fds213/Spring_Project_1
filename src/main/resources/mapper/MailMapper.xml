@@ -37,4 +37,21 @@
         FROM mail_outbox
         WHERE mail_outbox_id = #{mailOutboxId}
     </insert>
+    <!-- 다시 보내기: 같은 기록을 대기로 되돌린다. 실패했거나, 서버가 꺼지는 등으로 결과를 남기지 못한 채 오래 멈춘 기록만.
+         조건부 UPDATE라 동시에 눌러도 한 요청만 1행을 받아 메일은 한 통이다 -->
+    <update id="claimRetry">
+        UPDATE mail_outbox
+        SET status_code = 'MAIL_PENDING', last_error = NULL, updated_at = <include refid="now"/>
+        WHERE mail_outbox_id = #{mailOutboxId}
+          AND (status_code = 'MAIL_FAILED'
+               OR (status_code = 'MAIL_PENDING'
+                   AND updated_at &lt; <include refid="now"/> - NUMTODSINTERVAL(#{staleMinutes}, 'MINUTE')))
+    </update>
+
+    <!-- 공개 폼 횟수 제한: 그날 이 주소로 기록된 이 종류의 메일 수 -->
+    <select id="countForRecipient" resultType="int">
+        SELECT COUNT(*)
+        FROM mail_outbox
+        WHERE mail_type = #{mailType} AND recipient_email = #{recipientEmail} AND created_at &gt;= #{from}
+    </select>
 </mapper>

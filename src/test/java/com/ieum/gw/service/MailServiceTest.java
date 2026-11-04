@@ -73,6 +73,15 @@ class MailServiceTest {
             events.add("시도");
             return 1;
         }
+
+        int claimRows = 1;
+        Integer claimStaleMinutes;
+
+        @Override
+        public int claimRetry(Long mailOutboxId, int staleMinutes) {
+            claimStaleMinutes = staleMinutes;
+            return claimRows;
+        }
     }
 
     /** 보낸 메일을 적어 두거나 정해 준 예외를 던지는 가짜 메일 서버 */
@@ -265,5 +274,63 @@ class MailServiceTest {
         assertFalse(m.getSubject().contains("\n"));
         assertEquals(200, m.getSubject().length());
         assertFalse(sender.sent.get(0).getSubject().contains("\n"));
+    }
+
+    @Test
+    @DisplayName("record는 기록만 남기고 보내지 않는다: 업무 자료와 같은 트랜잭션에서 부른다")
+    void recordOnly() {
+        MailMessageDTO m = mail("kim@gana.com", "첫 줄\r\n둘째 줄");
+
+        service(true).record(m);
+
+        assertEquals(List.of("기록"), dao.events);
+        assertTrue(sender.sent.isEmpty());
+        assertEquals(1000L, m.getMailOutboxId());
+        assertFalse(m.getSubject().contains("\n"));
+    }
+
+    @Test
+    @DisplayName("record는 기록 실패를 숨기지 않는다: 업무 자료도 함께 취소되어야 한다")
+    void recordFailureThrows() {
+        dao.onInsert = new DataAccessResourceFailureException("DB 끊김");
+
+        assertThrows(DataAccessResourceFailureException.class, () -> service(true).record(mail("kim@gana.com", "제목")));
+    }
+
+    @Test
+    @DisplayName("sendRecorded는 기록을 더 남기지 않고 보낸 뒤 결과를 그 기록에 남긴다")
+    void sendRecorded() {
+        MailMessageDTO m = mail("kim@gana.com", "제목");
+        m.setMailOutboxId(7L);
+
+        MailResultDTO result = service(true).sendRecorded(m);
+
+        assertTrue(result.isOk());
+        assertEquals(List.of("발송", "결과", "시도"), dao.events);
+        assertEquals(1, sender.sent.size());
+    }
+
+    @Test
+    @DisplayName("sendRecorded도 트랜잭션 안에서 부르면 바로 예외를 던진다")
+    void sendRecordedInTransaction() {
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThrows(IllegalStateException.class, () -> service(true).sendRecorded(mail("kim@gana.com", "제목")));
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+        assertTrue(sender.sent.isEmpty());
+    }
+
+    @Test
+    @DisplayName("다시 보내기는 조건부 UPDATE가 1행을 바꾼 요청만 받는다")
+    void claimRetry() {
+        MailService service = service(true);
+
+        assertTrue(service.claimRetry(7L));
+        assertEquals(MailService.STALE_MINUTES, dao.claimStaleMinutes);
+
+        dao.claimRows = 0;
+        assertFalse(service.claimRetry(7L));
     }
 }

@@ -1,5 +1,7 @@
 package com.ieum.gw.dto;
 
+import java.util.List;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -18,4 +20,5 @@ public class OpsGuestInquiryDTO {
     private String title;
     private String body;
     private String state;   // 공통 코드 INQUIRY_STATUS(IQ_*)
+    private List<OpsGuestReplyDTO> replies; // 보낸 답변, 먼저 보낸 순
 }

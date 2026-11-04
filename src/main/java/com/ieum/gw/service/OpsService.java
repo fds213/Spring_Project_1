@@ -18,6 +18,7 @@ import com.ieum.gw.dto.OpsCompanyDetailDTO;
 import com.ieum.gw.dto.OpsCompanyRowDTO;
 import com.ieum.gw.dto.OpsEmployeeDTO;
 import com.ieum.gw.dto.OpsGuestInquiryDTO;
+import com.ieum.gw.dto.OpsGuestReplyDTO;
 import com.ieum.gw.dto.OpsPaymentDTO;
 import com.ieum.gw.dto.OpsPaymentStatDTO;
 import com.ieum.gw.dto.OpsStateDTO;
@@ -105,7 +106,29 @@ public class OpsService {
 
     /** 비회원 접수 목록, 최신 접수 순. 소개 사이트 도입 문의(WEB-02)로 들어온 것이라 업체와 묶이지 않는다 */
     public List<OpsGuestInquiryDTO> listGuestInquiries() {
-        return opsDAO.listGuestInquiries();
+        Map<Long, List<OpsGuestReplyDTO>> replies = new HashMap<>();
+        for (OpsGuestReplyDTO reply : opsDAO.listGuestReplies(MailService.STALE_MINUTES)) {
+            replies.computeIfAbsent(reply.getInquiryNo(), no -> new ArrayList<>()).add(reply);
+        }
+        List<OpsGuestInquiryDTO> inquiries = opsDAO.listGuestInquiries();
+        for (OpsGuestInquiryDTO inquiry : inquiries) {
+            inquiry.setReplies(replies.getOrDefault(inquiry.getNo(), List.of()));
+        }
+        return inquiries;
+    }
+
+    /**
+     * 비회원 접수 한 건과 그 답변.
+     *
+     * @throws OpsNotFoundException 없는 접수번호일 때
+     */
+    public OpsGuestInquiryDTO getGuestInquiry(Long no) {
+        OpsGuestInquiryDTO inquiry = opsDAO.getGuestInquiry(no);
+        if (inquiry == null) {
+            throw new OpsNotFoundException("접수를 찾을 수 없습니다.");
+        }
+        inquiry.setReplies(opsDAO.listGuestReplies(no, MailService.STALE_MINUTES));
+        return inquiry;
     }
 
     /** 운영자 메뉴 배지(inquiryGuest)의 수: 아직 답하지 않은 비회원 접수 */

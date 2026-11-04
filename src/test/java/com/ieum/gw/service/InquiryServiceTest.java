@@ -1,18 +1,25 @@
 package com.ieum.gw.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ieum.gw.code.MailType;
 import com.ieum.gw.dao.InquiryDAO;
 import com.ieum.gw.dto.InquiryResultDTO;
 import com.ieum.gw.dto.InquirySubmitDTO;
+import com.ieum.gw.dto.MailMessageDTO;
+import com.ieum.gw.dto.MailResultDTO;
 import com.ieum.gw.dto.PublicInquiryDTO;
 
 class InquiryServiceTest {
@@ -50,6 +57,41 @@ class InquiryServiceTest {
             saved.add(dto);
             return 1;
         }
+    }
+
+    /** 보낸 메일을 적어 두는 가짜. 저장이 먼저 끝났는지도 본다 */
+    class FakeMail extends MailService {
+        final List<MailMessageDTO> sent = new ArrayList<>();
+        int recordedToday;
+        MailResultDTO answer = MailResultDTO.sent();
+        RuntimeException error;
+        int savedWhenSent = -1;
+
+        FakeMail() {
+            super(null, null, null, null);
+        }
+
+        @Override
+        public int countForRecipient(MailType mailType, String recipientEmail, LocalDate day) {
+            return recordedToday;
+        }
+
+        @Override
+        public MailResultDTO send(MailMessageDTO mail) {
+            if (error != null) {
+                throw error;
+            }
+            savedWhenSent = inquiries.saved.size();
+            sent.add(mail);
+            return answer;
+        }
+    }
+
+    private final FakeDAO inquiries = new FakeDAO();
+    private final FakeMail mail = new FakeMail();
+
+    private InquiryService service(FakeDAO dao) {
+        return new InquiryService(dao, mail);
     }
 
     @Test
@@ -168,7 +210,7 @@ class InquiryServiceTest {
         InquirySubmitDTO f = valid();
         f.setEmail("Kim@Gana.com");
 
-        InquiryResultDTO result = new InquiryService(dao).submit(f);
+        InquiryResultDTO result = service(dao).submit(f);
 
         assertEquals(1000L, result.getNo());
         assertEquals("kim@gana.com", result.getEmail());
@@ -180,7 +222,7 @@ class InquiryServiceTest {
     @DisplayName("같은 이메일로 여러 번 접수해도 모두 저장한다")
     void sameEmailTwice() {
         FakeDAO dao = new FakeDAO();
-        InquiryService service = new InquiryService(dao);
+        InquiryService service = service(dao);
 
         assertEquals(1000L, service.submit(valid()).getNo());
         assertEquals(1001L, service.submit(valid()).getNo());
@@ -191,7 +233,7 @@ class InquiryServiceTest {
     @DisplayName("봇 막기 칸에 값이 있으면 저장하지 않고, 입력이 틀려도 성공처럼 빈 결과를 돌려준다")
     void honeypot() {
         FakeDAO dao = new FakeDAO();
-        InquiryService service = new InquiryService(dao);
+        InquiryService service = service(dao);
 
         InquirySubmitDTO bot = valid();
         bot.setWebsite("http://spam.example");
@@ -213,7 +255,101 @@ class InquiryServiceTest {
         InquirySubmitDTO f = valid();
         f.setEmail("kim");
 
-        assertThrows(InquiryFormException.class, () -> new InquiryService(dao).submit(f));
+        assertThrows(InquiryFormException.class, () -> service(dao).submit(f));
         assertEquals(0, dao.saved.size());
+    }
+
+    @Test
+    @DisplayName("접수 메일: 저장한 뒤 입력한 주소로 문의 내용을 보내고, 제목에는 입력값을 넣지 않는다")
+    void receiptAfterSave() {
+        InquirySubmitDTO f = valid();
+        f.setEmail("Kim@Gana.com");
+        f.setTitle("줄\n바꿈 제목");
+
+        InquiryResultDTO result = service(inquiries).submit(f);
+
+        assertTrue(result.isMailSent());
+        assertEquals(1, mail.savedWhenSent);
+        MailMessageDTO sent = mail.sent.get(0);
+        assertEquals(MailType.MT_INQUIRY_RECEIPT, sent.getMailType());
+        assertEquals("kim@gana.com", sent.getRecipientEmail());
+        assertEquals("[이음] 문의가 접수되었습니다", sent.getSubject());
+        assertEquals(1000L, sent.getPublicInquiryId());
+        assertTrue(sent.getBody().contains("50명 기준 비용이 궁금합니다."));
+        assertTrue(sent.getBody().contains("접수번호: 1000"));
+        assertFalse(sent.getBody().contains("010-1234-5678"));
+        assertFalse(sent.getBody().contains("가나상사"));
+    }
+
+    @Test
+    @DisplayName("접수 메일이 실패해도 문의는 남고 접수는 성공한다")
+    void receiptFailureKeepsInquiry() {
+        mail.answer = MailResultDTO.failed("메일 서버 연결 실패");
+
+        InquiryResultDTO result = service(inquiries).submit(valid());
+
+        assertEquals(1000L, result.getNo());
+        assertFalse(result.isMailSent());
+        assertEquals(1, inquiries.saved.size());
+    }
+
+    @Test
+    @DisplayName("메일 쪽에서 예외가 나도 문의는 남고 접수는 성공한다")
+    void receiptExceptionKeepsInquiry() {
+        mail.error = new IllegalStateException("DB 끊김");
+
+        InquiryResultDTO result = service(inquiries).submit(valid());
+
+        assertEquals(1000L, result.getNo());
+        assertFalse(result.isMailSent());
+    }
+
+    @Test
+    @DisplayName("같은 주소의 접수 메일은 하루 5통까지다. 문의는 그대로 저장한다")
+    void receiptDailyLimit() {
+        mail.recordedToday = InquiryService.MAX_RECEIPTS_PER_DAY;
+
+        InquiryResultDTO result = service(inquiries).submit(valid());
+
+        assertEquals(1000L, result.getNo());
+        assertFalse(result.isMailSent());
+        assertTrue(mail.sent.isEmpty());
+        assertEquals(1, inquiries.saved.size());
+    }
+
+    @Test
+    @DisplayName("다섯 번째 접수 메일까지는 보낸다. 키에 그날 몇 번째인지 들어가 동시 요청으로도 제한을 넘지 못한다")
+    void receiptLastAllowed() {
+        mail.recordedToday = InquiryService.MAX_RECEIPTS_PER_DAY - 1;
+
+        assertTrue(service(inquiries).submit(valid()).isMailSent());
+        assertTrue(mail.sent.get(0).getDedupeKey().endsWith(":" + InquiryService.MAX_RECEIPTS_PER_DAY));
+    }
+
+    @Test
+    @DisplayName("접수 메일 키: 주소·날짜·번째가 다르면 다르고, 긴 주소도 칸 길이(100자) 안이다")
+    void receiptKey() {
+        LocalDate day = LocalDate.of(2026, 11, 4);
+        String key = InquiryService.receiptKey("a".repeat(100) + "@gana.com", day, 5);
+
+        assertTrue(key.length() <= 100);
+        assertEquals(key, InquiryService.receiptKey("a".repeat(100) + "@gana.com", day, 5));
+        assertNotEquals(key, InquiryService.receiptKey("b@gana.com", day, 5));
+        assertNotEquals(key, InquiryService.receiptKey("a".repeat(100) + "@gana.com", day.plusDays(1), 5));
+        assertNotEquals(key, InquiryService.receiptKey("a".repeat(100) + "@gana.com", day, 4));
+    }
+
+    @Test
+    @DisplayName("봇 막기 칸에 걸렸거나 입력이 틀리면 접수 메일을 보내지 않는다")
+    void noReceiptWithoutSave() {
+        InquirySubmitDTO bot = valid();
+        bot.setWebsite("http://spam.example");
+        assertFalse(service(inquiries).submit(bot).isMailSent());
+
+        InquirySubmitDTO broken = valid();
+        broken.setEmail("kim");
+        assertThrows(InquiryFormException.class, () -> service(inquiries).submit(broken));
+
+        assertTrue(mail.sent.isEmpty());
     }
 }

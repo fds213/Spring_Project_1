@@ -1,5 +1,7 @@
 package com.ieum.gw.mapper;
 
+import java.time.LocalDateTime;
+
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -15,4 +17,9 @@ public interface MailMapper {
 
     int insertAttempt(@Param("mailOutboxId") Long mailOutboxId, @Param("success") String success,
             @Param("error") String error);
+
+    int claimRetry(@Param("mailOutboxId") Long mailOutboxId, @Param("staleMinutes") int staleMinutes);
+
+    int countForRecipient(@Param("mailType") String mailType, @Param("recipientEmail") String recipientEmail,
+            @Param("from") LocalDateTime from);
 }
