@@ -7,6 +7,10 @@
         </encoder>
     </appender>
     <logger name="org.springframework" level="INFO"/>
+        <!-- log4jdbc: SQL 문장(jdbc.sqlonly·sqltiming)은 남기고 호출 기록·결과표는 줄인다. /badges가 15초마다 돌아 콘솔이 밀리던 것 (#118 리뷰) -->
+    <logger name="jdbc.audit" level="WARN"/>
+    <logger name="jdbc.resultset" level="WARN"/>
+    <logger name="jdbc.resultsettable" level="WARN"/>
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
     </root>

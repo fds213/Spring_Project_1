@@ -71,6 +71,8 @@
 /src/*/java/**/FileStorage*              @kddong991121
 /src/*/java/**/FileType*                 @kddong991121
 /src/*/java/**/LocalFileStorage*         @kddong991121
+/src/*/java/**/Badge*                    @kddong991121
+/src/*/java/**/ReadOnly*                 @kddong991121
 # approval
 /src/*/java/**/Approv*                   @wishufeeldasame
 # chat

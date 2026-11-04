@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -12,13 +14,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.AccessDeniedException;
 
-import com.ieum.gw.dto.AuthEmpDTO;
-import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dao.EmployeeDAO;
 import com.ieum.gw.dao.JoinDAO;
+import com.ieum.gw.dto.AuthEmpDTO;
+import com.ieum.gw.dto.CompanyUsageDTO;
 import com.ieum.gw.dto.EmployeeDTO;
 import com.ieum.gw.dto.JoinRequestViewDTO;
-import com.ieum.gw.dto.CompanyUsageDTO;
+import com.ieum.gw.dto.LoginUser;
 
 /** 가입 승인·조회·취소: 두 번 승인 막기, 업체 코드가 다르면 막기 (가짜 DAO, DB 없음) */
 class JoinApproveTest {
@@ -35,7 +37,9 @@ class JoinApproveTest {
 		int activateCalls = 0;
 		int cancelCalls = 0;
 		int rejectAccountCalls = 0;
-
+		
+		List<JoinRequestViewDTO> waiting = new ArrayList<>(); // 대기 중인 가입 요청 (배지 수)
+		
 		FakeJoinDao() {
 			super(null);
 		}
@@ -43,6 +47,11 @@ class JoinApproveTest {
 		@Override
 		public String getHeadDeptName(Long companyId, Long employeeId) {
 			return headDept;
+		}
+		
+		@Override
+		public List<JoinRequestViewDTO> listWaitingRequests(Long companyId) {
+			return COMPANY.equals(companyId) ? waiting : List.of();
 		}
 
 		@Override
@@ -266,5 +275,26 @@ class JoinApproveTest {
 	void notFound() {
 		assertThrows(JoinNotFoundException.class, () -> service.approveRequest(admin, 9999L));
 		assertThrows(JoinNotFoundException.class, () -> service.rejectRequest(admin, 9999L));
+	}
+	
+	private static JoinRequestViewDTO waitingIn(String dept) {
+		JoinRequestViewDTO r = new JoinRequestViewDTO();
+		r.setDepartmentName(dept);
+		r.setRequestStatus("REQUESTED");
+		return r;
+	}
+
+	@Test
+	@DisplayName("가입 승인 배지: 관리자는 업체 전체, 부서장은 자기 부서 대기 수, 그 밖의 직원은 배지가 없다(null)")
+	void badgeCount() {
+		dao.waiting.addAll(List.of(waitingIn("개발팀"), waitingIn("개발팀"), waitingIn("IT지원팀")));
+
+		assertEquals(Integer.valueOf(3), service.countWaitingForBadge(admin));
+
+		dao.headDept = "개발팀";
+		assertEquals(Integer.valueOf(2), service.countWaitingForBadge(user(103L, "ROLE_EMP")));
+
+		dao.headDept = null;
+		assertNull(service.countWaitingForBadge(user(104L, "ROLE_HR")));
 	}
 }
