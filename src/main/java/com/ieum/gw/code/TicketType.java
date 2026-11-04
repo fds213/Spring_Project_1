@@ -4,7 +4,7 @@ package com.ieum.gw.code;
 public enum TicketType {
 	TK_INCIDENT("장애"),
 	TK_EQUIPMENT("장비 지급"),
-	TK_QUESTION("IT 문의");
+	TK_QUESTION("문의");
 
 	private final String label;
 
