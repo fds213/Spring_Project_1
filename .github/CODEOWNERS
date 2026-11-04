@@ -21,7 +21,7 @@
 /src/main/webapp/WEB-INF/tags/           @hodogu-021025
 /src/main/webapp/manifest.json           @hodogu-021025
 
-# 모듈: 이름이 같은 폴더(서버 패키지·테스트·JSP 폴더·화면 JS 폴더)를 모두 가리킨다.
+# 모듈: 이름이 같은 폴더(JSP 폴더·화면 JS 폴더·테스트의 attendance 폴더)를 가리킨다.
 **/common/                               @kddong991121
 **/employee/                             @kddong991121
 **/approval/                             @wishufeeldasame
@@ -50,6 +50,78 @@
 
 # 공통 레이아웃 JSP: 프론트 리드, 로그인·계정 만들기 화면이 있어 담당 1도 함께
 /src/main/webapp/WEB-INF/views/common/   @hodogu-021025 @kddong991121
+
+# Java 클래스(main·test): 패키지에 모듈이 없어 클래스 이름 앞부분으로 찾는다. 담당은 위 모듈 줄과 같다.
+# 새 이름이 아래에 없으면 자동 요청이 가지 않으니, 새 앞부분을 쓰면 여기에 한 줄 더한다.
+# 뒤쪽 줄이 이긴다: EmployeeHire는 Employee 뒤, 공통 상태 코드는 Ticket·Asset 뒤에 있어야 한다.
+# employee
+/src/*/java/**/Employee*                 @kddong991121
+/src/*/java/**/EmpSummary*               @kddong991121
+/src/*/java/**/Join*                     @kddong991121
+/src/*/java/**/Account*                  @kddong991121
+/src/*/java/**/AdminAccount*             @kddong991121
+/src/*/java/**/IdName*                   @kddong991121
+# common
+/src/*/java/**/Home*                     @kddong991121
+/src/*/java/**/Login*                    @kddong991121
+/src/*/java/**/Attachment*               @kddong991121
+/src/*/java/**/Auth*                     @kddong991121
+/src/*/java/**/Ajax*                     @kddong991121
+/src/*/java/**/CustomUserDetails*        @kddong991121
+/src/*/java/**/FileStorage*              @kddong991121
+/src/*/java/**/FileType*                 @kddong991121
+/src/*/java/**/LocalFileStorage*         @kddong991121
+# approval
+/src/*/java/**/Approv*                   @wishufeeldasame
+# chat
+/src/*/java/**/Chat*                     @wishufeeldasame
+# attendance
+/src/*/java/**/Attendance*               @hodogu-021025
+/src/*/java/**/Leave*                    @hodogu-021025
+/src/*/java/**/Holiday*                  @hodogu-021025
+/src/*/java/**/Punch*                    @hodogu-021025
+/src/*/java/**/TodayAttendance*          @hodogu-021025
+/src/*/java/**/DevicePerson*             @hodogu-021025
+/src/*/java/**/EmployeeHire*             @hodogu-021025
+# ticket
+/src/*/java/**/Ticket*                   @jbjsw0716
+/src/*/java/**/EquipmentTicket*          @jbjsw0716
+# asset
+/src/*/java/**/Asset*                    @jbjsw0716
+# location
+/src/*/java/**/Branch*                   @jbjsw0716 @ckdnffld13-crypto
+/src/*/java/**/WorkMap*                  @jbjsw0716 @ckdnffld13-crypto
+/src/*/java/**/MapMarker*                @jbjsw0716 @ckdnffld13-crypto
+# board
+/src/*/java/**/Board*                    @ckdnffld13-crypto
+/src/*/java/**/Notice*                   @ckdnffld13-crypto
+# schedule
+/src/*/java/**/Schedule*                 @ckdnffld13-crypto
+# site
+/src/*/java/**/Site*                     @fds213
+/src/*/java/**/Inquiry*                  @fds213
+/src/*/java/**/PublicInquiry*            @fds213
+/src/*/java/**/Trial*                    @fds213
+# subscription
+/src/*/java/**/Billing*                  @fds213
+/src/*/java/**/Subscription*             @fds213
+/src/*/java/**/Payment*                  @fds213
+/src/*/java/**/Company*                  @fds213
+/src/*/java/**/ConfirmForm*              @fds213
+/src/*/java/**/FailForm*                 @fds213
+/src/*/java/**/Order*                    @fds213
+/src/*/java/**/Quote*                    @fds213
+/src/*/java/**/ServicePeriod*            @fds213
+/src/*/java/**/Toss*                     @fds213
+# notification
+/src/*/java/**/Notification*             @fds213
+# ops
+/src/*/java/**/Ops*                      @fds213
+# common
+/src/*/java/**/TicketStatus*             @kddong991121
+/src/*/java/**/TicketType*               @kddong991121
+/src/*/java/**/AssetStatus*              @kddong991121
+/src/*/java/**/AssetType*                @kddong991121
 
 # Mapper XML·DB 스크립트: DB 리드가 본다(Mapper XML을 고치는 사람은 각 서버 담당)
 /src/main/resources/mapper/              @jbjsw0716

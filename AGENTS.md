@@ -44,15 +44,15 @@
 
 ## 패키지·이름 규칙
 
-- 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 모듈 패키지는 그 아래에 둔다(예: `com.ieum.gw.approval.controller`).
-- 모듈 패키지(15개):
+- 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 그 아래에 계층 패키지를 둔다(예: `com.ieum.gw.controller`). 모듈로는 패키지를 나누지 않는다.
+- 모듈(15개). 담당·주소·JSP 폴더·화면 JS 폴더를 나누는 단위다:
   - 그룹웨어 업무: `employee`(사원·조직·가입 승인·사번 발급·이메일 인증), `approval`, `attendance`(근태·연차·반차·휴일·단말기 API), `ticket`, `asset`, `location`(지점·지도), `schedule`, `board`, `chat`, `notification`
   - 운영 플랫폼: `site`(상품 홈페이지·체험 신청·도입 문의 접수), `subscription`(업체·업체 코드·이용 상태·결제·구독·증설), `ops`(운영자 화면: 업체·신청 현황·문의 답변·오류 로그·결제 복구·삭제 업체 관리자 재발급), `support`(이음 장애 문의·운영자 지원 허가)
   - 공통: `common`(인증·권한·파일 저장·메일 발송·만료 읽기 전용 검사)
 - 체험 신청은 `site`가 흐름만 맡는다. 업체 생성은 `subscription`, 관리자 계정·사번 발급은 `employee`의 Service를 불러 한 트랜잭션으로 묶는다.
-- 모듈 안 구조: `controller`, `service`, `dao`, `dto`. Mapper 인터페이스는 `dao` 패키지에 DAO와 함께 둔다. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
-- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.approval.dao.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
-- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. URL은 아래 'URL·요청 방식'을 따른다.
+- 패키지: `controller`, `service`, `dao`, `mapper`, `dto`. 그 밖에 `security`(로그인 처리), `code`(공통 상태 코드 enum), `server`(WebSocket)가 있다. Mapper 인터페이스는 `mapper`, DAO는 `dao`에 둔다. 테스트도 같은 패키지에 둔다(계층 폴더 없는 `attendance`·`test`는 그대로 둔다). JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.mapper.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
+- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. 패키지가 모듈로 나뉘지 않아 같은 계층에 같은 이름을 둘 수 없고, 이름이 곧 그 클래스의 모듈을 알려 준다. 새 클래스는 모듈을 알 수 있는 말로 시작한다. URL은 아래 'URL·요청 방식'을 따른다.
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
 ## URL·요청 방식
@@ -67,11 +67,11 @@
 
 ## 수정 범위
 
-- 자기 담당 모듈 안에서만 수정한다. 서버 담당은 그 모듈의 패키지와 Mapper XML 파일, 화면 담당은 그 모듈의 JSP 폴더(`WEB-INF/views/<모듈>/`)와 화면 JS 폴더(`resources/js/<모듈>/`)다. 담당은 아래 표를 따른다.
+- 자기 담당 모듈 안에서만 수정한다. 서버 담당은 그 모듈의 클래스(패키지가 아니라 이름으로 찾는다. `.github/CODEOWNERS`에 이름별 담당이 있다)와 Mapper XML 파일, 화면 담당은 그 모듈의 JSP 폴더(`WEB-INF/views/<모듈>/`)와 화면 JS 폴더(`resources/js/<모듈>/`)다. 담당은 아래 표를 따른다.
 - 다른 모듈의 기능이 필요하면 그 모듈 Service의 공개 메서드를 호출한다. Controller끼리 호출하지 않는다. 필요한 메서드가 없으면 직접 만들지 말고, 담당자에게 요청할 메서드 이름·입력·반환값을 정리해 사람에게 알린다.
 - 헤더·팝업처럼 모든 화면이 쓰는 값도 각 모듈 Service의 메서드로 받는다. 업체 이용 상태는 `subscription` 담당이, 오늘 출퇴근은 `attendance` 담당이 메서드를 만든다. 이용 상태는 요청마다 한 번 읽어 만료 읽기 전용 검사와 같이 쓴다.
 - 아래 공통 파일은 담당자만 수정한다. 에이전트는 수정하지 않고 필요한 변경 내용만 제안한다.
-  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 메일·스케줄러 설정, `common` 패키지 → 담당 1
+  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 메일·스케줄러 설정, `common` 모듈의 클래스 → 담당 1
   - 공통 레이아웃 JSP(`WEB-INF/views/common/`, `WEB-INF/tags/`), CSS, 공통 화면 JS(`util.js`·`common.js`), PWA 파일 → 프론트 리드
   - DDL·초기 데이터 스크립트 → DB 담당
   - `AGENTS.md`, `docs/`의 계획서·요구분석서 → 팀 합의
@@ -115,7 +115,7 @@
 ## DB·MyBatis
 
 - MyBatis는 Mapper 인터페이스 방식으로 쓰고, 호출은 Service → DAO → Mapper 순서로 한다(수업 ToyProject와 같은 구조).
-  - Mapper(`dao` 패키지)는 `@Mapper`를 붙인 인터페이스다. SQL 하나에 메서드 하나를 두고, 메서드 이름은 Mapper XML의 `id`와 같게 한다.
+  - Mapper(`mapper` 패키지)는 `@Mapper`를 붙인 인터페이스다. SQL 하나에 메서드 하나를 두고, 메서드 이름은 Mapper XML의 `id`와 같게 한다.
   - DAO(`dao` 패키지)는 `@Repository` 클래스다. Mapper를 주입받아 감싸고, Service는 DAO만 호출한다. Service나 Controller가 Mapper를 직접 부르지 않는다.
   - `SqlSessionTemplate`에 `"namespace.id"` 문자열을 넘기는 방식은 쓰지 않는다.
   - 공통 설정(담당 1)은 `root-context.xml`에서 `@Mapper`가 붙은 인터페이스만 Mapper로 등록한다(`<mybatis-spring:scan base-package="com.ieum.gw" annotation="org.apache.ibatis.annotations.Mapper" />`). 그래서 `@Mapper`를 빼먹으면 Mapper가 등록되지 않는다.
@@ -134,7 +134,7 @@
 
 ## 상태 코드
 
-DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코드는 `common`의 enum 한 곳에서만 정의하고, 문자열을 코드 곳곳에 직접 쓰지 않는다. 아래 코드값을 쓴다.
+DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코드는 `code` 패키지의 enum 한 곳에서만 정의하고, 문자열을 코드 곳곳에 직접 쓰지 않는다. 아래 코드값을 쓴다.
 
 - 결재 문서: `DRAFT`(임시저장) → `IN_PROGRESS`(진행) → `APPROVED`(완료) 또는 `REJECTED`(반려)
 - 결재선: `WAITING`(대기), `APPROVED`(승인), `REJECTED`(반려)

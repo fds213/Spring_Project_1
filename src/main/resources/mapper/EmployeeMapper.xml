@@ -1,8 +1,8 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.employee.dao.EmployeeMapper">
+<mapper namespace="com.ieum.gw.mapper.EmployeeMapper">
 
-    <select id="listActiveEmp" resultType="com.ieum.gw.employee.dto.EmpSummaryDTO">
+    <select id="listActiveEmp" resultType="com.ieum.gw.dto.EmpSummaryDTO">
         SELECT e.company_id, e.employee_id, e.employee_name, e.department_id, e.job_grade_id,
         d.department_name, g.grade_name
         FROM employee e
@@ -41,7 +41,7 @@
     </update>
 
     <!-- 사원 1행. 번호를 먼저 뽑아 dto.employeeId에 넣음 -->
-    <insert id="insertEmployee" parameterType="com.ieum.gw.employee.dto.EmployeeDTO">
+    <insert id="insertEmployee" parameterType="com.ieum.gw.dto.EmployeeDTO">
         <selectKey keyProperty="employeeId" resultType="long" order="BEFORE">
             SELECT SQ_EMPLOYEE.NEXTVAL FROM dual
         </selectKey>
@@ -54,7 +54,7 @@
     </insert>
 
     <!-- 계정 1행. ACTIVE로 만들 때 activated_at도 기록 -->
-    <insert id="insertAccount" parameterType="com.ieum.gw.employee.dto.AccountDTO">
+    <insert id="insertAccount" parameterType="com.ieum.gw.dto.AccountDTO">
         <selectKey keyProperty="userAccountId" resultType="long" order="BEFORE">
             SELECT SQ_USER_ACCOUNT.NEXTVAL FROM dual
         </selectKey>
@@ -97,7 +97,7 @@
 	</select>
 
 	<!-- 다른 모듈용: 직원 ID → 이름 (퇴사자 포함) -->
-	<select id="listEmployeeNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+	<select id="listEmployeeNames" resultType="com.ieum.gw.dto.IdNameDTO">
 		SELECT employee_id AS id, employee_name AS name
 		FROM employee
 		WHERE company_id = #{companyId}
@@ -106,7 +106,7 @@
 	</select>
 	
 		<!-- 다른 모듈용: 계정 ID → 직원 이름 (사원이 연결된 계정만) -->
-	<select id="listAccountNames" resultType="com.ieum.gw.employee.dto.IdNameDTO">
+	<select id="listAccountNames" resultType="com.ieum.gw.dto.IdNameDTO">
 		SELECT a.user_account_id AS id, e.employee_name AS name
 		FROM user_account a
 		JOIN employee e ON e.employee_id = a.employee_id AND e.company_id = a.company_id
@@ -116,7 +116,7 @@
 	</select>
 	
 		<!-- 다른 모듈용: 담당자로 고를 수 있는 사람 (재직 + 계정 사용 중 + 역할) -->
-	<select id="listAssignableEmployees" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+	<select id="listAssignableEmployees" resultType="com.ieum.gw.dto.EmployeeOptionDTO">
 		SELECT e.employee_id, e.employee_name, d.department_name
 		FROM employee e
 		JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
@@ -136,7 +136,7 @@
 	</select>
 	
 	<!-- 다른 모듈용: 직원 ID → 이름·부서명 (퇴사자 포함, 부서 없으면 null) -->
-	<select id="listEmployeeNamesWithDept" resultType="com.ieum.gw.employee.dto.EmployeeOptionDTO">
+	<select id="listEmployeeNamesWithDept" resultType="com.ieum.gw.dto.EmployeeOptionDTO">
 		SELECT e.employee_id, e.employee_name, d.department_name
 		FROM employee e
 		LEFT JOIN department d ON d.department_id = e.department_id
