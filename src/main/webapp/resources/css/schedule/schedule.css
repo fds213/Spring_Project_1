@@ -66,6 +66,10 @@
 }
 #view-schedule .sch-del:hover { color: var(--danger); text-decoration: underline; }
 #view-schedule .sch-del:disabled { opacity: .5; cursor: default; }
+/* 읽기 전용 업체: 흐린 [삭제] 위에서는 손가락 대신 금지 모양 (위 cursor: pointer가 공통 규칙보다 우선이라 따로 적는다) */
+body.is-readonly #view-schedule .sch-del { cursor: not-allowed; }
+/* 삭제 확인 창: 띄어쓰기 없는 긴 영문 제목도 창 안에서 줄을 바꾼다 */
+#schDeleteText { overflow-wrap: anywhere; }
 
 /* 툴바 버튼 글자가 세로로 쪼개지지 않게 */
 #view-schedule .sch-toolbar .btn { white-space: nowrap; flex-shrink: 0; }

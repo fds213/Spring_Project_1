@@ -21,6 +21,7 @@ const schState = {
   selected: '', // 선택한 날짜 'YYYY-MM-DD'
   show: { PERSONAL: true, DEPT: true, COMPANY: true, LEAVE: true },
   data: null,   // 서버에서 받은 그달 것
+  loaded: null, // data가 어느 달 것인지 { y, m }. 달을 옮기다 실패하면 이 달로 되돌린다
   jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
   jumpTimer: null,
 };
@@ -42,9 +43,24 @@ function renderSchedule() {
     .done(r => {
       if (month !== schMonthParam()) return; // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
       schState.data = r;
+      schState.loaded = { ...schState.month };
       drawSchedule();
     })
-    .fail(xhr => showToast(apiMessage(xhr, '일정을 불러오지 못했습니다')));
+    .fail(xhr => {
+      if (month !== schMonthParam()) return; // 그사이 다른 달로 옮겼다 (그 달 응답이 따로 온다)
+      showToast(apiMessage(xhr, '일정을 불러오지 못했습니다'));
+      // 달을 옮기다 실패하면 화면은 앞 달인데 속으로는 다음 달이 되어, 한 번 더 넘기면 두 달을 건너뛴다.
+      // 그래서 화면에 보이는 달(받아 둔 달)로 되돌리고, 고른 날짜도 그 달 안으로 맞춘다
+      const shown = schState.loaded;
+      if (!shown) return; // 처음 열 때 실패: 되돌릴 달이 없다
+      schState.month = { ...shown };
+      const sel = schFromKey(schState.selected);
+      if (sel.getFullYear() !== shown.y || sel.getMonth() !== shown.m) {
+        const now = new Date();
+        schState.selected = now.getFullYear() === shown.y && now.getMonth() === shown.m ? schDayKey(now) : schDayKey(new Date(shown.y, shown.m, 1));
+      }
+      drawSchedule();
+    });
 }
 
 // 한 날짜의 칸에 들어갈 것: 휴일, 내 연차, 일정 (보기 선택에 맞춰 거른다)
@@ -166,14 +182,27 @@ function openAddDialog(dateKey) {
   schEl('schTitle').focus();
 }
 schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
-schEl('schCancel').addEventListener('click', () => schEl('schDialog').close());
+schEl('schCancel').addEventListener('click', () => { schSkipRepeat = true; schEl('schDialog').close(); });
+
+// 창(추가·삭제 확인)의 버튼을 빠르게 두 번 누르면, 첫 클릭에 창이 닫혀 두 번째 클릭이 창 아래의 달력 칸·목록에 떨어진다.
+// 그러면 엉뚱한 날짜로 추가 팝업이 열리거나 고른 날짜가 바뀐다. 창을 닫은 뒤, 새로 누른 클릭(detail 1)이 오기 전까지
+// 이어지는 클릭(detail 2 이상)은 칸에 닿기 전에(capture) 버린다
+let schSkipRepeat = false;
+['click', 'dblclick'].forEach(type => document.addEventListener(type, e => {
+  if (!schSkipRepeat) return;
+  if (e.detail < 2) { schSkipRepeat = false; return; }
+  e.stopPropagation();
+}, true));
 
 // 삭제: 확인 창에서 [삭제]를 눌러야 지운다. 이미 지워진 일정(404, 다른 창·다른 사람이 먼저 지움)이면 달력을 다시 받는다
 function deleteSchedule(s, btn) {
   const dlg = schEl('schDeleteDialog');
   schEl('schDeleteText').textContent = `'${s.title}' 일정을 지웁니다. 삭제한 일정은 되돌릴 수 없습니다.`;
   dlg.querySelectorAll('button').forEach(b => {
-    b.onclick = () => {
+    b.onclick = e => {
+      // 목록 [삭제]를 두 번 눌러 두 번째 클릭이 막 열린 창의 버튼에 떨어진 경우: 확인 없이 지우지 않게 창을 그대로 둔다
+      if (e.detail > 1) return;
+      schSkipRepeat = true;
       dlg.close();
       if (b.value !== 'ok') return;
       btn.disabled = true;
@@ -238,6 +267,7 @@ schEl('schForm').addEventListener('submit', e => {
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
   api.post('/schedule/api/schedules', { scope, date, title, memo })
     .done(s => {
+      schSkipRepeat = true; // [추가]를 빠르게 두 번 눌렀을 때 두 번째 클릭이 닫힌 팝업 아래 달력에 떨어지지 않게
       schEl('schDialog').close(); // 팝업 닫기
       schEl('schTitle').value = '';
       schEl('schMemo').value = '';
