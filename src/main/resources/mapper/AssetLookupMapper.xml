@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.AssetLookupMapper">
+    <select id="selectSummaries" resultType="com.ieum.gw.dto.AssetDTO">
+        SELECT asset_id, asset_no, asset_name, asset_type, serial_no, branch_id FROM asset
+        WHERE company_id = #{companyId} AND asset_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>
