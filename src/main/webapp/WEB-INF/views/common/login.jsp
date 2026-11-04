@@ -80,6 +80,10 @@
         <c:if test="${param.logout ne null}">
           <p class="login-help" role="status">로그아웃했습니다</p>
         </c:if>
+        <%-- 비밀번호를 맞힌 세션의 업체에만 간다(TrialVerifyController). 다른 업체를 고르는 값은 보내지 않는다 --%>
+        <c:if test="${param.unverified ne null}">
+          <button class="btn btn-block" type="button" id="btnResendVerify">인증 메일 다시 보내기</button>
+        </c:if>
         <button class="btn btn-primary btn-block" type="submit" id="btnLogin">로그인</button>
         <%-- 직원 계정 생성과 이메일 인증 비밀번호 찾기. 둘 다 로그인 없이 여는 /join/** 아래에 둔다 --%>
         <p class="login-help"><a class="link-btn" href="${ctx}/join">계정 생성</a> / <a class="link-btn" href="${ctx}/join/password">비밀번호 찾기</a></p>
@@ -125,6 +129,26 @@
         sending = true;
         button.disabled = true;
       });
+      // 인증 메일 다시 보내기 (ACC-06). 이 화면에는 jQuery가 없어 fetch로 보낸다
+      var resend = document.getElementById('btnResendVerify');
+      if (resend) {
+        resend.addEventListener('click', function () {
+          resend.disabled = true;
+          fetch(document.body.dataset.ctx + '/trial/api/verify/resend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _csrf: form.elements._csrf.value })
+          }).then(function (res) {
+            return res.json().then(function (data) { return { ok: res.ok, message: data.message }; });
+          }).then(function (r) {
+            error.textContent = r.message;
+            error.classList.toggle('is-ok', r.ok);
+          }).catch(function () {
+            error.textContent = '인증 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
+            error.classList.remove('is-ok');
+          }).then(function () { resend.disabled = false; });
+        });
+      }
       // 뒤로 가기로 이 화면이 그대로 다시 보이면(브라우저가 저장해 둔 화면) 다시 누를 수 있게 푼다
       window.addEventListener('pageshow', function () {
         sending = false;

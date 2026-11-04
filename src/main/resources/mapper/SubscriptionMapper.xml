@@ -94,4 +94,11 @@
         FROM company
         WHERE company_id = #{companyId}
     </select>
+
+    <!-- 이메일 인증 완료. 이미 인증한 업체는 처음 시각을 그대로 둔다. 이용 기간은 건드리지 않는다(ACC-02) -->
+    <update id="markEmailVerified">
+        UPDATE company
+        SET email_verified_at = #{verifiedAt}, updated_at = #{verifiedAt}
+        WHERE company_id = #{companyId} AND email_verified_at IS NULL
+    </update>
 </mapper>

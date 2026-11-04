@@ -14,7 +14,8 @@
 		       a.password_hash  AS pw,
 		       a.role_code      AS role,
 		       a.status_code    AS status,
-		       CASE WHEN a.locked_until > <include refid="now"/> THEN 1 ELSE 0 END AS locked
+		       CASE WHEN a.locked_until > <include refid="now"/> THEN 1 ELSE 0 END AS locked,
+		       CASE WHEN c.email_verified_at IS NULL THEN 0 ELSE 1 END AS email_verified
 		FROM user_account a
 		JOIN company  c ON c.company_id  = a.company_id
 		JOIN employee e ON e.employee_id = a.employee_id

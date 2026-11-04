@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.TrialVerifyMapper">
+
+    <!-- 인증 메일을 받을 업체와 관리자. 관리자는 업체당 1명이다 -->
+    <select id="getTarget" resultType="com.ieum.gw.dto.TrialVerifyTargetDTO">
+        SELECT c.company_id, c.company_code, c.trial_email AS email, c.email_verified_at,
+               a.user_account_id, e.employee_no
+        FROM company c
+        JOIN user_account a ON a.company_id = c.company_id AND a.role_code = 'ROLE_ADMIN'
+        JOIN employee e ON e.company_id = c.company_id AND e.employee_id = a.employee_id
+        WHERE c.company_id = #{companyId}
+        ORDER BY a.user_account_id
+        FETCH FIRST 1 ROWS ONLY
+    </select>
+
+    <!-- 1분 제한은 날짜가 바뀌어도 이어지므로 날짜별 칸이 아니라 링크 발급 시각으로 본다 -->
+    <select id="getLastIssuedAt" resultType="java.time.LocalDateTime">
+        SELECT MAX(issued_at)
+        FROM email_verification
+        WHERE company_id = #{companyId} AND purpose_code = #{purpose}
+    </select>
+
+    <select id="getResendCount" resultType="java.lang.Integer">
+        SELECT sent_count
+        FROM email_rate_limit
+        WHERE company_id = #{companyId} AND email = #{email} AND purpose_code = #{purpose} AND quota_date = #{today}
+    </select>
+
+    <update id="revokeLive">
+        UPDATE email_verification
+        SET revoked_at = #{now}, updated_at = #{now}
+        WHERE company_id = #{companyId} AND purpose_code = #{purpose}
+          AND consumed_at IS NULL AND revoked_at IS NULL
+    </update>
+
+    <insert id="insertVerification">
+        <selectKey keyProperty="v.emailVerificationId" resultType="long" order="BEFORE">
+            SELECT SQ_EMAIL_VERIFICATION.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO email_verification
+            (email_verification_id, company_id, user_account_id, purpose_code, email, token_hash, issued_at, expires_at)
+        VALUES
+            (#{v.emailVerificationId}, #{v.companyId}, #{v.userAccountId}, #{purpose}, #{v.email}, #{v.tokenHash},
+             #{v.issuedAt}, #{v.expiresAt})
+    </insert>
+
+    <!-- SENT_COUNT는 다시 보낸 횟수다. '하루 5번'에 첫 메일이 들어가지 않는다(ACC-06 세부) -->
+    <update id="recordIssue">
+        MERGE INTO email_rate_limit t
+        USING (SELECT #{companyId} AS company_id, #{email} AS email, #{purpose} AS purpose_code, #{today} AS quota_date FROM dual) s
+        ON (t.company_id = s.company_id AND t.email = s.email AND t.purpose_code = s.purpose_code AND t.quota_date = s.quota_date)
+        WHEN MATCHED THEN
+            UPDATE SET t.sent_count = t.sent_count + #{resends}, t.last_sent_at = #{now}, t.updated_at = #{now}
+        WHEN NOT MATCHED THEN
+            INSERT (company_id, email, purpose_code, quota_date, sent_count, last_sent_at)
+            VALUES (s.company_id, s.email, s.purpose_code, s.quota_date, #{resends}, #{now})
+    </update>
+
+    <!-- 로그인 전 요청이라 업체를 모른다. 무작위 값의 해시가 곧 열쇠다 -->
+    <select id="findByTokenHash" resultType="com.ieum.gw.dto.TrialVerificationDTO">
+        SELECT email_verification_id, company_id, user_account_id, email, token_hash,
+               issued_at, expires_at, consumed_at, revoked_at
+        FROM email_verification
+        WHERE token_hash = #{tokenHash} AND purpose_code = #{purpose}
+    </select>
+
+    <update id="consume">
+        UPDATE email_verification
+        SET verified_at = #{now}, consumed_at = #{now}, updated_at = #{now}
+        WHERE email_verification_id = #{id} AND company_id = #{companyId}
+          AND consumed_at IS NULL AND revoked_at IS NULL AND expires_at > #{now}
+    </update>
+</mapper>

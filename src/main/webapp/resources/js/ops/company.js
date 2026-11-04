@@ -83,7 +83,6 @@ function firmDetail(d) {
     ['이용 인원', `${d.users}명`],
     ['월 기준 이용료', won(d.total)],
     ['이메일', d.email],
-    // TODO(ACC-06): 인증 메일을 붙여 인증 전 로그인을 막으면 '대기 (로그인 불가)'로 되돌린다
     ['이메일 인증', d.emailVerified ? '완료' : '대기'],
     ['체험 신청', whenFull(d.at)],
     ['신청번호', d.no],

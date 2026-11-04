@@ -33,6 +33,8 @@ src/main/resources/config/file.properties
 src/main/resources/config/toss.properties
 # 카카오 지도 JavaScript 키 (각자 PC에서 kakao.properties.example을 복사해서 사용)
 src/main/resources/config/kakao.properties
+# SMTP 앱 비밀번호 (각자 PC에서 mail.properties.example을 복사해서 사용)
+src/main/resources/config/mail.properties
 
 # STS가 자동으로 만드는 IDE 설정 (Lombok 어노테이션 처리)
 .factorypath

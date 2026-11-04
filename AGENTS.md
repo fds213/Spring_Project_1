@@ -20,7 +20,7 @@
 - 외부 연동: 토스페이먼츠 테스트 결제(실제 대금 없음), 이메일 발송(Spring `JavaMailSender` + SMTP, 팀 공용 Gmail 계정의 앱 비밀번호), 카카오 지도.
 - 정해진 시각에 도는 작업(연차 새 주기 부여, 오류 로그 ZIP, 만료 자료 삭제 등)은 Spring `@Scheduled`로 만든다.
 - 쓰지 않는다: Spring Boot, JPA·Hibernate, React·Vue, Gradle, Kotlin.
-- `pom.xml`의 의존성 추가·버전 변경은 하지 않는다. 필요하면 이유를 정리해 사람에게 요청한다. 메일 발송 의존성(`spring-context-support`, `com.sun.mail:javax.mail`)과 `@Scheduled` 설정은 담당 1이 추가한다.
+- `pom.xml`의 의존성 추가·버전 변경은 하지 않는다. 필요하면 이유를 정리해 사람에게 요청한다. `@Scheduled` 설정은 담당 1이 추가한다.
 - Oracle은 XE 21c를 쓰고, PK는 SEQUENCE로 만든다(테이블마다 시퀀스 1개).
 - DB는 공용 Oracle 서버 한 대에 모두 접속한다. 테이블 변경은 DDL 스크립트로 Git에 올리고 DB 리드가 공용 DB에 반영한다. TODO(회의): 공용 DB·중앙 서버를 둘 곳과 고정 HTTPS 주소(PWA 설치와 카카오 지도 도메인 등록에 필요).
 - WebSocket은 `@ServerEndpoint` 방식이다. `SpringConfigurator`를 상속한 Configurator로 Service를 주입받고, 핸드셰이크 때 서버의 인증 정보에서 로그인 사용자를 넘긴다. 채팅 담당이 사전 구현에서 확인해 공유한 공통 예제를 따르고, 이 방식이 안 되면 Spring `WebSocketHandler`로 바꾼다. `spring-websocket` 의존성은 담당 1이 추가한다.
@@ -71,7 +71,7 @@
 - 다른 모듈의 기능이 필요하면 그 모듈 Service의 공개 메서드를 호출한다. Controller끼리 호출하지 않는다. 필요한 메서드가 없으면 직접 만들지 말고, 담당자에게 요청할 메서드 이름·입력·반환값을 정리해 사람에게 알린다.
 - 헤더·팝업처럼 모든 화면이 쓰는 값도 각 모듈 Service의 메서드로 받는다. 업체 이용 상태는 `subscription` 담당이, 오늘 출퇴근은 `attendance` 담당이 메서드를 만든다. 이용 상태는 요청마다 한 번 읽어 만료 읽기 전용 검사와 같이 쓴다.
 - 아래 공통 파일은 담당자만 수정한다. 에이전트는 수정하지 않고 필요한 변경 내용만 제안한다.
-  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 메일·스케줄러 설정, `common` 모듈의 클래스 → 담당 1
+  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 스케줄러 설정, `common` 모듈의 클래스(메일 발송은 담당 6) → 담당 1
   - 공통 레이아웃 JSP(`WEB-INF/views/common/`, `WEB-INF/tags/`), CSS, 공통 화면 JS(`util.js`·`common.js`), PWA 파일 → 프론트 리드
   - DDL·초기 데이터 스크립트 → DB 담당
   - `AGENTS.md`, `docs/`의 계획서·요구분석서 → 팀 합의
@@ -80,12 +80,12 @@
 
 | 담당 | 모듈 | 이름 |
 |---|---|---|
-| 1 | `employee`, `common`(인증·권한·파일·메일·만료 읽기 전용 검사, `/home`·`/badges`) | 김상준 |
+| 1 | `employee`, `common`(인증·권한·파일·만료 읽기 전용 검사, `/home`·`/badges`) | 김상준 |
 | 2 | `approval`, `chat` | 서장호 |
 | 3 | `attendance`(근태·연차·반차·휴일·단말기 API) | 홍동국 |
 | 4 | `ticket`, `asset`, `location`의 지점 | 정상욱 |
 | 5 | `board`(공지 게시판), `schedule`, `location`의 공통 지도 | 이동희 |
-| 6 | `site`, `subscription`, `notification`, `ops` | 최준원 |
+| 6 | `site`, `subscription`, `notification`, `ops`, `common`의 메일 발송(`MailService`·메일 설정) | 최준원 |
 | 추가 구현 범위 | `support`(이음 장애 문의 최소판, 요구분석서 3장) | 자기 파트를 끝낸 사람 |
 
 - 화면(JSP·화면 JS)은 프론트(홍동국·이동희)가 맡는다. 근태(홍동국), 채팅(서장호), 공지 게시판·일정·공통 지도(이동희)는 한 사람이 화면부터 서버까지 맡는다. 메뉴만 있고 화면이 없던 필수 화면(티켓 처리·자산 관리·홈·알림 목록)은 홍동국이 만든다.

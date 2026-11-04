@@ -177,7 +177,7 @@ class JoinApproveTest {
 
 		employees = new FakeEmployeeService();
 		subscription = new FakeSubscriptionService();
-		service = new JoinService(dao, subscription, employees, new EmployeeDAO(null));
+		service = new JoinService(dao, subscription, employees, new EmployeeDAO(null), new MailSettings());
 		admin = user(101L, "ROLE_ADMIN");
 	}
 

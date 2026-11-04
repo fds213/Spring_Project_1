@@ -4,6 +4,8 @@ import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 
+import com.ieum.gw.dto.LoginUser;
+
 public class LoginAuthenticationProvider extends DaoAuthenticationProvider{
 	public LoginAuthenticationProvider() {
 		
@@ -18,6 +20,10 @@ public class LoginAuthenticationProvider extends DaoAuthenticationProvider{
 		setPostAuthenticationChecks(user ->{
 			if(!user.isEnabled()) {				// !활성화? => 비활성화인가?
 				throw new DisabledException("비활성 계정");
+			}
+			// 이메일 인증 전 업체 (ACC-06). 비밀번호가 맞을 때만 알린다(AGENTS.md '권한·보안')
+			if(user instanceof LoginUser && ((LoginUser) user).isVerificationPending()) {
+				throw new EmailNotVerifiedException(((LoginUser) user).getCompanyId());
 			}
 		});
 	}

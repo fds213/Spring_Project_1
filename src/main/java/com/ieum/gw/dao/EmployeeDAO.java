@@ -56,6 +56,11 @@ public class EmployeeDAO {
         return mapper.insertAccount(dto);
     }
 
+    /** 계정 이메일 인증 시각. 이미 인증한 계정이면 0 */
+    public int markAccountEmailVerified(Long companyId, Long userAccountId, java.time.LocalDateTime verifiedAt) {
+        return mapper.markAccountEmailVerified(companyId, userAccountId, verifiedAt);
+    }
+
     // ── 연동 확인 ──
 
     /** 같은 업체 재직자(재직 + 계정 사용 중)면 1, 아니면 0 */

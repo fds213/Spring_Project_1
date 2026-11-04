@@ -115,6 +115,9 @@
 /src/*/java/**/Toss*                     @fds213
 # notification
 /src/*/java/**/Notification*             @fds213
+# 메일 발송(common이지만 담당 6)
+/src/*/java/**/Mail*                     @fds213
+/src/main/resources/config/mail.properties.example @fds213
 # ops
 /src/*/java/**/Ops*                      @fds213
 # common
