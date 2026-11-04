@@ -2,7 +2,8 @@
 // 1 정보 입력 → 2 신청 확인 → 3 신청 완료. 비밀번호 확인과 이용 조건 동의는 화면에서만 확인하고 서버로 보내지 않는다.
 //
 //   POST /trial/api/apply  { companyName, seats, email, adminName, password }
-//     → 200 { companyName, companyCode, employeeNo, email, seats, trialStartDate, trialLastDate }
+//     → 200 { companyName, companyCode, employeeNo, email, seats, trialStartDate, trialLastDate, verificationRequired, mailSent }
+//   POST /trial/api/verify/resend  → 200 { message } / 그 밖 { message } (다시 보내기는 이 세션이 신청한 업체에만 간다)
 //     → 400 입력 오류·409 이미 쓴 이메일 { message, field } (field = 보내는 값의 이름) / 503 업체 코드 소진·500 그 밖 { message }
 // 업체 코드와 관리자 사번은 서버가 정한다. 둘을 알아야 로그인할 수 있어 완료 화면에 크게 보인다.
 (() => {
@@ -133,8 +134,24 @@
     install.type = 'button';
     install.addEventListener('click', () => { if (typeof startDownload === 'function') startDownload(); });
 
+    // 이메일 인증(ACC-06): 인증을 요구하면 메일 안내를 앞에, 다시 보내기를 버튼 줄에 둔다. 메일을 끈 환경(개발)에서는 지금처럼 바로 로그인한다
+    const status = node('p', r.mailSent ? 'done' : 'done err',
+      r.mailSent ? `${r.email} 주소로 인증 메일을 보냈습니다. 메일의 링크를 열어 [인증하기]를 누르면 로그인할 수 있습니다. 링크는 24시간 동안 쓸 수 있습니다.`
+        : '인증 메일을 보내지 못했습니다. 잠시 뒤 아래 버튼으로 다시 보내 주세요.');
+    status.setAttribute('role', 'status');
+    const resend = node('button', 'btn btn-lg', '인증 메일 다시 보내기');
+    resend.type = 'button';
+    resend.addEventListener('click', () => {
+      resend.disabled = true;
+      api.post('/trial/api/verify/resend')
+        .done(res => { status.className = 'done'; status.textContent = res.message; })
+        .fail(xhr => { status.className = 'done err'; status.textContent = apiMessage(xhr, '인증 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.'); })
+        .always(() => { resend.disabled = false; });
+    });
+
     $('step3').replaceChildren(
-      node('h3', '', '무료 체험을 시작했습니다'),
+      node('h3', '', r.verificationRequired ? '메일로 이메일을 인증해 주세요' : '무료 체험을 시작했습니다'),
+      ...(r.verificationRequired ? [status] : []),
       node('p', 'sub', `${r.companyName}의 관리자 계정이 만들어졌습니다. IEUM 앱을 설치한 뒤 아래 업체 코드와 관리자 사번, 신청할 때 정한 비밀번호로 로그인하세요.`),
       node('table', 'summary',
         row('업체 코드', r.companyCode, 'sum'),
@@ -144,7 +161,7 @@
         row('이용 인원', `${r.seats}명 (관리자 포함, 체험 중 10명까지)`),
         row('무료 체험 기간', `${dot(r.trialStartDate)} ~ ${dot(r.trialLastDate)}`)),
       node('p', 'done', '업체 코드와 사번은 로그인할 때마다 씁니다. 꼭 적어 두세요. 결제는 체험 중 그룹웨어의 업체 관리 > 이용 결제에서 합니다.'),
-      node('div', 'actions', copy, install));
+      node('div', 'actions', ...(r.verificationRequired ? [resend] : []), copy, install));
     go(3);
     $('step3').focus({ preventScroll: true });
   }

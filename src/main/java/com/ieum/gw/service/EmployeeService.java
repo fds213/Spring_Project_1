@@ -2,6 +2,7 @@ package com.ieum.gw.service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,9 +70,14 @@ public class EmployeeService {
         return dao.countRole(companyId, employeeId, Arrays.asList(roleCodes)) > 0;
     }
 
+    /** 체험 신청 관리자가 이메일 인증을 마쳤다(ACC-06). 이미 인증한 계정은 처음 시각을 그대로 둔다 */
+    public void markAccountEmailVerified(Long companyId, Long userAccountId, LocalDateTime verifiedAt) {
+        dao.markAccountEmailVerified(companyId, userAccountId, verifiedAt);
+    }
+
     /**
      * 체험 신청 때 업체 관리자(ROLE_ADMIN) 사원과 계정을 만든다. 체험 신청 트랜잭션 안에서 부른다(AGENTS.md 52줄).
-     * 인증 메일을 붙이기 전이라 바로 로그인할 수 있게(ACTIVE) 만든다(요구분석서 3장 범위 표 아래).
+     * 계정은 바로 사용 중(ACTIVE)으로 만든다. 이메일 인증 전 로그인은 로그인 검사가 업체 인증 시각으로 거절한다(ACC-06).
      * 사번 발급(업체별 다음 번호, AGENTS.md 179줄)과 첫 연차(AttendanceService.grantInitialLeave)도 이 안에서 한다.
      *
      * @param rawPassword 평문 비밀번호. 여기서 BCrypt로 해시하고 로그에 남기지 않는다

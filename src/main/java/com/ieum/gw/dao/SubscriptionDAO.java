@@ -57,6 +57,11 @@ public class SubscriptionDAO {
         return mapper.listAllPeriods();
     }
 
+    /** 업체를 이메일 인증 완료로 표시한다. 이미 인증한 업체면 0 */
+    public int markEmailVerified(Long companyId, LocalDateTime verifiedAt) {
+        return mapper.markEmailVerified(companyId, verifiedAt);
+    }
+
     /** 업체 이메일 인증 시각. 인증 전이면 null */
     public LocalDateTime getEmailVerifiedAt(Long companyId) {
         return mapper.getEmailVerifiedAt(companyId);

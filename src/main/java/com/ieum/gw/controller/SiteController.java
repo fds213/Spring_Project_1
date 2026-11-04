@@ -6,6 +6,7 @@ import com.ieum.gw.service.SiteService;
 import com.ieum.gw.service.TrialFormException;
 import com.ieum.gw.service.CompanyCodeExhaustedException;
 import com.ieum.gw.service.TrialEmailUsedException;
+import com.ieum.gw.service.TrialVerifyService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
 
 /**
  * 상품 홈페이지(로그인 없이 여는 주소: '/'는 그 주소만, '/trial'·'/inquiry'는 하위 주소까지, security-context.xml).
@@ -32,16 +36,19 @@ public class SiteController {
     private static final Logger logger = LoggerFactory.getLogger(SiteController.class);
 
     private final SiteService siteService;
+    private final TrialVerifyService trialVerifyService;
 
     // 상품 소개 (WEB-01)
     @GetMapping("/")
-    public String intro() {
+    public String intro(Model model) {
+        model.addAttribute("verificationRequired", trialVerifyService.isRequired());
         return "site/intro";
     }
 
     // 무료 체험 신청 화면 (ACC-01)
     @GetMapping("/trial")
-    public String trial() {
+    public String trial(Model model) {
+        model.addAttribute("verificationRequired", trialVerifyService.isRequired());
         return "site/trial";
     }
 
@@ -53,14 +60,19 @@ public class SiteController {
 
     /**
      * 무료 체험 신청. 화면 JS가 JSON 본문으로 보낸다(docs/front-screen-api.md 2장).
+     * 저장이 커밋된 뒤 인증 메일을 보낸다(ACC-06). 메일이 실패해도 신청은 성공이고 완료 화면에서 다시 보낼 수 있다.
      * 성공 200 {"success": true, "message", "data": TrialResultDTO}.
      * 실패 400 입력 오류 {"message", "field"}, 409 이미 쓴 이메일, 503 업체 코드 소진, 500 그 밖 {"message"}.
      */
     @PostMapping("/trial/api/apply")
     @ResponseBody
-    public Map<String, Object> apply(@RequestBody TrialApplyDTO form) {
+    public Map<String, Object> apply(@RequestBody TrialApplyDTO form, HttpServletRequest request) {
         TrialResultDTO result = siteService.applyTrial(form);
         logger.info("체험 신청: companyCode={}, employeeNo={}", result.getCompanyCode(), result.getEmployeeNo());
+        // 저장하는 사이 다른 탭의 로그아웃으로 세션이 끝났을 수 있어 여기서 다시 받는다. 신청은 이미 커밋됐다
+        request.getSession().setAttribute(TrialVerifyService.SESSION_COMPANY_ID, result.getCompanyId());
+        result.setVerificationRequired(trialVerifyService.isRequired());
+        result.setMailSent(trialVerifyService.sendFirst(result.getCompanyId()));
         return Map.of("success", true, "message", "무료 체험을 시작했습니다", "data", result);
     }
 

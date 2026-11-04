@@ -25,6 +25,7 @@ import com.ieum.gw.service.SiteService;
 import com.ieum.gw.service.TrialFormException;
 import com.ieum.gw.service.CompanyCodeExhaustedException;
 import com.ieum.gw.service.TrialEmailUsedException;
+import com.ieum.gw.service.TrialVerifyService;
 
 /** 화면 JS가 받는 응답 모양(docs/front-screen-api.md 2장)을 확인한다. Security(CSRF)는 빼고 Controller만 띄운다 */
 class SiteControllerTest {
@@ -49,12 +50,34 @@ class SiteControllerTest {
         }
     }
 
+    /** 신청 뒤 부른 업체를 적어 두고 메일 결과를 정해 주는 가짜 */
+    static class FakeVerify extends TrialVerifyService {
+        Long sentTo;
+        boolean required = true;
+        boolean sent = true;
+
+        FakeVerify() {
+            super(null, null, null);
+        }
+
+        @Override
+        public boolean isRequired() {
+            return required;
+        }
+
+        @Override
+        public boolean sendFirst(Long companyId) {
+            sentTo = companyId;
+            return sent;
+        }
+    }
+
     private static MockMvc mvc(Supplier<TrialResultDTO> answer) {
         return mvc(new FakeSiteService(answer));
     }
 
     private static MockMvc mvc(FakeSiteService service) {
-        return MockMvcBuilders.standaloneSetup(new SiteController(service)).build();
+        return MockMvcBuilders.standaloneSetup(new SiteController(service, new FakeVerify())).build();
     }
 
     @Test
@@ -102,6 +125,26 @@ class SiteControllerTest {
         assertEquals("20260001", body.get("data").get("employeeNo").asText());
         assertEquals("2026-11-12", body.get("data").get("trialLastDate").asText());
         assertFalse(body.get("data").has("password"));
+    }
+
+    @Test
+    @DisplayName("신청 성공 뒤 인증 메일을 보내고 그 결과를 화면에 준다. 업체 번호는 세션에만 두고 응답에는 넣지 않는다")
+    void sendsVerificationAfterApply() throws Exception {
+        TrialResultDTO done = new TrialResultDTO();
+        done.setCompanyId(42L);
+        FakeVerify verify = new FakeVerify();
+        verify.sent = false; // 메일이 실패해도 신청은 성공이다
+        MockMvc mvc = MockMvcBuilders.standaloneSetup(new SiteController(new FakeSiteService(() -> done), verify)).build();
+
+        MvcResult result = apply(mvc, BODY);
+
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals(42L, verify.sentTo);
+        assertEquals(42L, result.getRequest().getSession().getAttribute(TrialVerifyService.SESSION_COMPANY_ID));
+        JsonNode data = json(result).get("data");
+        assertTrue(data.get("verificationRequired").asBoolean());
+        assertFalse(data.get("mailSent").asBoolean());
+        assertFalse(data.has("companyId"));
     }
 
     @Test

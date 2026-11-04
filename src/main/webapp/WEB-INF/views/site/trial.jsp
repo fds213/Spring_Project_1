@@ -4,7 +4,7 @@
 <%--
   소개 사이트: 2주 무료 체험 신청 (GET /trial, 로그인 없이 연다).
   헤더·푸터·떠 있는 문의 버튼은 site.tag 가 넣는다. 단계 넘기기와 신청(POST /trial/api/apply)은 resources/js/site/trial.js.
-  인증 메일은 아직 없다: 신청하면 바로 로그인할 수 있다.
+  인증을 요구하면(verificationRequired, 메일을 켠 서버) 메일의 링크로 인증한 뒤 로그인한다(ACC-06). 메일을 끈 개발 환경은 바로 로그인한다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:site title="2주 무료 체험 신청" cta="false" mainClass="section" mainStyle="padding-top: 56px">
@@ -13,7 +13,7 @@
       <div class="wrap" style="max-width: 760px">
         <div class="section-head" style="margin-bottom: 28px">
           <h2>2주 무료 체험 신청</h2>
-          <p class="lead">결제 없이 바로 시작합니다. 신청하면 업체와 관리자 계정이 바로 만들어지고, IEUM 앱을 설치해 곧바로 로그인할 수 있습니다. 관리자를 포함해 10명까지 써 볼 수 있고, 결제는 체험 중 언제든 그룹웨어 안에서 합니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.</p>
+          <p class="lead">결제 없이 바로 시작합니다. 신청하면 업체와 관리자 계정이 바로 만들어지고, <c:choose><c:when test="${verificationRequired}">메일로 받은 링크에서 이메일을 인증하면 IEUM 앱에서 로그인할 수 있습니다</c:when><c:otherwise>IEUM 앱을 설치해 곧바로 로그인할 수 있습니다</c:otherwise></c:choose>. 관리자를 포함해 10명까지 써 볼 수 있고, 결제는 체험 중 언제든 그룹웨어 안에서 합니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.</p>
         </div>
 
         <ol class="stepper" id="stepper">

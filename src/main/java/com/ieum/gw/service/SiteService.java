@@ -38,7 +38,7 @@ public class SiteService {
 
     /**
      * 무료 체험 신청(ACC-01·02·03): 업체·업체 코드·14일 체험 기간과 업체 관리자 계정을 한 트랜잭션으로 만든다.
-     * 하나라도 실패하면 모두 되돌린다. 인증 메일(ACC-06)은 핵심 뒤 추가라 아직 보내지 않는다(붙이면 커밋 뒤에 보낸다).
+     * 하나라도 실패하면 모두 되돌린다. 인증 메일(ACC-06)은 커밋이 끝난 뒤 Controller가 TrialVerifyService로 보낸다.
      *
      * @throws TrialFormException 입력이 규칙에 맞지 않을 때
      * @throws com.ieum.gw.service.TrialEmailUsedException       이 이메일로 만든 업체가 이미 있을 때
@@ -55,6 +55,7 @@ public class SiteService {
                 company.getCompanyId(), in.getAdminName(), in.getEmail(), in.getPassword());
 
         TrialResultDTO result = new TrialResultDTO();
+        result.setCompanyId(company.getCompanyId());
         result.setCompanyName(in.getCompanyName());
         result.setCompanyCode(company.getCompanyCode());
         result.setEmployeeNo(admin.getEmployeeNo());

@@ -54,6 +54,13 @@
     </insert>
 
     <!-- 계정 1행. ACTIVE로 만들 때 activated_at도 기록 -->
+    <!-- 계정 이메일 인증 시각 (체험 신청 관리자, ACC-06) -->
+    <update id="markAccountEmailVerified">
+        UPDATE user_account
+        SET email_verified_at = #{verifiedAt}, updated_at = #{verifiedAt}
+        WHERE company_id = #{companyId} AND user_account_id = #{userAccountId} AND email_verified_at IS NULL
+    </update>
+
     <insert id="insertAccount" parameterType="com.ieum.gw.dto.AccountDTO">
         <selectKey keyProperty="userAccountId" resultType="long" order="BEFORE">
             SELECT SQ_USER_ACCOUNT.NEXTVAL FROM dual

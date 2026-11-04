@@ -52,6 +52,7 @@ public class JoinService {
     private final SubscriptionService subscriptionService; // 인원 한도·이용 상태
     private final EmployeeService employeeService; // 비밀번호 해시, 사번 발급 (같은 모듈)
     private final EmployeeDAO employeeDAO; // 계정 저장 (insertAccount)
+    private final MailSettings mailSettings;
 
     /** 가입 승인 화면에 보낼 내용 (GET /employee/api/join) */
     public Map<String, Object> getBoard(LoginUser user) {
@@ -460,11 +461,10 @@ public class JoinService {
             return null;
         }
 
-        // ④ 이메일 인증 전 업체 거절 (준원님 요청: 인증 메일이 아직 없어 주석)
-        // TODO(ACC-06): 인증 메일이 붙으면 주석을 푼다
-        // if (!usage.isEmailVerified()) {
-        // return null;
-        // }
+        // ④ 이메일 인증 전 업체 거절. 메일을 끈 환경에서는 인증할 길이 없으니 막지 않는다(MailSettings)
+        if (mailSettings.isVerificationRequired() && !usage.isEmailVerified()) {
+            return null;
+        }
         return company;
     }
 

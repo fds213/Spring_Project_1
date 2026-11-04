@@ -1,0 +1,20 @@
+# 이 파일을 복사해 mail.properties로 이름을 바꾸고 값을 채우세요. mail.properties는 .gitignore에 있어 저장소에 올라가지 않습니다.
+# 파일이 없거나 mail.enabled=false면 서버는 그대로 뜨고 메일만 보내지 않습니다. 이때는 이메일 인증도 요구하지 않아
+# 체험을 신청하면 바로 로그인할 수 있습니다. 메일을 시험할 사람이 아니면 이 파일을 만들지 않아도 됩니다.
+mail.enabled=false
+
+# 이메일 인증 전 로그인 거절(ACC-06). 메일은 보내되 거절만 끄려면 false로 둡니다.
+# 발표장에서 메일 포트(587)가 막히면 mail.enabled=false로 바꾸고 서버를 다시 시작합니다.
+mail.require-verification=true
+
+# 팀 공용 Gmail. 비밀번호는 로그인 비밀번호가 아니라 앱 비밀번호 16자리를 공백 없이 씁니다.
+mail.host=smtp.gmail.com
+mail.port=587
+mail.username=
+mail.password=
+
+# 받는 사람에게 보이는 이름. 보내는 주소는 Gmail 계정 주소로 고정됩니다.
+mail.from-name=이음
+
+# 메일 속 인증 링크의 앞부분. 받는 사람이 열 수 있는 주소를 씁니다(컨텍스트 경로가 있으면 포함).
+mail.base-url=http://localhost:8080
