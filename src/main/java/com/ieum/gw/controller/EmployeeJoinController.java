@@ -15,9 +15,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.JoinOpenFormDTO;
 import com.ieum.gw.dto.JoinRequestFormDTO;
+import com.ieum.gw.dto.LoginUser;
+import com.ieum.gw.service.JoinNotFoundException;
 import com.ieum.gw.service.JoinService;
 
 import lombok.RequiredArgsConstructor;
@@ -153,5 +154,12 @@ public class EmployeeJoinController {
 	@ResponseBody
 	public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
 		return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", e.getMessage()));
+	}
+	
+	/** 없는 가입 요청 → 404 { message } */
+	@ExceptionHandler(JoinNotFoundException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, String>> notFound(JoinNotFoundException e) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
 	}
 }
