@@ -4,7 +4,8 @@ package com.ieum.gw.code;
 public enum TicketStatus {
 	RECEIVED("접수"),
 	ASSIGNED("배정"),
-	IN_PROGRESS("진행 중"),
+	// 공통 코드 표시명은 결재와 같이 쓰는 '진행 중'이지만, 티켓 화면·기능명세서는 '처리 중'이라 여기서 맞춘다 (#68 리뷰)
+	IN_PROGRESS("처리 중"),
 	RESOLVED("처리 완료"),
 	CLOSED("종료"),
 	CANCELED("취소"),
