@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ieum.gw.dao.AttendanceDAO;
@@ -223,6 +224,18 @@ public class LeaveService {
             // 위에서 확인한 뒤 다른 승인이 먼저 같은 시간대를 저장했거나, 이미 차감한 휴가 날짜 행이다
             throw new IllegalStateException("이미 승인된 휴가와 겹치거나 이미 차감한 날짜입니다", ex);
         }
+    }
+
+    /**
+     * 휴가 상신 직렬화: 최종 승인(useLeave)이 잠그는 것과 같은 부여 행을 잠근다. 결재 상신 트랜잭션 안에서만 불린다(MANDATORY).
+     * 행이 없으면 만들고 잠근다: 15일·사용 0이라 행이 없을 때 남은 일수 계산과 같다.
+     * 입사일이 없으면 잠그지 않는다: 남은 일수가 0이라 상신이 어차피 거절된다.
+     */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockLeaveForSubmit(Long companyId, Long employeeId) {
+        EmployeeHireDTO emp = dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null || emp.getHireDate() == null) return;
+        lockGrant(companyId, employeeId, LocalDate.parse(emp.getHireDate()));
     }
 
     /** 새 사원에게 연차 15일을 준다(입사일부터). 직원 가입 승인과 체험 신청이 부른다. 이미 있으면 그대로 둔다 */

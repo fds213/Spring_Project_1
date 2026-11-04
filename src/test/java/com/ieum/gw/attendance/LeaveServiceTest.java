@@ -18,6 +18,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ieum.gw.dao.AttendanceDAO;
 import com.ieum.gw.dao.LeaveDAO;
@@ -201,6 +203,49 @@ class LeaveServiceTest {
     }
 
     @Test
+    @DisplayName("상신 잠금: 최종 승인(useLeave)과 같은 부여 행을 잠근다. 행이 이미 있으면 새로 만들지 않는다")
+    void lockLeaveForSubmitSameRow() {
+        leave.grantInitialLeave(CO, EMP, LocalDate.of(2024, 3, 4));
+        leave.lockLeaveForSubmit(CO, EMP);
+        leave.useLeave(CO, EMP, ACTOR, List.of(day("2026-11-03", "LV_FULL", 1)));
+        assertEquals(1, leaveMapper.cycles.size());
+        Long row = leaveMapper.cycles.get(0).getLeaveCycleId();
+        assertEquals(List.of(row, row), leaveMapper.locked); // 상신 한 번, 차감 한 번 모두 그 행
+    }
+
+    @Test
+    @DisplayName("상신 잠금: 부여 행이 없으면 15일·사용 0으로 만든 뒤 잠근다. 남은 일수는 그대로 15일")
+    void lockLeaveForSubmitCreatesRow() {
+        assertEquals(BigDecimal.valueOf(15), leave.getRemainingLeaveDays(CO, EMP));
+        leave.lockLeaveForSubmit(CO, EMP);
+        assertEquals(1, leaveMapper.cycles.size());
+        assertEquals("2024-03-04", leaveMapper.cycles.get(0).getStartsOn());
+        assertEquals(List.of(leaveMapper.cycles.get(0).getLeaveCycleId()), leaveMapper.locked);
+        assertEquals(BigDecimal.valueOf(15), leave.getRemainingLeaveDays(CO, EMP));
+
+        leave.lockLeaveForSubmit(CO, EMP); // 두 번째 상신: 행을 더 만들지 않고 같은 행을 잠근다
+        assertEquals(1, leaveMapper.cycles.size());
+        assertEquals(2, leaveMapper.locked.size());
+    }
+
+    @Test
+    @DisplayName("상신 잠금: 입사일이 비었거나 사원이 없으면 잠그지도 만들지도 않는다 (남은 연차 0이라 상신이 거절된다)")
+    void lockLeaveForSubmitWithoutHireDate() {
+        leaveMapper.hires.put(103L, hire(null));
+        leave.lockLeaveForSubmit(CO, 103L);
+        leave.lockLeaveForSubmit(CO, 999L);
+        assertTrue(leaveMapper.cycles.isEmpty());
+        assertTrue(leaveMapper.locked.isEmpty());
+    }
+
+    @Test
+    @DisplayName("상신 잠금은 호출한 트랜잭션 안에서만 쓴다(MANDATORY): 밖에서 부르면 잠금이 바로 풀려 한 줄로 서지 않는다")
+    void lockLeaveForSubmitIsMandatory() throws NoSuchMethodException {
+        Transactional tx = LeaveService.class.getMethod("lockLeaveForSubmit", Long.class, Long.class).getAnnotation(Transactional.class);
+        assertEquals(Propagation.MANDATORY, tx.propagation());
+    }
+
+    @Test
     @DisplayName("휴일 관리: 같은 날은 409, 공휴일 한 번에 넣기는 이미 있는 날을 건너뛴다")
     void holidays() {
         holiday.add(CO, "2026-01-01", "신정");
@@ -261,7 +306,13 @@ class LeaveServiceTest {
                     && !LocalDate.parse(c.getStartsOn()).isAfter(d) && LocalDate.parse(c.getEndsOn()).isAfter(d)).findFirst().orElse(null);
         }
 
-        @Override public LeaveCycleDTO selectCycleOnForUpdate(Long companyId, Long employeeId, String day) { return selectCycleOn(companyId, employeeId, day); }
+        final List<Long> locked = new ArrayList<>(); // FOR UPDATE 로 잠근 부여 행 (잠글 때마다 한 줄)
+
+        @Override public LeaveCycleDTO selectCycleOnForUpdate(Long companyId, Long employeeId, String day) {
+            LeaveCycleDTO c = selectCycleOn(companyId, employeeId, day);
+            if (c != null) locked.add(c.getLeaveCycleId());
+            return c;
+        }
 
         @Override public int insertCycle(LeaveCycleDTO c) {
             if (cycles.stream().anyMatch(x -> x.getEmployeeId().equals(c.getEmployeeId()) && x.getStartsOn().equals(c.getStartsOn()))) {
