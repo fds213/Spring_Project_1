@@ -24,6 +24,8 @@ const schState = {
   loaded: null, // data가 어느 달 것인지 { y, m }. 달을 옮기다 실패하면 이 달로 되돌린다
   jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
   jumpTimer: null,
+  reqSeq: 0,    // 달력 요청 번호. 가장 마지막에 보낸 요청의 응답만 쓴다
+  shownSelected: '', // 화면에 마지막으로 그린 고른 날짜. 달을 옮기다 실패하면 이 날짜로 되돌린다
 };
 const schMonthParam = () => `${schState.month.y}-${pad2(schState.month.m + 1)}`;
 
@@ -39,21 +41,25 @@ function openScheduleView() {
 function renderSchedule() {
   if (!schState.month) return openScheduleView();
   const month = schMonthParam();
+  // 요청마다 번호를 붙이고, 그사이 새 요청을 보냈으면 늦게 온 앞 응답은 성공·실패 모두 버린다.
+  // (달 이름으로 거르면 11월 → [>][>][<]에서 첫 12월 요청의 실패가 마지막 12월 요청 대신 처리돼 11월에 남았다)
+  const seq = ++schState.reqSeq;
   api.get('/schedule/api/schedules', { month })
     .done(r => {
-      if (month !== schMonthParam()) return; // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
+      if (seq !== schState.reqSeq) return;
       schState.data = r;
       schState.loaded = { ...schState.month };
       drawSchedule();
     })
     .fail(xhr => {
-      if (month !== schMonthParam()) return; // 그사이 다른 달로 옮겼다 (그 달 응답이 따로 온다)
+      if (seq !== schState.reqSeq) return; // 그사이 새 요청을 보냈다 (그 응답이 따로 온다)
       showToast(apiMessage(xhr, '일정을 불러오지 못했습니다'));
       // 달을 옮기다 실패하면 화면은 앞 달인데 속으로는 다음 달이 되어, 한 번 더 넘기면 두 달을 건너뛴다.
-      // 그래서 화면에 보이는 달(받아 둔 달)로 되돌리고, 고른 날짜도 그 달 안으로 맞춘다
+      // 그래서 화면에 보이는 달(받아 둔 달)과 그때 고른 날짜로 되돌린다
       const shown = schState.loaded;
       if (!shown) return; // 처음 열 때 실패: 되돌릴 달이 없다
       schState.month = { ...shown };
+      if (schState.shownSelected) schState.selected = schState.shownSelected;
       const sel = schFromKey(schState.selected);
       if (sel.getFullYear() !== shown.y || sel.getMonth() !== shown.m) {
         const now = new Date();
@@ -79,6 +85,7 @@ const schIsHoliday = key => schState.data.holidays.some(h => h.date === key);
 // 받아 둔 값으로 달력과 날짜 칸을 그린다 (보기 선택·날짜 선택은 서버에 다시 묻지 않는다)
 function drawSchedule() {
   if (!schState.data) return;
+  schState.shownSelected = schState.selected;
   const { y, m } = schState.month;
   schEl('schMonthLabel').textContent = `${y}년 ${m + 1}월`;
 
@@ -188,6 +195,9 @@ schEl('schCancel').addEventListener('click', () => { schSkipRepeat = true; schEl
 // 그러면 엉뚱한 날짜로 추가 팝업이 열리거나 고른 날짜가 바뀐다. 창을 닫은 뒤, 새로 누른 클릭(detail 1)이 오기 전까지
 // 이어지는 클릭(detail 2 이상)은 칸에 닿기 전에(capture) 버린다
 let schSkipRepeat = false;
+// 이 화면 밖의 창(머리줄 비밀번호 변경, 체험 안내 등)도 닫힐 때 같은 문제가 있어, 어떤 창이든 닫히면 이어지는 클릭을 버린다
+// (close 이벤트는 위로 퍼지지 않아 capture로 받는다)
+document.addEventListener('close', e => { if (e.target instanceof HTMLDialogElement) schSkipRepeat = true; }, true);
 ['click', 'dblclick'].forEach(type => document.addEventListener(type, e => {
   if (!schSkipRepeat) return;
   if (e.detail < 2) { schSkipRepeat = false; return; }
@@ -198,10 +208,12 @@ let schSkipRepeat = false;
 function deleteSchedule(s, btn) {
   const dlg = schEl('schDeleteDialog');
   schEl('schDeleteText').textContent = `'${s.title}' 일정을 지웁니다. 삭제한 일정은 되돌릴 수 없습니다.`;
+  const openedAt = performance.now(); // 창을 연 시각
   dlg.querySelectorAll('button').forEach(b => {
     b.onclick = e => {
-      // 목록 [삭제]를 두 번 눌러 두 번째 클릭이 막 열린 창의 버튼에 떨어진 경우: 확인 없이 지우지 않게 창을 그대로 둔다
-      if (e.detail > 1) return;
+      // 목록 [삭제]를 두 번 눌러 두 번째 클릭이 막 열린 창의 버튼에 떨어진 경우: 확인 없이 지우지 않게 창을 그대로 둔다.
+      // 휴대폰에 따라 두 번째 탭이 detail 1로 올 수 있어, 창을 연 지 0.4초 안의 마우스·탭도 버린다(키보드 Enter는 detail 0이라 그대로)
+      if (e.detail > 1 || (e.detail === 1 && performance.now() - openedAt < 400)) return;
       schSkipRepeat = true;
       dlg.close();
       if (b.value !== 'ok') return;

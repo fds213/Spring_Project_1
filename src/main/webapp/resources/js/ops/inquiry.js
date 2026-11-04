@@ -165,8 +165,8 @@ function replyItem(q, r) {
 
 function guestDetail(q) {
   const left = cardOf('접수 내용',
-    dlOf([['접수번호', q.no], ['접수 시각', whenFull(q.at)], ...(q.company ? [['회사명', q.company]] : []), ['이름', q.name],
-      ['이메일', q.email], ...(q.phone ? [['휴대전화', q.phone]] : []), ['제목', q.title], ['내용', text(q.body)]]),
+    dlOf([['접수번호', q.no], ['접수 시각', whenFull(q.at)], ...(q.company ? [['회사명', q.company]] : []), ['이름', q.name || '-'],
+      ['이메일', q.email], ...(q.phone ? [['휴대전화', q.phone]] : []), ['제목', q.title || '-'], ['내용', text(q.body)]]),
     h('p', 'inq-body inq-hint', '답변은 위 이메일로 보냅니다. 발송 성공은 메일 서버가 받았다는 뜻이라, 없는 주소면 나중에 반송될 수 있습니다.'));
 
   const log = q.replies.length
@@ -221,8 +221,9 @@ function renderGuest() {
     const state = guestRowState(q);
     const tr = dataRow(isOpen, () => { inq.guest.open = isOpen ? null : q.no; renderGuest(); },
       inqCell('접수 시각', span(when(q.at))),
-      inqCell('보낸 사람', span(q.company ? `${q.name} · ${q.company}` : q.name), small(q.email)),
-      inqCell('제목', titleBtn(q.title, isOpen), small(q.no)),
+      // 이름 칸은 11/2 스키마 패치 전에 받은 문의에는 비어 있다(REQUESTER_NAME 은 나중에 더한 칸)
+      inqCell('보낸 사람', span([q.name, q.company].filter(Boolean).join(' · ') || '-'), small(q.email)),
+      inqCell('제목', titleBtn(q.title || '(제목 없음)', isOpen), small(q.no)),
       inqCell('상태', span(state.label, `status status-${state.tone}`)));
     return isOpen ? [tr, detailTr(4, guestDetail(q))] : [tr];
   });
