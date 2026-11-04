@@ -22,8 +22,6 @@ public interface JoinMapper {
 
 	List<JoinOpeningDTO> listOpenings(@Param("companyId") Long companyId);
 
-	int countActiveAccounts(@Param("companyId") Long companyId);
-
 	Integer peekLastSerial(@Param("companyId") Long companyId);
 
 	int openDept(@Param("companyId") Long companyId, @Param("deptName") String deptName,

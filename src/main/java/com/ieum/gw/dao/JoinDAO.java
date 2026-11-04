@@ -39,12 +39,7 @@ public class JoinDAO {
         return mapper.listOpenings(companyId);
     }
 
-    /** ❺ 사용 중 계정 수 */
-    public int countActiveAccounts(Long companyId) {
-        return mapper.countActiveAccounts(companyId);
-    }
-
-    /** ❻ 번호표 기계의 마지막 번호. 기계가 없으면 null */
+    /** ❺ 번호표 기계의 마지막 번호. 기계가 없으면 null */
     public Integer peekLastSerial(Long companyId) {
         return mapper.peekLastSerial(companyId);
     }

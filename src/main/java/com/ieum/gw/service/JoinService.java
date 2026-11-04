@@ -77,7 +77,7 @@ public class JoinService {
         }
 
         // ③ 인원: 사용 중 / 한도. 이용 기간이 없는 업체(운영 업체)는 한도 없음
-        int used = dao.countActiveAccounts(companyId);
+        int used = employeeService.countAccountsInUse(companyId);
         CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
         Map<String, Object> caps = null;
         Integer room = null;
@@ -292,7 +292,7 @@ public class JoinService {
         // ② 신청서 잡기 (FOR UPDATE) → 없으면 400, 대기 중 아니면 409
         JoinRequestViewDTO req = dao.lockRequest(companyId, requestId);
         if (req == null) {
-            throw new IllegalArgumentException("없는 가입 요청입니다");
+            throw new JoinNotFoundException("없는 가입 요청입니다");
         }
         if (!"REQUESTED".equals(req.getRequestStatus())) {
             throw new IllegalStateException("이미 처리된 가입 요청입니다");
@@ -315,7 +315,7 @@ public class JoinService {
         CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
         if (usage != null) {
             int limit = subscriptionService.getSeatLimit(companyId);
-            if (dao.countActiveAccounts(companyId) >= limit) {
+            if (employeeService.countAccountsInUse(companyId) >= limit) {
                 throw new IllegalStateException("인원이 가득 차서 승인할 수 없습니다");
             }
         }
@@ -352,7 +352,7 @@ public class JoinService {
         // ② 신청서 잡기 → 없으면 400, 대기 중 아니면 409, 부서장은 자기 부서만
         JoinRequestViewDTO req = dao.lockRequest(companyId, requestId);
         if (req == null) {
-            throw new IllegalArgumentException("없는 가입 요청입니다");
+            throw new JoinNotFoundException("없는 가입 요청입니다");
         }
         if (!"REQUESTED".equals(req.getRequestStatus())) {
             throw new IllegalStateException("이미 처리된 가입 요청입니다");
