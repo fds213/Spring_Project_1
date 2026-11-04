@@ -12,11 +12,11 @@
 
 	<!-- 로그인 검사기: 잠금 → 비밀번호 → 상태 순서 (계정당 5회 실패 시 10분 잠금) -->
 	<bean id="loginAuthenticationProvider"
-		class="com.ieum.gw.common.security.LoginAuthenticationProvider">
+		class="com.ieum.gw.security.LoginAuthenticationProvider">
 		<property name="userDetailsService" ref="customUserDetailsService" />
 		<property name="passwordEncoder" ref="bCryptPasswordEncoder" />
 	</bean>
-	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.common.security.AjaxAwareEntryPoint">
+	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.security.AjaxAwareEntryPoint">
     <constructor-arg value="/login" />
 </bean>
 

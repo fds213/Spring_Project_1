@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.attendance.dao.AttendanceMapper">
+<mapper namespace="com.ieum.gw.mapper.AttendanceMapper">
 
 	<!-- 서울 시각 (테이블 기본값과 같은 기준). 출퇴근 시각은 단말기가 보낸 값이 아니라 이음이 받은 시각이다 -->
 	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
@@ -13,7 +13,7 @@
 	<!-- ===== 단말기 ===== -->
 
 	<!-- 단말기 키 해시로 쓰는 중인 단말기 1대 -->
-	<select id="selectDeviceByKeyHash" resultType="com.ieum.gw.attendance.dto.AttendanceDeviceDTO">
+	<select id="selectDeviceByKeyHash" resultType="com.ieum.gw.dto.AttendanceDeviceDTO">
 		SELECT d.attendance_device_id, d.company_id, c.company_name, d.device_name
 		FROM attendance_device d
 		JOIN company c ON c.company_id = d.company_id
@@ -21,7 +21,7 @@
 	</select>
 
 	<!-- 업체의 단말기 (여러 대면 먼저 등록한 것) -->
-	<select id="selectCompanyDevice" resultType="com.ieum.gw.attendance.dto.AttendanceDeviceDTO">
+	<select id="selectCompanyDevice" resultType="com.ieum.gw.dto.AttendanceDeviceDTO">
 		SELECT d.attendance_device_id, d.company_id, c.company_name, d.device_name
 		FROM attendance_device d
 		JOIN company c ON c.company_id = d.company_id
@@ -54,7 +54,7 @@
 	</update>
 
 	<!-- 업체 직원 목록 (근태 단말기 화면에서 번호를 연결할 사람 고르기) -->
-	<select id="selectCompanyEmployees" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+	<select id="selectCompanyEmployees" resultType="com.ieum.gw.dto.DevicePersonDTO">
 		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status
 		FROM employee e
 		LEFT JOIN department dp ON dp.department_id = e.department_id
@@ -69,7 +69,7 @@
 	</select>
 
 	<!-- 단말기에 등록된 사람 목록 (시뮬레이터·근태 단말기 화면) -->
-	<select id="selectDevicePeople" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+	<select id="selectDevicePeople" resultType="com.ieum.gw.dto.DevicePersonDTO">
 		SELECT de.device_user_no, e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status
 		FROM device_employee de
 		JOIN employee e ON e.employee_id = de.employee_id AND e.company_id = de.company_id
@@ -78,7 +78,7 @@
 		ORDER BY de.device_user_no
 	</select>
 
-	<select id="selectDevicePerson" resultType="com.ieum.gw.attendance.dto.DevicePersonDTO">
+	<select id="selectDevicePerson" resultType="com.ieum.gw.dto.DevicePersonDTO">
 		SELECT de.device_user_no, e.employee_id, e.employee_name, dp.department_name, e.employment_status
 		FROM device_employee de
 		JOIN employee e ON e.employee_id = de.employee_id AND e.company_id = de.company_id
@@ -89,7 +89,7 @@
 	<!-- ===== 출퇴근 기록 ===== -->
 
 	<!-- 출근: 같은 직원·같은 날 근태는 고유 제약(UQ_36_01)으로 하나뿐이라, 두 번째 출근은 여기서 막힌다 -->
-	<insert id="insertCheckIn" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+	<insert id="insertCheckIn" parameterType="com.ieum.gw.dto.PunchDTO">
 		<selectKey keyProperty="attendanceId" resultType="long" order="BEFORE">
 			SELECT sq_attendance.NEXTVAL FROM dual
 		</selectKey>
@@ -98,7 +98,7 @@
 	</insert>
 
 	<!-- 퇴근: 오늘 출근했고 아직 퇴근하지 않은 근태에만. 영향 받은 행이 0이면 Service가 이유를 다시 확인한다 -->
-	<update id="updateCheckOut" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+	<update id="updateCheckOut" parameterType="com.ieum.gw.dto.PunchDTO">
 		UPDATE attendance
 		SET check_out_at = <include refid="now"/>,
 		    updated_at   = <include refid="now"/>
@@ -108,7 +108,7 @@
 	</update>
 
 	<!-- 수신 이력: 받은 시각은 방금 기록한 출근·퇴근 시각과 같게 -->
-	<insert id="insertEvent" parameterType="com.ieum.gw.attendance.dto.PunchDTO">
+	<insert id="insertEvent" parameterType="com.ieum.gw.dto.PunchDTO">
 		INSERT INTO attendance_event (company_id, attendance_id, attendance_device_id, event_type, received_at, event_key)
 		SELECT a.company_id, a.attendance_id, #{attendanceDeviceId}, #{eventType},
 		       CASE WHEN #{eventType} = 'ATT_IN' THEN a.check_in_at ELSE a.check_out_at END,
@@ -124,7 +124,7 @@
 		TO_CHAR(check_out_at, 'HH24:MI:SS') AS check_out
 	</sql>
 
-	<select id="selectTodayAttendance" resultType="com.ieum.gw.attendance.dto.AttendanceDTO">
+	<select id="selectTodayAttendance" resultType="com.ieum.gw.dto.AttendanceDTO">
 		SELECT <include refid="attendanceColumns"/>
 		FROM attendance
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
@@ -132,7 +132,7 @@
 	</select>
 
 	<!-- 한 달 근태 (month = YYYY-MM) -->
-	<select id="selectMonthAttendance" resultType="com.ieum.gw.attendance.dto.AttendanceDTO">
+	<select id="selectMonthAttendance" resultType="com.ieum.gw.dto.AttendanceDTO">
 		SELECT <include refid="attendanceColumns"/>
 		FROM attendance
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
@@ -142,7 +142,7 @@
 	</select>
 
 	<!-- 오늘 출퇴근 시각 (연동 계약 getTodayAttendance, 헤더 표시) -->
-	<select id="selectTodayTimes" resultType="com.ieum.gw.attendance.dto.TodayAttendanceDTO">
+	<select id="selectTodayTimes" resultType="com.ieum.gw.dto.TodayAttendanceDTO">
 		SELECT check_in_at, check_out_at
 		FROM attendance
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
@@ -151,7 +151,7 @@
 
 	<!-- ===== 휴일 (업체마다. 휴가 날짜 계산과 달력이 쓴다) ===== -->
 
-	<select id="selectHolidays" resultType="com.ieum.gw.attendance.dto.HolidayDTO">
+	<select id="selectHolidays" resultType="com.ieum.gw.dto.HolidayDTO">
 		SELECT holiday_id, holiday_date, holiday_name
 		FROM holiday
 		WHERE company_id = #{companyId}
@@ -180,7 +180,7 @@
 	</delete>
 
 	<!-- ===== 근태·연차 관리: 업체 직원별 한 달 요약 (한 번에). 지각·조퇴 기준 시각은 AttendanceService 가 넘긴다 ===== -->
-	<select id="selectMonthSummary" resultType="com.ieum.gw.attendance.dto.AttendanceSummaryDTO">
+	<select id="selectMonthSummary" resultType="com.ieum.gw.dto.AttendanceSummaryDTO">
 		SELECT e.employee_id, e.employee_no, e.employee_name, dp.department_name, e.employment_status,
 		       TO_CHAR(e.hire_date, 'YYYY-MM-DD') AS hire_date,
 		       (SELECT MIN(de.device_user_no) FROM device_employee de
@@ -211,7 +211,7 @@
 	</select>
 
 	<!-- 한 달 동안 최종 승인된 휴가 날짜 (전자결재 휴가 신청서). 기록의 비고에 연차·반차로 보여 준다 -->
-	<select id="selectMonthLeaveDays" resultType="com.ieum.gw.attendance.dto.LeaveDayDTO">
+	<select id="selectMonthLeaveDays" resultType="com.ieum.gw.dto.LeaveDayDTO">
 		SELECT d.leave_request_day_id, d.leave_date, d.leave_type, d.deduct_days
 		FROM approval_document ad
 		JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
