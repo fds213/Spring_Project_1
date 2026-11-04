@@ -11,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -69,6 +70,13 @@ public class ApprovalController {
     public ResponseEntity<Map<String, Object>> handleBadRequest(RuntimeException e) {
         String message = (e.getMessage() != null ? e.getMessage() : "요청을 처리하지 못했습니다.");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("message", message));
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    @ResponseBody
+    public ResponseEntity<Map<String, Object>> handleStatus(ResponseStatusException e) {
+        return ResponseEntity.status(e.getStatus())
+                .body(Map.of("message", e.getReason()));
     }
 
 

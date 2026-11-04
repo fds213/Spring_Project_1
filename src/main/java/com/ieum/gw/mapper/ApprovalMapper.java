@@ -43,4 +43,12 @@ public interface ApprovalMapper {
     List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId);
 
     int countWaitingForMe(Long companyId, Long employeeId);
+
+    ApprovalDocumentDTO lockDocument(Long companyId, long documentId);
+
+    List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId);
+
+    int approveStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
+
+    int approveDocument(Long companyId, long documentId);
 }

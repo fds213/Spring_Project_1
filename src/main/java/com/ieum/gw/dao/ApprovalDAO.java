@@ -73,4 +73,20 @@ public class ApprovalDAO {
     public int countWaitingForMe(Long companyId, Long employeeId) {
         return mapper.countWaitingForMe(companyId, employeeId);
     }
+
+    public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
+        return mapper.lockDocument(companyId, documentId);
+    }
+
+    public List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId) {
+        return mapper.selectDocumentSteps(companyId, documentId);
+    }
+
+    public int approveStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion) {
+        return mapper.approveStep(companyId, employeeId, stepNo, documentId, opinion);
+    }
+
+    public int approveDocument(Long companyId, long documentId) {
+        return mapper.approveDocument(companyId, documentId);
+    }
 }

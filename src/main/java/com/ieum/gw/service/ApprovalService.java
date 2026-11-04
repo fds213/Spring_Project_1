@@ -4,21 +4,36 @@ import com.ieum.gw.dao.ApprovalDAO;
 import com.ieum.gw.dto.*;
 import com.ieum.gw.dto.LeaveDayDTO;
 import com.ieum.gw.code.AssetType;
+import com.ieum.gw.code.ApprovalAction;
+import com.ieum.gw.code.ApprovalDocumentStatus;
+import com.ieum.gw.code.ApprovalDocumentType;
+import com.ieum.gw.code.ApprovalStepStatus;
+import com.ieum.gw.code.LeaveType;
 import com.ieum.gw.dto.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
+
+// Dear programmer:
+// When I wrote this code, only god and I knew how it worked.
+// Now, only god knows it!
+//
+// Therefore, if u are trying to optimize this routine and fails,
+// please increase this counter as a warning for the next person:
+//
+// total_hours_wasted_here = 1
+
 
 /**
  * 결재가 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
@@ -54,8 +69,57 @@ public class ApprovalService {
         }
     }
 
+    @Nullable
+    private static String validateOpinion(String opinion) {
+
+        if (opinion != null && opinion.codePointCount(0, opinion.length()) > 1000) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "결재 의견은 1000자까지 입력할 수 있습니다."
+            );
+        }
+        return opinion;
+    }
+
+    @NonNull
+    private static ApprovalStepDTO requireCurrentApprover(LoginUser user, List<ApprovalStepDTO> steps) {
+    /*
+        로그인한 사원의 결재선이 있는지 확인
+        내 결재선 상태가 WAITING인지 확인
+        내 앞 단계가 모두 APPROVED인지 확인
+    */
+
+        // 내 결재선이 있는지?
+        ApprovalStepDTO approver = null;
+        for(ApprovalStepDTO step : steps) {
+            if(Objects.equals(user.getEmployeeId(), step.getApproverEmployeeId())) {
+                approver = step;
+                break;
+            }
+        }
+
+        if(approver == null) throw new ResponseStatusException(HttpStatus.FORBIDDEN, "이 문서의 결재자가 아닙니다.");
+        if(!ApprovalStepStatus.WAITING.name().equals(approver.getStatusCode())) throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리된 결재입니다.");
+        if(approver.getStepNo()==2) {
+            if(!ApprovalStepStatus.APPROVED.name().equals(steps.get(0).getStatusCode())) throw new ResponseStatusException(HttpStatus.CONFLICT, "이전 결재가 완료되지 않았습니다.");
+        }
+        return approver;
+    }
+
+    @NonNull
+    private ApprovalDocumentDTO lockInDocument(LoginUser user, long documentId) {
+        // 행 잠금 슛
+        ApprovalDocumentDTO doc = dao.lockDocument(user.getCompanyId(), documentId);
+
+        // 문서가 없으면 404
+        if(doc==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "조회된 문서가 없습니다.");
+        // 진행 중인 문서가 아니면 409
+        if(!ApprovalDocumentStatus.IN_PROGRESS.name().equals(doc.getStatusCode())) throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 처리되었거나 결재할 수 없는 문서입니다.");
+        return doc;
+    }
+
     private boolean overlaps(LeaveDayDTO day, LeaveDayDTO p) {
-        return day.getLeaveDate().equals(p.getLeaveDate()) && ("LV_FULL".equals(day.getLeaveType())|| "LV_FULL".equals(p.getLeaveType()) || day.getLeaveType().equals(p.getLeaveType()));
+        return day.getLeaveDate().equals(p.getLeaveDate()) && (LeaveType.LV_FULL.name().equals(day.getLeaveType())|| LeaveType.LV_FULL.name().equals(p.getLeaveType()) || day.getLeaveType().equals(p.getLeaveType()));
     }
 
     public Map<String, Object> getFormOptions(Long companyId, Long employeeId) {
@@ -109,8 +173,8 @@ public class ApprovalService {
     public Long submit(LoginUser user, ApprovalSubmitDTO dto) {
 
         // 양식 확인
-        boolean isLeave = "DOC_LEAVE".equals(dto.getDocumentType());
-        if(!isLeave && !"DOC_EQUIPMENT".equals(dto.getDocumentType())) {
+        boolean isLeave = ApprovalDocumentType.DOC_LEAVE.name().equals(dto.getDocumentType());
+        if(!isLeave && !ApprovalDocumentType.DOC_EQUIPMENT.name().equals(dto.getDocumentType())) {
             throw new IllegalArgumentException("지원하지 않는 양식");
         }
 
@@ -185,7 +249,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, "DOC_LEAVE", "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_LEAVE.name(), "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds);
 
         ApprovalLeaveDTO leave = new ApprovalLeaveDTO();
         leave.setCompanyId(user.getCompanyId());
@@ -221,7 +285,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, "DOC_EQUIPMENT", "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_EQUIPMENT.name(), "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds);
 
         ApprovalEquipmentDTO equipment = new ApprovalEquipmentDTO();
         equipment.setApprovalDocumentId(documentId);
@@ -255,7 +319,7 @@ public class ApprovalService {
         ApprovalDocumentDTO document = new ApprovalDocumentDTO();
         document.setCompanyId(user.getCompanyId());
         document.setAuthorEmployeeId(user.getEmployeeId());
-        document.setStatusCode("IN_PROGRESS"); // enum 들어오면 수정
+        document.setStatusCode(ApprovalDocumentStatus.IN_PROGRESS.name());
         document.setDocumentType(documentType);
         document.setTitle(title);
         document.setContent(content);
@@ -275,8 +339,8 @@ public class ApprovalService {
         }
 
         ApprovalHistoryDTO history = new ApprovalHistoryDTO();
-        history.setActionCode("APR_SUBMIT"); // enum 수정
-        history.setAfterStatus("IN_PROGRESS");
+        history.setActionCode(ApprovalAction.APR_SUBMIT.name());
+        history.setAfterStatus(ApprovalDocumentStatus.IN_PROGRESS.name());
         history.setActorAccountId(user.getUserAccountId());
         history.setApprovalDocumentId(documentId);
         history.setCompanyId(user.getCompanyId());
@@ -325,19 +389,77 @@ public class ApprovalService {
             }
 
             if (doc.isMyTurn()) box.get("WAIT").add(doc);
-            else if ("IN_PROGRESS".equals(doc.getStatusCode())) box.get("PROGRESS").add(doc);
-            else if ("APPROVED".equals(doc.getStatusCode())) box.get("DONE").add(doc);
-            else if ("REJECTED".equals(doc.getStatusCode())) box.get("REJECTED").add(doc);
+            else if (ApprovalDocumentStatus.IN_PROGRESS.name().equals(doc.getStatusCode())) box.get("PROGRESS").add(doc);
+            else if (ApprovalDocumentStatus.APPROVED.name().equals(doc.getStatusCode())) box.get("DONE").add(doc);
+            else if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) box.get("REJECTED").add(doc);
         }
         return box;
     }
 
+    @Transactional
     public ApprovalDecisionResultDTO approve(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
 
-        return null;
+        ApprovalDocumentDTO doc = lockInDocument(user, documentId);
+        List<ApprovalStepDTO> steps = dao.selectDocumentSteps(user.getCompanyId(), documentId);
+        ApprovalStepDTO approver = requireCurrentApprover(user, steps);
+
+        // 결재 처리
+        String opinion = validateOpinion(dto.getOpinion());
+
+        int result = dao.approveStep(user.getCompanyId(), user.getEmployeeId(), approver.getStepNo(),documentId, opinion);
+        if(result!=1) throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+
+        // 다음 결재자에게 알림, 최종 결재자면 문서 상태 변경
+        if (approver.getStepNo() == 1 && steps.size() == 2) {
+            nService.notifyApprovalRequest(
+                    user.getCompanyId(),
+                    steps.get(1).getApproverEmployeeId(),
+                    documentId,
+                    doc.getTitle()
+            );
+        } else {
+            // 마지막 결재자: 문서를 APPROVED로 변경
+            result = dao.approveDocument(user.getCompanyId(), documentId);
+            if(result!=1) throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+        }
+
+        // 이력 저장
+        ApprovalHistoryDTO history = new ApprovalHistoryDTO();
+        history.setActionCode(ApprovalAction.APR_APPROVE.name());
+        history.setBeforeStatus(doc.getStatusCode());
+        history.setAfterStatus(
+                approver.getStepNo() == 1 && steps.size() == 2
+                        ? ApprovalDocumentStatus.IN_PROGRESS.name()
+                        : ApprovalDocumentStatus.APPROVED.name()
+        );
+        history.setOpinion(opinion);
+        history.setActorAccountId(user.getUserAccountId());
+        history.setApprovalDocumentId(documentId);
+        history.setCompanyId(user.getCompanyId());
+        dao.insertHistory(history);
+
+        ApprovalDecisionResultDTO response = new ApprovalDecisionResultDTO();
+
+        String authorName = eService.getEmployeeNames(
+                user.getCompanyId(),
+                List.of(doc.getAuthorEmployeeId())
+        ).get(doc.getAuthorEmployeeId());
+
+        response.setEmployeeName(authorName);
+        response.setDocumentType(doc.getDocumentType());
+        response.setStatusCode(history.getAfterStatus());
+
+        return response;
     }
 
+
+
+    @Transactional
     public ApprovalDecisionResultDTO reject(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
+
+        // 행 잠금 슛
+        ApprovalDocumentDTO doc = dao.lockDocument(user.getCompanyId(), documentId);
+
         return null;
     }
 }
