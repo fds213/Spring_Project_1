@@ -71,6 +71,10 @@ class ApprovalServiceTest {
         String leaveType;
         LocalDate from;
         LocalDate to;
+        final List<String> submitCalls = new ArrayList<>();
+        Long lockedCompanyId;
+        Long lockedEmployeeId;
+        RuntimeException lockError;
 
         FakeAttendance() {
             super(null, null, null);
@@ -78,6 +82,7 @@ class ApprovalServiceTest {
 
         @Override
         public List<LeaveDayDTO> calculateLeaveDays(Long companyId, String leaveType, LocalDate fromDate, LocalDate toDate) {
+            submitCalls.add("calculate");
             this.companyId = companyId;
             this.leaveType = leaveType;
             this.from = fromDate;
@@ -88,11 +93,21 @@ class ApprovalServiceTest {
 
         @Override
         public BigDecimal getRemainingLeaveDays(Long companyId, Long employeeId) {
+            submitCalls.add("remaining");
             return remaining;
         }
 
         @Override
+        public void lockLeaveForSubmit(Long companyId, Long employeeId) {
+            submitCalls.add("lock");
+            lockedCompanyId = companyId;
+            lockedEmployeeId = employeeId;
+            if (lockError != null) throw lockError;
+        }
+
+        @Override
         public boolean hasApprovedLeaveOverlap(Long companyId, Long employeeId, List<LeaveDayDTO> days) {
+            submitCalls.add("approvedOverlap");
             return approvedOverlap;
         }
     }
@@ -125,9 +140,15 @@ class ApprovalServiceTest {
         int waitingCount;
         Long boxQueryCompanyId;
         Long boxQueryEmployeeId;
+        final List<String> submitCalls;
 
         FakeDao() {
+            this(new ArrayList<>());
+        }
+
+        FakeDao(List<String> submitCalls) {
             super(null);
+            this.submitCalls = submitCalls;
         }
 
         /** 저장한 행이 하나도 없는지 */
@@ -138,6 +159,7 @@ class ApprovalServiceTest {
 
         @Override
         public void insertDocument(ApprovalDocumentDTO document) {
+            submitCalls.add("saveDocument");
             document.setApprovalDocumentId(NEW_DOCUMENT_ID); // selectKey가 하는 일
             this.document = document;
         }
@@ -154,11 +176,13 @@ class ApprovalServiceTest {
 
         @Override
         public void insertLeaveRequest(ApprovalLeaveDTO leave) {
+            submitCalls.add("saveLeave");
             this.leave = leave;
         }
 
         @Override
         public void insertLeaveDay(Long companyId, Long documentId, LeaveDayDTO day) {
+            submitCalls.add("saveDay");
             leaveDayCompanyIds.add(companyId);
             leaveDayDocumentIds.add(documentId);
             leaveDays.add(day);
@@ -202,11 +226,13 @@ class ApprovalServiceTest {
 
         @Override
         public BigDecimal sumPendingLeaveDays(Long companyId, Long employeeId) {
+            submitCalls.add("pendingSum");
             return pendingSum;
         }
 
         @Override
         public List<LeaveDayDTO> selectPendingLeaveDays(Long companyId, Long employeeId, String fromDate, String toDate) {
+            submitCalls.add("pendingDays");
             this.fromDate = fromDate;
             this.toDate = toDate;
             return pendingDays;
@@ -229,9 +255,11 @@ class ApprovalServiceTest {
         }
     }
 
-    /** 결재 요청 알림을 저장하지 않고 받은 값만 적어 두는 가짜 알림 */
+    /** 결재 알림을 저장하지 않고 받은 값만 적어 두는 가짜 알림 */
     static class FakeNotification extends NotificationService {
         final List<List<Object>> requests = new ArrayList<>();
+        final List<List<Object>> done = new ArrayList<>();
+        final List<List<Object>> rejected = new ArrayList<>();
 
         FakeNotification() {
             super(null);
@@ -241,14 +269,25 @@ class ApprovalServiceTest {
         public void notifyApprovalRequest(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
             requests.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
         }
+
+        @Override
+        public void notifyApprovalDone(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
+            done.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
+        }
+
+        @Override
+        public void notifyApprovalRejected(Long companyId, Long receiverEmployeeId, Long approvalDocumentId, String documentTitle) {
+            rejected.add(List.of(companyId, receiverEmployeeId, approvalDocumentId, documentTitle));
+        }
     }
 
     private final FakeEmployee employee = new FakeEmployee();
     private final FakeAttendance attendance = new FakeAttendance();
-    private final FakeDao dao = new FakeDao();
+    private final FakeDao dao = new FakeDao(attendance.submitCalls);
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
-    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification);
+    private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
+            new ScheduleService(null, null), new TicketService(null));
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();
@@ -954,5 +993,76 @@ class ApprovalServiceTest {
     @DisplayName("결재선: 결재자 값이 숫자가 아니면 내부 오류 문구 대신 안내 문구로 거절")
     void nonNumericApproverIsRejectedWithGuide() {
         assertEquals("결재자를 다시 골라 주세요.", rejectedMessage(form("DOC_LEAVE", "abc", "")));
+    }
+
+    @Test
+    @DisplayName("휴가 상신은 로그인 업체·기안자의 연차를 잠근 뒤 잔여·대기·겹침을 조회하고 저장한다")
+    void locksBeforeReadingLeaveAndSaving() {
+        service.submit(user(), validLeave());
+
+        assertEquals(COMPANY_ID, attendance.lockedCompanyId);
+        assertEquals(MY_ID, attendance.lockedEmployeeId);
+        assertEquals(List.of("calculate", "lock", "remaining", "pendingSum", "pendingDays",
+                "approvedOverlap", "saveDocument", "saveLeave", "saveDay", "saveDay"), attendance.submitCalls);
+    }
+
+    @Test
+    @DisplayName("상신 잠금이 실패하면 예외를 전파하고 연차 조회·문서 저장·알림을 진행하지 않는다")
+    void lockFailureStopsSubmission() {
+        attendance.lockError = new IllegalStateException("연차 잠금 실패");
+
+        assertSame(attendance.lockError,
+                assertThrows(IllegalStateException.class, () -> service.submit(user(), validLeave())));
+        assertEquals(List.of("calculate", "lock"), attendance.submitCalls);
+        assertTrue(dao.savedNothing());
+        assertTrue(notification.requests.isEmpty());
+    }
+
+    @Test
+    @DisplayName("잠금 획득 시점에 늘어난 대기 일수를 다시 읽어 연차 초과 상신을 거절한다")
+    void readsPendingDaysAfterLock() {
+        FakeAttendance changedAttendance = new FakeAttendance() {
+            @Override public void lockLeaveForSubmit(Long companyId, Long employeeId) {
+                super.lockLeaveForSubmit(companyId, employeeId);
+                dao.pendingSum = new BigDecimal("14");
+            }
+        };
+        ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
+                new ScheduleService(null, null), new TicketService(null));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> subject.submit(user(), validLeave()));
+        assertTrue(error.getMessage().startsWith("남은 연차가 부족합니다."));
+        assertTrue(dao.savedNothing());
+        assertTrue(notification.requests.isEmpty());
+    }
+
+    @Test
+    @DisplayName("잠금 획득 시점에 추가된 대기 휴가 날짜를 다시 읽어 겹치는 상신을 거절한다")
+    void readsPendingOverlapAfterLock() {
+        FakeAttendance changedAttendance = new FakeAttendance() {
+            @Override public void lockLeaveForSubmit(Long companyId, Long employeeId) {
+                super.lockLeaveForSubmit(companyId, employeeId);
+                dao.pendingDays = List.of(day("2026-11-10", "LV_FULL"));
+            }
+        };
+        ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
+                new ScheduleService(null, null), new TicketService(null));
+
+        IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+                () -> subject.submit(user(), validLeave()));
+        assertEquals("결재 중인 휴가와 겹칩니다.", error.getMessage());
+        assertTrue(dao.savedNothing());
+        assertTrue(notification.requests.isEmpty());
+    }
+
+    @Test
+    @DisplayName("장비 상신은 연차 행을 잠그거나 휴가 대기 일수를 조회하지 않는다")
+    void equipmentDoesNotLockLeave() {
+        service.submit(user(), validEquipment());
+
+        assertEquals(List.of("saveDocument"), attendance.submitCalls);
+        assertNull(attendance.lockedCompanyId);
+        assertNull(attendance.lockedEmployeeId);
     }
 }

@@ -13,4 +13,5 @@ public class ApprovalStepDTO {
     private Long approverEmployeeId;
     private Long companyId;
     private Integer stepNo;
+    private String statusCode;
 }

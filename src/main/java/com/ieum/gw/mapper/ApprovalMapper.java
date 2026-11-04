@@ -43,4 +43,23 @@ public interface ApprovalMapper {
     List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId);
 
     int countWaitingForMe(Long companyId, Long employeeId);
+
+    ApprovalDocumentDTO lockDocument(Long companyId, long documentId);
+
+    List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId);
+
+    int approveStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
+
+    int approveDocument(Long companyId, long documentId);
+
+    int rejectStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
+
+    int rejectDocument(Long companyId, long documentId);
+
+    List<LeaveDayDTO> selectLeaveDays(Long companyId, long documentId);
+
+    ApprovalEquipmentDTO selectEquipmentRequest(@Param("companyId") Long companyId,
+                                               @Param("documentId") long documentId);
+
+    List<Long> selectWaitingDocumentIds(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 }
