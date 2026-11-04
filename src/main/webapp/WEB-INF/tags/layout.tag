@@ -100,5 +100,6 @@
   <script src="${ctx}/resources/js/select.js"></script>
   <script src="${ctx}/resources/js/install.js"></script>
   <jsp:invoke fragment="scripts" />
+  <%@ include file="/WEB-INF/views/subscription/trial-notice.jspf" %>
 </body>
 </html>

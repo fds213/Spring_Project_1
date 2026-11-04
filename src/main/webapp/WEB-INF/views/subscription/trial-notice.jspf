@@ -1,0 +1,21 @@
+<%-- tag 파일(layout.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
+<%@ tag pageEncoding="UTF-8" %>
+<%-- 남은 일수 팝업(DEM-02). 체험 중인 업체의 직원에게만 그린다. 그날 처음 연 화면에서 띄우는 동작은 trial-notice.js --%>
+<c:if test="${not isOps and companyBilling.status eq 'TRIAL'}">
+  <dialog class="modal" id="trialNoticeDialog" aria-labelledby="trialNoticeTitle" aria-describedby="trialNoticeText" data-account="${loginUser.compcode}-${loginUser.empnum}">
+    <h2 id="trialNoticeTitle">무료 체험 안내</h2>
+    <p id="trialNoticeText">
+      <c:choose>
+        <c:when test="${companyBilling.daysLeft eq 0}"><strong>오늘 무료 체험이 끝납니다</strong> (<c:out value="${companyBilling.endDate}" />).</c:when>
+        <c:otherwise><strong>무료 체험이 ${companyBilling.daysLeft}일 남았습니다</strong> (<c:out value="${companyBilling.endDate}" /> 만료).</c:otherwise>
+      </c:choose>
+      <br>결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀝니다.
+      <c:if test="${not isAdmin}"><br>결제는 업체 관리자에게 문의해 주세요.</c:if>
+    </p>
+    <div class="modal-actions">
+      <button type="button" class="btn" value="cancel">닫기</button>
+      <c:if test="${isAdmin}"><a class="btn btn-primary" href="${ctx}/subscription/billing">즉시 구매</a></c:if>
+    </div>
+  </dialog>
+  <script src="${ctx}/resources/js/subscription/trial-notice.js"></script>
+</c:if>
