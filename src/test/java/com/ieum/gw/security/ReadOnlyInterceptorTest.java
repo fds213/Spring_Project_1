@@ -134,4 +134,19 @@ class ReadOnlyInterceptorTest {
 
 		assertTrue(send("POST", "/join/api/companies/ieum0001/requests"));
 	}
+	
+	@Test
+	@DisplayName("만료 업체에서도 업체 관리자의 직원 상태 변경 주소는 통과하고(off만 Service가 허용), 인사 담당과 다른 사원 관리 주소는 409다")
+	void expiredStaffStatus() throws IOException {
+		expired(true);
+
+		login("ROLE_ADMIN");
+		assertTrue(send("POST", "/employee/admin/api/employees/20260002/status"));
+		assertFalse(send("POST", "/employee/admin/api/employees/20260002/head"));
+		assertEquals(409, response.getStatus());
+
+		login("ROLE_HR");
+		assertFalse(send("POST", "/employee/admin/api/employees/20260002/status"));
+		assertEquals(409, response.getStatus());
+	}
 }

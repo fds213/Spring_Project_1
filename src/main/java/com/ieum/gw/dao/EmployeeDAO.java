@@ -129,4 +129,19 @@ public class EmployeeDAO {
     public EmployeeLoginInfoDTO getLoginInfo(Long companyId, Long employeeId) {
         return mapper.getLoginInfo(companyId, employeeId);
     }
+    
+    /** 계정 비활성화(ACTIVE → RETIRED). 바뀐 행 수 */
+    public int retireAccount(Long companyId, Long employeeId) {
+        return mapper.retireAccount(companyId, employeeId);
+    }
+
+    /** 계정 다시 사용(RETIRED → ACTIVE). 바뀐 행 수 */
+    public int reactivateAccount(Long companyId, Long employeeId) {
+        return mapper.reactivateAccount(companyId, employeeId);
+    }
+
+    /** 이 사람이 부서장인 부서의 부서장 칸 비우기 */
+    public int clearHeadOf(Long companyId, Long employeeId) {
+        return mapper.clearHeadOf(companyId, employeeId);
+    }
 }

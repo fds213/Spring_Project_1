@@ -24,7 +24,8 @@ import lombok.RequiredArgsConstructor;
 public class EmployeeAdminService {
 
     private static final Set<String> MANAGERS = Set.of("ROLE_ADMIN", "ROLE_HR");
-
+    private static final Set<String> ACTIONS = Set.of("on", "off");
+    
     private final EmployeeDAO dao;
     private final EmployeeService employeeService;          // 사용 중 계정 수 (결제·가입 승인과 같은 기준)
     private final SubscriptionService subscriptionService;  // 구매 인원·만료
@@ -130,12 +131,77 @@ public class EmployeeAdminService {
         } else if (dao.clearDeptHead(companyId, t.getDepartmentId(), t.getEmployeeId()) == 0) {
             throw new IllegalStateException("이미 부서장이 아닙니다. 화면을 새로 고쳐 주세요");
         }
-
+        
         // ⑤ 화면 토스트용
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("head", head);
         result.put("name", t.getEmployeeName());
         result.put("dept", t.getDepartmentName());
+        return result;
+    }
+    
+    /** 계정 비활성화·다시 사용 (POST /employee/admin/api/employees/{empNo}/status). 업체 관리자·인사 담당 */
+    @Transactional
+    public Map<String, Object> setStatus(LoginUser user, String empNo, String action) {
+        // ① 권한
+        if (!MANAGERS.contains(user.getRole())) {
+            throw new AccessDeniedException("사원 관리는 업체 관리자와 인사 담당만 할 수 있습니다");
+        }
+        // ② 입력: 모르는 값이면 아무것도 바꾸지 않는다
+        if (action == null || !ACTIONS.contains(action)) {
+            throw new IllegalArgumentException("action은 on 또는 off로 보내 주세요");
+        }
+        Long companyId = user.getCompanyId();
+        boolean admin = "ROLE_ADMIN".equals(user.getRole());
+        boolean off = "off".equals(action);
+
+        // ③ 만료 중에는 업체 관리자의 비활성화만 된다 (요구분석서 3.11: 자리를 줄이는 쪽이라 허용)
+        CompanyUsageDTO usage = subscriptionService.getCompanyUsage(companyId);
+        if (usage != null && usage.isExpired() && !(admin && off)) {
+            throw new IllegalStateException("이용 기간이 끝나 읽기 전용입니다. 업체 관리자의 비활성화만 할 수 있습니다");
+        }
+
+        // ④ 대상 (다른 업체 사번이면 찾지 못한다)
+        EmployeeHeadTargetDTO t = dao.getHeadTarget(companyId, empNo);
+        if (t == null) {
+            throw new IllegalArgumentException("없는 사원입니다");
+        }
+
+        int released = 0;
+        if (off) {
+            // ⑤ 업체 관리자 계정과 본인은 끌 수 없다 (목록의 protectedOne과 같은 기준)
+            if ("ROLE_ADMIN".equals(t.getRoleCode()) || t.getEmployeeId().equals(user.getEmployeeId())) {
+                throw new IllegalStateException("업체 관리자와 본인 계정은 비활성화할 수 없습니다");
+            }
+            // ⑥ 사용 중일 때만 끈다
+            if (dao.retireAccount(companyId, t.getEmployeeId()) == 0) {
+                throw new IllegalStateException("이미 비활성 계정입니다. 화면을 새로 고쳐 주세요");
+            }
+            // ⑦ 부서장이었으면 그 칸도 비운다 (#111 리뷰)
+            dao.clearHeadOf(companyId, t.getEmployeeId());
+            // shortcut: 이 사람이 결재할 차례였던 휴가 자동 반려는 결재 모듈 메서드가 생기면 연결, 그 전까지 0
+        } else {
+            // ⑤ 퇴사자는 인사 정보에서 재직 상태를 먼저 바꿔야 한다
+            if ("ST_RETIRED".equals(t.getEmploymentStatus())) {
+                throw new IllegalStateException("퇴사 처리된 사원입니다. 인사 정보에서 재직 상태를 먼저 바꿔 주세요");
+            }
+            // ⑥ 자리: 가입 승인과 같은 자물쇠(사번 카운터)를 잡고 센다. 동시에 눌러도 한도를 넘지 않는다
+            if (usage != null) {
+                dao.lockLastSerial(companyId);
+                if (employeeService.countAccountsInUse(companyId) >= subscriptionService.getSeatLimit(companyId)) {
+                    throw new IllegalStateException("빈 자리가 없습니다. 구매 인원을 늘리거나 다른 계정을 비활성화해 주세요");
+                }
+            }
+            // ⑦ 비활성일 때만 켠다
+            if (dao.reactivateAccount(companyId, t.getEmployeeId()) == 0) {
+                throw new IllegalStateException("이미 사용 중인 계정입니다. 화면을 새로 고쳐 주세요");
+            }
+        }
+
+        // 화면 토스트용
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", t.getEmployeeName());
+        result.put("released", released);
         return result;
     }
 }
