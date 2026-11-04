@@ -37,14 +37,18 @@ function openTicketNewView() {
 }
 
 // 접수 지점 기본값: 고른 자산이 있는 지점. 자산이 없으면 사원의 근무 지점(서버가 정한 기본 지점).
-// 실제 장애가 난 곳이 다르면 사원이 바꿔 접수한다
+// 실제 장애가 난 곳이 다르면 사원이 바꿔 접수한다.
+// 채울 지점이 목록에 없으면(근무 지점이 없음, 자산의 지점이 사용 중지) 첫 지점을 대신 고르지 않고 비워 둔다. 비운 채 접수하면 제출 검사가 막는다
 function syncTicketBranch() {
   const o = itNew.opts || { assets: [], defaultBranchId: '' };
   // 서버의 ID 는 숫자, select 값은 글자라서 글자로 맞춰 비교한다
   const asset = o.assets.find(a => String(a.id) === itEl('ticketAsset').value);
   const want = String(asset ? asset.branchId : o.defaultBranchId ?? '');
-  if ([...itEl('ticketBranch').options].some(x => x.value === want)) itEl('ticketBranch').value = want;
-  itEl('ticketBranchHint').textContent = asset ? '고른 자산이 있는 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요' : '근무 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요';
+  const sel = itEl('ticketBranch');
+  const found = [...sel.options].some(x => x.value === want);
+  if (found) sel.value = want; else sel.selectedIndex = -1;
+  itEl('ticketBranchHint').textContent = !found ? '접수 지점을 골라 주세요'
+    : asset ? '고른 자산이 있는 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요' : '근무 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요';
 }
 itEl('ticketAsset')?.addEventListener('change', syncTicketBranch);
 
@@ -128,7 +132,8 @@ function ticketDetail(t) {
     ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', text(t.body)]]
     .forEach(([k, v]) => info.append(itNode('dt', '', k), itNode('dd', '', v)));
 
-  const log = itNode('ul', 'bill-history', ...t.history.map(h => itNode('li', '', text(`${whenFull(h.at)} · ${h.name} · ${h.text}`))));
+  // 접수 직후에는 이력이 없다: 티켓 처리 화면(ticket-admin.js)과 같은 안내를 보인다
+  const log = historyList((t.history || []).map(x => text(`${whenFull(x.at)} · ${x.name} · ${x.text}`)), '아직 이력이 없습니다');
   const comments = itNode('ul', 'bill-history', ...(t.comments.length
     ? t.comments.map(c => itNode('li', '', text(`${whenFull(c.at)} · ${c.name} · ${c.body}`)))
     : [itNode('li', '', itNode('span', 'muted', '아직 댓글이 없습니다'))]));
