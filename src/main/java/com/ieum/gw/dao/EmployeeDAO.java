@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.dto.AccountDTO;
 import com.ieum.gw.dto.EmpSummaryDTO;
+import com.ieum.gw.dto.EmployeeAdminRowDTO;
 import com.ieum.gw.dto.EmployeeDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.IdNameDTO;
@@ -95,5 +96,10 @@ public class EmployeeDAO {
     /** 직원 ID → 이름·부서명 (퇴사자 포함) */
     public List<EmployeeOptionDTO> listEmployeeNamesWithDept(Long companyId, List<Long> ids) {
         return mapper.listEmployeeNamesWithDept(companyId, ids);
+    }
+    
+    /** 사원 관리 목록 (사원증 있는 사람만) */
+    public List<EmployeeAdminRowDTO> listAdminRows(Long companyId) {
+        return mapper.listAdminRows(companyId);
     }
 }
