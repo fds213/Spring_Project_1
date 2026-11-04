@@ -28,8 +28,14 @@
 		location="/resources/js/" />
 	<resources mapping="/manifest.json" location="/" />
 	
-	<!-- 만료 읽기 전용 검사: 만료 업체의 쓰기 요청 거절 (ReadOnlyInterceptor) -->
 	<interceptors>
+		<!-- 계정 상태 검사: 비활성화·퇴사한 계정의 기존 세션을 끊는다 (AccountStatusInterceptor). 만료 검사보다 먼저 -->
+		<interceptor>
+			<mapping path="/**" />
+			<exclude-mapping path="/resources/**" />
+			<beans:ref bean="accountStatusInterceptor" />
+		</interceptor>
+		<!-- 만료 읽기 전용 검사: 만료 업체의 쓰기 요청 거절 (ReadOnlyInterceptor) -->
 		<interceptor>
 			<mapping path="/**" />
 			<exclude-mapping path="/resources/**" />
