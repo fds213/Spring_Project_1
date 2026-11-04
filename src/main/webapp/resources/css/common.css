@@ -275,6 +275,8 @@ input::-ms-reveal { display: none; }
 .nav-panel { flex: 1; min-width: 0; padding: 14px 12px; overflow-y: auto; }
 .nav-title { margin: 4px 12px 10px; font-size: 16px; font-weight: 600; color: #fff; }
 .nav-group { margin: 16px 12px 4px; font-size: 12px; color: var(--nav-group); }
+/* 업체명(폰 전용): 머리글에 자리가 없는 폰에서만 메뉴 맨 위에 보인다 (아래 600px 규칙) */
+.nav-company { display: none; }
 .nav-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 9px 12px; border-radius: var(--radius); color: var(--nav-text);
@@ -325,6 +327,8 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .join-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 .empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 표의 관리 칸 버튼: 좁은 표가 칸을 줄이면 글자가 한 글자씩 줄바꿈되어 높이가 정해진 버튼 밖으로 넘쳐 겹친다. 한 줄로 두고 표가 옆으로 밀리게 한다 */
+.row-actions .btn { white-space: nowrap; }
 /* 부서 관리·직급 관리 (org-admin.js) */
 .org-add { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 560px; }
 .org-add .input { flex: 1 1 220px; min-width: 0; }
@@ -700,7 +704,12 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
   .icon-btn, .menu-btn { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
   /* 비밀번호 변경 + 로그아웃 버튼이 360px 에서도 들어가게 */
   .header-right .btn { height: 36px; padding: 0 8px; font-size: 13px; }
-  .company { margin-left: 10px; padding-left: 10px; font-size: 13px; }
+  /* 업체명: 오른쪽 버튼에 밀려 한 글자만 남아서 머리글에서 빼고 메뉴 맨 위(.nav-company)에 보인다 */
+  .company { display: none; }
+  .nav-company {
+    display: block; margin: 0 12px 12px; padding-bottom: 10px; border-bottom: 1px solid var(--nav-line);
+    font-size: 13px; font-weight: 600; color: #fff; word-break: keep-all; overflow-wrap: anywhere;
+  }
   .badge-dot { top: 4px; right: 2px; }
 }
 
