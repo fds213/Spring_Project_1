@@ -59,6 +59,7 @@
 		<security:intercept-url pattern="/attendance/admin/**" access="hasAnyRole('HR','ADMIN')" />
 
 		<!-- 4. 그 밖의 관리 화면 (부서·역할 관리 등) -->
+		<security:intercept-url pattern="/employee/admin/api/employees/**" access="hasAnyRole('HR','ADMIN')" />
 		<security:intercept-url pattern="/*/admin/**"        access="hasRole('ADMIN')" />
 
 		<!-- 5. 나머지는 로그인한 사람 (가입 승인·이용 결제는 서버가 요청마다 따로 확인) -->

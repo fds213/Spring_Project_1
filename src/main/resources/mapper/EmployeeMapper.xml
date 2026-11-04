@@ -144,4 +144,20 @@
 		  AND e.employee_id IN
 		<foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
 	</select>
+	
+		<!-- 사원 관리 목록: 사원증 있는 사람만 (승인 대기는 가입 승인 화면) -->
+	<select id="listAdminRows" resultType="com.ieum.gw.dto.EmployeeAdminRowDTO">
+		SELECT e.employee_id, e.employee_name, e.employee_no,
+		       d.department_name, d.department_type,
+		       CASE WHEN d.head_employee_id = e.employee_id THEN 1 ELSE 0 END AS head,
+		       g.grade_name,
+		       a.role_code, a.status_code, a.created_at,
+		       e.employment_status, e.employment_type, e.gender_code
+		FROM employee e
+		JOIN user_account a    ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+		LEFT JOIN department d ON d.department_id = e.department_id
+		LEFT JOIN job_grade g  ON g.job_grade_id = e.job_grade_id
+		WHERE e.company_id = #{companyId}
+		ORDER BY d.sort_order, d.department_name, e.employee_no
+	</select>
 </mapper>
