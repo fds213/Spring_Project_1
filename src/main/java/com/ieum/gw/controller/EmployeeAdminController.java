@@ -9,6 +9,9 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 
 import com.ieum.gw.dto.LoginUser;
@@ -35,11 +38,35 @@ public class EmployeeAdminController {
 	public Map<String, Object> employees(@AuthenticationPrincipal LoginUser loginUser) {
 		return Map.of("success", true, "data", employeeAdminService.getList(loginUser));
 	}
+	
+	/** 부서장 지정·해제 (업체 관리자만, Service에서 확인) */
+	@PostMapping("/employee/admin/api/employees/{empNo}/head")
+	@ResponseBody
+	public Map<String, Object> head(@PathVariable String empNo, @RequestBody Map<String, Boolean> body,
+			@AuthenticationPrincipal LoginUser loginUser) {
+		return Map.of("success", true, "data", employeeAdminService.setHead(loginUser, empNo, body.get("head")));
+	}
 
 	@ExceptionHandler(AccessDeniedException.class)
 	@ResponseBody
 	public ResponseEntity<Map<String, Object>> denied(AccessDeniedException e) {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN)
+				.body(Map.of("success", false, "message", e.getMessage()));
+	}
+	
+	/** 없는 사원 등 요청 값이 틀림 → 400 */
+	@ExceptionHandler(IllegalArgumentException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException e) {
+		return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+				.body(Map.of("success", false, "message", e.getMessage()));
+	}
+
+	/** 지금 상태로는 안 됨 (부서 없음, 비활성 계정, 이미 해제됨) → 409 */
+	@ExceptionHandler(IllegalStateException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, Object>> conflict(IllegalStateException e) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
 				.body(Map.of("success", false, "message", e.getMessage()));
 	}
 }

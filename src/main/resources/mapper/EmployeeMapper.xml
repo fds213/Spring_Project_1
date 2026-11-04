@@ -160,4 +160,34 @@
 		WHERE e.company_id = #{companyId}
 		ORDER BY d.sort_order, d.department_name, e.employee_no
 	</select>
+	
+	    <!-- 부서장 지정 대상: 사번으로 같은 업체 사원 1명 -->
+    <select id="getHeadTarget" resultType="com.ieum.gw.dto.EmployeeHeadTargetDTO">
+        SELECT e.employee_id, e.employee_name, e.department_id, d.department_name, a.status_code,
+               CASE WHEN d.head_employee_id = e.employee_id THEN 1 ELSE 0 END AS head
+        FROM employee e
+        JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+        LEFT JOIN department d ON d.department_id = e.department_id AND d.company_id = e.company_id
+        WHERE e.company_id = #{companyId}
+        AND e.employee_no = #{employeeNo}
+    </select>
+
+    <!-- 부서장 지정: 그 부서의 부서장 칸을 이 사람으로 (전 부서장은 덮어써져 빠진다) -->
+    <update id="setDeptHead">
+        UPDATE department
+        SET head_employee_id = #{employeeId},
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND department_id = #{departmentId}
+    </update>
+
+    <!-- 부서장 해제: 지금 부서장이 이 사람일 때만 비운다 (0행이면 그사이 바뀐 것) -->
+    <update id="clearDeptHead">
+        UPDATE department
+        SET head_employee_id = NULL,
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND department_id = #{departmentId}
+        AND head_employee_id = #{employeeId}
+    </update>
 </mapper>
