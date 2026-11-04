@@ -152,4 +152,19 @@ class ApprovalMapperTest {
         }
         return values;
     }
+
+    @Test
+    @DisplayName("장비 반영 조회는 업체·문서로 한정하고 티켓 생성에 필요한 수령 지점·종류·목적을 읽는다")
+    void selectsEquipmentRequest() throws Exception {
+        Configuration config = configuration();
+        var method = ApprovalMapper.class.getMethod("selectEquipmentRequest", Long.class, long.class);
+        Object parameters = new ParamNameResolver(config, method).getNamedParams(new Object[] {1L, 10L});
+        var statement = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.selectEquipmentRequest");
+        BoundSql sql = statement.getBoundSql(parameters);
+        assertEquals(List.of(1L, 10L), boundValues(config, sql, parameters));
+        String query = sql.getSql().replaceAll("\\s+", " ").trim();
+        assertTrue(query.contains("branch_id, asset_type, quantity, purpose"));
+        assertTrue(query.contains("WHERE company_id = ? AND approval_document_id = ?"));
+        assertEquals(com.ieum.gw.dto.ApprovalEquipmentDTO.class, statement.getResultMaps().get(0).getType());
+    }
 }

@@ -261,7 +261,7 @@ class ApprovalServiceTest {
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
     private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null));
+            new ScheduleService(null, null), new TicketService(null));
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();

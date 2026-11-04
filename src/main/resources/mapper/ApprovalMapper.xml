@@ -252,4 +252,11 @@
         ORDER BY leave_date ASC
     </select>
 
+    <select id="selectEquipmentRequest" resultType="com.ieum.gw.dto.ApprovalEquipmentDTO">
+        SELECT approval_document_id, company_id, branch_id, asset_type, quantity, purpose
+        FROM equipment_request
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{documentId}
+    </select>
+
 </mapper>

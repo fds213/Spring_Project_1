@@ -40,6 +40,13 @@ class ApprovalDecisionServiceTest {
             return storedDays;
         }
 
+        @Override public ApprovalEquipmentDTO selectEquipmentRequest(Long companyId, long documentId) {
+            assertEquals(1L, companyId);
+            assertEquals(10L, documentId);
+            calls.add("equipmentRequest");
+            return equipment;
+        }
+
         @Override public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
             calls.add("lock");
             return companyId.equals(1L) && documentId == 10L ? document : null;
@@ -104,6 +111,16 @@ class ApprovalDecisionServiceTest {
     private final DecisionDao dao = new DecisionDao();
     private RuntimeException leaveError;
     private RuntimeException scheduleError;
+    private RuntimeException ticketError;
+    private final List<List<Object>> ticketRequests = new ArrayList<>();
+    private final TicketService tickets = new TicketService(null) {
+        @Override public void createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long documentId,
+                                                    Long branchId, String assetType, String purpose) {
+            calls.add("createTicket");
+            ticketRequests.add(List.of(companyId, requesterEmployeeId, documentId, branchId, assetType, purpose));
+            if (ticketError != null) throw ticketError;
+        }
+    };
     private final AttendanceService attendance = new ApprovalServiceTest.FakeAttendance() {
         @Override public void useLeave(Long companyId, Long employeeId, Long actorAccountId, List<LeaveDayDTO> days) {
             calls.add("useLeave");
@@ -133,7 +150,7 @@ class ApprovalDecisionServiceTest {
         }
     };
     private final ApprovalService service = new ApprovalService(employee,
-            attendance, dao, new ApprovalServiceTest.FakeBranch(), notification, schedule);
+            attendance, dao, new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets);
 
     ApprovalDecisionServiceTest() {
         dao.document = new ApprovalDocumentDTO();
@@ -144,6 +161,13 @@ class ApprovalDecisionServiceTest {
         dao.document.setTitle("휴가 신청");
         dao.document.setStatusCode("IN_PROGRESS");
         dao.steps.add(step(1, 100L, "WAITING"));
+        dao.equipment = new ApprovalEquipmentDTO();
+        dao.equipment.setCompanyId(1L);
+        dao.equipment.setApprovalDocumentId(10L);
+        dao.equipment.setBranchId(8L);
+        dao.equipment.setAssetType("AT_LAPTOP");
+        dao.equipment.setQuantity(1);
+        dao.equipment.setPurpose("개발용 노트북");
     }
 
     private static ApprovalStepDTO step(int no, long employeeId, String status) {
@@ -196,6 +220,7 @@ class ApprovalDecisionServiceTest {
         assertTrue(notification.requests.isEmpty());
         assertTrue(notification.done.isEmpty());
         assertTrue(notification.rejected.isEmpty());
+        assertTrue(ticketRequests.isEmpty());
     }
 
     @Test @DisplayName("없는 문서와 다른 업체 문서는 404로 거절하고 쓰지 않는다")
@@ -449,7 +474,10 @@ class ApprovalDecisionServiceTest {
     void equipmentDoesNotUseLeave() {
         dao.document.setDocumentType("DOC_EQUIPMENT");
         assertEquals("APPROVED", approve(100L, null).getStatusCode());
-        assertEquals(List.of("lock", "steps", "approveStep", "approveDocument", "history"), calls);
+        assertEquals(List.of("lock", "steps", "approveStep", "approveDocument", "equipmentRequest",
+                "createTicket", "history"), calls);
+        assertEquals(List.of(List.of(1L, 1001L, 10L, 8L, "AT_LAPTOP", "개발용 노트북")), ticketRequests);
+        assertEquals(List.of(List.of(1L, 1001L, 10L, "휴가 신청")), notification.done);
     }
 
     @Test @DisplayName("휴가 날짜가 비어 있거나 연차 차감이 실패하면 일정·완료 알림·이력으로 진행하지 않는다")
@@ -472,6 +500,18 @@ class ApprovalDecisionServiceTest {
     void scheduleFailureRollsBackApproval() {
         scheduleError = new IllegalStateException("일정 저장 실패");
         int[] rollbacks = {0};
+        ApprovalService proxy = rollbackProxy(rollbacks);
+
+        assertSame(scheduleError, assertThrows(IllegalStateException.class,
+                () -> proxy.approve(user(1L, 100L), new ApprovalDecisionDTO(), 10L)));
+        assertEquals(1, rollbacks[0]);
+        assertTrue(calls.contains("useLeave"));
+        assertTrue(calls.contains("leaveEvents"));
+        assertNull(dao.history);
+        assertTrue(notification.done.isEmpty());
+    }
+
+    private ApprovalService rollbackProxy(int[] rollbacks) {
         AbstractPlatformTransactionManager transactions = new AbstractPlatformTransactionManager() {
             @Override protected Object doGetTransaction() { return new Object(); }
             @Override protected void doBegin(Object tx, TransactionDefinition definition) { }
@@ -480,13 +520,50 @@ class ApprovalDecisionServiceTest {
         };
         ProxyFactory factory = new ProxyFactory(service);
         factory.addAdvice(new TransactionInterceptor(transactions, new AnnotationTransactionAttributeSource()));
-        ApprovalService proxy = (ApprovalService) factory.getProxy();
+        return (ApprovalService) factory.getProxy();
+    }
 
-        assertSame(scheduleError, assertThrows(IllegalStateException.class,
+    @Test @DisplayName("장비 신청 상세가 없으면 409로 중단하고 티켓·완료 알림·이력을 생성하지 않는다")
+    void missingEquipmentStopsApproval() {
+        dao.document.setDocumentType("DOC_EQUIPMENT");
+        dao.equipment = null;
+        fails(409, () -> approve(100L, null));
+        assertTrue(ticketRequests.isEmpty());
+        assertTrue(notification.done.isEmpty());
+        assertNull(dao.history);
+    }
+
+    @Test @DisplayName("장비의 중간 승인과 중복 승인에서는 지급 티켓을 생성하지 않는다")
+    void equipmentTicketOnlyOnFinalApproval() {
+        dao.document.setDocumentType("DOC_EQUIPMENT");
+        dao.steps.add(step(2, 1002L, "WAITING"));
+        assertEquals("IN_PROGRESS", approve(100L, null).getStatusCode());
+        assertFalse(calls.contains("equipmentRequest"));
+        assertTrue(ticketRequests.isEmpty());
+
+        assertEquals("APPROVED", approve(1002L, null).getStatusCode());
+        assertEquals(1, ticketRequests.size());
+        fails(409, () -> approve(1002L, null));
+        assertEquals(1, ticketRequests.size());
+    }
+
+    @Test @DisplayName("장비 반려는 지급 티켓을 만들지 않는다")
+    void equipmentRejectionDoesNotCreateTicket() {
+        dao.document.setDocumentType("DOC_EQUIPMENT");
+        assertEquals("REJECTED", reject(100L, "사유").getStatusCode());
+        assertFalse(calls.contains("equipmentRequest"));
+        assertTrue(ticketRequests.isEmpty());
+    }
+
+    @Test @DisplayName("지급 티켓 생성 실패는 완료 알림·이력을 막고 승인 트랜잭션을 롤백 경로로 보낸다")
+    void ticketFailureRollsBackApproval() {
+        dao.document.setDocumentType("DOC_EQUIPMENT");
+        ticketError = new IllegalStateException("티켓 저장 실패");
+        int[] rollbacks = {0};
+        ApprovalService proxy = rollbackProxy(rollbacks);
+        assertSame(ticketError, assertThrows(IllegalStateException.class,
                 () -> proxy.approve(user(1L, 100L), new ApprovalDecisionDTO(), 10L)));
         assertEquals(1, rollbacks[0]);
-        assertTrue(calls.contains("useLeave"));
-        assertTrue(calls.contains("leaveEvents"));
         assertNull(dao.history);
         assertTrue(notification.done.isEmpty());
     }

@@ -57,4 +57,7 @@ public interface ApprovalMapper {
     int rejectDocument(Long companyId, long documentId);
 
     List<LeaveDayDTO> selectLeaveDays(Long companyId, long documentId);
+
+    ApprovalEquipmentDTO selectEquipmentRequest(@Param("companyId") Long companyId,
+                                               @Param("documentId") long documentId);
 }

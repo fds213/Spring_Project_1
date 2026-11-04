@@ -54,6 +54,7 @@ public class ApprovalService {
     private final BranchService bService;
     private final NotificationService nService;
     private final ScheduleService sService;
+    private final TicketService tService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -131,6 +132,7 @@ public class ApprovalService {
         response.setEmployeeName(authorName);
         response.setDocumentType(doc.getDocumentType());
         response.setStatusCode(history.getAfterStatus());
+//        response.setTicketId();
         return response;
     }
 
@@ -453,6 +455,19 @@ public class ApprovalService {
                         user.getCompanyId(),
                         doc.getAuthorEmployeeId(),
                         days
+                );
+            } else if (ApprovalDocumentType.DOC_EQUIPMENT.name().equals(doc.getDocumentType())) {
+                ApprovalEquipmentDTO equipment = dao.selectEquipmentRequest(user.getCompanyId(), documentId);
+                if (equipment == null) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "장비 신청 정보를 찾을 수 없습니다.");
+                }
+                tService.createEquipmentTicket(
+                        user.getCompanyId(),
+                        doc.getAuthorEmployeeId(),
+                        documentId,
+                        equipment.getBranchId(),
+                        equipment.getAssetType(),
+                        equipment.getPurpose()
                 );
             }
 

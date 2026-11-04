@@ -102,4 +102,8 @@ public class ApprovalDAO {
     public List<LeaveDayDTO> selectLeaveDays(Long companyId, long documentId) {
         return mapper.selectLeaveDays(companyId, documentId);
     }
+
+    public ApprovalEquipmentDTO selectEquipmentRequest(Long companyId, long documentId) {
+        return mapper.selectEquipmentRequest(companyId, documentId);
+    }
 }
