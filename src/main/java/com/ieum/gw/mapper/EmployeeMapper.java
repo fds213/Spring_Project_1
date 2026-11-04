@@ -10,6 +10,7 @@ import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.dto.EmployeeAdminRowDTO;
 import com.ieum.gw.dto.EmployeeDTO;
 import com.ieum.gw.dto.EmployeeHeadTargetDTO;
+import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.IdNameDTO;
 
@@ -55,4 +56,6 @@ public interface EmployeeMapper {
 
 	int clearDeptHead(@Param("companyId") Long companyId, @Param("departmentId") Long departmentId,
 			@Param("employeeId") Long employeeId);
+	
+	EmployeeLoginInfoDTO getLoginInfo(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 }

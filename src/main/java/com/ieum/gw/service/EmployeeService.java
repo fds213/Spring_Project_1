@@ -19,6 +19,7 @@ import com.ieum.gw.dto.AccountDTO;
 import com.ieum.gw.dto.AdminAccountDTO;
 import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.dto.EmployeeDTO;
+import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.IdNameDTO;
 
@@ -226,6 +227,14 @@ public class EmployeeService {
 			map.put(e.getEmployeeId(), e);
 		}
 		return map;
+	}
+	
+	/** 화면 공통 값: 업체명·부서·직급·내가 부서장인 부서 (헤더·사이드바, EmployeeHeaderAdvice). 없으면 null */
+	public EmployeeLoginInfoDTO getLoginInfo(Long companyId, Long employeeId) {
+		if (companyId == null || employeeId == null) {
+			return null;
+		}
+		return dao.getLoginInfo(companyId, employeeId);
 	}
 
 	/** (id, name) 목록 → Map */

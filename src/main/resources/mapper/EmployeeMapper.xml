@@ -190,4 +190,23 @@
         AND department_id = #{departmentId}
         AND head_employee_id = #{employeeId}
     </update>
+    
+    	<!-- 화면 공통 값: 헤더 업체명·부서·직급, 사이드바 부서장 여부 (부서장이 아니면 head_dept_name은 null) -->
+	<select id="getLoginInfo" resultType="com.ieum.gw.dto.EmployeeLoginInfoDTO">
+		SELECT c.company_name,
+		       d.department_name AS dept_name,
+		       g.grade_name AS rank_name,
+		       (SELECT hd.department_name
+		          FROM department hd
+		         WHERE hd.company_id = e.company_id
+		           AND hd.head_employee_id = e.employee_id
+		           AND hd.use_yn = 'Y'
+		           AND ROWNUM = 1) AS head_dept_name
+		FROM employee e
+		JOIN company c         ON c.company_id = e.company_id
+		LEFT JOIN department d ON d.department_id = e.department_id AND d.company_id = e.company_id
+		LEFT JOIN job_grade g  ON g.job_grade_id = e.job_grade_id AND g.company_id = e.company_id
+		WHERE e.company_id = #{companyId}
+		  AND e.employee_id = #{employeeId}
+	</select>
 </mapper>
