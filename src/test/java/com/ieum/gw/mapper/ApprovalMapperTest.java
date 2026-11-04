@@ -177,4 +177,21 @@ class ApprovalMapperTest {
         assertTrue(query.contains("WHERE company_id = ? AND approval_document_id = ?"));
         assertEquals(com.ieum.gw.dto.ApprovalEquipmentDTO.class, statement.getResultMaps().get(0).getType());
     }
+    @Test
+    @DisplayName("자동 반려 후보는 업체·현재 순번으로 조회하며 문서 종류 제한 없이 ID순으로 반환한다")
+    void retirementCandidatesUseCurrentTurn() throws Exception {
+        Configuration config = configuration();
+        var method = ApprovalMapper.class.getMethod("selectWaitingDocumentIds", Long.class, Long.class);
+        Object params = new ParamNameResolver(config, method).getNamedParams(new Object[] {1L, 100L});
+        var statement = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.selectWaitingDocumentIds");
+        BoundSql sql = statement.getBoundSql(params);
+        assertEquals(List.of(1L, "IN_PROGRESS", 100L, "WAITING", "APPROVED"), boundValues(config, sql, params));
+        String query = sql.getSql().replaceAll("\\s+", " ");
+        assertTrue(query.contains("ps.company_id = ms.company_id"));
+        assertTrue(query.contains("ps.step_no < ms.step_no"));
+        assertTrue(query.contains("ORDER BY ad.approval_document_id ASC"));
+        assertFalse(query.contains("document_type"));
+        assertEquals(Long.class, statement.getResultMaps().get(0).getType());
+    }
+
 }

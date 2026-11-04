@@ -11,6 +11,9 @@ import java.sql.SQLException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.aop.framework.ProxyFactory;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
@@ -27,6 +30,12 @@ class ApprovalDecisionServiceTest {
     private final List<String> calls = new ArrayList<>();
 
     class DecisionDao extends ApprovalServiceTest.FakeDao {
+        List<Long> waitingIds = List.of(10L);
+        @Override public List<Long> selectWaitingDocumentIds(Long companyId, Long employeeId) {
+            assertEquals(1L, companyId);
+            assertEquals(100L, employeeId);
+            return waitingIds;
+        }
         int stepResult = 1;
         int documentResult = 1;
         int stepWrites;
@@ -603,4 +612,163 @@ class ApprovalDecisionServiceTest {
         assertNull(dao.history);
         assertTrue(notification.done.isEmpty());
     }
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private void loginRetirementActor(Long companyId, String role) {
+        AuthEmpDTO emp = new AuthEmpDTO();
+        emp.setCompanyId(companyId);
+        emp.setEmployeeId(900L);
+        emp.setUserAccountId(901L);
+        emp.setRole(role);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(new LoginUser(emp), null, List.of()));
+    }
+
+    @Test @DisplayName("비활성화 자동 반려는 휴가와 장비 모두 처리하고 실행 계정·사유·알림을 남긴다")
+    void retirementRejectsBothDocumentTypes() {
+        loginRetirementActor(1L, "ROLE_ADMIN");
+        for (String type : List.of("DOC_LEAVE", "DOC_EQUIPMENT")) {
+            dao.document.setDocumentType(type);
+            dao.steps.get(0).setStatusCode("WAITING");
+            assertEquals(1, service.rejectWaitingForRetired(1L, 100L));
+            assertEquals(901L, dao.history.getActorAccountId());
+            assertEquals("APR_REJECT", dao.history.getActionCode());
+            assertEquals("IN_PROGRESS", dao.history.getBeforeStatus());
+            assertEquals("REJECTED", dao.history.getAfterStatus());
+            assertEquals("결재자 계정 비활성화로 자동 반려되었습니다.", dao.opinion);
+            assertEquals(dao.opinion, dao.history.getOpinion());
+        }
+        assertEquals(2, notification.rejected.size());
+        assertTrue(ticketRequests.isEmpty());
+        assertFalse(calls.contains("useLeave"));
+        assertFalse(calls.contains("leaveEvents"));
+    }
+
+    @Test @DisplayName("자동 반려 대상이 없으면 0건이고 변경하지 않는다")
+    void retirementWithoutCandidates() {
+        loginRetirementActor(1L, "ROLE_HR");
+        dao.waitingIds = List.of();
+        assertEquals(0, service.rejectWaitingForRetired(1L, 100L));
+        assertTrue(calls.isEmpty());
+    }
+
+    @Test @DisplayName("잠금 후 완료·처리된 결재선·사라진 결재자·이전 단계 대기는 자동 반려하지 않는다")
+    void retirementRechecksCurrentTurn() {
+        loginRetirementActor(1L, "ROLE_HR");
+        dao.document.setStatusCode("APPROVED");
+        assertEquals(0, service.rejectWaitingForRetired(1L, 100L));
+        dao.document.setStatusCode("IN_PROGRESS");
+        dao.steps.get(0).setStatusCode("APPROVED");
+        assertEquals(0, service.rejectWaitingForRetired(1L, 100L));
+        dao.steps.clear();
+        assertEquals(0, service.rejectWaitingForRetired(1L, 100L));
+        dao.steps.add(step(1, 101L, "WAITING"));
+        dao.steps.add(step(2, 100L, "WAITING"));
+        assertEquals(0, service.rejectWaitingForRetired(1L, 100L));
+        assertEquals(0, dao.stepWrites);
+        dao.steps.get(0).setStatusCode("APPROVED");
+        assertEquals(1, service.rejectWaitingForRetired(1L, 100L));
+    }
+
+    @Test @DisplayName("자동 반려 잠금 시간 초과와 조건부 변경 실패는 예외로 전파한다")
+    void retirementPropagatesFailures() {
+        loginRetirementActor(1L, "ROLE_ADMIN");
+        dao.lockError = new CannotAcquireLockException("locked");
+        assertEquals(409, assertThrows(ResponseStatusException.class,
+                () -> service.rejectWaitingForRetired(1L, 100L)).getRawStatusCode());
+        dao.lockError = null;
+        dao.stepResult = 0;
+        assertThrows(ResponseStatusException.class, () -> service.rejectWaitingForRetired(1L, 100L));
+        assertEquals(0, dao.documentWrites);
+        dao.stepResult = 1;
+        dao.documentResult = 0;
+        assertThrows(ResponseStatusException.class, () -> service.rejectWaitingForRetired(1L, 100L));
+        assertNull(dao.history);
+        assertTrue(notification.rejected.isEmpty());
+    }
+
+    @Test @DisplayName("자동 반려는 인증 없음·다른 업체·일반 직원 호출을 거절한다")
+    void retirementRequiresManagerInSameCompany() {
+        assertThrows(ResponseStatusException.class, () -> service.rejectWaitingForRetired(1L, 100L));
+        loginRetirementActor(2L, "ROLE_ADMIN");
+        assertThrows(ResponseStatusException.class, () -> service.rejectWaitingForRetired(1L, 100L));
+        loginRetirementActor(1L, "ROLE_EMP");
+        assertThrows(ResponseStatusException.class, () -> service.rejectWaitingForRetired(1L, 100L));
+        assertTrue(calls.isEmpty());
+    }
+
+    @Test @DisplayName("자동 반려 이력 저장 실패는 트랜잭션 롤백 경로로 전달되고 알림을 보내지 않는다")
+    void retirementHistoryFailureRollsBack() {
+        loginRetirementActor(1L, "ROLE_ADMIN");
+        dao.historyError = new IllegalStateException("history failed");
+        int[] rollbacks = {0};
+        ApprovalService proxy = rollbackProxy(rollbacks);
+        assertThrows(IllegalStateException.class, () -> proxy.rejectWaitingForRetired(1L, 100L));
+        assertEquals(1, rollbacks[0]);
+        assertTrue(notification.rejected.isEmpty());
+    }
+
+    @Test @DisplayName("여러 문서 중 유효한 휴가·장비만 합산하고 중복 호출은 0건을 반환한다")
+    void retirementCountsDocumentsAndDoesNotRejectTwice() {
+        loginRetirementActor(1L, "ROLE_ADMIN");
+        Map<Long, ApprovalDocumentDTO> documents = new java.util.LinkedHashMap<>();
+        Map<Long, ApprovalStepDTO> pendingSteps = new java.util.HashMap<>();
+        for (long id : new long[] {10L, 20L, 40L}) {
+            ApprovalDocumentDTO doc = new ApprovalDocumentDTO();
+            doc.setApprovalDocumentId(id);
+            doc.setCompanyId(1L);
+            doc.setAuthorEmployeeId(1001L);
+            doc.setTitle("문서 " + id);
+            doc.setDocumentType(id == 10L ? "DOC_LEAVE" : "DOC_EQUIPMENT");
+            doc.setStatusCode(id == 40L ? "APPROVED" : "IN_PROGRESS");
+            documents.put(id, doc);
+            pendingSteps.put(id, step(1, 100L, "WAITING"));
+        }
+        List<Long> locked = new ArrayList<>();
+        List<ApprovalHistoryDTO> histories = new ArrayList<>();
+        DecisionDao multiple = new DecisionDao() {
+            @Override public List<Long> selectWaitingDocumentIds(Long companyId, Long employeeId) {
+                assertEquals(1L, companyId);
+                assertEquals(100L, employeeId);
+                return List.of(10L, 20L, 30L, 40L);
+            }
+            @Override public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
+                locked.add(documentId);
+                return documents.get(documentId);
+            }
+            @Override public List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId) {
+                return List.of(pendingSteps.get(documentId));
+            }
+            @Override public int rejectStep(Long companyId, Long employeeId, Integer stepNo,
+                                            long documentId, String opinion) {
+                ApprovalStepDTO target = pendingSteps.get(documentId);
+                assertEquals(target.getApproverEmployeeId(), employeeId);
+                assertEquals(target.getStepNo(), stepNo);
+                assertEquals("WAITING", target.getStatusCode());
+                target.setStatusCode("REJECTED");
+                return 1;
+            }
+            @Override public int rejectDocument(Long companyId, long documentId) {
+                documents.get(documentId).setStatusCode("REJECTED");
+                return 1;
+            }
+            @Override public void insertHistory(ApprovalHistoryDTO history) {
+                histories.add(history);
+            }
+        };
+        ApprovalService batch = new ApprovalService(employee, attendance, multiple,
+                new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets);
+        assertEquals(2, batch.rejectWaitingForRetired(1L, 100L));
+        assertEquals(List.of(10L, 20L, 30L, 40L), locked);
+        assertEquals(List.of(10L, 20L), histories.stream()
+                .map(ApprovalHistoryDTO::getApprovalDocumentId).collect(java.util.stream.Collectors.toList()));
+        assertEquals(2, notification.rejected.size());
+        assertEquals(0, batch.rejectWaitingForRetired(1L, 100L));
+        assertEquals(2, histories.size());
+        assertEquals(2, notification.rejected.size());
+    }
+
 }

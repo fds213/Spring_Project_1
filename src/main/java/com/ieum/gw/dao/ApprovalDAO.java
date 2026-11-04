@@ -106,4 +106,8 @@ public class ApprovalDAO {
     public ApprovalEquipmentDTO selectEquipmentRequest(Long companyId, long documentId) {
         return mapper.selectEquipmentRequest(companyId, documentId);
     }
+
+    public List<Long> selectWaitingDocumentIds(Long companyId, Long employeeId) {
+        return mapper.selectWaitingDocumentIds(companyId, employeeId);
+    }
 }

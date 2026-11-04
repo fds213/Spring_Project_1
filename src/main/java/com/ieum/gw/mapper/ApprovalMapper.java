@@ -60,4 +60,6 @@ public interface ApprovalMapper {
 
     ApprovalEquipmentDTO selectEquipmentRequest(@Param("companyId") Long companyId,
                                                @Param("documentId") long documentId);
+
+    List<Long> selectWaitingDocumentIds(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 }

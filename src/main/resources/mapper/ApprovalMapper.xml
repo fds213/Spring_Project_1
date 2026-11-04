@@ -259,4 +259,35 @@
           AND approval_document_id = #{documentId}
     </select>
 
+    <select id="selectWaitingDocumentIds" resultType="java.lang.Long">
+        <bind name="inProgress"
+              value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+        <bind name="waiting"
+              value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+        <bind name="approved"
+              value="@com.ieum.gw.code.ApprovalStepStatus@APPROVED.name()"/>
+
+        SELECT ad.approval_document_id
+        FROM approval_document ad
+        WHERE ad.company_id = #{companyId}
+        AND ad.status_code = #{inProgress}
+        AND EXISTS (
+        SELECT 1
+        FROM approval_step ms
+        WHERE ms.company_id = ad.company_id
+        AND ms.approval_document_id = ad.approval_document_id
+        AND ms.approver_employee_id = #{employeeId}
+        AND ms.status_code = #{waiting}
+        AND NOT EXISTS (
+        SELECT 1
+        FROM approval_step ps
+        WHERE ps.company_id = ms.company_id
+        AND ps.approval_document_id = ms.approval_document_id
+        AND ps.step_no &lt; ms.step_no
+        AND ps.status_code != #{approved}
+        )
+        )
+        ORDER BY ad.approval_document_id ASC
+    </select>
+
 </mapper>

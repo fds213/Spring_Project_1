@@ -16,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
@@ -70,6 +72,21 @@ public class ApprovalService {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("결재자를 다시 골라 주세요.");
         }
+    }
+
+    @NonNull
+    private static LoginUser getActor(Long companyId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()
+                || !(authentication.getPrincipal() instanceof LoginUser)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "로그인 정보를 확인할 수 없습니다.");
+        }
+        LoginUser actor = (LoginUser) authentication.getPrincipal();
+        if (!Objects.equals(companyId, actor.getCompanyId())
+                || !("ROLE_ADMIN".equals(actor.getRole()) || "ROLE_HR".equals(actor.getRole()))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "사원 비활성화 권한이 없습니다.");
+        }
+        return actor;
     }
 
     @Nullable
@@ -376,6 +393,62 @@ public class ApprovalService {
 
         return documentId;
     }
+
+
+
+    @Transactional
+    public int rejectWaitingForRetired(Long companyId, Long employeeId) {
+        LoginUser actor = getActor(companyId);
+        if (companyId == null || employeeId == null || actor.getUserAccountId() == null) {
+            throw new IllegalArgumentException("업체·사원·처리 계정 정보가 필요합니다.");
+        }
+
+        List<Long> docs = dao.selectWaitingDocumentIds(companyId, employeeId);
+        int rejectedCount = 0;
+        String opinion = "결재자 계정 비활성화로 자동 반려되었습니다.";
+        for (Long documentId : docs) {
+            ApprovalDocumentDTO doc;
+            try {
+                doc = dao.lockDocument(companyId, documentId);
+            } catch (CannotAcquireLockException e) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+            }
+            // 후보 조회 이후 다른 결재 요청이 먼저 처리했을 수 있다.
+            if (doc == null || !ApprovalDocumentStatus.IN_PROGRESS.name().equals(doc.getStatusCode())) {
+                continue;
+            }
+            List<ApprovalStepDTO> steps = dao.selectDocumentSteps(companyId, documentId);
+            ApprovalStepDTO target = steps.stream()
+                    .filter(step -> Objects.equals(employeeId, step.getApproverEmployeeId()))
+                    .findFirst().orElse(null);
+            if (target == null || !ApprovalStepStatus.WAITING.name().equals(target.getStatusCode())) {
+                continue;
+            }
+            boolean previousPending = steps.stream().anyMatch(step -> step.getStepNo() < target.getStepNo()
+                    && !ApprovalStepStatus.APPROVED.name().equals(step.getStatusCode()));
+            if (previousPending) continue;
+
+            if (dao.rejectStep(companyId, employeeId, target.getStepNo(), documentId, opinion) != 1
+                    || dao.rejectDocument(companyId, documentId) != 1) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "결재를 처리하지 못했습니다. 다시 시도하세요.");
+            }
+            ApprovalHistoryDTO history = new ApprovalHistoryDTO();
+            history.setCompanyId(companyId);
+            history.setApprovalDocumentId(documentId);
+            history.setActorAccountId(actor.getUserAccountId());
+            history.setActionCode(ApprovalAction.APR_REJECT.name());
+            history.setBeforeStatus(ApprovalDocumentStatus.IN_PROGRESS.name());
+            history.setAfterStatus(ApprovalDocumentStatus.REJECTED.name());
+            history.setOpinion(opinion);
+            dao.insertHistory(history);
+            nService.notifyApprovalRejected(companyId, doc.getAuthorEmployeeId(), documentId, doc.getTitle());
+            rejectedCount++;
+        }
+        return rejectedCount;
+    }
+
+
 
     /**
      * 결재함: 내가 기안했거나 결재선에 있는 문서를 탭(WAIT·PROGRESS·DONE·REJECTED·DRAFT)별로 나눠 돌려준다.
