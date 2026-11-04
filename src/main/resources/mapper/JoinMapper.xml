@@ -50,14 +50,7 @@
 		ORDER BY d.sort_order, d.department_id
 	</select>
 
-	<!-- ❺ 사용 중 계정 수 (관리자 포함) -->
-	<select id="countActiveAccounts" resultType="int">
-		SELECT COUNT(*) FROM
-		user_account
-		WHERE company_id = #{companyId} AND status_code = 'ACTIVE'
-	</select>
-
-	<!-- ❻ 번호표 기계의 마지막 번호 (보기만, 잠그지 않음) -->
+	<!-- ❺ 번호표 기계의 마지막 번호 (보기만, 잠그지 않음) -->
 	<select id="peekLastSerial" resultType="java.lang.Integer">
 		SELECT last_serial FROM
 		employee_no_counter WHERE company_id = #{companyId}
@@ -254,7 +247,8 @@
 	    UPDATE user_account
 	       SET employee_id  = #{employeeId},
 	           status_code  = 'ACTIVE',
-	           activated_at = <include refid="now"/>
+	           activated_at = <include refid="now"/>,
+	           updated_at   = <include refid="now"/>
 	     WHERE user_account_id = #{userAccountId}
 	       AND company_id = #{companyId}
 	       AND status_code = 'REQUESTED'

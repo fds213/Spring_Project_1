@@ -10,6 +10,7 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.access.AccessDeniedException;
 
 import com.ieum.gw.dto.AuthEmpDTO;
 import com.ieum.gw.dto.LoginUser;
@@ -30,8 +31,10 @@ class JoinApproveTest {
 	static class FakeJoinDao extends JoinDAO {
 		JoinRequestViewDTO row;
 		String accountStatus = "REQUESTED";
+		String headDept = null; // 로그인한 사람이 부서장인 부서 (관리자 테스트는 null)
 		int activateCalls = 0;
 		int cancelCalls = 0;
+		int rejectAccountCalls = 0;
 
 		FakeJoinDao() {
 			super(null);
@@ -39,7 +42,7 @@ class JoinApproveTest {
 
 		@Override
 		public String getHeadDeptName(Long companyId, Long employeeId) {
-			return null; // 테스트 사용자는 관리자라 부서장 여부는 상관없다
+			return headDept;
 		}
 
 		@Override
@@ -67,7 +70,21 @@ class JoinApproveTest {
 		}
 
 		@Override
-		public int countActiveAccounts(Long companyId) {
+		public int rejectRequest(Long companyId, Long requestId, Long reviewerId) {
+			if (!"REQUESTED".equals(row.getRequestStatus())) {
+				return 0;
+			}
+			row.setRequestStatus("REJECTED");
+			return 1;
+		}
+
+		@Override
+		public int rejectAccount(Long companyId, Long userAccountId) {
+			rejectAccountCalls++;
+			if (!"REQUESTED".equals(accountStatus)) {
+				return 0;
+			}
+			accountStatus = "REJECTED";
 			return 1;
 		}
 
@@ -93,10 +110,16 @@ class JoinApproveTest {
 		}
 	}
 
-	/** 사번 발급·사원 만들기를 몇 번 불렀는지만 센다 */
+	/** 사번 발급·사원 만들기를 몇 번 불렀는지 세고, 사용 중 계정 수를 정해 준다 */
 	static class FakeEmployeeService extends EmployeeService {
 		int issueCalls = 0;
 		int createCalls = 0;
+		int inUse = 1;
+
+		@Override
+		public int countAccountsInUse(Long companyId) {
+			return inUse;
+		}
 
 		@Override
 		String issueEmployeeNo(Long companyId) {
@@ -115,20 +138,28 @@ class JoinApproveTest {
 		}
 	}
 
-	/** 이용 기간이 없는 업체처럼(한도 없음) 동작 → 좌석 검사는 이 테스트 범위 밖 */
+	/** 좌석 한도. null이면 이용 기간이 없는 업체(한도 없음) */
 	static class FakeSubscriptionService extends SubscriptionService {
+		Integer limit = null;
+
 		FakeSubscriptionService() {
 			super(null, null);
 		}
 
 		@Override
 		public CompanyUsageDTO getCompanyUsage(Long companyId) {
-			return null;
+			return limit == null ? null : new CompanyUsageDTO();
+		}
+
+		@Override
+		public int getSeatLimit(Long companyId) {
+			return limit;
 		}
 	}
 
 	private FakeJoinDao dao;
 	private FakeEmployeeService employees;
+	private FakeSubscriptionService subscription;
 	private JoinService service;
 	private LoginUser admin;
 
@@ -145,14 +176,18 @@ class JoinApproveTest {
 		dao.row = row;
 
 		employees = new FakeEmployeeService();
-		service = new JoinService(dao, new FakeSubscriptionService(), employees, new EmployeeDAO(null));
+		subscription = new FakeSubscriptionService();
+		service = new JoinService(dao, subscription, employees, new EmployeeDAO(null));
+		admin = user(101L, "ROLE_ADMIN");
+	}
 
+	private static LoginUser user(Long employeeId, String role) {
 		AuthEmpDTO emp = new AuthEmpDTO();
 		emp.setCompanyId(COMPANY);
-		emp.setUserAccountId(1L);
-		emp.setEmployeeId(101L);
-		emp.setRole("ROLE_ADMIN");
-		admin = new LoginUser(emp);
+		emp.setUserAccountId(employeeId);
+		emp.setEmployeeId(employeeId);
+		emp.setRole(role);
+		return new LoginUser(emp);
 	}
 
 	@Test
@@ -181,5 +216,55 @@ class JoinApproveTest {
 
 		// 같은 키라도 맞는 업체 코드면 보인다 (대문자·공백도 정리해서 찾는다)
 		assertNotNull(service.getMyRequest(" IEUM0001 ", key));
+	}
+
+	@Test
+	@DisplayName("자리가 다 찼으면 승인은 409이고, 사원 생성과 계정 연결은 하지 않는다")
+	void seatFull() {
+		subscription.limit = 5;
+		employees.inUse = 5;
+
+		assertThrows(IllegalStateException.class, () -> service.approveRequest(admin, REQ));
+
+		assertEquals(0, employees.createCalls);
+		assertEquals(0, dao.activateCalls);
+		assertEquals("REQUESTED", dao.row.getRequestStatus());
+
+		// 한 자리가 비면 승인된다
+		employees.inUse = 4;
+		assertEquals("테스트", service.approveRequest(admin, REQ).get("name"));
+	}
+
+	@Test
+	@DisplayName("부서장은 다른 부서의 가입 요청을 승인·반려할 수 없다(403)")
+	void headOtherDept() {
+		dao.headDept = "IT지원팀"; // 신청은 개발팀
+		LoginUser head = user(103L, "ROLE_EMP");
+
+		assertThrows(AccessDeniedException.class, () -> service.approveRequest(head, REQ));
+		assertThrows(AccessDeniedException.class, () -> service.rejectRequest(head, REQ));
+
+		assertEquals(0, employees.issueCalls);
+		assertEquals(0, dao.rejectAccountCalls);
+		assertEquals("REQUESTED", dao.row.getRequestStatus());
+	}
+
+	@Test
+	@DisplayName("같은 요청을 두 번 반려하면 두 번째는 409이고, 계정 반려는 한 번만 일어난다")
+	void rejectTwice() {
+		assertEquals("테스트", service.rejectRequest(admin, REQ).get("name"));
+
+		assertThrows(IllegalStateException.class, () -> service.rejectRequest(admin, REQ));
+
+		assertEquals(1, dao.rejectAccountCalls);
+		assertEquals("REJECTED", dao.row.getRequestStatus());
+		assertEquals("REJECTED", dao.accountStatus);
+	}
+
+	@Test
+	@DisplayName("없는 가입 요청은 404로 거절한다")
+	void notFound() {
+		assertThrows(JoinNotFoundException.class, () -> service.approveRequest(admin, 9999L));
+		assertThrows(JoinNotFoundException.class, () -> service.rejectRequest(admin, 9999L));
 	}
 }
