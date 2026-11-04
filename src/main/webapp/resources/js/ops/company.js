@@ -65,7 +65,7 @@ function employeeCard(d) {
   const list = d.employees;
   // 계정마다 한 줄(왼쪽 이름, 오른쪽 사번·부서): 두 줄로 쓰면 상자에 4명밖에 안 보인다
   const body = list.length
-    ? h('div', 'emp-scroll', h('ul', 'mini-list', ...list.map(e => h('li', 'emp-row', span(e.name), h('span', 'mini-sub', `${e.empNo} · ${e.dept}${e.status !== 'ACTIVE' ? ` · ${e.statusLabel}` : ''}`)))))
+    ? h('div', 'emp-scroll', h('ul', 'mini-list', ...list.map(e => h('li', 'emp-row', span(e.name), h('span', 'mini-sub', [e.empNo, e.dept, e.status !== 'ACTIVE' && e.statusLabel].filter(Boolean).join(' · '))))))
     : h('p', 'mini-empty', '등록된 계정이 없습니다');
   if (list.length) {
     body.tabIndex = 0;
