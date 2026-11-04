@@ -138,7 +138,6 @@ public class ApprovalService {
         response.setEmployeeName(authorName);
         response.setDocumentType(doc.getDocumentType());
         response.setStatusCode(history.getAfterStatus());
-//        response.setTicketId();
         return response;
     }
 
@@ -425,6 +424,7 @@ public class ApprovalService {
     @Transactional
     public ApprovalDecisionResultDTO approve(LoginUser user, ApprovalDecisionDTO dto, long documentId) {
 
+        Long ticketId = null;
         ApprovalDocumentDTO doc = lockInDocument(user, documentId);
         List<ApprovalStepDTO> steps = dao.selectDocumentSteps(user.getCompanyId(), documentId);
         ApprovalStepDTO approver = requireCurrentApprover(user, steps);
@@ -469,7 +469,7 @@ public class ApprovalService {
                 if (equipment == null) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "장비 신청 정보를 찾을 수 없습니다.");
                 }
-                tService.createEquipmentTicket(
+                ticketId = tService.createEquipmentTicket(
                         user.getCompanyId(),
                         doc.getAuthorEmployeeId(),
                         documentId,
@@ -497,7 +497,9 @@ public class ApprovalService {
         history.setCompanyId(user.getCompanyId());
         dao.insertHistory(history);
 
-        return createResponse(user, doc, history);
+        ApprovalDecisionResultDTO response = createResponse(user, doc, history);
+        response.setTicketId(ticketId == null ? null : ticketId.toString());
+        return response;
     }
 
 

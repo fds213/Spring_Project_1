@@ -119,11 +119,12 @@ class ApprovalDecisionServiceTest {
     private RuntimeException ticketError;
     private final List<List<Object>> ticketRequests = new ArrayList<>();
     private final TicketService tickets = new TicketService(null) {
-        @Override public void createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long documentId,
+        @Override public Long createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long documentId,
                                                     Long branchId, String assetType, String purpose) {
             calls.add("createTicket");
             ticketRequests.add(List.of(companyId, requesterEmployeeId, documentId, branchId, assetType, purpose));
             if (ticketError != null) throw ticketError;
+            return 7000L;
         }
     };
     private final AttendanceService attendance = new ApprovalServiceTest.FakeAttendance() {
@@ -321,6 +322,7 @@ class ApprovalDecisionServiceTest {
         assertEquals("기안자", response.getEmployeeName());
         assertEquals("DOC_LEAVE", response.getDocumentType());
         assertEquals("APPROVED", response.getStatusCode());
+        assertNull(response.getTicketId());
         assertEquals(List.of(List.of(1L, 1001L, 10L, "휴가 신청")), notification.done);
         assertTrue(notification.requests.isEmpty());
         assertTrue(notification.rejected.isEmpty());
@@ -329,7 +331,9 @@ class ApprovalDecisionServiceTest {
     @Test @DisplayName("1차 승인 뒤 중복 요청은 거절하고 2차 승인 때만 문서를 완료한다")
     void twoApproversAndDuplicate() {
         dao.steps.add(step(2, 1002L, "WAITING"));
-        assertEquals("IN_PROGRESS", approve(100L, "1차 승인").getStatusCode());
+        ApprovalDecisionResultDTO intermediate = approve(100L, "1차 승인");
+        assertEquals("IN_PROGRESS", intermediate.getStatusCode());
+        assertNull(intermediate.getTicketId());
         assertEquals("IN_PROGRESS", dao.history.getAfterStatus());
         assertEquals(0, dao.documentWrites);
         assertTrue(notification.done.isEmpty());
@@ -429,6 +433,7 @@ class ApprovalDecisionServiceTest {
         assertEquals("기안자", response.getEmployeeName());
         assertEquals("DOC_LEAVE", response.getDocumentType());
         assertEquals("REJECTED", response.getStatusCode());
+        assertNull(response.getTicketId());
         fails(409, () -> reject(100L, opinion));
         assertEquals(1, dao.stepWrites);
         assertEquals(1, notification.rejected.size());
@@ -496,7 +501,9 @@ class ApprovalDecisionServiceTest {
     @Test @DisplayName("장비 문서 최종 승인에서는 휴가 차감과 일정 생성을 호출하지 않는다")
     void equipmentDoesNotUseLeave() {
         dao.document.setDocumentType("DOC_EQUIPMENT");
-        assertEquals("APPROVED", approve(100L, null).getStatusCode());
+        ApprovalDecisionResultDTO response = approve(100L, null);
+        assertEquals("APPROVED", response.getStatusCode());
+        assertEquals("7000", response.getTicketId());
         assertEquals(List.of("lock", "steps", "approveStep", "approveDocument", "equipmentRequest",
                 "createTicket", "history"), calls);
         assertEquals(List.of(List.of(1L, 1001L, 10L, 8L, "AT_LAPTOP", "개발용 노트북")), ticketRequests);
@@ -560,11 +567,15 @@ class ApprovalDecisionServiceTest {
     void equipmentTicketOnlyOnFinalApproval() {
         dao.document.setDocumentType("DOC_EQUIPMENT");
         dao.steps.add(step(2, 1002L, "WAITING"));
-        assertEquals("IN_PROGRESS", approve(100L, null).getStatusCode());
+        ApprovalDecisionResultDTO intermediate = approve(100L, null);
+        assertEquals("IN_PROGRESS", intermediate.getStatusCode());
+        assertNull(intermediate.getTicketId());
         assertFalse(calls.contains("equipmentRequest"));
         assertTrue(ticketRequests.isEmpty());
 
-        assertEquals("APPROVED", approve(1002L, null).getStatusCode());
+        ApprovalDecisionResultDTO response = approve(1002L, null);
+        assertEquals("APPROVED", response.getStatusCode());
+        assertEquals("7000", response.getTicketId());
         assertEquals(1, ticketRequests.size());
         fails(409, () -> approve(1002L, null));
         assertEquals(1, ticketRequests.size());
@@ -573,7 +584,9 @@ class ApprovalDecisionServiceTest {
     @Test @DisplayName("장비 반려는 지급 티켓을 만들지 않는다")
     void equipmentRejectionDoesNotCreateTicket() {
         dao.document.setDocumentType("DOC_EQUIPMENT");
-        assertEquals("REJECTED", reject(100L, "사유").getStatusCode());
+        ApprovalDecisionResultDTO response = reject(100L, "사유");
+        assertEquals("REJECTED", response.getStatusCode());
+        assertNull(response.getTicketId());
         assertFalse(calls.contains("equipmentRequest"));
         assertTrue(ticketRequests.isEmpty());
     }

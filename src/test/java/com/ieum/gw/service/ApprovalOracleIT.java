@@ -179,9 +179,13 @@ class ApprovalOracleIT {
                 author.getCompanyId()).toString());
         request.setFields(fields);
         long id = approval.submit(author, request);
-        assertEquals("APPROVED", approval.approve(first, opinion(null), id).getStatusCode());
+        ApprovalDecisionResultDTO response = approval.approve(first, opinion(null), id);
+        assertEquals("APPROVED", response.getStatusCode());
         assertEquals(1, count("SELECT COUNT(*) FROM it_ticket WHERE company_id=? AND equipment_document_id=?",
                 author.getCompanyId(), id));
+        Long ticketId = jdbc.queryForObject("SELECT it_ticket_id FROM it_ticket WHERE company_id=? AND equipment_document_id=?",
+                Long.class, author.getCompanyId(), id);
+        assertEquals(ticketId.toString(), response.getTicketId());
         assertEquals(409, assertThrows(ResponseStatusException.class,
                 () -> approval.approve(first, opinion(null), id)).getRawStatusCode());
         assertEquals(1, count("SELECT COUNT(*) FROM it_ticket WHERE equipment_document_id=?", id));
