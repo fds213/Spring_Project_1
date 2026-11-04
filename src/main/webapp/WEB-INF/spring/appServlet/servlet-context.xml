@@ -27,6 +27,15 @@
 	<resources mapping="/service-worker.js"
 		location="/resources/js/" />
 	<resources mapping="/manifest.json" location="/" />
+	
+	<!-- 만료 읽기 전용 검사: 만료 업체의 쓰기 요청 거절 (ReadOnlyInterceptor) -->
+	<interceptors>
+		<interceptor>
+			<mapping path="/**" />
+			<exclude-mapping path="/resources/**" />
+			<beans:ref bean="readOnlyInterceptor" />
+		</interceptor>
+	</interceptors>
 		<!-- 파일 업로드. id는 반드시 multipartResolver -->
 	<beans:bean id="multipartResolver"
 		class="org.springframework.web.multipart.support.StandardServletMultipartResolver" />
