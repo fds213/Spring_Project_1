@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-approval-write">
-      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 반려된 문서는 결재함에서 재기안한다(임시저장은 이번 범위가 아니다) (approval/approval.js) --%>
+      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 반려된 문서는 결재함에서 재기안한다(임시저장은 핵심 뒤 추가라 아직 만들지 않았다) (approval/approval.js) --%>
       <div class="page-head"><h1>기안 작성</h1></div>
       <div class="info-grid info-grid-2">
         <section class="info-card">

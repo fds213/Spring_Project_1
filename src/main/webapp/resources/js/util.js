@@ -116,7 +116,7 @@ function el(tag, attrs = {}, text) {
 }
 const emptyRow = emptyTr; // 옛 이름 (board.js 가 쓴다)
 
-// 다른 화면(내 장비, 결재함의 재기안·이어서 쓰기)에서 기안 작성을 채워서 연다. 페이지가 바뀌므로 sessionStorage로 넘긴다
+// 다른 화면(내 장비, 결재함의 재기안)에서 기안 작성을 채워서 연다. 페이지가 바뀌므로 sessionStorage로 넘긴다
 const APPROVAL_PRE_KEY = 'ieum-approval-pre';
 function startApprovalWrite(form, pre) {
   try { sessionStorage.setItem(APPROVAL_PRE_KEY, JSON.stringify({ form, ...pre })); } catch (e) { /* 저장소 막힘: 빈 양식으로 연다 */ }
