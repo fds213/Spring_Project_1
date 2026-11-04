@@ -115,6 +115,22 @@ public class JoinService {
         board.put("requests", waitingRequests(companyId, admin, headDept));
         return board;
     }
+    
+    /** 가입 승인 배지 수 (/badges의 join). 관리자는 업체 전체, 부서장은 자기 부서 대기 요청. 둘 다 아니면 null(배지 없음) */
+    public Integer countWaitingForBadge(LoginUser user) {
+        boolean admin = isAdmin(user);
+        String headDept = dao.getHeadDeptName(user.getCompanyId(), user.getEmployeeId());
+        if (!admin && headDept == null) {
+            return null;
+        }
+        int count = 0;
+        for (JoinRequestViewDTO r : dao.listWaitingRequests(user.getCompanyId())) {
+            if (admin || headDept.equals(r.getDepartmentName())) {
+                count++;
+            }
+        }
+        return count;
+    }
 
     // ---------- 가입 열기·끄기 ----------
 
