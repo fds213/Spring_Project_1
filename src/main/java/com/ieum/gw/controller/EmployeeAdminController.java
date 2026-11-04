@@ -46,6 +46,14 @@ public class EmployeeAdminController {
 			@AuthenticationPrincipal LoginUser loginUser) {
 		return Map.of("success", true, "data", employeeAdminService.setHead(loginUser, empNo, body.get("head")));
 	}
+	
+	/** 계정 비활성화·다시 사용 (업체 관리자·인사 담당, Service에서 확인) */
+	@PostMapping("/employee/admin/api/employees/{empNo}/status")
+	@ResponseBody
+	public Map<String, Object> status(@PathVariable String empNo, @RequestBody Map<String, String> body,
+			@AuthenticationPrincipal LoginUser loginUser) {
+		return Map.of("success", true, "data", employeeAdminService.setStatus(loginUser, empNo, body.get("action")));
+	}
 
 	@ExceptionHandler(AccessDeniedException.class)
 	@ResponseBody

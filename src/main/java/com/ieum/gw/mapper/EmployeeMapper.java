@@ -58,4 +58,10 @@ public interface EmployeeMapper {
 			@Param("employeeId") Long employeeId);
 	
 	EmployeeLoginInfoDTO getLoginInfo(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+
+	int retireAccount(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+
+	int reactivateAccount(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+
+	int clearHeadOf(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 }

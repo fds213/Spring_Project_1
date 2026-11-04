@@ -161,15 +161,18 @@
 		ORDER BY d.sort_order, d.department_name, e.employee_no
 	</select>
 	
-	    <!-- 부서장 지정 대상: 사번으로 같은 업체 사원 1명 -->
+	    <!-- 사원 관리 대상(부서장 지정·켜기/끄기): 사번으로 같은 업체 사원 1명 -->
     <select id="getHeadTarget" resultType="com.ieum.gw.dto.EmployeeHeadTargetDTO">
-        SELECT e.employee_id, e.employee_name, e.department_id, d.department_name, a.status_code,
-               CASE WHEN d.head_employee_id = e.employee_id THEN 1 ELSE 0 END AS head
-        FROM employee e
-        JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
-        LEFT JOIN department d ON d.department_id = e.department_id AND d.company_id = e.company_id
-        WHERE e.company_id = #{companyId}
-        AND e.employee_no = #{employeeNo}
+		SELECT e.employee_id, e.employee_name, e.department_id,
+			d.department_name, a.status_code,a.role_code, e.employment_status,
+		CASE WHEN d.head_employee_id = e.employee_id THEN 1 ELSE 0 END AS head
+		FROM employee e
+		JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id =
+		e.company_id
+		LEFT JOIN department d ON d.department_id = e.department_id AND
+		d.company_id = e.company_id
+		WHERE e.company_id = #{companyId}
+		AND e.employee_no = #{employeeNo}
     </select>
 
     <!-- 부서장 지정: 그 부서의 부서장 칸을 이 사람으로 (전 부서장은 덮어써져 빠진다) -->
@@ -188,6 +191,35 @@
             updated_at = <include refid="now" />
         WHERE company_id = #{companyId}
         AND department_id = #{departmentId}
+        AND head_employee_id = #{employeeId}
+    </update>
+    
+        <!-- 계정 비활성화: 사용 중일 때만 (0행이면 이미 꺼졌거나 그사이 바뀜) -->
+    <update id="retireAccount">
+        UPDATE user_account
+        SET status_code = 'RETIRED',
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND employee_id = #{employeeId}
+        AND status_code = 'ACTIVE'
+    </update>
+
+    <!-- 계정 다시 사용: 비활성일 때만 -->
+    <update id="reactivateAccount">
+        UPDATE user_account
+        SET status_code = 'ACTIVE',
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND employee_id = #{employeeId}
+        AND status_code = 'RETIRED'
+    </update>
+
+    <!-- 이 사람이 부서장인 부서의 부서장 칸 비우기 (비활성화·퇴사 때, #111 리뷰) -->
+    <update id="clearHeadOf">
+        UPDATE department
+        SET head_employee_id = NULL,
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
         AND head_employee_id = #{employeeId}
     </update>
     

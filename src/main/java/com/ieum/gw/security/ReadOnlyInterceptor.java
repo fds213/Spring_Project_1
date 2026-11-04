@@ -3,6 +3,7 @@ package com.ieum.gw.security;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -29,7 +30,9 @@ public class ReadOnlyInterceptor implements HandlerInterceptor {
 
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
     private static final String MESSAGE = "이용 기간이 끝나 읽기 전용입니다. 자료 조회와 내려받기는 그대로 됩니다.";
-
+    // 업체 관리자의 직원 비활성화 주소 (요구분석서 3.11). 다시 사용(on)은 Service가 거절한다
+    private static final Pattern STAFF_STATUS = Pattern.compile("/employee/admin/api/employees/[^/]+/status");
+    
     private final SubscriptionService subscriptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -70,12 +73,16 @@ public class ReadOnlyInterceptor implements HandlerInterceptor {
         return null;
     }
 
-    /** 요구분석서 3.11 '만료 중 허용하는 쓰기': 본인 비밀번호 변경, 업체 관리자 결제 */
+    /** 요구분석서 3.11 '만료 중 허용하는 쓰기': 본인 비밀번호 변경, 업체 관리자 결제, 업체 관리자의 직원 비활성화 */
     private boolean allowed(HttpServletRequest request, LoginUser user) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         if (path.equals("/employee/api/password")) {
             return true;
         }
-        return path.startsWith("/subscription/api/orders") && "ROLE_ADMIN".equals(user.getRole());
+        boolean admin = "ROLE_ADMIN".equals(user.getRole());
+        if (admin && STAFF_STATUS.matcher(path).matches()) {
+            return true;
+        }
+        return admin && path.startsWith("/subscription/api/orders");
     }
 }
