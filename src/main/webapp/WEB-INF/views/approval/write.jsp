@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-approval-write">
-      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 임시저장은 이어서 쓰고, 반려된 문서는 결재함에서 재기안한다 (approval/approval.js) --%>
+      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 반려된 문서는 결재함에서 재기안한다(임시저장은 이번 범위가 아니다) (approval/approval.js) --%>
       <div class="page-head"><h1>기안 작성</h1></div>
       <div class="info-grid info-grid-2">
         <section class="info-card">
@@ -44,7 +44,6 @@
             <div class="leave-row"><label for="eaAppr2">2단계 결재</label><select class="filter-select" id="eaAppr2"></select></div>
             <p class="form-error" id="eaError" role="alert"></p>
             <div class="bill-actions">
-              <button type="button" class="btn" id="btnEaDraft" data-write>임시저장</button>
               <button type="submit" class="btn btn-primary" data-write>제출</button>
             </div>
             <p class="bill-note">결재선은 최대 2단계이고 순서대로 승인합니다. 결재자는 부서장·인사 담당·업체 관리자입니다.</p>
