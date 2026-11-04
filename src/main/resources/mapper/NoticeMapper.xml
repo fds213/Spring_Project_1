@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.board.dao.NoticeMapper">
+<mapper namespace="com.ieum.gw.mapper.NoticeMapper">
 
 	<!-- 공지 목록·개수가 같이 쓰는 조건:
 	     우리 업체의 공지 게시판(BOARD_NOTICE) 글 중 지우지 않았고 보이는 글.
@@ -23,7 +23,7 @@
 	</sql>
 
 	<!-- 공지 목록: 최신 글부터, 한 페이지 분량 -->
-	<select id="selectNoticeList" resultType="com.ieum.gw.board.dto.NoticeDTO">
+	<select id="selectNoticeList" resultType="com.ieum.gw.dto.NoticeDTO">
 		SELECT p.post_id        AS id,
 		       'ALL'            AS scope,
 		       p.title          AS title,
@@ -51,7 +51,7 @@
 
 	<!-- 공지 한 건: 목록과 같은 조건(우리 업체·공지 게시판·지우지 않음·보임)에 글 번호를 더한다.
 	     다른 업체 글이나 지운 글이면 아무것도 안 나와서 Java에서는 null이 된다 -->
-	<select id="selectNotice" resultType="com.ieum.gw.board.dto.NoticeDTO">
+	<select id="selectNotice" resultType="com.ieum.gw.dto.NoticeDTO">
 		SELECT p.post_id        AS id,
 		       'ALL'            AS scope,
 		       p.title          AS title,
@@ -104,7 +104,7 @@
 	<!-- ========== 댓글 ========== -->
 
 	<!-- 댓글 목록: 지우지 않은 댓글을 오래된 순으로 -->
-	<select id="selectComments" resultType="com.ieum.gw.board.dto.NoticeCommentDTO">
+	<select id="selectComments" resultType="com.ieum.gw.dto.NoticeCommentDTO">
 		SELECT c.post_comment_id   AS id,
 		       c.content           AS text,
 		       c.author_employee_id AS authorId,
@@ -157,7 +157,7 @@
 	<!-- ========== 첨부파일 ========== -->
 
 	<!-- 첨부 목록: 공지와 파일을 잇는 POST_FILE + 파일 정보 ATTACHMENT (지운 파일은 빼고, 붙인 순서대로) -->
-	<select id="selectFiles" resultType="com.ieum.gw.board.dto.NoticeFileDTO">
+	<select id="selectFiles" resultType="com.ieum.gw.dto.NoticeFileDTO">
 		SELECT a.attachment_id AS id,
 		       a.original_name AS name,
 		       a.byte_size     AS "size",
