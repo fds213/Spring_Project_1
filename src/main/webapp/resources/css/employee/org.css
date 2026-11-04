@@ -1,0 +1,23 @@
+/* ---------- 조직도 (views/employee/org.jsp) ---------- */
+.org-result { font-size: 13px; color: var(--text-muted); }
+/* 폰에서 검색 줄이 세로로 쌓일 때 검색칸이 납작해지지 않게 (게시판 board.css 와 같은 처리) */
+@media (max-width: 600px) { .search-row .search-input { flex: none; } }
+/* 부서 카드: 넓으면 여러 칸, 폰에서는 한 줄에 하나 */
+.org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; align-items: start; }
+.org-card .info-card-head { min-height: 52px; }
+.org-count { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+.org-members { list-style: none; margin: 0; padding: 6px 0; }
+.org-member { display: flex; align-items: center; gap: 10px; padding: 8px 18px; }
+.org-member + .org-member { border-top: 1px solid var(--line); }
+.org-avatar {
+  flex: none; width: 32px; height: 32px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--bg-sub); color: var(--text-sub); font-size: 13px; font-weight: 600;
+}
+.org-member.is-head .org-avatar { background: var(--accent-bg); color: var(--accent); }
+.org-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.org-name { font-weight: 600; overflow-wrap: anywhere; }
+.org-grade { font-size: 12px; color: var(--text-muted); }
+.org-tags { flex: none; display: flex; gap: 4px; }
+.org-empty { margin: 0; padding: 32px 18px; text-align: center; color: var(--text-muted); }
+.org-grid > .org-empty { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--bg); }

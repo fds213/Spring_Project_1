@@ -42,6 +42,7 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/employee/join` | `employee/join` |
 | `/employee/admin/dept` | `employee/admin/dept` |
 | `/employee/admin/rank` | `employee/admin/rank` |
+| `/employee/org` | `employee/org` (조직도. 업체 직원 모두) |
 | `/subscription/billing` | `subscription/billing` |
 | `/board/notice`, `/board/notice/view/{id}`, `/board/notice/write`, `/board/notice/edit/{id}` | `board/notice` (네 주소 모두 같은 JSP) |
 | `/board/dept`, `/board/dept/view/{id}`, `/board/dept/write`, `/board/dept/edit/{id}` | `board/dept` (네 주소 모두 같은 JSP) |
