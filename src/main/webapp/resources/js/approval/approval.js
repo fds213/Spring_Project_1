@@ -2,12 +2,12 @@
 // 결재선은 최대 2단계로 순서대로 승인한다. 마지막 결재자가 승인해야 최종 승인이다.
 // - 휴가: 최종 승인 때 연차가 차감되고 일정에 나타난다 (연차 화면의 신청 내역과 같은 데이터다).
 // - 장비 지급: 최종 승인 때 IT 서비스에 지급 티켓이 만들어진다. 지급이 끝나면 내 장비에 나타난다.
-// 임시저장은 검사 없이 입력값을 그대로 저장하고, 반려된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다.
+// 반려된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다. 임시저장은 이번 범위가 아니다(요구분석서 3장 범위 표).
 // 결재자 목록, 내 순번인지, 재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
 // 읽기 전용 업체는 쓰는 요청이 403으로 거절된다 (버튼의 data-write로 화면도 먼저 막는다).
 
 const EA_FORMS = { DOC_LEAVE: '휴가 신청서', DOC_EQUIPMENT: '장비 지급 신청서' };
-const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려', DRAFT: '임시저장' };
+const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려' };
 const EA_STATUS = { IN_PROGRESS: '진행', APPROVED: '완료', REJECTED: '반려' };
 const EA_STATUS_CLASS = { IN_PROGRESS: 'waiting', APPROVED: 'paid', REJECTED: 'failed' };
 const EA_LEAVE_TYPE = { LV_FULL: '연차', LV_AM: '오전 반차', LV_PM: '오후 반차' };
@@ -31,7 +31,7 @@ const eaButton = (label, cls, write) => {
 };
 const eaDays = n => `${Number.isInteger(n) ? n : n.toFixed(1)}일`;
 const eaSpan = f => (f.fromDate ? `${f.fromDate}${f.toDate && f.toDate !== f.fromDate ? ` ~ ${f.toDate}` : ''}` : '');
-const eaState = { tab: 'WAIT', open: null, draftId: null, pre: null, box: null, opts: null };
+const eaState = { tab: 'WAIT', open: null, pre: null, box: null, opts: null };
 
 
 // "박관리 ✓ → 최팀장 (결재 중)"처럼 결재선의 진행을 한 줄로
@@ -97,13 +97,12 @@ function eaApplyForm(p) {
   eaSyncForm();
 }
 
-// 다른 화면(내 장비, 결재함의 재기안·이어서 쓰기)에서 기안 작성을 열 때 쓴다 (util.js startApprovalWrite)
+// 다른 화면(내 장비, 결재함의 재기안)에서 기안 작성을 열 때 쓴다 (util.js startApprovalWrite)
 const eaStartWrite = (form, pre) => startApprovalWrite(form, pre);
 
 // 화면을 열 때 (JSP 페이지가 열리면 부른다). 결재자·지점 목록을 받은 뒤 입력칸을 채운다
 function openApprovalWriteView() {
   const pre = takeApprovalPre();
-  eaState.draftId = pre && pre.draftId ? pre.draftId : null;
   eaEl('eaError').textContent = '';
   api.get('/approval/api/form-options')
     .done(opts => {
@@ -148,27 +147,6 @@ eaEl('eaFormKind')?.addEventListener('change', eaSyncForm);
 eaEl('eaLeaveKind')?.addEventListener('change', eaSyncForm);
 eaEl('eaLeaveFrom')?.addEventListener('change', eaSyncForm);
 
-// 임시저장: 검사 없이 지금 입력한 그대로. 저장한 뒤에는 같은 임시저장 문서를 계속 고친다
-function eaSaveDraft(body, btn) {
-  const id = eaState.draftId;
-  btn.disabled = true;
-  (id ? api.post(`/approval/api/drafts/${encodeURIComponent(id)}`, body) : api.post('/approval/api/drafts', body))
-    .always(() => { btn.disabled = false; })
-    .done(d => {
-      eaState.draftId = d.approvalDocumentId;
-      showToast('임시저장했습니다. 결재함의 임시저장에서 이어서 쓸 수 있습니다');
-    })
-    .fail(xhr => {
-      // 다른 곳에서 지운 임시저장이면 새로 저장한다
-      if (id && xhr.status === 404) { eaState.draftId = null; eaSaveDraft(body, btn); return; }
-      showToast(apiMessage(xhr));
-    });
-}
-eaEl('btnEaDraft')?.addEventListener('click', () => {
-  const c = eaCollect();
-  eaSaveDraft({ documentType: c.form, fields: c.fields, line: [c.a1, c.a2] }, eaEl('btnEaDraft'));
-});
-
 eaEl('eaForm')?.addEventListener('submit', e => {
   e.preventDefault();
   const err = eaEl('eaError');
@@ -177,9 +155,8 @@ eaEl('eaForm')?.addEventListener('submit', e => {
   if (msg) { err.textContent = msg; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
   if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], draftId: eaState.draftId })
+  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2] })
     .done(() => {
-      eaState.draftId = null;
       err.textContent = '';
       toastAndGo(`${EA_FORMS[c.form]}를 제출했습니다. 첫 결재자에게 넘어갔습니다`, pageHref('/approval/list'));
     })
@@ -205,28 +182,26 @@ function renderApprovalBox() {
   document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === eaState.tab));
   IEUM.refreshBadges(); // 메뉴의 결재함 숫자 (common.js /badges)
 
-  const draft = eaState.tab === 'DRAFT';
-  eaEl('eaHead').replaceChildren(eaNode('tr', '', ...(draft ? ['문서', '저장 시각'] : ['문서', '기안자', '결재선', '상태', '기안일']).map(t => eaNode('th', '', t))));
-  const cols = draft ? 2 : 5;
+  eaEl('eaHead').replaceChildren(eaNode('tr', '', ...['문서', '기안자', '결재선', '상태', '기안일'].map(t => eaNode('th', '', t))));
+  const cols = 5;
   const rows = [];
   (buckets[eaState.tab] || []).forEach(d => {
-    const key = `${draft ? 'DRAFT' : d.documentType}:${d.approvalDocumentId}`;
+    const key = `${d.documentType}:${d.approvalDocumentId}`;
     const isOpen = eaState.open === key;
-    const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''), ...(draft
-      ? [eaCell('문서', eaNode('span', '', `${EA_FORMS[d.documentType]}${eaDraftTitle(d)}`)), eaCell('저장 시각', eaNode('span', '', whenFull(d.updatedAt)))]
-      : [eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), eaNode('small', 'cell-sub', d.departmentName)),
-        eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode])),
-        eaCell('기안일', eaNode('span', '', whenFull(d.submittedAt)))]));
+    const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''),
+      eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), eaNode('small', 'cell-sub', d.departmentName)),
+      eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode])),
+      eaCell('기안일', eaNode('span', '', whenFull(d.submittedAt))));
     tr.addEventListener('click', () => { eaState.open = isOpen ? null : key; renderApprovalBox(); });
     rows.push(tr);
     if (isOpen) {
-      const td = eaNode('td', '', eaNode('div', 'slide open', eaNode('div', 'slide-inner', draft ? eaDraftDetail(d) : eaDocDetail(d))));
+      const td = eaNode('td', '', eaNode('div', 'slide open', eaNode('div', 'slide-inner', eaDocDetail(d))));
       td.colSpan = cols;
       rows.push(eaNode('tr', 'row-detail', td));
     }
   });
   if (!rows.length) {
-    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려된 문서가 없습니다', DRAFT: '임시저장한 문서가 없습니다' }[eaState.tab]);
+    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려된 문서가 없습니다' }[eaState.tab]);
     td.colSpan = cols;
     rows.push(eaNode('tr', 'row-empty', td));
   }
@@ -237,10 +212,6 @@ document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.addEventListene
   eaState.open = null;
   renderApprovalBox();
 }));
-
-const eaDraftTitle = d => (d.documentType === 'DOC_LEAVE'
-  ? (d.fields.fromDate ? ` · ${eaSpan(d.fields)}` : '')
-  : (d.fields.assetType ? ` · ${d.assetTypeName} ${d.fields.quantity || ''}대` : ''));
 
 // 문서 내용 줄: 양식마다 다르다
 function eaDocRows(d) {
@@ -276,28 +247,6 @@ function eaDocDetail(d) {
       eaNode('p', 'inq-hint', '내용과 결재선을 채운 새 기안 화면이 열립니다. 고친 뒤 다시 제출하세요.'), eaNode('div', 'inq-actions', again)));
   }
   return eaNode('div', 'inq-grid', eaNode('section', 'info-card', eaNode('header', 'info-card-head', eaNode('h2', '', '문서 내용')), info), side);
-}
-
-function eaDraftDetail(d) {
-  const info = eaNode('dl', 'detail');
-  const f = d.fields;
-  const rows = d.documentType === 'DOC_LEAVE'
-    ? [['구분', EA_LEAVE_TYPE[f.leaveType] || '-'], ['기간', eaSpan(f) || '-'], ['사유', f.reason || '-']]
-    : [['장비', f.assetType ? `${d.assetTypeName} ${f.quantity || ''}대` : '-'], ['수령 지점', d.branchName || '-'], ['사유', f.purpose || '-']];
-  [['양식', EA_FORMS[d.documentType]], ...rows, ['결재선', d.steps.map(p => p.employeeName).join(' → ') || '-'], ['저장', whenFull(d.updatedAt)]]
-    .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
-  const resume = eaButton('이어서 쓰기', 'btn btn-primary', true);
-  const drop = eaButton('삭제', 'btn', true);
-  resume.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.steps.map(p => p.approverEmployeeId), draftId: d.approvalDocumentId }));
-  drop.addEventListener('click', () => {
-    drop.disabled = true;
-    api.post(`/approval/api/drafts/${encodeURIComponent(d.approvalDocumentId)}/delete`)
-      .done(() => { eaState.open = null; loadApprovalBox(); })
-      .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 404) loadApprovalBox(); })
-      .always(() => { drop.disabled = false; });
-  });
-  return eaNode('div', 'inq-grid', eaNode('section', 'info-card', eaNode('header', 'info-card-head', eaNode('h2', '', '임시저장 내용')), info),
-    eaNode('section', 'info-card', eaNode('div', 'inq-body', eaNode('p', 'inq-hint', '임시저장은 검사 없이 저장돼 있습니다. 이어서 쓰고 제출할 때 검사합니다.'), eaNode('div', 'inq-actions', resume, drop))));
 }
 
 // ---------- 결재 처리 ----------
