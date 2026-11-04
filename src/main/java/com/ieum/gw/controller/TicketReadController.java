@@ -33,6 +33,12 @@ public class TicketReadController {
         return "ticket/mine";
     }
 
+    @GetMapping("/ticket/api/form-options")
+    @ResponseBody
+    public Map<String, Object> formOptions(@AuthenticationPrincipal LoginUser user) {
+        return Map.of("success", true, "data", ticketReadService.getFormOptions(user));
+    }
+
     @GetMapping("/ticket/api/tickets/{itTicketId}/comments")
     @ResponseBody
     public Map<String, Object> comments(@AuthenticationPrincipal LoginUser user, @PathVariable Long itTicketId) {
