@@ -117,6 +117,9 @@ class TicketWorkServiceTest {
     Notices notices;
     TicketWorkService service;
     AssetDTO asset;
+    com.ieum.gw.dto.ApprovedEquipmentDTO approvedEquipment;
+    boolean stockConflict;
+    int equipmentIssues;
 
     public static LoginUser user(Long company, Long employee, String role) {
         AuthEmpDTO auth = new AuthEmpDTO();
@@ -144,8 +147,29 @@ class TicketWorkServiceTest {
         };
         service = new TicketWorkService(rows, assets, lookup, branches, people, notices,
                 new ApprovalService(null, null, null, null, null) {
-                    @Override public com.ieum.gw.dto.ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long documentId) { return null; }
-                }, null);
+                    @Override public com.ieum.gw.dto.ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long documentId) {
+                        if (approvedEquipment != null) {
+                            assertEquals(1L, companyId);
+                            assertEquals(70L, documentId);
+                        }
+                        return approvedEquipment;
+                    }
+                }, new AssetAllocationService(null, null, null) {
+                    @Override public Long issueForTicket(LoginUser operator, Long receiverId, Long ticketId,
+                                                         Long assetId, String approvedType, Long branchId) {
+                        assertEquals(1L, operator.getCompanyId());
+                        assertEquals(2L, receiverId);
+                        assertEquals(10L, ticketId);
+                        assertEquals(50L, assetId);
+                        assertEquals("AT_LAPTOP", approvedType);
+                        assertEquals(8L, branchId);
+                        if (stockConflict) {
+                            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 지급된 자산입니다.");
+                        }
+                        equipmentIssues++;
+                        return 100L;
+                    }
+                });
         rows.row = ticket(RECEIVED.name());
     }
     private TicketWorkDTO ticket(String status) {
@@ -154,6 +178,44 @@ class TicketWorkServiceTest {
         t.setType("TK_INCIDENT"); t.setStatus(status); t.setTitle("장애"); t.setBody("내용"); t.setVersion(0L);
         t.setAt(LocalDateTime.of(2026,11,3,10,0,0));
         return t;
+    }
+
+    private TicketRequestDTO equipmentResolution() {
+        rows.row.setType("TK_EQUIPMENT");
+        rows.row.setStatus(IN_PROGRESS.name());
+        rows.row.setAssigneeId(3L);
+        rows.row.setAssetId(null);
+        rows.row.setEquipmentDocumentId(70L);
+        approvedEquipment = new com.ieum.gw.dto.ApprovedEquipmentDTO();
+        approvedEquipment.setAssetType("AT_LAPTOP");
+        approvedEquipment.setQuantity(1);
+        TicketRequestDTO request = form();
+        request.setAssetId(50L);
+        return request;
+    }
+
+    @Test
+    @DisplayName("승인 장비 지급 완료 시 티켓에 지급 자산과 완료 상태를 기록한다")
+    void resolveApprovedEquipment() {
+        service.resolve(user(1L, 3L, "ROLE_IT"), 10L, equipmentResolution());
+        assertEquals(1, equipmentIssues);
+        assertEquals(50L, rows.lastChange.get("assetId"));
+        assertEquals(RESOLVED.name(), rows.lastChange.get("afterStatus"));
+        assertEquals(1, rows.histories);
+        assertEquals(1, notices.resolved);
+    }
+
+    @Test
+    @DisplayName("지급 재고 충돌 시 티켓 상태·이력·알림을 변경하지 않는다")
+    void stockConflictLeavesTicketInProgress() {
+        TicketRequestDTO request = equipmentResolution();
+        stockConflict = true;
+        status(HttpStatus.CONFLICT, () -> service.resolve(user(1L, 3L, "ROLE_IT"), 10L, request));
+        assertEquals(IN_PROGRESS.name(), rows.row.getStatus());
+        assertNull(rows.row.getAssetId());
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+        assertEquals(0, notices.resolved);
     }
     private TicketRequestDTO form() {
         TicketRequestDTO f = new TicketRequestDTO(); f.setVersion(0L); f.setResult("해결했습니다"); f.setReason("반려 사유");
