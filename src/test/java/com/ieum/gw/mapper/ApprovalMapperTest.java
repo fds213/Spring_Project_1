@@ -22,6 +22,16 @@ import org.junit.jupiter.api.Test;
 import com.ieum.gw.dao.ApprovalDAO;
 
 class ApprovalMapperTest {
+    @Test
+    @DisplayName("결재 문서 조회는 업체·문서 조건으로 해당 문서만 잠그고 최대 5초 대기한다")
+    void documentLockHasWaitLimit() throws Exception {
+        Configuration config = configuration();
+        BoundSql sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.lockDocument")
+                .getBoundSql(Map.of("companyId", 1L, "documentId", 10L));
+        assertTrue(sql.getSql().replaceAll("\\s+", " ")
+                .contains("FOR UPDATE OF approval_document_id WAIT 5"));
+        assertEquals(List.of(1L, 10L), boundValues(config, sql, Map.of("companyId", 1L, "documentId", 10L)));
+    }
     private Configuration configuration() throws Exception {
         Configuration config = new Configuration();
         try (InputStream in = getClass().getResourceAsStream("/mapper/ApprovalMapper.xml")) {

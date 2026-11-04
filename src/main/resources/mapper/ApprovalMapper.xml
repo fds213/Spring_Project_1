@@ -171,7 +171,7 @@
     <select id="lockDocument" resultType="com.ieum.gw.dto.ApprovalDocumentDTO">
         SELECT * FROM approval_document
         WHERE company_id = #{companyId} AND approval_document_id = #{documentId}
-        FOR UPDATE OF approval_document_id
+        FOR UPDATE OF approval_document_id WAIT 5
     </select>
 
     <select id="selectDocumentSteps" resultType="com.ieum.gw.dto.ApprovalStepDTO">

@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.sql.SQLException;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.jdbc.support.SQLErrorCodeSQLExceptionTranslator;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
@@ -30,6 +33,7 @@ class ApprovalDecisionServiceTest {
         int documentWrites;
         String opinion;
         RuntimeException historyError;
+        RuntimeException lockError;
         List<LeaveDayDTO> storedDays = List.of(leaveDay(50L, "LV_FULL", BigDecimal.ONE),
                 leaveDay(51L, "LV_AM", new BigDecimal("0.5")));
 
@@ -49,6 +53,7 @@ class ApprovalDecisionServiceTest {
 
         @Override public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
             calls.add("lock");
+            if (lockError != null) throw lockError;
             return companyId.equals(1L) && documentId == 10L ? document : null;
         }
 
@@ -211,6 +216,24 @@ class ApprovalDecisionServiceTest {
 
     private void fails(int status, Runnable action) {
         assertEquals(status, assertThrows(ResponseStatusException.class, action::run).getRawStatusCode());
+    }
+
+    @Test @DisplayName("Oracle 문서 잠금 시간초과는 승인·반려 모두 쓰기 없이 409와 재시도 안내로 응답한다")
+    void documentLockTimeout() {
+        for (int code : new int[] {54, 30006}) {
+            dao.lockError = new SQLErrorCodeSQLExceptionTranslator("Oracle").translate(
+                    "문서 잠금", "SELECT ... FOR UPDATE WAIT 5",
+                    new SQLException("resource busy; acquire with WAIT timeout expired", "72000", code));
+            assertTrue(dao.lockError instanceof CannotAcquireLockException);
+            for (Runnable action : List.<Runnable>of(() -> approve(100L, null), () -> reject(100L, "반려 사유"))) {
+                ResponseStatusException error = assertThrows(ResponseStatusException.class, action::run);
+                assertEquals(409, error.getRawStatusCode());
+                assertEquals("다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", error.getReason());
+                assertSame(dao.lockError, error.getCause());
+            }
+        }
+        assertEquals(List.of("lock", "lock", "lock", "lock"), calls);
+        noWrites();
     }
 
     private void noWrites() {

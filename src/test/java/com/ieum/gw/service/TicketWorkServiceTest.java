@@ -146,7 +146,7 @@ class TicketWorkServiceTest {
             }
         };
         service = new TicketWorkService(rows, assets, lookup, branches, people, notices,
-                new ApprovalService(null, null, null, null, null) {
+                new ApprovalService(null, null, null, null, null, null, null) {
                     @Override public com.ieum.gw.dto.ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long documentId) {
                         if (approvedEquipment != null) {
                             assertEquals(1L, companyId);

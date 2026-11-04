@@ -11,6 +11,7 @@ import com.ieum.gw.code.ApprovalStepStatus;
 import com.ieum.gw.code.LeaveType;
 import com.ieum.gw.dto.LoginUser;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
@@ -110,8 +111,13 @@ public class ApprovalService {
 
     @NonNull
     private ApprovalDocumentDTO lockInDocument(LoginUser user, long documentId) {
-        // 행 잠금 슛
-        ApprovalDocumentDTO doc = dao.lockDocument(user.getCompanyId(), documentId);
+        ApprovalDocumentDTO doc;
+        try {
+            doc = dao.lockDocument(user.getCompanyId(), documentId);
+        } catch (CannotAcquireLockException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+        }
 
         // 문서가 없으면 404
         if(doc==null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "조회된 문서가 없습니다.");
@@ -247,6 +253,8 @@ public class ApprovalService {
         for(LeaveDayDTO day : leaveDays) {
             total = total.add(day.getDeductDays());
         }
+
+        aService.lockLeaveForSubmit(user.getCompanyId(), user.getEmployeeId());
 
         // 연차확인
         BigDecimal remain = aService.getRemainingLeaveDays(user.getCompanyId(), user.getEmployeeId());
