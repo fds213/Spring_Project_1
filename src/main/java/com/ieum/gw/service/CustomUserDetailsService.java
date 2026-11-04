@@ -20,6 +20,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Autowired
     private AuthDAO dao;
 
+    @Autowired
+    private MailSettings mailSettings;
+
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
@@ -36,6 +39,7 @@ public class CustomUserDetailsService implements UserDetailsService {
             throw new UsernameNotFoundException("존재하지 않는 계정: " + compcode + " / " + username);
         }
 
+        emp.setVerificationPending(mailSettings.isVerificationRequired() && !emp.isEmailVerified());
         return new LoginUser(emp);
     }
 }

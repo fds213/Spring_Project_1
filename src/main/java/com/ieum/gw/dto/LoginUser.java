@@ -61,6 +61,11 @@ public class LoginUser implements UserDetails {
 		return emp.getRole();
 	}
 
+	/** 이메일 인증을 요구하는데 아직 안 한 업체의 계정인가(ACC-06). 비밀번호를 확인한 뒤에 거절한다 */
+	public boolean isVerificationPending() {
+		return emp.isVerificationPending();
+	}
+
 	@Override
 	public boolean isEnabled() {
 		// TODO Auto-generated method stub

@@ -13,6 +13,7 @@ import org.springframework.security.web.authentication.AuthenticationFailureHand
 import org.springframework.stereotype.Component;
 
 import com.ieum.gw.service.LoginFailService;
+import com.ieum.gw.service.TrialVerifyService;
 
 @Component("loginFailureHandler")
 public class LoginFailureHandler implements AuthenticationFailureHandler {
@@ -34,6 +35,11 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
             result = "locked=" + minutes;
         } else if (exception instanceof DisabledException) {     // 비밀번호 맞음 + 비활성
             result = "disabled";
+        } else if (exception instanceof EmailNotVerifiedException) { // 비밀번호 맞음 + 이메일 인증 전(ACC-06)
+            // 다시 보내기는 주소에 업체를 적지 않고, 비밀번호를 맞힌 이 세션의 업체에만 보낸다
+            request.getSession().setAttribute(TrialVerifyService.SESSION_COMPANY_ID,
+                    ((EmailNotVerifiedException) exception).getCompanyId());
+            result = "unverified";
         } else {                                      // 비밀번호 틀림·계정 없음
             loginFailService.recordFail(compcode, empnum);
             result = "error";

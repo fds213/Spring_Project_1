@@ -29,6 +29,9 @@ public interface EmployeeMapper {
     int insertEmployee(EmployeeDTO dto);
     int insertAccount(AccountDTO dto);
 
+    int markAccountEmailVerified(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId,
+            @Param("verifiedAt") java.time.LocalDateTime verifiedAt);
+
     // ── 연동 확인 ──
     int countActiveEmployee(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
     int countRole(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,

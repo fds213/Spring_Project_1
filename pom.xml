@@ -24,6 +24,18 @@
             <artifactId>spring-context</artifactId>
             <version>${org.springframework-version}</version>
         </dependency>
+
+        <!-- 메일 발송: JavaMailSender(MailService). Spring 5.3은 javax.mail을 쓴다(jakarta.mail은 Spring 6용) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context-support</artifactId>
+            <version>${org.springframework-version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+            <version>1.6.2</version>
+        </dependency>
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-webmvc</artifactId>

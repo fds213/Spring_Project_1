@@ -82,6 +82,9 @@
 
   <%-- 오른쪽 칸: 묶음마다 하나, 고른 묶음만 보인다 --%>
   <div class="nav-panel">
+    <%-- 업체명: 폰에서는 머리글에 자리가 없어 머리글 대신 여기(메뉴를 열면 맨 위)에 보인다. PC에서는 숨긴다(머리글에 있다) --%>
+    <c:set var="navCompany" value="${isOps ? '이음 운영' : loginInfo.companyName}" />
+    <c:if test="${not empty navCompany}"><p class="nav-company"><c:out value="${navCompany}" /></p></c:if>
     <c:if test="${isOps}">
       <%-- 이음 운영자 메뉴 (주소 /ops/...). 운영자는 아래 직원 기본 메뉴도 함께 본다 --%>
       <div class="nav-cat" id="navCat-ops" data-cat="ops"${navCat eq 'ops' ? '' : ' hidden'}>

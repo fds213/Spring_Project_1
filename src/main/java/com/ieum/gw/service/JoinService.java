@@ -52,6 +52,7 @@ public class JoinService {
     private final SubscriptionService subscriptionService; // 인원 한도·이용 상태
     private final EmployeeService employeeService; // 비밀번호 해시, 사번 발급 (같은 모듈)
     private final EmployeeDAO employeeDAO; // 계정 저장 (insertAccount)
+    private final MailSettings mailSettings;
 
     /** 가입 승인 화면에 보낼 내용 (GET /employee/api/join) */
     public Map<String, Object> getBoard(LoginUser user) {
@@ -114,6 +115,22 @@ public class JoinService {
         board.put("readOnly", readOnly);
         board.put("requests", waitingRequests(companyId, admin, headDept));
         return board;
+    }
+    
+    /** 가입 승인 배지 수 (/badges의 join). 관리자는 업체 전체, 부서장은 자기 부서 대기 요청. 둘 다 아니면 null(배지 없음) */
+    public Integer countWaitingForBadge(LoginUser user) {
+        boolean admin = isAdmin(user);
+        String headDept = dao.getHeadDeptName(user.getCompanyId(), user.getEmployeeId());
+        if (!admin && headDept == null) {
+            return null;
+        }
+        int count = 0;
+        for (JoinRequestViewDTO r : dao.listWaitingRequests(user.getCompanyId())) {
+            if (admin || headDept.equals(r.getDepartmentName())) {
+                count++;
+            }
+        }
+        return count;
     }
 
     // ---------- 가입 열기·끄기 ----------
@@ -460,11 +477,10 @@ public class JoinService {
             return null;
         }
 
-        // ④ 이메일 인증 전 업체 거절 (준원님 요청: 인증 메일이 아직 없어 주석)
-        // TODO(ACC-06): 인증 메일이 붙으면 주석을 푼다
-        // if (!usage.isEmailVerified()) {
-        // return null;
-        // }
+        // ④ 이메일 인증 전 업체 거절. 메일을 끈 환경에서는 인증할 길이 없으니 막지 않는다(MailSettings)
+        if (mailSettings.isVerificationRequired() && !usage.isEmailVerified()) {
+            return null;
+        }
         return company;
     }
 

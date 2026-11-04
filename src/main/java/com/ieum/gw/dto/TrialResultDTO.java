@@ -1,5 +1,7 @@
 package com.ieum.gw.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -16,4 +18,9 @@ public class TrialResultDTO {
     private int seats;             // 신청 인원
     private String trialStartDate; // 체험 첫날 "2026-10-30" (신청일)
     private String trialLastDate;  // 체험 마지막 날 "2026-11-12" (다음 날 0시에 만료)
+    private boolean verificationRequired; // 이메일 인증을 마쳐야 로그인할 수 있는가(ACC-06)
+    private boolean mailSent;      // 인증 메일을 메일 서버에 넘겼는가
+
+    @JsonIgnore
+    private Long companyId;        // 인증 메일을 보낼 업체. 화면에는 주지 않는다
 }

@@ -251,7 +251,7 @@
 - DB는 공용 Oracle 서버 한 대에 모두 접속한다. 테이블 변경은 DDL 스크립트로 Git에 올리고 DB 리드가 공용 DB에 반영한다. 공용 DB를 둘 곳은 회의에서 정한다.
 - WebSocket은 수업의 `@ServerEndpoint` 방식으로 한다. `SpringConfigurator`를 상속한 Configurator로 Service를 주입받고, 핸드셰이크 때 서버의 인증 정보에서 로그인 사용자를 넘긴다. `SpringConfigurator`는 root context의 bean을 찾으므로 Service·DAO는 `root-context.xml`에서 스캔한다.
 - 채팅 담당이 11장의 사전 구현에서 인증 사용자·Service 주입·DB 저장을 확인하고 공통 예제로 공유한다. 이 방식이 안 되면 Spring `WebSocketHandler`로 바꾼다. `spring-websocket` 의존성은 담당 1이 추가한다.
-- 필수 외부 연동은 카카오 지도, 토스페이먼츠 테스트 결제, 이메일 발송(Spring `JavaMailSender` + SMTP, 팀 공용 Gmail 앱 비밀번호)이다. 메일 발송 의존성(`spring-context-support`, `javax.mail`)과 `@Scheduled` 설정은 담당 1이 추가한다. 일정 UI는 FullCalendar를 검토하되 버전을 고정하고 JSP에서 조회·등록 동작을 먼저 확인한다. 구독 통계(SUB-02)에는 그래프가 필요하고, 리치 에디터는 필수가 아니다.
+- 필수 외부 연동은 카카오 지도, 토스페이먼츠 테스트 결제, 이메일 발송(Spring `JavaMailSender` + SMTP, 팀 공용 Gmail 앱 비밀번호)이다. 메일 발송은 담당 6이 맡고, `@Scheduled` 설정은 담당 1이 추가한다. 일정 UI는 FullCalendar를 검토하되 버전을 고정하고 JSP에서 조회·등록 동작을 먼저 확인한다. 구독 통계(SUB-02)에는 그래프가 필요하고, 리치 에디터는 필수가 아니다.
 - 그룹웨어는 PWA로 제공한다(`manifest.json`, 서비스 워커, 아이콘). 설치는 HTTPS 주소나 `localhost`에서만 되므로 중앙 서버의 고정 HTTPS 주소를 공용 DB 자리와 함께 정한다. 서비스 워커는 정적 파일만 캐시한다.
 - 패키지는 계층(`controller/service/dao/mapper/dto` 등)으로 나눈다. 모듈 15개(`employee`, `approval`, `attendance`, `ticket`, `asset`, `location`, `schedule`, `board`, `chat`, `notification`, `site`, `subscription`, `ops`, `support`, `common`)는 담당과 주소·화면 폴더를 나누는 단위다. 모듈별 맡는 일은 AGENTS.md에 있다. MyBatis는 Mapper 인터페이스 방식으로 쓰고, DAO 클래스가 Mapper 인터페이스를 감싸 Service는 DAO만 호출한다. Mapper XML은 `src/main/resources/mapper/<Mapper 인터페이스 이름>.xml`에 둔다.
 - 업체 구분은 공유 테이블 + `company_id`다. 업체 ID는 로그인 사용자에게서만 꺼내 모든 SQL에 조건을 붙이고, 사번 고유 제약은 `(company_id, 사번)`이다(AGENTS.md 'DB·MyBatis'). 운영자가 이음 장애 문의를 읽고 답변하는 것만 예외다.
