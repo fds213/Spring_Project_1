@@ -4,24 +4,38 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieum.gw.dto.AuthEmpDTO;
+import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.OpsApplicationDTO;
 import com.ieum.gw.dto.OpsCompanyDTO;
 import com.ieum.gw.dto.OpsCompanyDetailDTO;
 import com.ieum.gw.dto.OpsGuestInquiryDTO;
+import com.ieum.gw.dto.OpsGuestReplyDTO;
+import com.ieum.gw.dto.OpsReplyFormDTO;
+import com.ieum.gw.dto.OpsReplyResultDTO;
 import com.ieum.gw.dto.OpsStateDTO;
 import com.ieum.gw.service.OpsNotFoundException;
+import com.ieum.gw.service.OpsReplyException;
+import com.ieum.gw.service.OpsReplyService;
 import com.ieum.gw.service.OpsService;
 
 /** 화면 JS가 받는 응답 모양을 확인한다. Security는 빼고 Controller만 띄운다. ROLE_OPS 검사는 임시 Tomcat에서 따로 본다 */
@@ -86,13 +100,77 @@ class OpsControllerTest {
             inquiry.setTitle("도입 문의");
             inquiry.setBody("내용");
             inquiry.setState("IQ_RECEIVED");
+            OpsGuestReplyDTO reply = new OpsGuestReplyDTO();
+            reply.setId(5L);
+            reply.setAt("2026-11-03T11:00:00");
+            reply.setBody("답변");
+            reply.setStatus("MAIL_FAILED");
+            reply.setReason("메일 서버 연결 실패");
+            reply.setInquiryNo(1000L);
+            reply.setMailOutboxId(77L);
+            inquiry.setReplies(List.of(reply));
             return List.of(inquiry);
         }
     }
 
+    static class FakeReplies extends OpsReplyService {
+        RuntimeException error;
+        Long no;
+        Long replyId;
+        OpsReplyFormDTO form;
+        Long operator;
+
+        FakeReplies() {
+            super(null, null, null, null);
+        }
+
+        private OpsReplyResultDTO result() {
+            if (error != null) {
+                throw error;
+            }
+            OpsGuestInquiryDTO inquiry = new OpsGuestInquiryDTO();
+            inquiry.setNo(no);
+            return new OpsReplyResultDTO(inquiry, false, "메일 서버 연결 실패");
+        }
+
+        @Override
+        public OpsReplyResultDTO sendReply(Long no, OpsReplyFormDTO form, Long operatorAccountId) {
+            this.no = no;
+            this.form = form;
+            this.operator = operatorAccountId;
+            return result();
+        }
+
+        @Override
+        public OpsReplyResultDTO resend(Long no, Long replyId) {
+            this.no = no;
+            this.replyId = replyId;
+            return result();
+        }
+    }
+
     private final FakeService service = new FakeService();
-    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new OpsController(service)).build();
+    private final FakeReplies replies = new FakeReplies();
+    private final MockMvc mvc = MockMvcBuilders.standaloneSetup(new OpsController(service, replies))
+            .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
     private final ObjectMapper json = new ObjectMapper();
+
+    @BeforeEach
+    void login() {
+        AuthEmpDTO emp = new AuthEmpDTO();
+        emp.setUserAccountId(9L);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new LoginUser(emp), null, List.of()));
+    }
+
+    @AfterEach
+    void logout() {
+        SecurityContextHolder.clearContext();
+    }
+
+    private MvcResult postReply(String path, String json) throws Exception {
+        return mvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(json)).andReturn();
+    }
 
     private JsonNode body(MvcResult result) throws Exception {
         return json.readTree(result.getResponse().getContentAsString(StandardCharsets.UTF_8));
@@ -165,6 +243,67 @@ class OpsControllerTest {
         assertEquals("도입 문의", item.get("title").asText());
         assertEquals("내용", item.get("body").asText());
         assertEquals("IQ_RECEIVED", item.get("state").asText());
+    }
+
+    @Test
+    @DisplayName("비회원 접수의 답변은 화면이 읽는 칸만 주고 안쪽 번호는 내보내지 않는다")
+    void guestReplies() throws Exception {
+        JsonNode reply = body(mvc.perform(get("/ops/api/guest-inquiries")).andReturn()).get("data").get(0).get("replies").get(0);
+        assertEquals(5, reply.get("id").asInt());
+        assertEquals("2026-11-03T11:00:00", reply.get("at").asText());
+        assertEquals("답변", reply.get("body").asText());
+        assertEquals("MAIL_FAILED", reply.get("status").asText());
+        assertEquals("메일 서버 연결 실패", reply.get("reason").asText());
+        assertFalse(reply.get("stale").asBoolean());
+        assertFalse(reply.has("mailOutboxId"));
+        assertFalse(reply.has("inquiryNo"));
+    }
+
+    @Test
+    @DisplayName("답변: 운영자는 로그인 정보에서 꺼내고, 메일이 실패해도 200에 sent·reason으로 알린다")
+    void reply() throws Exception {
+        MvcResult result = postReply("/ops/api/guest-inquiries/1000/replies",
+                "{\"body\":\"답변\",\"lastReplyId\":5,\"operatorAccountId\":1}");
+
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals(1000L, replies.no);
+        assertEquals(9L, replies.operator);
+        assertEquals("답변", replies.form.getBody());
+        assertEquals(5L, replies.form.getLastReplyId());
+        JsonNode data = body(result).get("data");
+        assertFalse(data.get("sent").asBoolean());
+        assertEquals("메일 서버 연결 실패", data.get("reason").asText());
+        assertEquals(1000, data.get("inquiry").get("no").asInt());
+    }
+
+    @Test
+    @DisplayName("다시 보내기: 접수번호와 답변 번호를 주소에서 읽는다")
+    void resend() throws Exception {
+        MvcResult result = postReply("/ops/api/guest-inquiries/1000/replies/5/resend", "");
+
+        assertEquals(200, result.getResponse().getStatus());
+        assertEquals(1000L, replies.no);
+        assertEquals(5L, replies.replyId);
+    }
+
+    @Test
+    @DisplayName("겹친 답변은 서비스가 정한 상태와 문구로, 없는 접수는 404로 답한다")
+    void replyRejected() throws Exception {
+        replies.error = new OpsReplyException(409, "그사이 다른 답변이 있습니다.");
+        MvcResult conflict = postReply("/ops/api/guest-inquiries/1000/replies", "{\"body\":\"답변\"}");
+        assertEquals(409, conflict.getResponse().getStatus());
+        assertEquals("그사이 다른 답변이 있습니다.", body(conflict).get("message").asText());
+
+        replies.error = new OpsNotFoundException("접수를 찾을 수 없습니다.");
+        assertEquals(404, postReply("/ops/api/guest-inquiries/1/replies/5/resend", "").getResponse().getStatus());
+    }
+
+    @Test
+    @DisplayName("JSON이 깨졌거나 번호 칸에 글자가 오면 500이 아니라 400이다")
+    void replyUnreadable() throws Exception {
+        assertEquals(400, postReply("/ops/api/guest-inquiries/1000/replies", "{깨진").getResponse().getStatus());
+        assertEquals(400, postReply("/ops/api/guest-inquiries/abc/replies", "{\"body\":\"답변\"}").getResponse().getStatus());
+        assertEquals(400, postReply("/ops/api/guest-inquiries/1000/replies/abc/resend", "").getResponse().getStatus());
     }
 
     @Test

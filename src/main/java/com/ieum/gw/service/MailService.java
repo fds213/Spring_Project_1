@@ -1,6 +1,7 @@
 package com.ieum.gw.service;
 
 import java.io.UnsupportedEncodingException;
+import java.time.LocalDate;
 
 import javax.mail.MessagingException;
 import javax.mail.SendFailedException;
@@ -19,6 +20,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import com.ieum.gw.code.MailType;
 import com.ieum.gw.dao.MailDAO;
 import com.ieum.gw.dto.MailMessageDTO;
 import com.ieum.gw.dto.MailResultDTO;
@@ -33,6 +35,8 @@ public class MailService {
 
     private static final Logger logger = LoggerFactory.getLogger(MailService.class);
     private static final int MAX_SUBJECT = 200;  // MAIL_OUTBOX.SUBJECT
+    /** 결과를 남기지 못하고 멈춘 발송으로 보는 시간. 메일 서버와 주고받는 단계마다 5초 제한이라 정상 발송은 이 안에 끝난다 */
+    public static final int STALE_MINUTES = 2;
     static final String REASON_OFF = "메일 발송이 꺼져 있음(서버 설정)";
     static final String REASON_AUTH = "메일 서버 인증 실패(서버 설정 확인 필요)";
     static final String REASON_REJECTED = "받는 주소를 메일 서버가 거부함";
@@ -66,13 +70,8 @@ public class MailService {
      * @throws IllegalStateException 트랜잭션 안에서 불렀을 때
      */
     public MailResultDTO send(MailMessageDTO mail) {
-        if (TransactionSynchronizationManager.isActualTransactionActive()) {
-            throw new IllegalStateException("메일은 트랜잭션 밖에서 보냅니다. 커밋이 끝난 뒤에 부르세요.");
-        }
-        // 제목 줄바꿈은 메일 머리글을 끼워 넣는 데 쓰일 수 있다
-        String subject = mail.getSubject().replaceAll("[\\r\\n]+", " ");
-        mail.setSubject(subject.length() > MAX_SUBJECT ? subject.substring(0, MAX_SUBJECT) : subject);
-
+        requireNoTransaction();
+        cleanSubject(mail);
         try {
             dao.insertOutbox(mail);
         } catch (DuplicateKeyException e) {
@@ -81,9 +80,58 @@ public class MailService {
             logger.error("메일 발송 기록 실패: 종류={}", mail.getMailType(), e);
             return MailResultDTO.failed(REASON_NO_RECORD);
         }
+        return deliverAndRecord(mail);
+    }
 
+    /**
+     * 발송 기록만 남기고 보내지는 않는다. 문의 답변처럼 업무 자료와 기록이 함께 커밋돼야 하는 메일은 그 트랜잭션에서 이것을 부르고,
+     * 커밋이 끝난 뒤 sendRecorded로 보낸다. 기록에 실패하면 업무 자료도 함께 취소되도록 예외를 그대로 던진다.
+     */
+    public void record(MailMessageDTO mail) {
+        cleanSubject(mail);
+        dao.insertOutbox(mail);
+    }
+
+    /**
+     * record로 남겼거나 claimRetry로 되돌린 기록의 메일을 보내고 결과를 그 기록에 남긴다.
+     *
+     * @throws IllegalStateException 트랜잭션 안에서 불렀을 때
+     */
+    public MailResultDTO sendRecorded(MailMessageDTO mail) {
+        requireNoTransaction();
+        cleanSubject(mail);
+        return deliverAndRecord(mail);
+    }
+
+    /**
+     * 실패했거나 결과를 남기지 못하고 멈춘 기록을 다시 보낼 수 있게 대기로 되돌린다. 조건부 UPDATE라 같은 기록을 동시에 되돌려도
+     * 한 요청만 true를 받는다. true를 받은 요청만 커밋 뒤 sendRecorded를 부른다.
+     *
+     * @return 되돌렸으면 true, 이미 보냈거나 다른 요청이 보내는 중이면 false
+     */
+    public boolean claimRetry(Long mailOutboxId) {
+        return dao.claimRetry(mailOutboxId, STALE_MINUTES) == 1;
+    }
+
+    /** 그날 이 주소로 기록된 이 종류의 메일 수. 보내지 못한 것도 센다. 공개 폼의 횟수 제한에 쓴다 */
+    public int countForRecipient(MailType mailType, String recipientEmail, LocalDate day) {
+        return dao.countForRecipient(mailType, recipientEmail, day);
+    }
+
+    private void requireNoTransaction() {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("메일은 트랜잭션 밖에서 보냅니다. 커밋이 끝난 뒤에 부르세요.");
+        }
+    }
+
+    // 제목 줄바꿈은 메일 머리글을 끼워 넣는 데 쓰일 수 있다
+    private static void cleanSubject(MailMessageDTO mail) {
+        String subject = mail.getSubject().replaceAll("[\\r\\n]+", " ");
+        mail.setSubject(subject.length() > MAX_SUBJECT ? subject.substring(0, MAX_SUBJECT) : subject);
+    }
+
+    private MailResultDTO deliverAndRecord(MailMessageDTO mail) {
         MailResultDTO result = deliver(mail);
-
         try {
             recordService.recordResult(mail.getMailOutboxId(), result.isOk(), result.getReason());
         } catch (RuntimeException e) {

@@ -34,7 +34,7 @@ class InquiryControllerTest {
         InquirySubmitDTO received; // 마지막으로 받은 입력
 
         FakeService(Supplier<InquiryResultDTO> answer) {
-            super(null);
+            super(null, null);
             this.answer = answer;
         }
 

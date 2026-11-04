@@ -15,7 +15,7 @@
   </jsp:attribute>
   <jsp:body>
     <section class="view on" id="view-ops-inquiry-guest">
-      <%-- 비회원 접수: 소개 사이트 도입 문의(WEB-02). 답변 메일(WEB-03)은 메일 기능이 들어온 뒤 붙인다 --%>
+      <%-- 비회원 접수: 소개 사이트 도입 문의(WEB-02)를 보고 메일로 답변한다(WEB-03) --%>
       <div class="page-head"><h1>비회원 접수</h1></div>
       <div class="cards" id="guestFilters">
         <button type="button" class="card card-filter" data-filter="all" aria-pressed="true"><small>전체</small><strong id="gCntAll">0건</strong></button>

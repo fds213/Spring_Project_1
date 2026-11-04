@@ -2,7 +2,7 @@
 // 입력 → 접수(같은 페이지에서 완료 화면으로 바뀐다). 개인정보 동의는 화면에서만 확인하고 서버로 보내지 않는다.
 //
 //   POST /inquiry/api/submit  { companyName, name, email, phone, title, content, website }
-//     → 200 { no (접수번호), email }
+//     → 200 { no (접수번호), email, mailSent (접수 메일을 보냈는지) }
 //     → 400 입력 오류 { message, field } (field = 보내는 값의 이름) / 429 너무 잦음·500 그 밖 { message }
 // 주소·값 이름은 화면이 먼저 정한 제안이다(서버 담당이 정하면 그에 맞춘다, AGENTS.md '수정 범위').
 // 값 이름은 운영자 화면(ops/inquiry.js)이 받는 비회원 문의 목록과 맞췄다. website 는 사람에게 안 보이는 봇 막기 칸이다.
@@ -106,6 +106,10 @@
       node('dt', '', '문의 내용'), node('dd', 'clamp', f.content));
     $('doneNo').textContent = r.no || '-';
     $('doneNo').closest('.done-no').hidden = !r.no;
+    // 메일이 꺼져 있거나 실패했으면 보냈다고 말하지 않는다
+    $('doneGuide').textContent = r.mailSent
+      ? '접수 내용을 입력하신 이메일로 보내 드렸습니다. 답변도 같은 주소로 보내 드립니다.'
+      : '답변은 입력하신 이메일로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.';
     $('inqLayout').hidden = true;
     $('inqDone').hidden = false;
     window.scrollTo({ top: 0 });

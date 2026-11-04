@@ -22,6 +22,8 @@ import com.ieum.gw.dto.OpsCompanyDTO;
 import com.ieum.gw.dto.OpsCompanyDetailDTO;
 import com.ieum.gw.dto.OpsCompanyRowDTO;
 import com.ieum.gw.dto.OpsEmployeeDTO;
+import com.ieum.gw.dto.OpsGuestInquiryDTO;
+import com.ieum.gw.dto.OpsGuestReplyDTO;
 import com.ieum.gw.dto.OpsPaymentDTO;
 import com.ieum.gw.dto.OpsPaymentStatDTO;
 import com.ieum.gw.dto.CompanyPeriodDTO;
@@ -37,6 +39,35 @@ class OpsServiceTest {
 
         FakeDAO() {
             super(null);
+        }
+
+        final List<OpsGuestInquiryDTO> guestInquiries = new ArrayList<>();
+        final List<OpsGuestReplyDTO> guestReplies = new ArrayList<>();
+
+        @Override
+        public List<OpsGuestInquiryDTO> listGuestInquiries() {
+            return guestInquiries;
+        }
+
+        @Override
+        public OpsGuestInquiryDTO getGuestInquiry(Long no) {
+            return guestInquiries.stream().filter(q -> q.getNo().equals(no)).findFirst().orElse(null);
+        }
+
+        @Override
+        public List<OpsGuestReplyDTO> listGuestReplies(int staleMinutes) {
+            return guestReplies;
+        }
+
+        @Override
+        public List<OpsGuestReplyDTO> listGuestReplies(Long no, int staleMinutes) {
+            List<OpsGuestReplyDTO> list = new ArrayList<>();
+            for (OpsGuestReplyDTO reply : guestReplies) {
+                if (reply.getInquiryNo().equals(no)) {
+                    list.add(reply);
+                }
+            }
+            return list;
         }
 
         @Override
@@ -317,5 +348,50 @@ class OpsServiceTest {
         LocalDateTime now = LocalDateTime.parse("2026-11-03T12:00:00");
         assertTrue(OpsService.isNew(LocalDateTime.parse("2026-11-02T12:00:01"), now));
         assertFalse(OpsService.isNew(LocalDateTime.parse("2026-11-02T12:00:00"), now));
+    }
+
+    private OpsGuestInquiryDTO guest(long no) {
+        OpsGuestInquiryDTO inquiry = new OpsGuestInquiryDTO();
+        inquiry.setNo(no);
+        dao.guestInquiries.add(inquiry);
+        return inquiry;
+    }
+
+    private OpsGuestReplyDTO guestReply(long id, long no) {
+        OpsGuestReplyDTO reply = new OpsGuestReplyDTO();
+        reply.setId(id);
+        reply.setInquiryNo(no);
+        dao.guestReplies.add(reply);
+        return reply;
+    }
+
+    @Test
+    @DisplayName("비회원 접수 목록: 답변을 접수별로 묶고, 답변이 없는 접수는 빈 목록이다")
+    void guestInquiriesGroupReplies() {
+        guest(1000L);
+        guest(1001L);
+        guestReply(1L, 1000L);
+        guestReply(2L, 1000L);
+
+        List<OpsGuestInquiryDTO> list = service.listGuestInquiries();
+
+        assertEquals(2, list.get(0).getReplies().size());
+        assertEquals(2L, list.get(0).getReplies().get(1).getId());
+        assertTrue(list.get(1).getReplies().isEmpty());
+    }
+
+    @Test
+    @DisplayName("비회원 접수 한 건: 그 접수의 답변만 붙이고, 없는 번호는 404다")
+    void guestInquiryOne() {
+        guest(1000L);
+        guest(1001L);
+        guestReply(1L, 1000L);
+        guestReply(2L, 1001L);
+
+        OpsGuestInquiryDTO found = service.getGuestInquiry(1001L);
+
+        assertEquals(1, found.getReplies().size());
+        assertEquals(2L, found.getReplies().get(0).getId());
+        assertThrows(OpsNotFoundException.class, () -> service.getGuestInquiry(9999L));
     }
 }
