@@ -23,6 +23,7 @@ class TicketServiceTest {
         int result = 1;
         int calls;
         RuntimeException error;
+        RuntimeException readError;
         EquipmentTicketDTO existing;
 
         FakeDAO() { super(null); }
@@ -44,32 +45,49 @@ class TicketServiceTest {
         public EquipmentTicketDTO selectEquipmentTicket(Long companyId, Long approvalDocumentId) {
             assertEquals(7L, companyId);
             assertEquals(11L, approvalDocumentId);
+            if (readError != null) { throw readError; }
             return existing;
         }
     }
 
-    private void create(TicketService service) {
-        service.createEquipmentTicket(7L, 9L, 11L, 13L, "AT_LAPTOP", "개발 업무");
+    private Long create(TicketService service) {
+        return service.createEquipmentTicket(7L, 9L, 11L, 13L, "AT_LAPTOP", "개발 업무");
     }
 
     @Test
-    @DisplayName("장비 승인 연동 계약의 업체·요청자·결재 문서·지점·목적을 저장한다")
+    @DisplayName("신규 지급 티켓 생성 후 생성된 티켓 ID를 반환한다")
     void insertsEquipmentTicket() {
         FakeDAO dao = new FakeDAO();
-        create(new TicketService(dao));
+
+        // INSERT 후 조회했을 때 DB에서 읽었다고 가정할 결과
+        dao.existing = new EquipmentTicketDTO();
+        dao.existing.setItTicketId(101L);
+        dao.existing.setRequesterEmployeeId(9L);
+        dao.existing.setBranchId(13L);
+        dao.existing.setContent("개발 업무");
+
+        Long ticketId = create(new TicketService(dao));
+
+        assertEquals(101L, ticketId);
         assertEquals(1, dao.calls);
     }
 
     @Test
-    @DisplayName("동일 결재의 중복 생성은 같은 내용일 때 기존 티켓을 유지한다")
+    @DisplayName("동일 결재의 중복 요청은 정보 검증 후 기존 티켓 ID를 반환한다")
     void acceptsMatchingDuplicate() {
         FakeDAO dao = new FakeDAO();
-        dao.result = 0;
+        dao.result = 0; // 원본 결재 문서 중복으로 INSERT 생략
+
         dao.existing = new EquipmentTicketDTO();
+        dao.existing.setItTicketId(202L);
         dao.existing.setRequesterEmployeeId(9L);
         dao.existing.setBranchId(13L);
         dao.existing.setContent("개발 업무");
-        assertDoesNotThrow(() -> create(new TicketService(dao)));
+
+        Long ticketId = create(new TicketService(dao));
+
+        assertEquals(202L, ticketId);
+        assertEquals(1, dao.calls);
     }
 
     @Test
@@ -79,6 +97,7 @@ class TicketServiceTest {
         dao.result = 0;
         assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
         dao.existing = new EquipmentTicketDTO();
+        dao.existing.setItTicketId(202L);
         dao.existing.setRequesterEmployeeId(99L);
         dao.existing.setBranchId(13L);
         dao.existing.setContent("개발 업무");
@@ -89,6 +108,49 @@ class TicketServiceTest {
         dao.existing.setBranchId(13L);
         dao.existing.setContent("다른 목적");
         assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+    }
+
+    @Test
+    @DisplayName("신규·중복 처리 뒤 티켓이 조회되지 않으면 ID를 반환하지 않고 실패한다")
+    void rejectsMissingTicketAfterInsert() {
+        for (int inserted : new int[] {1, 0}) {
+            FakeDAO dao = new FakeDAO();
+            dao.result = inserted;
+            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        }
+    }
+
+    @Test
+    @DisplayName("신규·중복 조회 결과의 티켓 ID가 없거나 양수가 아니면 실패한다")
+    void rejectsInvalidReturnedId() {
+        for (int inserted : new int[] {1, 0}) {
+            for (Long id : new Long[] {null, 0L, -1L}) {
+                FakeDAO dao = new FakeDAO();
+                dao.result = inserted;
+                dao.existing = matchingTicket(id);
+                assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("INSERT 처리 행 수가 0이나 1이 아니면 티켓 ID를 반환하지 않는다")
+    void rejectsUnexpectedInsertCount() {
+        for (int inserted : new int[] {-1, 2}) {
+            FakeDAO dao = new FakeDAO();
+            dao.result = inserted;
+            dao.existing = matchingTicket(101L);
+            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        }
+    }
+
+    private EquipmentTicketDTO matchingTicket(Long id) {
+        EquipmentTicketDTO ticket = new EquipmentTicketDTO();
+        ticket.setItTicketId(id);
+        ticket.setRequesterEmployeeId(9L);
+        ticket.setBranchId(13L);
+        ticket.setContent("개발 업무");
+        return ticket;
     }
 
     @Test
@@ -169,8 +231,11 @@ class TicketServiceTest {
     @DisplayName("결재 트랜잭션에 참여해 별도 트랜잭션을 시작하지 않는다")
     void joinsApprovalTransaction() {
         FakeTransactions transactions = new FakeTransactions();
-        TicketService service = proxy(new FakeDAO(), transactions);
-        new TransactionTemplate(transactions).execute(status -> { create(service); return null; });
+        FakeDAO dao = new FakeDAO();
+        dao.existing = matchingTicket(101L);
+        TicketService service = proxy(dao, transactions);
+        Long ticketId = new TransactionTemplate(transactions).execute(status -> create(service));
+        assertEquals(101L, ticketId);
         assertEquals(1, transactions.begins);
         assertEquals(1, transactions.commits);
         assertEquals(0, transactions.rollbacks);
@@ -185,6 +250,20 @@ class TicketServiceTest {
         TicketService service = proxy(dao, transactions);
         assertThrows(IllegalStateException.class, () -> new TransactionTemplate(transactions)
                 .execute(status -> { create(service); return null; }));
+        assertEquals(0, transactions.commits);
+        assertEquals(1, transactions.rollbacks);
+    }
+
+    @Test
+    @DisplayName("생성 티켓 ID 조회가 실패해도 예외를 전파하고 결재 트랜잭션을 롤백한다")
+    void rollsBackApprovalOnLookupFailure() {
+        FakeDAO dao = new FakeDAO();
+        dao.readError = new IllegalStateException("조회 실패");
+        FakeTransactions transactions = new FakeTransactions();
+        TicketService service = proxy(dao, transactions);
+        assertSame(dao.readError, assertThrows(IllegalStateException.class,
+                () -> new TransactionTemplate(transactions).execute(status -> create(service))));
+        assertEquals(1, dao.calls);
         assertEquals(0, transactions.commits);
         assertEquals(1, transactions.rollbacks);
     }
