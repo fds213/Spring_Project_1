@@ -78,7 +78,7 @@ class TicketReadControllerTest {
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
-        mvc = MockMvcBuilders.standaloneSetup(new TicketReadController(new TicketReadService(dao)))
+        mvc = MockMvcBuilders.standaloneSetup(new TicketReadController(new TicketReadService(dao, null, null, null)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
         login(7L, 9L);
     }
