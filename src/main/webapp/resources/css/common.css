@@ -90,7 +90,12 @@ a { color: inherit; text-decoration: none; }
 .join-status.is-bad { background: var(--danger-bg); color: var(--danger); }
 .join-code-input { margin-top: 8px; }
 .join-code-note:empty { display: none; }
-.join-request-hint { margin: 0; text-align: center; }
+/* 승인 요청 전에 남은 입력: 주황 테두리 상자로 눈에 띄게 (안내 상자 .notice-warn 과 같은 색) */
+.emp-roles-hint.join-request-hint {
+  margin: 0 0 10px; padding: 10px 14px; border: 1px solid #f0a44b; border-radius: var(--radius);
+  background: #fff4e5; color: #8a4b08; text-align: center;
+  white-space: pre-line; /* 비밀번호 조건(괄호)은 다음 줄에 */
+}
 /* 가입 승인: 가입 활성화 box */
 .join-open { margin: 4px 0 18px; padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
 /* 켜져 있는 동안 테두리 색이 천천히 한 바퀴씩 돈다 (2px 테두리라 padding을 1px 줄여 크기를 맞춤) */
@@ -164,7 +169,7 @@ a { color: inherit; text-decoration: none; }
   .select.open .select-option { animation: none; }
 }
 /* 로그인 상자 안의 다른 화면 제목·안내 (계정 생성, 비밀번호 찾기) */
-.login-title { margin: 0; font-size: 18px; font-weight: 600; }
+.login-title { margin: 0; font-size: 18px; font-weight: 600; text-align: center; }
 .login-lead { margin: -6px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 
 /* 헤더 */
@@ -604,6 +609,8 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 }
 /* 동작 버튼이 있는 카드 아래쪽: 카드 바닥에 붙여 카드가 늘어나도 줄이 맞는다 */
 .btn-block { width: 100%; height: 40px; justify-content: center; font-weight: 500; }
+/* 계정 생성·비밀번호 찾기의 넓은 보조 버튼(취소, 로그인으로 돌아가기): 바탕과 섞이지 않게 테두리를 둔다 */
+.btn-ghost.btn-block { border-color: var(--line); }
 /* 카드 안의 목록은 자체 테두리·바탕을 뺀다: 왼쪽에 흐린 항목, 그 옆에 값 */
 .info-card .detail { border: 0; border-radius: 0; grid-template-columns: 128px minmax(0, 1fr); }
 .info-card .detail dt { background: none; padding-left: 18px; padding-right: 12px; white-space: nowrap; }

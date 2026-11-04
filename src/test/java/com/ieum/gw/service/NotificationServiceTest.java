@@ -1,0 +1,295 @@
+package com.ieum.gw.service;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
+
+import com.ieum.gw.dao.NotificationDAO;
+import com.ieum.gw.dto.NotificationDTO;
+import com.ieum.gw.dto.NotificationPageDTO;
+import com.ieum.gw.dto.NotificationSaveDTO;
+
+/**
+ * DB 없이 확인한다: DAO를 가짜로 바꿔 고유 제약(UQ_69_01)과 업체·계정 조건을 흉내 낸다.
+ * SQL과 트랜잭션은 이 테스트 밖이다(PR 설명의 Oracle 확인).
+ */
+class NotificationServiceTest {
+
+    private static final Long COMPANY = 1L;
+    private static final Long OTHER_COMPANY = 2L;
+    private static final Long EMP_KIM = 100L;
+    private static final Long EMP_LEE = 200L;
+    private static final Long EMP_NO_ACCOUNT = 300L;
+    private static final Long ACCOUNT_KIM = 10L;
+    private static final Long ACCOUNT_LEE = 20L;
+    private static final Long DOC = 7000L;
+    private static final Long TICKET = 8000L;
+
+    /** 저장한 행을 기억하고, 받는 계정·중복 방지 키가 겹치면 고유 제약처럼 예외를 던지는 가짜 DAO */
+    static class FakeDAO extends NotificationDAO {
+        final Map<String, Long> accounts = new HashMap<>();
+        final List<NotificationSaveDTO> rows = new ArrayList<>();
+        final List<Long> readIds = new ArrayList<>();
+        RuntimeException insertError;
+        int lastOffset = -1;
+
+        FakeDAO() {
+            super(null);
+            accounts.put(COMPANY + ":" + EMP_KIM, ACCOUNT_KIM);
+            accounts.put(COMPANY + ":" + EMP_LEE, ACCOUNT_LEE);
+        }
+
+        @Override
+        public Long findAccountId(Long companyId, Long employeeId) {
+            return accounts.get(companyId + ":" + employeeId);
+        }
+
+        @Override
+        public int insert(NotificationSaveDTO dto) {
+            if (insertError != null) {
+                throw insertError;
+            }
+            boolean duplicate = rows.stream().anyMatch(r -> r.getReceiverAccountId().equals(dto.getReceiverAccountId())
+                    && r.getDedupeKey().equals(dto.getDedupeKey()));
+            if (duplicate) {
+                throw new DuplicateKeyException("ORA-00001");
+            }
+            rows.add(dto);
+            return 1;
+        }
+
+        /** 알림 번호는 rows 순번(0부터)으로 친다 */
+        private boolean owned(Long companyId, Long accountId, Long id) {
+            if (id < 0 || id >= rows.size()) {
+                return false;
+            }
+            NotificationSaveDTO row = rows.get(id.intValue());
+            return row.getCompanyId().equals(companyId) && row.getReceiverAccountId().equals(accountId);
+        }
+
+        @Override
+        public List<NotificationDTO> list(Long companyId, Long accountId, int offset, int size) {
+            lastOffset = offset;
+            return rows.stream()
+                    .filter(r -> r.getCompanyId().equals(companyId) && r.getReceiverAccountId().equals(accountId))
+                    .skip(offset)
+                    .limit(size)
+                    .map(r -> {
+                        NotificationDTO dto = new NotificationDTO();
+                        dto.setMessage(r.getMessage());
+                        return dto;
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        public int count(Long companyId, Long accountId) {
+            return (int) rows.stream()
+                    .filter(r -> r.getCompanyId().equals(companyId) && r.getReceiverAccountId().equals(accountId))
+                    .count();
+        }
+
+        @Override
+        public int countUnread(Long companyId, Long accountId) {
+            int unread = 0;
+            for (long id = 0; id < rows.size(); id++) {
+                if (owned(companyId, accountId, id) && !readIds.contains(id)) {
+                    unread++;
+                }
+            }
+            return unread;
+        }
+
+        @Override
+        public int markRead(Long companyId, Long accountId, Long id) {
+            if (!owned(companyId, accountId, id) || readIds.contains(id)) {
+                return 0;
+            }
+            readIds.add(id);
+            return 1;
+        }
+
+        @Override
+        public boolean isOwned(Long companyId, Long accountId, Long id) {
+            return owned(companyId, accountId, id);
+        }
+    }
+
+    private final FakeDAO dao = new FakeDAO();
+    private final NotificationService service = new NotificationService(dao);
+
+    @Test
+    @DisplayName("결재 요청 알림은 사원 ID를 계정 ID로 바꿔 문서 번호와 함께 저장한다")
+    void approvalRequestSaved() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+
+        assertEquals(1, dao.rows.size());
+        NotificationSaveDTO row = dao.rows.get(0);
+        assertEquals(COMPANY, row.getCompanyId());
+        assertEquals(ACCOUNT_KIM, row.getReceiverAccountId());
+        assertEquals("NT_APPROVAL_REQUEST", row.getNotificationType());
+        assertEquals("결재 요청", row.getTitle());
+        assertTrue(row.getMessage().contains("휴가 신청서"));
+        assertEquals(DOC, row.getApprovalDocumentId());
+        assertNull(row.getItTicketId());
+    }
+
+    @Test
+    @DisplayName("결재 완료·반려는 각자의 종류로 저장한다")
+    void approvalTypes() {
+        service.notifyApprovalDone(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+        service.notifyApprovalRejected(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+
+        assertEquals("NT_APPROVAL_DONE", dao.rows.get(0).getNotificationType());
+        assertEquals("NT_APPROVAL_REJECT", dao.rows.get(1).getNotificationType());
+    }
+
+    @Test
+    @DisplayName("같은 사람에게 같은 문서·같은 종류의 결재 알림을 두 번 보내도 예외 없이 하나만 저장한다")
+    void approvalDeduped() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+
+        assertEquals(1, dao.rows.size());
+    }
+
+    @Test
+    @DisplayName("같은 문서라도 받는 사람이나 종류나 문서가 다르면 각각 저장한다")
+    void approvalNotOverDeduped() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+        service.notifyApprovalRequest(COMPANY, EMP_LEE, DOC, "휴가 신청서");
+        service.notifyApprovalDone(COMPANY, EMP_KIM, DOC, "휴가 신청서");
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC + 1, "장비 지급 신청서");
+
+        assertEquals(4, dao.rows.size());
+    }
+
+    @Test
+    @DisplayName("티켓 알림은 같은 인자로 두 번 불러도 부를 때마다 저장한다")
+    void ticketNotDeduped() {
+        service.notifyTicketAssigned(COMPANY, EMP_KIM, TICKET, "모니터 고장");
+        service.notifyTicketAssigned(COMPANY, EMP_KIM, TICKET, "모니터 고장");
+
+        assertEquals(2, dao.rows.size());
+        assertNotEquals(dao.rows.get(0).getDedupeKey(), dao.rows.get(1).getDedupeKey());
+        assertEquals("NT_TICKET_ASSIGNED", dao.rows.get(0).getNotificationType());
+        assertEquals(TICKET, dao.rows.get(0).getItTicketId());
+        assertNull(dao.rows.get(0).getApprovalDocumentId());
+    }
+
+    @Test
+    @DisplayName("티켓 처리 완료 알림은 요청자 계정으로 저장하고 중복 방지 키가 칸 길이(100자)를 넘지 않는다")
+    void ticketResolvedSaved() {
+        service.notifyTicketResolved(COMPANY, EMP_LEE, Long.MAX_VALUE, "모니터 고장");
+
+        NotificationSaveDTO row = dao.rows.get(0);
+        assertEquals("NT_TICKET_RESOLVED", row.getNotificationType());
+        assertEquals(ACCOUNT_LEE, row.getReceiverAccountId());
+        assertTrue(row.getDedupeKey().length() <= 100);
+    }
+
+    @Test
+    @DisplayName("받는 사원의 계정이 없으면 저장하지 않고 업무도 막지 않는다")
+    void noAccountSkipped() {
+        service.notifyApprovalDone(COMPANY, EMP_NO_ACCOUNT, DOC, "휴가 신청서");
+
+        assertTrue(dao.rows.isEmpty());
+    }
+
+    @Test
+    @DisplayName("다른 업체의 사원 번호로는 그 사원의 계정을 찾지 않는다")
+    void otherCompanyEmployeeSkipped() {
+        service.notifyApprovalDone(OTHER_COMPANY, EMP_KIM, DOC, "휴가 신청서");
+
+        assertTrue(dao.rows.isEmpty());
+    }
+
+    @Test
+    @DisplayName("중복이 아닌 저장 오류는 그대로 던져 업무 트랜잭션을 취소하게 한다")
+    void otherErrorPropagates() {
+        dao.insertError = new DataIntegrityViolationException("ORA-02291");
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> service.notifyApprovalDone(COMPANY, EMP_KIM, DOC, "휴가 신청서"));
+    }
+
+    @Test
+    @DisplayName("안 읽은 수는 본인 알림만 세고, 읽으면 줄어든다")
+    void countUnreadOwnOnly() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "a");
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC + 1, "b");
+        service.notifyApprovalRequest(COMPANY, EMP_LEE, DOC, "a");
+
+        assertEquals(2, service.countUnread(COMPANY, ACCOUNT_KIM));
+        assertEquals(1, service.countUnread(COMPANY, ACCOUNT_LEE));
+        assertEquals(0, service.countUnread(OTHER_COMPANY, ACCOUNT_KIM));
+
+        service.markRead(COMPANY, ACCOUNT_KIM, 0L);
+
+        assertEquals(1, service.countUnread(COMPANY, ACCOUNT_KIM));
+    }
+
+    @Test
+    @DisplayName("이미 읽은 알림을 다시 읽어도 성공이다")
+    void markReadTwice() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "a");
+
+        service.markRead(COMPANY, ACCOUNT_KIM, 0L);
+        service.markRead(COMPANY, ACCOUNT_KIM, 0L);
+
+        assertEquals(1, dao.readIds.size());
+    }
+
+    @Test
+    @DisplayName("남의 알림·다른 업체의 알림·없는 알림은 읽음 처리를 거절하고 아무것도 바꾸지 않는다")
+    void markReadRejected() {
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "a");
+
+        assertThrows(NotificationNotFoundException.class, () -> service.markRead(COMPANY, ACCOUNT_LEE, 0L));
+        assertThrows(NotificationNotFoundException.class, () -> service.markRead(OTHER_COMPANY, ACCOUNT_KIM, 0L));
+        assertThrows(NotificationNotFoundException.class, () -> service.markRead(COMPANY, ACCOUNT_KIM, 99L));
+        assertTrue(dao.readIds.isEmpty());
+    }
+
+    @Test
+    @DisplayName("목록은 페이지를 1 ~ 마지막 사이로 맞추고 알림이 없어도 1페이지를 준다")
+    void listPaging() {
+        NotificationPageDTO empty = service.list(COMPANY, ACCOUNT_KIM, 5);
+        assertEquals(1, empty.getPage());
+        assertEquals(1, empty.getPages());
+        assertEquals(0, empty.getTotal());
+        assertNotNull(empty.getItems());
+        assertEquals(0, dao.lastOffset);
+
+        long total = NotificationService.PAGE_SIZE + 1;
+        for (long i = 0; i < total; i++) {
+            service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC + i, "문서");
+        }
+
+        NotificationPageDTO last = service.list(COMPANY, ACCOUNT_KIM, Integer.MAX_VALUE);
+        assertEquals(2, last.getPage());
+        assertEquals(2, last.getPages());
+        assertEquals(total, last.getTotal());
+        assertEquals(1, last.getItems().size());
+        assertEquals(NotificationService.PAGE_SIZE, dao.lastOffset);
+
+        NotificationPageDTO first = service.list(COMPANY, ACCOUNT_KIM, -3);
+        assertEquals(1, first.getPage());
+        assertEquals(NotificationService.PAGE_SIZE, first.getItems().size());
+        assertEquals(0, dao.lastOffset);
+    }
+}

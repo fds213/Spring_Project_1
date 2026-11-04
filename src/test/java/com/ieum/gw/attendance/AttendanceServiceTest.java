@@ -16,21 +16,21 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
-import com.ieum.gw.attendance.dao.AttendanceDAO;
-import com.ieum.gw.attendance.dao.LeaveDAO;
-import com.ieum.gw.attendance.dto.AttendanceDTO;
-import com.ieum.gw.attendance.dto.AttendanceSummaryDTO;
-import com.ieum.gw.attendance.dto.AttendanceDeviceDTO;
-import com.ieum.gw.attendance.dto.DevicePersonDTO;
-import com.ieum.gw.attendance.dto.HolidayDTO;
-import com.ieum.gw.attendance.dto.LeaveDayDTO;
-import com.ieum.gw.attendance.dto.PunchDTO;
-import com.ieum.gw.attendance.dto.TodayAttendanceDTO;
-import com.ieum.gw.attendance.mapper.AttendanceMapper;
-import com.ieum.gw.attendance.service.AttendanceException;
-import com.ieum.gw.attendance.service.AttendanceService;
-import com.ieum.gw.attendance.service.HolidayService;
-import com.ieum.gw.attendance.service.LeaveService;
+import com.ieum.gw.dao.AttendanceDAO;
+import com.ieum.gw.dao.LeaveDAO;
+import com.ieum.gw.dto.AttendanceDTO;
+import com.ieum.gw.dto.AttendanceSummaryDTO;
+import com.ieum.gw.dto.AttendanceDeviceDTO;
+import com.ieum.gw.dto.DevicePersonDTO;
+import com.ieum.gw.dto.HolidayDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.PunchDTO;
+import com.ieum.gw.dto.TodayAttendanceDTO;
+import com.ieum.gw.mapper.AttendanceMapper;
+import com.ieum.gw.service.AttendanceException;
+import com.ieum.gw.service.AttendanceService;
+import com.ieum.gw.service.HolidayService;
+import com.ieum.gw.service.LeaveService;
 
 /** 지문 단말기 출퇴근 규칙 (요구분석서 3.4·3.10, AGENTS.md 테스트: 만료 읽기 전용을 단말기로 우회하는 요청 거절) */
 class AttendanceServiceTest {

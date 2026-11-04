@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.ticket.mapper.TicketReadMapper">
+<mapper namespace="com.ieum.gw.mapper.TicketReadMapper">
     <!-- 부모 티켓과 댓글·이력을 모두 같은 업체·요청자 범위로 읽는다. -->
     <sql id="myTicket">
         t.company_id = #{companyId}
@@ -13,7 +13,7 @@
          WHERE <include refid="myTicket"/>
     </select>
 
-    <select id="selectMyComments" resultType="com.ieum.gw.ticket.dto.TicketCommentDTO">
+    <select id="selectMyComments" resultType="com.ieum.gw.dto.TicketCommentDTO">
         SELECT c.ticket_comment_id AS ticketCommentId, c.author_employee_id AS authorEmployeeId,
                c.content, c.created_at AS createdAt
           FROM ticket_comment c
@@ -22,7 +22,7 @@
          ORDER BY c.created_at, c.ticket_comment_id
     </select>
 
-    <select id="selectMyHistory" resultType="com.ieum.gw.ticket.dto.TicketHistoryDTO">
+    <select id="selectMyHistory" resultType="com.ieum.gw.dto.TicketHistoryDTO">
         SELECT h.ticket_history_id AS ticketHistoryId, h.actor_account_id AS actorAccountId,
                h.before_status AS beforeStatus, h.after_status AS afterStatus,
                h.before_assignee_id AS beforeAssigneeId, h.after_assignee_id AS afterAssigneeId,

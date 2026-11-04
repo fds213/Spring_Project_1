@@ -51,14 +51,16 @@ function renderBilling() {
     .done(s => { billState = s; drawBilling(); })
     .fail(xhr => {
       billState = null;
-      if (xhr.status === 404) drawNoOrder();
+      if (xhr.status === 404) drawNoBilling('이 업체의 신청 정보가 없습니다');
+      else if (xhr.status === 403) drawNoBilling(apiMessage(xhr, '이용 결제는 업체 관리자만 쓸 수 있습니다'));
       else showToast(apiMessage(xhr, '이용 정보를 불러오지 못했습니다'));
     });
 }
 
-function drawNoOrder() {
+// 보여 줄 이용 정보가 없을 때(신청 정보 없음, 권한 없음): 안내만 남기고 결제 칸을 감춘다
+function drawNoBilling(text) {
   ['billStatus', 'billPlan', 'billEnd', 'billUsersNow'].forEach(id => { document.getElementById(id).textContent = '-'; });
-  fillDetail('billInfo', [['안내', '이 업체의 신청 정보가 없습니다']]);
+  fillDetail('billInfo', [['안내', text]]);
   document.getElementById('billPay').hidden = true;
   document.getElementById('billHistoryBox').hidden = true;
 }
@@ -76,19 +78,26 @@ function drawBilling() {
   // 날짜가 카드 한 줄에 들어가도록 D-day 는 제목에 붙인다
   card('billEndLabel', `${s.paid ? '만료일' : '체험 만료일'} · ${s.status === 'EXPIRED' ? '만료됨' : billDday(s.daysLeft)}`);
   card('billEnd', ymd(s.end));
+  // 체험의 인원은 신청할 때 적은 값이고, 유료의 인원은 결제한 값이다
+  const seatsLabel = s.paid ? '구매 인원' : '신청 인원';
+  card('billUsersLabel', seatsLabel);
   card('billUsersNow', `${s.users}명`);
+  // 구독 현황(SUB-01): 결제일·구독 시작일·만료일·구매 인원·이용 상태
   fillDetail('billInfo', [
     ['업체명', s.company],
     ['업체 코드', s.companyCode],
-    ['이용 인원', `${s.users}명`],
+    [seatsLabel, `${s.users}명`],
     ['1인 월 이용료', won(s.pricePerUser)],
-    ...(s.trialFrom ? [['체험 기간', `${ymd(s.trialFrom)} ~ ${ymd(s.trialEnd)} (14일)`]] : []),
+    ...(s.trialFrom ? [['체험 기간', `${ymd(s.trialFrom)} ~ ${ymd(s.trialEnd)}`]] : []),
+    // 승인됐지만 아직 이용 기간에 반영되지 않은 결제도 결제일은 있다. 그래서 유료 칸과 따로 본다
+    ...(s.lastPaidDate ? [['결제일', ymd(s.lastPaidDate)]] : []),
     ...(s.paid ? [
       ['요금제', BILL_PLAN[s.plan] || '월간'],
-      ['이용 기간', `${ymd(s.serviceFrom)} ~ ${ymd(s.end)}`],
+      ['구독 시작일', ymd(s.serviceFrom)],
+      ['만료일', ymd(s.end)],
       ['결제 방식', '자동 결제 없음 · 만료 전에 직접 연장'],
     ] : []),
-    ['계정 한도', s.paid ? `사용 중 ${s.users}명 (구매 인원)` : `관리자 포함 ${s.trialSeats}명 (결제하면 해제)`],
+    ['계정 한도', s.paid ? `사용 중 ${s.accountsInUse}명 / 구매 ${s.users}명` : `관리자 포함 ${s.trialSeats}명 (결제하면 해제)`],
   ]);
   renderPayHistory();
 

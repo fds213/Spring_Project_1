@@ -19,17 +19,17 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DuplicateKeyException;
 
-import com.ieum.gw.attendance.dao.AttendanceDAO;
-import com.ieum.gw.attendance.dao.LeaveDAO;
-import com.ieum.gw.attendance.dto.ApprovalStepDTO;
-import com.ieum.gw.attendance.dto.EmployeeHireDTO;
-import com.ieum.gw.attendance.dto.LeaveCycleDTO;
-import com.ieum.gw.attendance.dto.LeaveDayDTO;
-import com.ieum.gw.attendance.dto.LeaveRequestDTO;
-import com.ieum.gw.attendance.dto.LeaveSlotDTO;
-import com.ieum.gw.attendance.mapper.LeaveMapper;
-import com.ieum.gw.attendance.service.HolidayService;
-import com.ieum.gw.attendance.service.LeaveService;
+import com.ieum.gw.dao.AttendanceDAO;
+import com.ieum.gw.dao.LeaveDAO;
+import com.ieum.gw.dto.AttendanceApprovalStepDTO;
+import com.ieum.gw.dto.EmployeeHireDTO;
+import com.ieum.gw.dto.LeaveCycleDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LeaveRequestDTO;
+import com.ieum.gw.dto.LeaveSlotDTO;
+import com.ieum.gw.mapper.LeaveMapper;
+import com.ieum.gw.service.HolidayService;
+import com.ieum.gw.service.LeaveService;
 
 /** 연차 연동 규칙 (결재가 부르는 날짜 나누기·남은 일수·겹침·차감·최초 부여, 요구분석서 3.9). 모든 직원 15일, 자동 부여 없음 */
 class LeaveServiceTest {
@@ -204,12 +204,12 @@ class LeaveServiceTest {
     @DisplayName("휴일 관리: 같은 날은 409, 공휴일 한 번에 넣기는 이미 있는 날을 건너뛴다")
     void holidays() {
         holiday.add(CO, "2026-01-01", "신정");
-        assertEquals(409, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
+        assertEquals(409, assertThrows(com.ieum.gw.service.AttendanceException.class,
                 () -> holiday.add(CO, "2026-01-01", "또 신정")).getStatus());
         Map<String, Object> r = holiday.addPreset(CO, 2026);
         assertEquals(1, r.get("skipped"));
         assertEquals(19, r.get("added"));
-        assertEquals(404, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
+        assertEquals(404, assertThrows(com.ieum.gw.service.AttendanceException.class,
                 () -> holiday.addPreset(CO, 2031)).getStatus());
     }
 
@@ -217,7 +217,7 @@ class LeaveServiceTest {
     @DisplayName("휴일 넣기: 휴일 관리 화면에서 볼 수 있는 2000~2100년만 받는다 (범위 밖은 넣으면 화면에서 못 지운다)")
     void holidayYearRange() {
         for (String outside : List.of("1999-12-31", "2101-01-01")) {
-            assertEquals(400, assertThrows(com.ieum.gw.attendance.service.AttendanceException.class,
+            assertEquals(400, assertThrows(com.ieum.gw.service.AttendanceException.class,
                     () -> holiday.add(CO, outside, "범위 밖")).getStatus());
         }
         holiday.add(CO, "2000-01-01", "처음 해");
@@ -304,6 +304,6 @@ class LeaveServiceTest {
 
         @Override public List<LeaveRequestDTO> selectRequests(Long companyId, Long employeeId, String startsOn, String endsOn) { return List.of(); }
 
-        @Override public List<ApprovalStepDTO> selectSteps(Long companyId, List<Long> documentIds) { return List.of(); }
+        @Override public List<AttendanceApprovalStepDTO> selectSteps(Long companyId, List<Long> documentIds) { return List.of(); }
     }
 }

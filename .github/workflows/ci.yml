@@ -70,6 +70,20 @@ jobs:
           IEUM_DB_CHECK_PASSWORD: ci_only_1234
         run: mvn -B -ntp -Dtest=MapperSqlCheckIT test
 
+  # 화면(JS·JSP)이 부르는 주소 중 서버에 없는 것을 표로 낸다. 없는 주소가 있어도 실패하지 않으니 표는 이 job의 Summary에서 본다.
+  # 빨간불이면 보고 스크립트 쪽 문제다. PR에서는 대상 브랜치와 비교해 새로 빠진 주소를 경고로 알린다(HEAD는 합친 커밋, HEAD^1이 대상 브랜치).
+  url-report:
+    name: url-report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+      - name: 화면-서버 주소 대조
+        run: python3 .github/scripts/report-urls.py ${{ github.event_name == 'pull_request' && '--base HEAD^1' || '' }}
+
   # 앱을 실제 Tomcat에 올려 뜨는지 보고, JSP 전체 컴파일과 JS 문법 검사를 한다. 단위 테스트는 Spring 설정을 올리지 않아 이것들을 못 잡는다.
   # build와 따로 돌고 필수 검사가 아니다. 한 검사가 실패해도 할 수 있는 나머지 검사는 끝까지 돈다. 값은 이 job 안에서만 쓰는 임시 DB의 비밀번호다.
   app-check:

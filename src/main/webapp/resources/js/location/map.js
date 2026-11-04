@@ -24,6 +24,13 @@ function mapEl(tag, cls, text) {
   if (text !== undefined && text !== null) e.textContent = text;
   return e;
 }
+// 쓰기로 이어지는 버튼: 체험이 끝난 읽기 전용 업체에서는 흐려지고 누르면 안내만 뜬다(common.js의 data-write).
+// 창을 열어 다 쓴 뒤에야 저장이 막히는 일이 없게, 창을 여는 버튼에도 붙인다
+function mapWriteButton(cls, text, onClick) {
+  const b = mapButton(cls, text, onClick);
+  b.setAttribute('data-write', '');
+  return b;
+}
 function mapButton(cls, text, onClick) {
   const b = mapEl('button', cls, text);
   b.type = 'button';
@@ -63,6 +70,7 @@ const mapState = {
   saving: false,
   sort: 'recent',    // 목록 순서: recent(최근 수정순, 서버가 준 순서) | name(이름순)
   formStart: '',     // 창을 열 때의 값. 닫을 때 이것과 다르면 '작성 중인 내용' 확인을 띄운다
+  lastFocus: null,   // 확인 창을 띄우기 전 커서가 있던 칸. [계속 쓰기]로 돌아오면 그 칸으로 커서를 돌려준다
 };
 
 // ---------- 시작 ----------
@@ -74,8 +82,20 @@ function openMapView() {
   });
   mapById('mapForm').addEventListener('submit', e => { e.preventDefault(); mapSave(); });
   mapById('mfCancel').addEventListener('click', mapAskClose);
-  // Esc로 닫을 때도 같은 확인을 거친다 (브라우저가 바로 닫지 않게 막고 직접 판단)
-  mapById('mapDialog').addEventListener('cancel', e => { e.preventDefault(); mapAskClose(); });
+  // Esc로 닫을 때도 같은 확인을 거친다. 브라우저의 cancel만 막으면, Esc를 연달아 누를 때 Chrome이 막을 수 없는
+  // cancel을 보내 창이 그냥 닫히고 쓰던 내용이 사라진다. 그래서 창이 열려 있는 동안 Esc 키는 페이지 전체에서 먼저 잡는다
+  // (확인 창을 닫은 직후에는 글자 칸에 커서가 없어 창 안의 keydown만으로는 놓친다)
+  // - 확인 창이 떠 있으면: Esc = [계속 쓰기] (확인 창만 닫고 쓰던 칸으로 돌아간다)
+  // - 아니면: 고친 내용이 있는지 보고 확인 창을 띄우거나 닫는다
+  // - 한글을 조합하는 중(예: '가나ㄷ')의 Esc는 조합 취소이므로 건드리지 않는다
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || e.isComposing || !mapById('mapDialog').open) return;
+    e.preventDefault();
+    const discard = mapById('mapDiscardDialog');
+    if (discard.open) { discard.close(); mapKeepWriting(); return; }
+    mapAskClose();
+  }, true);
+  mapById('mapDialog').addEventListener('cancel', e => { e.preventDefault(); if (e.cancelable) mapAskClose(); });
   mapById('mapDialog').addEventListener('close', () => {
     mapState.formSeq++; // 찾던 주소 결과는 버린다
     mapById('mfResults').replaceChildren();
@@ -181,6 +201,9 @@ function mapLoad(selectId) {
       if (selectId !== undefined) mapState.selectedId = selectId;
       if (!mapState.markers.some(m => m.id === mapState.selectedId)) mapState.selectedId = null;
       mapRenderList();
+      // 방금 저장한 마커가 목록 화면 밖(이름순이면 아래쪽일 수 있다)에 있으면 그 줄까지 내린다
+      const on = selectId !== undefined && mapById('mapList').querySelector('li.is-on');
+      if (on) mapScrollListTo(on);
       mapDrawPins(selectId === undefined);
       if (mapState.selectedId !== null) mapFocus(mapState.selectedId);
     })
@@ -206,10 +229,10 @@ function mapApplyFilter(text) {
   mapDrawPins(false);
 }
 
-// 목록에 보일 순서. 최근 수정순은 서버가 준 순서 그대로, 이름순은 한글 가나다순
+// 목록에 보일 순서. 최근 수정순은 서버가 준 순서 그대로, 이름순은 한글 가나다순 (숫자는 크기대로: 지점 2 → 지점 10)
 function mapSorted(markers) {
   if (mapState.sort !== 'name') return markers;
-  return [...markers].sort((a, b) => String(a.title).localeCompare(String(b.title), 'ko'));
+  return [...markers].sort((a, b) => String(a.title).localeCompare(String(b.title), 'ko', { numeric: true }));
 }
 
 function mapRenderList() {
@@ -451,6 +474,7 @@ function mapPickAt(latLng) {
 function mapOfferPick(r, moveMap) {
   if (mapById('mapDialog').open || !mapState.ok) return;
   mapState.pickSeq++;
+  mapById('mapResults').replaceChildren(); // 위 검색 결과를 고르지 않고 지도를 눌렀으면 남은 결과 목록은 접는다
   mapSelect(null, false);
   mapShowPick(r.lat, r.lng, moveMap);
 
@@ -461,7 +485,7 @@ function mapOfferPick(r, moveMap) {
   card.append(mapEl('small', '', r.address));
   const actions = mapEl('div', 'map-pick-actions');
   actions.append(
-    mapButton('btn btn-primary', mapState.relocating ? '이 위치로 바꾸기' : '이 위치에 마커 추가', () => mapChoose(r)),
+    mapWriteButton('btn btn-primary', mapState.relocating ? '이 위치로 바꾸기' : '이 위치에 마커 추가', () => mapChoose(r)),
     mapButton('btn', '닫기', () => { mapClearPick(); if (mapState.relocating) { mapEndRelocate(); mapOpenForm(mapState.form, true); } }));
   card.append(actions);
   mapStopMap(card);
@@ -560,12 +584,24 @@ function mapFormValues() {
 
 // [취소]·Esc: 고친 내용이 있으면 정말 닫을지 묻는다. 고친 게 없으면 바로 닫는다 (저장은 묻지 않는다)
 function mapAskClose() {
-  if (mapFormValues() === mapState.formStart) { mapCloseForm(); return; }
+  if (mapState.saving) return; // 저장 응답을 기다리는 중: 끝나면 창이 저절로 닫힌다 (닫으면 '저장되지 않습니다'만 남는다)
   const dlg = mapById('mapDiscardDialog');
+  if (dlg.open) return;        // 확인 창이 이미 떠 있다 (Esc가 여러 번 들어와도 창은 하나)
+  if (mapFormValues() === mapState.formStart) { mapCloseForm(); return; }
+  const active = document.activeElement;
+  mapState.lastFocus = mapById('mapDialog').contains(active) ? active : null;
   dlg.querySelectorAll('button').forEach(b => {
-    b.onclick = () => { dlg.close(); if (b.value === 'ok') mapCloseForm(); };
+    b.onclick = () => { dlg.close(); if (b.value === 'ok') mapCloseForm(); else mapKeepWriting(); };
   });
   dlg.showModal();
+}
+
+// [계속 쓰기]: 확인 창을 띄우기 전 커서가 있던 글자 칸으로 돌아간다.
+// [취소] 버튼을 눌러 띄웠으면(커서가 버튼에 있었으면) 제목 칸으로 (버튼으로 돌아가면 Enter 한 번에 다시 취소된다)
+function mapKeepWriting() {
+  const el = mapState.lastFocus;
+  const typing = el && el.isConnected && !el.disabled && el.matches('input, textarea');
+  (typing ? el : mapById('mfTitle')).focus();
 }
 
 function mapCloseForm() {
@@ -643,7 +679,19 @@ function mapSave() {
       mapState.filter = '';
       mapLoad(res.id);
     })
-    .fail(xhr => { mapById('mfError').textContent = apiMessage(xhr, '저장하지 못했습니다'); })
+    .fail(xhr => {
+      // 고치는 사이 다른 사람(관리자·인사 담당)이 이 마커를 지웠다: 창에 남아 있어 봐야 저장할 수 없으므로
+      // 창을 닫고 안내한 뒤 목록을 다시 받는다 (지워진 마커가 목록에 남지 않게)
+      if (editing && xhr.status === 404) {
+        mapCloseForm();
+        showToast(apiMessage(xhr, '이미 삭제된 마커입니다'));
+        mapState.selectedId = null;
+        if (mapState.bubble) mapState.bubble.setMap(null);
+        mapLoad();
+        return;
+      }
+      mapById('mfError').textContent = apiMessage(xhr, '저장하지 못했습니다');
+    })
     .always(() => { mapState.saving = false; mapById('mfSave').disabled = false; });
 }
 
@@ -663,7 +711,14 @@ function mapDelete(m) {
           if (mapState.bubble) mapState.bubble.setMap(null);
           mapLoad();
         })
-        .fail(xhr => showToast(apiMessage(xhr, '삭제하지 못했습니다')));
+        .fail(xhr => {
+          showToast(apiMessage(xhr, '삭제하지 못했습니다'));
+          if (xhr.status === 404) { // 이미 지워진 마커: 말풍선을 접고 목록을 다시 받아 없앤다
+            mapState.selectedId = null;
+            if (mapState.bubble) mapState.bubble.setMap(null);
+            mapLoad();
+          }
+        });
     };
   });
   dlg.showModal();

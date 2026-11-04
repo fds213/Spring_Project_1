@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.site.mapper.InquiryMapper">
+<mapper namespace="com.ieum.gw.mapper.InquiryMapper">
 
     <!-- 홈페이지 문의 1행. 번호를 먼저 뽑아 dto.publicInquiryId에 넣고 INSERT.
          문의 종류는 화면에 칸이 없어 비워 두고, 상태(IQ_RECEIVED)와 일시는 DB 기본값을 쓴다 -->
-    <insert id="insertInquiry" parameterType="com.ieum.gw.site.dto.PublicInquiryDTO">
+    <insert id="insertInquiry" parameterType="com.ieum.gw.dto.PublicInquiryDTO">
         <selectKey keyProperty="publicInquiryId" resultType="long" order="BEFORE">
             SELECT SQ_PUBLIC_INQUIRY.NEXTVAL FROM dual
         </selectKey>

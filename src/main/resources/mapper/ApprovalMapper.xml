@@ -1,6 +1,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.approval.mapper.ApprovalMapper">
+<mapper namespace="com.ieum.gw.mapper.ApprovalMapper">
 
 
     <select id="sumPendingLeaveDays" resultType="java.math.BigDecimal">
@@ -11,7 +11,7 @@
           AND ad.document_type = 'DOC_LEAVE' AND ad.status_code = 'IN_PROGRESS'
     </select>
 
-    <select id="selectPendingLeaveDays" resultType="com.ieum.gw.attendance.dto.LeaveDayDTO">
+    <select id="selectPendingLeaveDays" resultType="com.ieum.gw.dto.LeaveDayDTO">
         SELECT d.leave_date, d.leave_type, d.deduct_days
         FROM approval_document ad
                  JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
@@ -24,7 +24,7 @@
     <!-- ===== 상신 저장: 문서 → 결재선 → 이력 → 휴가 상세 → 휴가 날짜 (한 트랜잭션) ===== -->
 
     <!-- 문서. 새 번호를 먼저 받아 DTO의 approvalDocumentId에 채운다(뒤 저장들이 이 번호를 쓴다) -->
-    <insert id="insertDocument" parameterType="com.ieum.gw.approval.dto.ApprovalDocumentDTO">
+    <insert id="insertDocument" parameterType="com.ieum.gw.dto.ApprovalDocumentDTO">
         <selectKey keyProperty="approvalDocumentId" resultType="long" order="BEFORE">
             SELECT sq_approval_document.NEXTVAL FROM dual
         </selectKey>
@@ -35,13 +35,13 @@
     </insert>
 
     <!-- 결재선 한 단계. 번호는 DB 기본값(sq_approval_step), 상태는 기본값 WAITING -->
-    <insert id="insertStep" parameterType="com.ieum.gw.approval.dto.ApprovalStepDTO">
+    <insert id="insertStep" parameterType="com.ieum.gw.dto.ApprovalStepDTO">
         INSERT INTO approval_step (company_id, approval_document_id, step_no, approver_employee_id)
         VALUES (#{companyId}, #{approvalDocumentId}, #{stepNo}, #{approverEmployeeId})
     </insert>
 
     <!-- 처리 이력 한 줄. 이전 상태·의견은 비어 있을 수 있다 -->
-    <insert id="insertHistory" parameterType="com.ieum.gw.approval.dto.ApprovalHistoryDTO">
+    <insert id="insertHistory" parameterType="com.ieum.gw.dto.ApprovalHistoryDTO">
         INSERT INTO approval_history (company_id, approval_document_id, actor_account_id, action_code,
                                       before_status, after_status, opinion)
         VALUES (#{companyId}, #{approvalDocumentId}, #{actorAccountId}, #{actionCode},
@@ -49,7 +49,7 @@
     </insert>
 
     <!-- 휴가 상세. PK는 문서 번호 -->
-    <insert id="insertLeaveRequest" parameterType="com.ieum.gw.approval.dto.ApprovalLeaveDTO">
+    <insert id="insertLeaveRequest" parameterType="com.ieum.gw.dto.ApprovalLeaveDTO">
         INSERT INTO leave_request (approval_document_id, company_id, reason, requested_days)
         VALUES (#{approvalDocumentId}, #{companyId}, #{reason}, #{requestedDays})
     </insert>
@@ -61,7 +61,7 @@
     </insert>
 
     <!-- 장비 신청 상세. PK는 문서 번호. 지점은 (업체, 지점) 복합 FK라 다른 업체 지점은 DB도 막는다 -->
-    <insert id="insertEquipmentRequest" parameterType="com.ieum.gw.approval.dto.ApprovalEquipmentDTO">
+    <insert id="insertEquipmentRequest" parameterType="com.ieum.gw.dto.ApprovalEquipmentDTO">
         INSERT INTO equipment_request (approval_document_id, company_id, branch_id, asset_type, quantity, purpose)
         VALUES (#{approvalDocumentId}, #{companyId}, #{branchId}, #{assetType}, #{quantity}, #{purpose})
     </insert>
@@ -69,7 +69,7 @@
     <!-- ===== 다른 모듈에 주는 조회 ===== -->
 
     <!-- 결재 완료된 장비 신청의 지급 정보. 결재 중·반려 문서와 다른 업체 문서는 나오지 않는다 -->
-    <select id="selectApprovedEquipment" resultType="com.ieum.gw.approval.dto.ApprovedEquipmentDTO">
+    <select id="selectApprovedEquipment" resultType="com.ieum.gw.dto.ApprovedEquipmentDTO">
         SELECT er.asset_type, er.quantity, er.purpose
         FROM equipment_request er
                  JOIN approval_document ad ON ad.approval_document_id = er.approval_document_id AND ad.company_id = er.company_id
@@ -102,9 +102,9 @@
     </sql>
 
     <!-- fields: 컬럼 앞에 f_ 를 붙여 ApprovalFieldsDTO에 담는다 -->
-    <resultMap id="boxDocumentMap" type="com.ieum.gw.approval.dto.ApprovalBoxDTO" autoMapping="true">
+    <resultMap id="boxDocumentMap" type="com.ieum.gw.dto.ApprovalBoxDTO" autoMapping="true">
         <id property="approvalDocumentId" column="approval_document_id"/>
-        <association property="fields" javaType="com.ieum.gw.approval.dto.ApprovalFieldsDTO" columnPrefix="f_" autoMapping="true"/>
+        <association property="fields" javaType="com.ieum.gw.dto.ApprovalFieldsDTO" columnPrefix="f_" autoMapping="true"/>
     </resultMap>
 
     <select id="selectBoxDocuments" resultMap="boxDocumentMap">
@@ -130,7 +130,7 @@
         ORDER BY ad.submitted_at DESC, ad.approval_document_id DESC
     </select>
 
-    <select id="selectBoxSteps" resultType="com.ieum.gw.approval.dto.ApprovalBoxStepDTO">
+    <select id="selectBoxSteps" resultType="com.ieum.gw.dto.ApprovalBoxStepDTO">
         SELECT s.approval_document_id, s.approver_employee_id, e.employee_name, s.status_code
         FROM approval_step s
                  JOIN approval_document ad ON ad.company_id = s.company_id AND ad.approval_document_id = s.approval_document_id
@@ -140,7 +140,7 @@
     </select>
 
     <!-- 처리한 사람은 계정 ID로 저장돼 있어 계정 → 사원 순으로 이름을 찾는다 -->
-    <select id="selectBoxHistory" resultType="com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO">
+    <select id="selectBoxHistory" resultType="com.ieum.gw.dto.ApprovalBoxHistoryDTO">
         SELECT h.approval_document_id, TO_CHAR(h.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
                e.employee_name, h.action_code, h.opinion
         FROM approval_history h

@@ -1,6 +1,6 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.chat.mapper.ChatMapper">
+<mapper namespace="com.ieum.gw.mapper.ChatMapper">
 
     <!-- companyId 조건 넣어야 함 -->
     <select id="isMember" resultType="int">
@@ -11,7 +11,7 @@
           AND left_at IS NULL
     </select>
 
-    <insert id="insertMessage" parameterType="com.ieum.gw.chat.dto.ChatMessageDTO">
+    <insert id="insertMessage" parameterType="com.ieum.gw.dto.ChatMessageDTO">
         <selectKey keyProperty="chatMessageId" resultType="long" order="BEFORE">
             SELECT sq_chat_message.NEXTVAL FROM dual
         </selectKey>
@@ -20,7 +20,7 @@
     </insert>
 
     <!-- 본인이 참여중인 대화방 목록 -->
-    <select id="getRoomList" resultType="com.ieum.gw.chat.dto.ChatRoomDTO">
+    <select id="getRoomList" resultType="com.ieum.gw.dto.ChatRoomDTO">
         SELECT r.chat_room_id, r.room_type,
                CASE
                    WHEN r.room_type = 'ROOM_DIRECT' THEN e.employee_name

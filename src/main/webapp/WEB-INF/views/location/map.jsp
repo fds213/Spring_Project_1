@@ -110,9 +110,10 @@
     <dialog class="modal" id="mapDiscardDialog">
       <h2>작성 중인 내용이 있어요</h2>
       <p>닫으면 고친 내용은 저장되지 않습니다.</p>
+      <%-- 쓴 내용을 버리는 [닫기]는 보통 버튼, 안전한 [계속 쓰기]를 파란 버튼으로 두고 처음 커서도 거기에 둔다 (Enter를 눌러도 계속 쓰기) --%>
       <div class="modal-actions">
-        <button type="button" class="btn" value="cancel">계속 쓰기</button>
-        <button type="button" class="btn btn-primary" value="ok">닫기</button>
+        <button type="button" class="btn" value="ok">닫기</button>
+        <button type="button" class="btn btn-primary" value="cancel" autofocus>계속 쓰기</button>
       </div>
     </dialog>
 
