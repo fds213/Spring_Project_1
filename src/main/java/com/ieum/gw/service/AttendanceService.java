@@ -510,6 +510,19 @@ public class AttendanceService {
     }
 
     /**
+     * 휴가 상신을 같은 직원 기준으로 한 줄로 세운다. 결재가 상신할 때 날짜를 나눈 직후, 남은 연차를 읽기 전에 부른다.
+     * 최종 승인의 useLeave가 잠그는 것과 같은 연차 주기 행(LEAVE_CYCLE)을 SELECT ... FOR UPDATE로 잠근다.
+     * 그래서 상신끼리, 상신과 최종 승인이 동시에 와도 하나씩 남은 연차를 본다. 잠금은 호출한 트랜잭션이 끝날 때 풀린다.
+     * 호출한 쪽 트랜잭션 안에서만 쓴다(밖에서 부르면 IllegalTransactionStateException).
+     * 잠금 순서: 상신은 이 행만, 최종 승인은 결재 문서 행 → 이 행(useLeave). 근태가 이 행과 다른 행을 함께 잠그는 흐름은 없다.
+     * (구현 메모: 행이 없으면 15일·사용 0으로 만든 뒤 잠근다. 행이 없을 때 남은 일수 계산과 같아 숫자는 바뀌지 않는다.
+     *  입사일이 없으면 잠그지 않는다. 남은 연차가 0이라 상신이 어차피 거절된다)
+     */
+    public void lockLeaveForSubmit(Long companyId, Long employeeId) {
+        leaveService.lockLeaveForSubmit(companyId, employeeId);
+    }
+
+    /**
      * 새 사원에게 첫 연차 주기와 기본 15일을 준다(요구분석서 3.9 '최초 부여').
      * 사원을 만드는 쪽(직원 가입 승인, 체험 신청의 관리자 계정)이 같은 트랜잭션 안에서 부른다.
      *
