@@ -52,7 +52,11 @@ function eaFillSelects() {
     const sel = eaEl(id);
     const keep = sel.value;
     sel.replaceChildren(...(withNone ? [new Option('(없음)', '')] : [new Option('(고르세요)', '')]),
-      ...o.approvers.map(e => new Option(`${e.employeeName} (${e.departmentName} · ${e.gradeName})`, e.employeeId)));
+      ...o.approvers.map(e => {
+        // 체험 신청으로 만든 업체 관리자는 부서·직급이 없다: 있는 값만 괄호에 넣는다
+        const sub = [e.departmentName, e.gradeName].filter(Boolean).join(' · ');
+        return new Option(sub ? `${e.employeeName} (${sub})` : e.employeeName, e.employeeId);
+      }));
     if ([...sel.options].some(x => x.value === keep)) sel.value = keep;
   };
   fill('eaAppr1', false);
@@ -189,7 +193,7 @@ function renderApprovalBox() {
     const key = `${d.documentType}:${d.approvalDocumentId}`;
     const isOpen = eaState.open === key;
     const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''),
-      eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), eaNode('small', 'cell-sub', d.departmentName)),
+      eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), ...(d.departmentName ? [eaNode('small', 'cell-sub', d.departmentName)] : [])),
       eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode])),
       eaCell('기안일', eaNode('span', '', whenFull(d.submittedAt))));
     tr.addEventListener('click', () => { eaState.open = isOpen ? null : key; renderApprovalBox(); });
