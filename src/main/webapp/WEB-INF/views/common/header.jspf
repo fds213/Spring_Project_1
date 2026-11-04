@@ -55,12 +55,16 @@
   </div>
 </header>
 
-<%-- 체험 중이거나 체험이 끝난(읽기 전용) 업체만. 결제 버튼은 업체 관리자에게만 --%>
+<%-- 체험 중이거나 이용 기간이 끝난(읽기 전용) 업체만. 결제 버튼은 업체 관리자에게만, 유료가 끝난 업체에는 없다(재구매는 이번 제외) --%>
 <c:if test="${not isOps and not empty companyBilling and companyBilling.status ne 'PAID'}">
   <c:set var="trialUrgent" value="${companyBilling.status eq 'TRIAL' and companyBilling.daysLeft le 3}" />
   <div class="trial-bar${trialUrgent ? ' is-urgent' : ''}${readOnly ? ' is-expired' : ''}" role="status">
     <span>
       <c:choose>
+        <c:when test="${paidExpired}">
+          <strong>이용 기간이 끝나 읽기 전용입니다 (<c:out value="${companyBilling.endDate}" /> 만료)</strong>
+          <span class="trial-more"> · 자료 조회와 내려받기는 그대로 됩니다</span>
+        </c:when>
         <c:when test="${readOnly}">
           <strong>체험이 끝나 읽기 전용입니다 (<c:out value="${companyBilling.endDate}" /> 만료)</strong>
           <span class="trial-more">${isAdmin ? ' · 결제하면 바로 이어서 쓸 수 있습니다' : ' · 업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다'}</span>
@@ -75,7 +79,7 @@
         </c:otherwise>
       </c:choose>
     </span>
-    <c:if test="${isAdmin}">
+    <c:if test="${isAdmin and not paidExpired}">
       <a class="btn btn-primary" href="${ctx}/subscription/billing">결제하기</a>
     </c:if>
   </div>
