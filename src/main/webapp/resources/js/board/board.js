@@ -85,6 +85,9 @@ const writerLabel = x => [x.writerDept, x.writerName].filter(Boolean).join(' ');
 
 // 안내는 그룹웨어 토스트(util.js showToast)로
 const toast = msg => showToast(msg);
+// 이용 기간이 끝난 읽기 전용 업체인지 (common.js 가 body 에 is-readonly 를 붙인다).
+// 만료 업체의 쓰기 요청은 서버가 409로 거절하므로(PR #110), 409를 '고정 5개가 꽉 참'과 구분할 때 쓴다
+const readOnly = () => document.body.classList.contains('is-readonly');
 
 // 확인 창(<dialog>)을 열고, 누른 버튼이 '확인'이면 true
 function confirmDialog(id) {
@@ -363,7 +366,12 @@ byId('btnPin')?.addEventListener('click', () => {
   btn.disabled = true;
   api.post(`/board/api/notices/${n.id}/pin`, { pinned: !n.pinned })
     .done(r => { toast(r.pinned ? '목록 맨 위에 고정했습니다' : '고정을 풀었습니다'); openDetail(n.id); })
-    .fail(xhr => { if (xhr.status === 409) showPinFull(n.scope); else failTo(pageHref('/board/notice'))(xhr); })
+    .fail(xhr => {
+      // 409는 두 가지다: 고정 5개가 꽉 참(고정할 때만), 이용 기간이 끝난 읽기 전용 업체(서버 문구를 그대로 보인다)
+      if (xhr.status === 409 && !readOnly() && !n.pinned) showPinFull(n.scope);
+      else if (xhr.status === 409) toast(apiMessage(xhr));
+      else failTo(pageHref('/board/notice'))(xhr);
+    })
     .always(() => { btn.disabled = false; });
 });
 
@@ -918,7 +926,8 @@ byId('noticeForm')?.addEventListener('submit', e => {
       formState.saving = false;
       setSaving('btnSave', false, '저장');
       const msg = apiMessage(xhr);
-      if (xhr.status === 409) byId('fPinnedError').textContent = msg; // 고정 5개가 꽉 참
+      // 409는 고정을 고르고 저장했을 때의 '고정 5개가 꽉 참'만 고정 칸 아래에 둔다. 읽기 전용 업체의 409는 아래 toast로 서버 문구를 보인다
+      if (xhr.status === 409 && !readOnly() && body.pinned) byId('fPinnedError').textContent = msg; // 고정 5개가 꽉 참
       else if (xhr.status === 413) noticeFiles.error(msg);             // 파일이 너무 큼
       else if (xhr.status === 404) { formState.leaving = true; toastAndGo(msg, pageHref('/board/notice')); } // 저장하는 사이 지워진 공지
       else toast(msg);
