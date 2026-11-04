@@ -2,8 +2,9 @@
 // 부서 카드를 부서 관리에서 정한 순서대로 놓고, 카드마다 구성원의 이름·직급을 보인다. 검색칸은 받은 목록 안에서 이름·부서·직급으로 거른다.
 // 순서(부서 순서, 부서장 먼저, 직급 높은 순, 이름순)와 보일 사람(사용 중 계정, 퇴사자 빼고)은 서버가 정해 준다. 화면은 받은 대로 그린다.
 // 서버 (주소는 제안. 사원 모듈 담당이 정하면 맞춘다):
-//   GET /employee/api/org → { me, departments: [{ departmentId, departmentName, headEmployeeId, members: [{ employeeId, employeeName, gradeName }] }] }
-//     me: 내 employeeId. departmentId 가 null 인 묶음은 부서가 정해지지 않은 사람들이다(맨 끝에 둔다)
+//   GET /employee/api/org → { me, departments: [{ departmentId, departmentName, members: [{ employeeId, employeeName, gradeName, head }] }] }
+//     me: 내 employeeId. head: 그 부서의 부서장인지 (사원 관리 목록 API의 head 와 같은 기준: department.head_employee_id)
+//     departmentId 가 null 인 묶음은 부서가 정해지지 않은 사람들이다(맨 끝에 둔다)
 // util.js 의 h, span, showToast 를 쓴다.
 (() => {
   const $ = id => document.getElementById(id);
@@ -48,7 +49,7 @@
 
   function card(d) {
     const rows = d.members.map(m => {
-      const head = m.employeeId === d.headEmployeeId;
+      const head = !!m.head;
       const tags = [...(head ? [span('부서장', 'status status-approved')] : []), ...(m.employeeId === state.me ? [span('나', 'status')] : [])];
       return h('li', 'org-member' + (head ? ' is-head' : ''),
         span((m.employeeName || '?').slice(0, 1), 'org-avatar'),
