@@ -100,11 +100,15 @@ public class EmployeeAdminService {
     
     /** 부서장 지정·해제 (POST /employee/admin/api/employees/{empNo}/head). 업체 관리자만 */
     @Transactional
-    public Map<String, Object> setHead(LoginUser user, String empNo, boolean head) {
+    public Map<String, Object> setHead(LoginUser user, String empNo, Boolean head) {        
         // ① 권한: 인사 담당도 이 주소까지는 들어오지만(Security), 부서장 지정은 관리자만
-        if (!"ROLE_ADMIN".equals(user.getRole())) {
+    	if (!"ROLE_ADMIN".equals(user.getRole())) {
             throw new AccessDeniedException("부서장 지정은 업체 관리자만 할 수 있습니다");
         }
+        if (head == null) {
+            throw new IllegalArgumentException("부서장 지정 여부(head)를 보내 주세요");
+        }
+        
         Long companyId = user.getCompanyId();
 
         // ② 대상 찾기 (다른 업체 사번이면 찾지 못한다)

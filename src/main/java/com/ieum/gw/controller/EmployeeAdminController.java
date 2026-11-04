@@ -44,8 +44,7 @@ public class EmployeeAdminController {
 	@ResponseBody
 	public Map<String, Object> head(@PathVariable String empNo, @RequestBody Map<String, Boolean> body,
 			@AuthenticationPrincipal LoginUser loginUser) {
-		boolean head = Boolean.TRUE.equals(body.get("head"));
-		return Map.of("success", true, "data", employeeAdminService.setHead(loginUser, empNo, head));
+		return Map.of("success", true, "data", employeeAdminService.setHead(loginUser, empNo, body.get("head")));
 	}
 
 	@ExceptionHandler(AccessDeniedException.class)
