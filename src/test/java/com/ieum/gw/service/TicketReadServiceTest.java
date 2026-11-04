@@ -21,7 +21,7 @@ class TicketReadServiceTest {
         emp.setCompanyId(7L);
         emp.setEmployeeId(9L);
         LoginUser user = new LoginUser(emp);
-        TicketReadService service = new TicketReadService(null);
+        TicketReadService service = new TicketReadService(null, null, null, null);
         assertEquals(400, assertThrows(ResponseStatusException.class,
                 () -> service.getMyComments(user, null)).getRawStatusCode());
         assertEquals(400, assertThrows(ResponseStatusException.class,

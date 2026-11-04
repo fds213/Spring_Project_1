@@ -30,9 +30,11 @@ const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
 // ---------- 화면 도구 ----------
 const $j = id => document.getElementById(id);
 const pathPart = encodeURIComponent; // 주소에 넣는 값
+// 값이 있는 것만 ' · '로 잇는다 (체험 신청으로 만든 업체 관리자는 부서·직급이 없다)
+const dotJoin = (...parts) => parts.filter(Boolean).join(' · ');
 // 화면이 지금 보이는지 (view 섹션에 class on이 있고, hidden 요소 안에 있지 않다)
 const viewShown = id => { const v = $j(id); return !!v && v.classList.contains('on') && !v.closest('[hidden]'); };
-// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 403으로 한다)
+// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 409로 한다: 공통 검사 ReadOnlyInterceptor)
 const readOnlyUi = () => document.body.classList.contains('is-readonly');
 const hhmm = iso => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const minsUntil = iso => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000));
@@ -134,7 +136,7 @@ function drawEmployees(d) {
     tr.classList.toggle('is-inactive', offStatus(e.status));
     tr.append(
       cellOf('이름', whoCell(e)),
-      cellOf('부서·직급', `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''} · ${e.rank}`),
+      cellOf('부서·직급', dotJoin(e.dept && `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''}`, e.rank) || '-'),
       cellOf('계정 형태', ROLE_CODE[e.role] || '-'),
       cellOf('인사 정보', hrInfoText(e)),
       cellOf('상태', statusChip(e)),
@@ -241,7 +243,7 @@ function openHrInfo(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님 인사 정보`;
-  dialog.querySelector('p').textContent = `사번 ${e.empNo} · ${e.dept} · ${e.rank}. 퇴사로 바꾸면 계정도 비활성이 되어 로그인할 수 없습니다.`;
+  dialog.querySelector('p').textContent = `${dotJoin(`사번 ${e.empNo}`, e.dept, e.rank)}. 퇴사로 바꾸면 계정도 비활성이 되어 로그인할 수 없습니다.`;
   $j('hrEmpType').value = e.empType || 'EMP_REGULAR';
   $j('hrWork').value = e.work || 'ST_SERVING';
   $j('hrGender').value = e.gender || '';
@@ -483,7 +485,7 @@ function drawJoin(d) {
     );
     tr.append(
       cellOf('이름', e.name),
-      cellOf('부서·직급', `${e.dept} · ${e.rank}`),
+      cellOf('부서·직급', dotJoin(e.dept, e.rank) || '-'),
       cellOf('이메일', e.email),
       cellOf('요청 시각', whenAt(e.requestAt)),
       cellOf('처리', actions),
@@ -522,7 +524,7 @@ function openApprove(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
+  dialog.querySelector('p').textContent = `${dotJoin(e.dept, e.rank, e.email)}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
   if (!dialog.open) dialog.showModal();
 }
 

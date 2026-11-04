@@ -6,7 +6,10 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.dto.AccountDTO;
 import com.ieum.gw.dto.EmpSummaryDTO;
+import com.ieum.gw.dto.EmployeeAdminRowDTO;
 import com.ieum.gw.dto.EmployeeDTO;
+import com.ieum.gw.dto.EmployeeHeadTargetDTO;
+import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.IdNameDTO;
 import com.ieum.gw.mapper.EmployeeMapper;
@@ -95,5 +98,30 @@ public class EmployeeDAO {
     /** 직원 ID → 이름·부서명 (퇴사자 포함) */
     public List<EmployeeOptionDTO> listEmployeeNamesWithDept(Long companyId, List<Long> ids) {
         return mapper.listEmployeeNamesWithDept(companyId, ids);
+    }
+    
+    /** 사원 관리 목록 (사원증 있는 사람만) */
+    public List<EmployeeAdminRowDTO> listAdminRows(Long companyId) {
+        return mapper.listAdminRows(companyId);
+    }
+    
+    /** 부서장 지정 대상. 같은 업체에 그 사번이 없으면 null */
+    public EmployeeHeadTargetDTO getHeadTarget(Long companyId, String employeeNo) {
+        return mapper.getHeadTarget(companyId, employeeNo);
+    }
+
+    /** 그 부서의 부서장을 이 사람으로 */
+    public int setDeptHead(Long companyId, Long departmentId, Long employeeId) {
+        return mapper.setDeptHead(companyId, departmentId, employeeId);
+    }
+
+    /** 지금 부서장이 이 사람일 때만 비운다. 바뀐 행 수 */
+    public int clearDeptHead(Long companyId, Long departmentId, Long employeeId) {
+        return mapper.clearDeptHead(companyId, departmentId, employeeId);
+    }
+    
+    /** 화면 공통 값 (헤더·사이드바). 사원 행이 없으면 null */
+    public EmployeeLoginInfoDTO getLoginInfo(Long companyId, Long employeeId) {
+        return mapper.getLoginInfo(companyId, employeeId);
     }
 }

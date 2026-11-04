@@ -289,7 +289,7 @@ public class JoinService {
         boolean admin = isAdmin(user);
         String headDept = requireApprover(user, admin);
 
-        // ② 신청서 잡기 (FOR UPDATE) → 없으면 400, 대기 중 아니면 409
+        // ② 신청서 잡기 (FOR UPDATE) → 없으면 404, 대기 중 아니면 409
         JoinRequestViewDTO req = dao.lockRequest(companyId, requestId);
         if (req == null) {
             throw new JoinNotFoundException("없는 가입 요청입니다");
@@ -349,7 +349,7 @@ public class JoinService {
         boolean admin = isAdmin(user);
         String headDept = requireApprover(user, admin);
 
-        // ② 신청서 잡기 → 없으면 400, 대기 중 아니면 409, 부서장은 자기 부서만
+        // ② 신청서 잡기 → 없으면 404, 대기 중 아니면 409, 부서장은 자기 부서만
         JoinRequestViewDTO req = dao.lockRequest(companyId, requestId);
         if (req == null) {
             throw new JoinNotFoundException("없는 가입 요청입니다");
