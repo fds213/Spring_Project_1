@@ -32,7 +32,9 @@ try {
 
 // ---------- 화면 만들기 도구 (여러 모듈의 화면 JS가 같이 쓴다) ----------
 // h(태그, class, ...자식): 요소를 만든다. 글자는 textContent로 들어가므로 사용자가 쓴 글도 그대로 넣어도 된다
-const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+// 서버가 빈 칸을 null로 보내도 화면에 'null'·'undefined' 글자가 찍히지 않게 null·undefined 자식은 건너뛴다(0과 '' 는 그대로 넣는다).
+// 빈 칸에 '-' 같은 안내가 필요하면 부르는 쪽에서 값 || '-' 로 넣는다
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids.filter(k => k != null)); return e; };
 const span = (text, cls) => h('span', cls, text);
 const small = text => h('small', 'cell-sub', text);
 const dlOf = rows => h('dl', 'detail', ...rows.flatMap(([k, v]) => [h('dt', '', k), h('dd', '', v)]));
