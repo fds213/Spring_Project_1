@@ -26,6 +26,7 @@ public class AccountStatusInterceptor implements HandlerInterceptor {
 
     private final EmployeeService employeeService;
 
+    /** 로그인한 계정이 지금도 사용 중인지 매 요청 확인. 아니면 세션을 끊고 AJAX는 401, 화면은 /login?disabled */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {

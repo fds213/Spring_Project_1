@@ -187,6 +187,7 @@ public class EmployeeJoinController {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("message", e.getMessage()));
 	}
 
+	/** 요청 값이 틀림 → 400 { message } */
 	@ExceptionHandler(IllegalArgumentException.class)
 	@ResponseBody
 	public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
