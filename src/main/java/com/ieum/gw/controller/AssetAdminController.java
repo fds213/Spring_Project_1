@@ -20,6 +20,14 @@ import lombok.Setter;
 public class AssetAdminController {
     private final AssetAllocationService service;
 
+    /** 관리자가 선택한 자산의 지급·회수 이력을 JSON으로 반환한다. */
+    @GetMapping("/{id}/assignments")
+    public Map<String, Object> assignments(@AuthenticationPrincipal LoginUser user, 
+    									   @PathVariable("id") Long assetId) {
+    	return Map.of("success", true,
+				  "data", service.getAssignments(user, assetId));
+    }
+    
     /** 같은 업체의 관리자용 자산 목록을 JSON으로 반환한다. */
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal LoginUser user) {
