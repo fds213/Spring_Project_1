@@ -27,6 +27,7 @@ class EmployeeAdminStatusTest {
 	static class FakeEmployeeDao extends EmployeeDAO {
 		Map<String, EmployeeHeadTargetDTO> people = new HashMap<>();
 		Map<Long, String> status = new HashMap<>();
+		Map<Long, String> work = new HashMap<>(); // 재직 상태 (employeeId → ST_SERVING 등)
 		Long deptHead = null;
 		int lockCalls = 0;
 
@@ -34,6 +35,11 @@ class EmployeeAdminStatusTest {
 			super(null);
 		}
 
+		@Override
+		public int updateHrInfo(Long companyId, Long employeeId, String empType, String work, String gender) {
+			return 1;
+		}
+		
 		@Override
 		public EmployeeHeadTargetDTO getHeadTarget(Long companyId, String employeeNo) {
 			return COMPANY.equals(companyId) ? people.get(employeeNo) : null;
@@ -50,7 +56,7 @@ class EmployeeAdminStatusTest {
 
 		@Override
 		public int reactivateAccount(Long companyId, Long employeeId) {
-			if (!"RETIRED".equals(status.get(employeeId))) {
+			if (!"RETIRED".equals(status.get(employeeId)) || !"ST_SERVING".equals(work.get(employeeId))) {
 				return 0;
 			}
 			status.put(employeeId, "ACTIVE");
@@ -102,10 +108,27 @@ class EmployeeAdminStatusTest {
 			return limit;
 		}
 	}
+	
+	/** 자동 반려 건수를 정해 주는 가짜 결재 Service */
+	static class FakeApprovalService extends ApprovalService {
+		int released = 0;
+		int calls = 0;
+
+		FakeApprovalService() {
+			super(null, null, null, null, null, null, null);
+		}
+
+		@Override
+		public int rejectWaitingForRetired(Long companyId, Long employeeId) {
+			calls++;
+			return released;
+		}
+	}
 
 	private FakeEmployeeDao dao;
 	private FakeEmployeeService employees;
 	private FakeSubscriptionService subscription;
+	private FakeApprovalService approvals; 
 	private EmployeeAdminService service;
 	private LoginUser admin;
 	private LoginUser hr;
@@ -121,7 +144,8 @@ class EmployeeAdminStatusTest {
 
 		employees = new FakeEmployeeService();
 		subscription = new FakeSubscriptionService();
-		service = new EmployeeAdminService(dao, employees, subscription);
+		approvals = new FakeApprovalService();                                       
+		service = new EmployeeAdminService(dao, employees, subscription, approvals);
 		admin = user(101L, "ROLE_ADMIN");
 		hr = user(505L, "ROLE_HR");
 	}
@@ -135,6 +159,7 @@ class EmployeeAdminStatusTest {
 		t.setEmploymentStatus(work);
 		dao.people.put(no, t);
 		dao.status.put(id, status);
+		dao.work.put(id, work);
 	}
 
 	private static LoginUser user(Long employeeId, String role) {
@@ -248,6 +273,45 @@ class EmployeeAdminStatusTest {
 		LoginUser retiredHr = user(503L, "ROLE_HR"); // 꺼진 박휴직이 인사 담당이라고 치고, 기존 세션으로 자기를 켜려는 경우
 
 		assertThrows(IllegalStateException.class, () -> service.setStatus(retiredHr, "20260003", "on"));
+		assertEquals("RETIRED", dao.status.get(503L));
+	}
+	
+	@Test
+	@DisplayName("비활성화하면 결재 차례 자동 반려 건수를 released로 돌려준다")
+	void offReleases() {
+		approvals.released = 2;
+
+		assertEquals(2, service.setStatus(admin, "20260002", "off").get("released"));
+		assertEquals(1, approvals.calls);
+	}
+
+	@Test
+	@DisplayName("퇴사로 바꾸면 계정도 끄고 부서장 칸·결재를 정리한다. 관리자·본인은 409, 휴직·모르는 값은 400")
+	void retireByHrInfo() {
+		dao.deptHead = 502L;
+		approvals.released = 1;
+
+		Map<String, Object> r = service.setHrInfo(hr, "20260002", "EMP_REGULAR", "ST_RETIRED", "");
+		assertEquals(true, r.get("turnedOff"));
+		assertEquals(1, r.get("released"));
+		assertEquals("RETIRED", dao.status.get(502L));
+		assertNull(dao.deptHead);
+
+		assertThrows(IllegalStateException.class, () -> service.setHrInfo(hr, "20260001", "EMP_REGULAR", "ST_RETIRED", ""));
+		
+		assertThrows(IllegalStateException.class, () -> service.setHrInfo(hr, "20260005", "EMP_REGULAR", "ST_RETIRED", ""));
+		
+		assertThrows(IllegalArgumentException.class, () -> service.setHrInfo(hr, "20260002", "EMP_REGULAR", "ST_LEAVE", ""));
+		
+		assertThrows(IllegalArgumentException.class, () -> service.setHrInfo(hr, "20260002", "X", "ST_SERVING", ""));
+	}
+	
+	@Test
+	@DisplayName("다시 사용을 기다리는 사이 퇴사 저장이 먼저 끝나면, 계정을 켜지 않고 409다")
+	void reactivateAfterRetiredMeanwhile() {
+		dao.work.put(503L, "ST_RETIRED"); // 화면은 재직으로 봤지만 그사이 다른 사람이 퇴사로 저장했다
+
+		assertThrows(IllegalStateException.class, () -> service.setStatus(admin, "20260003", "on"));
 		assertEquals("RETIRED", dao.status.get(503L));
 	}
 }

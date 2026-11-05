@@ -197,4 +197,9 @@ public class EmployeeDAO {
     public int updateDeptType(Long companyId, Long id, String type) {
         return mapper.updateDeptType(companyId, id, type);
     }
+    
+    /** 인사 정보 저장 (고용 형태·재직 상태·성별, 퇴사일) */
+    public int updateHrInfo(Long companyId, Long employeeId, String empType, String work, String gender) {
+        return mapper.updateHrInfo(companyId, employeeId, empType, work, gender);
+    }
 }
