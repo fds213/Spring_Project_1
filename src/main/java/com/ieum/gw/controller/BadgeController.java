@@ -19,6 +19,7 @@ public class BadgeController {
 
 	private final BadgeService badgeService;
 
+	/** 사이드바 배지 수 { success, data: { 키: 수 } } (common.js가 15초마다) */
 	@GetMapping("/badges")
 	@ResponseBody
 	public Map<String, Object> badges(@AuthenticationPrincipal LoginUser loginUser) {

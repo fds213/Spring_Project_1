@@ -136,6 +136,7 @@ public class EmployeeAdminController {
 		return kind;
 	}
 
+	/** 관리자·인사 담당이 아님 → 403 */
 	@ExceptionHandler(AccessDeniedException.class)
 	@ResponseBody
 	public ResponseEntity<Map<String, Object>> denied(AccessDeniedException e) {

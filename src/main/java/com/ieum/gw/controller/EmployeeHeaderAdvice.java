@@ -28,6 +28,7 @@ public class EmployeeHeaderAdvice {
 
     private final EmployeeService employeeService;
 
+    /** 모든 화면의 헤더 값(업체명·부서·직급·내가 부서장인 부서). 화면 요청이고 로그인했을 때만, 아니면 null */
     @ModelAttribute("loginInfo")
     public EmployeeLoginInfoDTO loginInfo(HttpServletRequest request) {
         // ① 화면 요청만 (API·배지 요청은 헤더를 그리지 않으니 DB를 읽지 않는다)
