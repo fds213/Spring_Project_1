@@ -65,9 +65,9 @@
         </section>
 
         <aside class="tk-side">
-          <%-- 처리 중인 내 티켓: 같은 문제를 두 번 접수하지 않게 (GET /ticket/api/tickets, 내 티켓과 같은 자료) --%>
+          <%-- 진행 중인 내 티켓(접수·배정·처리 중): 같은 문제를 두 번 접수하지 않게 (GET /ticket/api/tickets, 내 티켓과 같은 자료) --%>
           <a class="info-card tk-open" id="ticketOpenCard" href="${ctx}/ticket/mine" hidden>
-            <small>처리 중인 내 티켓</small>
+            <small>진행 중인 내 티켓</small>
             <strong><span id="ticketOpenCount">0</span><span class="unit">건</span></strong>
             <span class="tk-open-sub" id="ticketOpenSub">같은 문제면 새로 접수하지 말고 내 티켓에 댓글로 남겨 주세요</span>
           </a>

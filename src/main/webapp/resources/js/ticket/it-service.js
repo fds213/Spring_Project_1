@@ -43,7 +43,7 @@ function openTicketNewView() {
       itNew.initial = itSnapshot();
     })
     .fail(xhr => { itEl('ticketError').textContent = apiMessage(xhr, '접수에 필요한 정보를 불러오지 못했습니다'); });
-  // 처리 중인 내 티켓 수 (내 티켓 화면과 같은 자료). 받은 뒤에 카드를 보인다. 못 받아도 접수는 할 수 있어 카드를 숨긴 채 둔다
+  // 진행 중인 내 티켓 수: 접수·배정·처리 중 (내 티켓 화면과 같은 자료). 받은 뒤에 카드를 보인다. 못 받아도 접수는 할 수 있어 카드를 숨긴 채 둔다
   api.get('/ticket/api/tickets').done(items => {
     itEl('ticketOpenCard').hidden = false;
     const open = (items || []).filter(t => TICKET_GROUP[t.status] !== 'DONE');
@@ -58,7 +58,10 @@ function openTicketNewView() {
 // 구분 버튼과 숨긴 select를 맞추고, 내용 칸 예시를 구분에 맞게 바꾼다
 function syncTicketType() {
   const type = itEl('ticketType').value;
-  document.querySelectorAll('.tk-type').forEach(b => b.setAttribute('aria-checked', b.dataset.type === type));
+  document.querySelectorAll('.tk-type').forEach(b => {
+    b.setAttribute('aria-checked', b.dataset.type === type);
+    b.tabIndex = b.dataset.type === type ? 0 : -1; // 라디오 묶음: Tab은 고른 버튼에만 멈추고, 묶음 안에서는 화살표로 옮긴다
+  });
   const incident = type === 'TK_INCIDENT';
   itEl('ticketTitle').placeholder = incident ? '예: 노트북 화면이 켜지지 않아요' : '예: 공용 프린터 연결 방법이 궁금해요';
   itEl('ticketBody').placeholder = incident
@@ -109,6 +112,16 @@ document.querySelectorAll('.tk-type').forEach(b => b.addEventListener('click', (
   itEl('ticketType').value = b.dataset.type;
   syncTicketType();
 }));
+// 구분 버튼(role="radio")은 화면 읽기 프로그램에 라디오로 읽히므로, 라디오처럼 화살표로 옮겨 고르게 한다
+itEl('view-ticket-new')?.querySelector('.tk-types')?.addEventListener('keydown', e => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  const btns = [...document.querySelectorAll('.tk-type')];
+  const next = btns[(btns.indexOf(document.activeElement) + step + btns.length) % btns.length];
+  next.click();
+  next.focus();
+});
 itEl('ticketAsset')?.addEventListener('change', syncTicketBranch);
 itEl('ticketBranch')?.addEventListener('change', () => {
   itEl('ticketBranchHint').textContent = '';
@@ -159,8 +172,8 @@ itEl('ticketForm')?.addEventListener('submit', e => {
       itNew.initial = itSnapshot(); // 접수했으니 나갈 때 묻지 않는다
       toastAndGo(`${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`, pageHref('/ticket/mine'));
     })
-    .fail(xhr => { err.textContent = apiMessage(xhr); })
-    .always(() => { btn.disabled = false; });
+    // 성공하면 버튼을 풀지 않는다: 내 티켓 화면으로 넘어가기 전에 한 번 더 눌러 같은 티켓이 두 건 생기지 않게. 실패했을 때만 다시 누를 수 있게 푼다
+    .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
 });
 
 // ---------- 내 티켓 ----------
