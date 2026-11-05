@@ -56,6 +56,13 @@
         WHERE m.company_id = #{companyId}
           AND m.employee_id = #{employeeId}
           AND m.left_at IS NULL
+        ORDER BY COALESCE(
+            (SELECT MAX(msg.created_at)
+             FROM chat_message msg
+             WHERE msg.company_id = r.company_id
+               AND msg.chat_room_id = r.chat_room_id),
+            r.created_at
+        ) DESC, r.chat_room_id DESC
     </select>
 
     <select id="getMessages"

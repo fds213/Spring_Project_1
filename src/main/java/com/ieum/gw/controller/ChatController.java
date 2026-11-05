@@ -39,6 +39,7 @@ public class ChatController {
     private final ChatServerEndpoint chatEndpoint;
     private final ChatUpdateEndpoint chatUpdates;
 
+    /** 방별 안 읽은 수와 전체 합계를 반환한다 */
     @GetMapping("/unread")
     @ResponseBody
     public ResponseEntity<Map<String, Object>> unread(@AuthenticationPrincipal LoginUser user) {
@@ -49,6 +50,7 @@ public class ChatController {
     }
 
 
+    /** 이미지 한 장을 저장하고 새 메시지일 때만 방에 알린다 */
     @PostMapping(value = "/room/{roomId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseBody
     public ChatMessageDTO sendImage(@PathVariable long roomId,
@@ -58,17 +60,19 @@ public class ChatController {
         if (images.size() != 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 한 장을 선택해 주세요.");
         }
-        ChatMessageDTO message;
+        ChatService.MessageSaveResult result;
         try {
-            message = cService.sendImage(roomId, user, clientMessageKey, images.get(0));
+            result = cService.sendImage(roomId, user, clientMessageKey, images.get(0));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
         }
+        ChatMessageDTO message = result.getMessage();
         message.setSenderName(user.getName());
-        chatEndpoint.publishMessage(message, user);
+        if (result.isInserted()) chatEndpoint.publishMessage(message, user);
         return message;
     }
 
+    /** 참여자가 요청한 채팅 이미지를 반환한다 */
     @GetMapping("/room/{roomId}/messages/{messageId}/image")
     public ResponseEntity<Resource> image(@PathVariable long roomId, @PathVariable long messageId,
                                           @AuthenticationPrincipal LoginUser user) throws IOException {
@@ -122,6 +126,7 @@ public class ChatController {
     }
 
     // 이전 메시지 받기
+    /** 이전 대화 한 페이지를 반환한다 */
     @GetMapping("/room/{roomId}/messages")
     @ResponseBody
     public List<ChatMessageDTO> messages(@PathVariable Long roomId, @RequestParam(required = false) Long beforeMessageId, @AuthenticationPrincipal LoginUser user) {
@@ -137,6 +142,7 @@ public class ChatController {
     }
 
     // 이전 메시지 보다 더 전 메시지 받기
+    /** 재접속 시 마지막 수신 이후의 대화를 반환한다 */
     @GetMapping("/room/{roomId}/messages/after")
     @ResponseBody
     public List<ChatMessageDTO> messagesAfter(@PathVariable Long roomId, @RequestParam Long afterMessageId, @AuthenticationPrincipal LoginUser user) {
@@ -152,6 +158,7 @@ public class ChatController {
     }
 
     // 읽음 처리
+    /** 읽음 위치를 저장하고 배지 갱신을 알린다 */
     @PostMapping("/room/{roomId}/read")
     @ResponseBody
     @ResponseStatus(HttpStatus.NO_CONTENT)
@@ -171,6 +178,7 @@ public class ChatController {
         chatUpdates.publishUser(user.getCompanyId(), user.getEmployeeId());
     }
 
+    /** 1:1 상대방의 읽음 위치를 반환한다 */
     @GetMapping("/room/{roomId}/read")
     @ResponseBody
     public Map<String, String> readState(
@@ -184,6 +192,7 @@ public class ChatController {
     }
 
     // 채팅방 생성
+    /** 채팅방을 만들거나 기존 1:1 방으로 이동한다 */
     @PostMapping("/createroom")
     public String createroom(@RequestParam ChatRoomType roomType, @RequestParam(required = false) String roomName, @RequestParam(required = false) List<Long> members, @AuthenticationPrincipal LoginUser user) {
 

@@ -7,6 +7,7 @@ import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.ChatMessageDTO;
 import com.ieum.gw.dto.ChatRoomDTO;
 import com.ieum.gw.dto.CompanyUsageDTO;
+import lombok.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.access.AccessDeniedException;
@@ -27,6 +28,12 @@ import java.util.stream.Collectors;
 
 @Service
 public class ChatService {
+
+    @Value
+    public static class MessageSaveResult {
+        ChatMessageDTO message;
+        boolean inserted;
+    }
 
     private static final Logger LOG = LoggerFactory.getLogger(ChatService.class);
     private static final String IMAGE_TYPE = "MSG_IMAGE";
@@ -51,28 +58,28 @@ public class ChatService {
         System.out.println("hi zz");
     }
 
-    private ChatMessageDTO reuseMessage(
-            ChatMessageDTO requested, ChatMessageDTO existing) {
-
+    /** 같은 키로 재전송한 내용이 기존 메시지와 일치하는지 검사한다 */
+    private void validateReplay(ChatMessageDTO requested, ChatMessageDTO existing) {
         if (!Objects.equals(requested.getChatRoomId(), existing.getChatRoomId())
                 || !Objects.equals(requested.getMessageType(), existing.getMessageType())
                 || !Objects.equals(requested.getMessageText(), existing.getMessageText())) {
             throw new IllegalArgumentException(
                     "같은 전송 키를 다른 방이나 내용에 사용할 수 없습니다.");
         }
-
-        return existing;
     }
 
+    /** 참여 중인 사원이 방에 속하는지 확인한다 */
     public boolean isMember(Long companyId, long roomId, Long empNum) {
         return dao.isMember(companyId, roomId, empNum) == 1;
     }
 
+    /** 활성 직원이 참여 중인 방에 접근할 수 있는지 확인한다 */
     public boolean canAccessRoom(Long companyId, long roomId, Long employeeId) {
         return isMember(companyId, roomId, employeeId)
                 && eService.isActiveEmployee(companyId, employeeId);
     }
 
+    /** 전송 전에 방을 잠그고 참여 권한과 업체 이용 상태를 검사한다 */
     private void lockForSend(ChatMessageDTO dto) {
         // 같은 방은 ID 발급 전에 잠가 메시지 ID와 커밋 순서를 맞춘다.
         if (dao.lockRoom(dto.getCompanyId(), dto.getChatRoomId()) == null
@@ -85,8 +92,9 @@ public class ChatService {
         }
     }
 
+    /** 텍스트를 저장하거나 같은 키로 저장된 메시지를 반환한다 */
     @Transactional
-    public ChatMessageDTO insertMessage(ChatMessageDTO dto) {
+    public MessageSaveResult insertMessage(ChatMessageDTO dto) {
         lockForSend(dto);
 
         // 빈 메시지와 1000자 검사
@@ -103,7 +111,8 @@ public class ChatService {
 
         ChatMessageDTO existing = dao.findByClientKey(dto);
         if (existing != null) {
-            return reuseMessage(dto, existing);
+            validateReplay(dto, existing);
+            return new MessageSaveResult(existing, false);
         }
 
         try {
@@ -112,20 +121,23 @@ public class ChatService {
             existing = dao.findByClientKey(dto);
             if (existing == null) throw e;
 
-            return reuseMessage(dto, existing);
+            validateReplay(dto, existing);
+            return new MessageSaveResult(existing, false);
         }
 
-        return dto;
+        return new MessageSaveResult(dto, true);
     }
 
+    /** 메시지 전송 키의 길이와 허용 문자를 검사한다 */
     private void validateClientKey(String key) {
         if (key == null || !key.matches("[A-Za-z0-9_-]{1,64}")) {
             throw new IllegalArgumentException("메시지 전송 키가 올바르지 않습니다.");
         }
     }
 
+    /** 이미지를 저장하거나 같은 키로 저장된 동일 이미지를 반환한다 */
     @Transactional(rollbackFor = IOException.class)
-    public ChatMessageDTO sendImage(long roomId, LoginUser user, String key, MultipartFile file)
+    public MessageSaveResult sendImage(long roomId, LoginUser user, String key, MultipartFile file)
             throws IOException {
         validateClientKey(key);
         if (file.isEmpty() || file.getSize() > MAX_IMAGE_BYTES) {
@@ -142,19 +154,20 @@ public class ChatService {
 
         ChatMessageDTO existing = dao.findByClientKey(message);
         if (existing != null) {
-            reuseMessage(message, existing);
+            validateReplay(message, existing);
             AttachmentDTO original = attachmentService.get(existing.getAttachmentId(), user.getCompanyId());
             try (InputStream in = attachmentService.load(original).getInputStream()) {
                 if (!Arrays.equals(file.getBytes(), in.readNBytes((int) file.getSize() + 1))) {
                     throw new IllegalArgumentException("같은 전송 키를 다른 이미지에 사용할 수 없습니다.");
                 }
             }
-            return existing;
+            return new MessageSaveResult(existing, false);
         }
 
         // 공통 저장소가 확장자와 파일 시그니처를 검사한다.
         AttachmentDTO attachment = attachmentService.upload(file, user, "chat");
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            /** 이미지 저장이 롤백되면 파일을 정리한다 */
             @Override
             public void afterCompletion(int status) {
                 if (status == STATUS_ROLLED_BACK) {
@@ -169,9 +182,10 @@ public class ChatService {
         message.setAttachmentId(attachment.getAttachmentId());
         attachmentService.markAttached(attachment.getAttachmentId(), user.getCompanyId());
         dao.insertMessage(message);
-        return message;
+        return new MessageSaveResult(message, true);
     }
 
+    /** 방 참여 권한을 확인하고 이미지 정보를 반환한다 */
     public AttachmentDTO getImage(long roomId, long messageId, LoginUser user) {
         if (!canAccessRoom(user.getCompanyId(), roomId, user.getEmployeeId())) {
             throw new AccessDeniedException("채팅방에 접근할 수 없습니다.");
@@ -187,10 +201,12 @@ public class ChatService {
         return dao.getRoomList(companyId, employeeId);
     }
 
+    /** 채팅방에 남아 있는 참여자 ID를 조회한다 */
     public List<Long> getRoomMemberIds(Long companyId, Long roomId) {
         return dao.getRoomMemberIds(companyId, roomId);
     }
 
+    /** 참여 권한을 확인하고 방 참여자의 이름을 반환한다 */
     public List<String> getRoomMemberNames(Long companyId, long roomId, Long employeeId) {
         if (!canAccessRoom(companyId, roomId, employeeId)) {
             throw new AccessDeniedException("채팅방에 접근할 수 없습니다.");
@@ -206,6 +222,7 @@ public class ChatService {
         return names;
     }
 
+    /** 기준 메시지보다 이전 대화 한 페이지를 조회한다 */
     public List<ChatMessageDTO> getMessages(
             Long companyId, Long roomId, Long employeeId,
             Long beforeMessageId) {
@@ -224,6 +241,7 @@ public class ChatService {
         return messages;
     }
 
+    /** 조회한 메시지에 작성자 이름을 채운다 */
     private void fillSenderNames(
             Long companyId, List<ChatMessageDTO> messages) {
 
@@ -241,6 +259,7 @@ public class ChatService {
         }
     }
 
+    /** 기준 메시지 이후 대화 한 페이지를 조회한다 */
     public List<ChatMessageDTO> getMessagesAfter(
             Long companyId, Long roomId, Long employeeId,
             Long afterMessageId) {
@@ -261,6 +280,7 @@ public class ChatService {
         return messages;
     }
 
+    /** 참여자의 마지막 읽음 위치를 앞으로 갱신한다 */
     @Transactional
     public void markRead(Long companyId, Long roomId,
                          Long employeeId, Long messageId) {
@@ -284,6 +304,7 @@ public class ChatService {
         }
     }
 
+    /** 사원의 전체 안 읽은 메시지 수를 조회한다 */
     public int countUnread(Long companyId, Long employeeId) {
         if (!eService.isActiveEmployee(companyId, employeeId)) {
             throw new AccessDeniedException("사용 중인 재직 계정만 조회할 수 있습니다.");
@@ -292,6 +313,7 @@ public class ChatService {
         return dao.countUnread(companyId, employeeId);
     }
 
+    /** 1:1 상대방이 마지막으로 읽은 메시지 ID를 조회한다 */
     public Long getOtherLastReadId(
             Long companyId, Long roomId, Long employeeId) {
 
@@ -303,6 +325,7 @@ public class ChatService {
         return dao.getOtherLastReadId(companyId, roomId, employeeId);
     }
 
+    /** 참여자를 검증해 채팅방을 만들거나 기존 1:1 방을 반환한다 */
     @Transactional
     public Long createRoom(
             Long companyId, Long employeeId,

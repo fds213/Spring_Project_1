@@ -34,6 +34,7 @@ public class ChatUpdateEndpoint {
     @Autowired
     private EmployeeService employeeService;
 
+    /** 로그인한 활성 직원의 배지 갱신 연결을 등록한다 */
     @OnOpen
     public void open(Session session) throws IOException {
         if (!(session.getUserPrincipal() instanceof Authentication)) {
@@ -59,6 +60,7 @@ public class ChatUpdateEndpoint {
         });
     }
 
+    /** 닫힌 배지 갱신 연결을 제거한다 */
     @OnClose
     public void close(Session session) {
         LoginUser user = (LoginUser) session.getUserProperties().get("updateUser");
@@ -69,6 +71,7 @@ public class ChatUpdateEndpoint {
         });
     }
 
+    /** 방 참여자에게 안 읽은 수 갱신을 알린다 */
     public void publishRoom(Long companyId, Long roomId) {
         if (sessions.isEmpty()) return;
         try {
@@ -80,6 +83,7 @@ public class ChatUpdateEndpoint {
         }
     }
 
+    /** 해당 사원의 열린 연결에 안 읽은 수 갱신을 알린다 */
     public void publishUser(Long companyId, Long employeeId) {
         Set<Session> connections = sessions.get(List.of(companyId, employeeId));
         if (connections == null) return;
@@ -104,6 +108,7 @@ public class ChatUpdateEndpoint {
         }
     }
 
+    /** 권한이 없는 배지 갱신 연결을 닫는다 */
     private void deny(Session session) throws IOException {
         session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "채팅 알림 수신 권한이 없습니다."));
     }

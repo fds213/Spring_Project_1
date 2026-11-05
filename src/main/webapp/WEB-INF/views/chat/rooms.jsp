@@ -121,8 +121,8 @@
               badge.className = 'badge';
               link.append(name, ' ', badge);
               row.append(link);
-              list.append(row);
             }
+            list.append(row);
             row.querySelector('[data-room-name]').textContent = room.displayName || '';
             var badge = row.querySelector('[data-room-unread]');
             badge.textContent = '안 읽은 메시지 ' + room.unreadCount + '개';

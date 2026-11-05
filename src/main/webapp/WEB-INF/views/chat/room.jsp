@@ -415,6 +415,11 @@ pageEncoding="UTF-8"%>
                     if (leaving || socket !== ws) return;
                     clearTimeout(receiptTimer);
                     connectionStatus("연결이 종료되었습니다.", false);
+                    if (e.code === 1009 && pendingSend) {
+                        pendingSend = null;
+                        $("#retrySend").prop("hidden", true);
+                        $("#sendStatus").text("메시지가 너무 길어 전송하지 못했습니다. 내용을 줄여 다시 보내 주세요.");
+                    }
                     if (e.code !== 1000 && e.code !== 1008) scheduleReconnect();
                 };
                 socket.onmessage = function(e) {
@@ -465,6 +470,11 @@ pageEncoding="UTF-8"%>
                     e.preventDefault();
                     var text = $(".input-area").text().trim();
                     if (text === "" || pendingSend || recovering || !ws || ws.readyState !== WebSocket.OPEN) return false;
+
+                    if (Array.from(text).length > 1000) {
+                        $("#sendStatus").text("메시지는 1,000자까지 보낼 수 있습니다.");
+                        return false;
+                    }
 
                     pendingSend = {
                         clientMessageKey: crypto.randomUUID(),
