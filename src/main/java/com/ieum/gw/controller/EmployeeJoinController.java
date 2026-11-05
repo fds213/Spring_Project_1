@@ -14,12 +14,15 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.dto.JoinOpenFormDTO;
 import com.ieum.gw.dto.JoinRequestFormDTO;
 import com.ieum.gw.dto.LoginUser;
+import com.ieum.gw.dto.PasswordResetTargetDTO;
 import com.ieum.gw.service.JoinNotFoundException;
 import com.ieum.gw.service.JoinService;
+import com.ieum.gw.service.PasswordResetService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,6 +32,7 @@ import lombok.RequiredArgsConstructor;
 public class EmployeeJoinController {
 
 	private final JoinService joinService;
+	private final PasswordResetService passwordResetService;
 
 	// ---------- 화면 ----------
 
@@ -42,6 +46,12 @@ public class EmployeeJoinController {
 	@GetMapping("/join")
 	public String join() {
 		return "common/join";
+	}
+	
+	/** 비밀번호 찾기 화면 (로그인 없이 여는 주소, ACC-07). 요청은 화면이 /join/api/password/*로 보낸다 */
+	@GetMapping("/join/password")
+	public String passwordPage() {
+		return "common/join-password";
 	}
 
 	// ---------- 가입 승인 API ----------
@@ -131,6 +141,33 @@ public class EmployeeJoinController {
 		joinService.cancelMyRequest(code, reqId);
 		return Map.of("success", true);
 	}
+	
+	// ---------- 비밀번호 찾기 (ACC-07, 로그인 화면) ----------
+
+	/** 인증 코드 보내기. 계정이 있든 없든 같은 답 (계정이 있는지 드러나지 않게) */
+	@PostMapping("/join/api/password/code")
+	@ResponseBody
+	public Map<String, Object> sendResetCode(@RequestBody Map<String, String> body) {
+		passwordResetService.sendCode(body.get("companyCode"), body.get("empNo"));
+		return Map.of("success", true);
+	}
+
+	/** 인증 코드 확인 → resetToken (새 비밀번호와 함께 보낼 값) */
+	@PostMapping("/join/api/password/verify")
+	@ResponseBody
+	public Map<String, Object> verifyResetCode(@RequestBody Map<String, String> body) {
+		String token = passwordResetService.verify(body.get("companyCode"), body.get("empNo"), body.get("code"));
+		return Map.of("success", true, "data", Map.of("resetToken", token));
+	}
+
+	/** 새 비밀번호 저장 → 로그인 칸에 채울 업체 코드·사번 */
+	@PostMapping("/join/api/password/reset")
+	@ResponseBody
+	public Map<String, Object> resetPassword(@RequestBody Map<String, String> body) {
+		PasswordResetTargetDTO target = passwordResetService.reset(body.get("resetToken"), body.get("password"));
+		return Map.of("success", true,
+				"data", Map.of("companyCode", target.getCompanyCode(), "empNo", target.getEmployeeNo()));
+	}
 
 	// ---------- 오류 응답 ----------
 
@@ -161,5 +198,13 @@ public class EmployeeJoinController {
 	@ResponseBody
 	public ResponseEntity<Map<String, String>> notFound(JoinNotFoundException e) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+	}
+	
+	/** Service가 정한 상태 그대로 (비밀번호 찾기: 400 코드 틀림, 409 메일 꺼짐, 410 코드·요청 만료) */
+	@ExceptionHandler(ResponseStatusException.class)
+	@ResponseBody
+	public ResponseEntity<Map<String, String>> statusError(ResponseStatusException e) {
+		String message = e.getReason() == null ? "처리하지 못했습니다" : e.getReason();
+		return ResponseEntity.status(e.getStatus()).body(Map.of("message", message));
 	}
 }
