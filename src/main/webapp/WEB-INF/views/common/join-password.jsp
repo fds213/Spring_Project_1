@@ -2,7 +2,7 @@
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%--
   비밀번호 찾기 (GET /join/password → common/join-password, 로그인 없이 연다).
-  지금은 화면 모양만 있다. 업체 코드 확인·인증 메일·요청 처리(employee/employee.js)와 서버 API는 담당이 붙인다.
+  인증 코드 보내기·확인·새 비밀번호 저장은 employee/employee.js('비밀번호 찾기' 부분), 서버는 EmployeeJoinController(/join/api/password/*).
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <!doctype html>
@@ -20,6 +20,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
+  <%-- 코드 보내기·확인·저장(POST)에 붙이는 CSRF 값 (common.js 가 읽는다) --%>
+  <meta name="_csrf" content="${_csrf.token}">
+  <meta name="_csrf_header" content="${_csrf.headerName}">
 </head>
 <body data-ctx="${ctx}">
   <section class="login-screen">
@@ -67,5 +70,9 @@
 
   <script src="${ctx}/resources/js/install.js"></script>
   <script src="${ctx}/resources/js/password-toggle.js"></script>
+  <script src="${ctx}/resources/lib/jquery-3.7.1.min.js"></script>
+  <script src="${ctx}/resources/js/common.js"></script>
+  <script src="${ctx}/resources/js/util.js"></script>
+  <script src="${ctx}/resources/js/employee/employee.js"></script>
 </body>
 </html>

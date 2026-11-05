@@ -102,13 +102,18 @@
       var button = document.getElementById('btnLogin');
       var sending = false;
       try { if (!company.value) company.value = localStorage.getItem('ieum-last-company') || ''; } catch (e) { /* 저장소 막힘 */ }
-      // 계정 생성(/join)에서 승인된 뒤 넘어오면 사번을 채우고 안내한다(employee.js 가 넘긴 값, 한 번만 쓴다)
+      // 계정 생성(/join)에서 승인된 뒤, 비밀번호 찾기(/join/password)에서 새 비밀번호를 저장한 뒤 넘어오면
+      // 사번을 채우고 안내한다(employee.js 가 넘긴 값, 한 번만 쓴다)
       try {
         var joined = sessionStorage.getItem('ieum-joined-id');
-        if (joined) {
-          sessionStorage.removeItem('ieum-joined-id');
-          document.getElementById('loginId').value = joined;
-          error.textContent = '계정이 만들어졌습니다. 사번 ' + joined + '와 요청할 때 정한 비밀번호로 로그인하세요.';
+        var reset = sessionStorage.getItem('ieum-pw-reset-id');
+        sessionStorage.removeItem('ieum-joined-id');
+        sessionStorage.removeItem('ieum-pw-reset-id');
+        if (joined || reset) {
+          document.getElementById('loginId').value = joined || reset;
+          error.textContent = joined
+            ? '계정이 만들어졌습니다. 사번 ' + joined + '와 요청할 때 정한 비밀번호로 로그인하세요.'
+            : '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
           error.classList.add('is-ok');
           form.addEventListener('input', function () { error.classList.remove('is-ok'); }, { once: true });
           document.getElementById('loginPw').focus();
