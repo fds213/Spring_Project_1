@@ -19,6 +19,9 @@
 	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.security.AjaxAwareEntryPoint">
     <constructor-arg value="/login" />
 </bean>
+	
+	<!-- 로그인했지만 권한이 없을 때(403): AJAX는 JSON, 화면은 /access-denied 안내 -->
+	<bean id="ajaxAwareAccessDeniedHandler" class="com.ieum.gw.security.AjaxAwareAccessDeniedHandler" />
 
 	<!-- 근태 단말기(지문 시뮬레이터) 전용 /api/** 체인 (AGENTS.md URL 규칙). 로그인 세션·CSRF 없이 받고,
 	     X-Device-Key 단말기 키로 업체를 확인하는 일은 근태 Service 가 요청마다 한다(키가 없거나 틀리면 401).
@@ -75,6 +78,8 @@
 
 		<security:logout logout-url="/logout"
 			logout-success-url="/login?logout" invalidate-session="true" />
+
+		<security:access-denied-handler ref="ajaxAwareAccessDeniedHandler" />
 
 		<security:csrf />
 	</security:http>
