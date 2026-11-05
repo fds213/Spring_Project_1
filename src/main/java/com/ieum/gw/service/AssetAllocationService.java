@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dao.AssetAllocationDAO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
+import com.ieum.gw.dto.AssetListDTO;
 import com.ieum.gw.code.AssetStatus;
 import com.ieum.gw.code.AssetType;
 import com.ieum.gw.dto.LoginUser;
@@ -23,6 +24,15 @@ public class AssetAllocationService {
     private final BranchService branchService;
     private final EmployeeService employeeService;
 
+    /** 로그인한 IT 담당자·관리자에게 같은 업체의 전체 자산 목록을 제공한다. */
+    @Transactional(readOnly = true)
+    public List<AssetListDTO> getAssetList(LoginUser user) {
+    	requireOperator(user);
+    	
+    	return dao.selectList(user.getCompanyId());
+    }
+    
+    /** 자산 ID로 같은 업체의 자산 상세 정보를 조회한다. */
     @Transactional(readOnly = true)
     public java.util.Map<String, Object> detail(LoginUser operator, Long id) {
         requireOperator(operator);
@@ -150,10 +160,13 @@ public class AssetAllocationService {
         if(row==null) { throw new ResponseStatusException(HttpStatus.NOT_FOUND,"자산을 찾을 수 없습니다."); }
         return row;
     }
+    
     private static AssetType kind(String type) {
         try { return AssetType.from(type); } catch(IllegalArgumentException e) { throw bad("장비 종류가 올바르지 않습니다."); }
     }
+    
     private static void requireId(Long id) { if(id==null || id<=0) { throw bad("번호가 올바르지 않습니다."); } }
+    
     private static void requireOperator(LoginUser user) {
         if(user==null || user.getCompanyId()==null || user.getCompanyId()<=0 || user.getEmployeeId()==null
                 || user.getEmployeeId()<=0 || user.getUserAccountId()==null || user.getUserAccountId()<=0) {
@@ -163,6 +176,8 @@ public class AssetAllocationService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,"IT 담당자 또는 관리자만 사용할 수 있습니다.");
         }
     }
+    
     private static ResponseStatusException bad(String message) { return new ResponseStatusException(HttpStatus.BAD_REQUEST,message); }
+    
     private static ResponseStatusException conflict(String message) { return new ResponseStatusException(HttpStatus.CONFLICT,message); }
 }
