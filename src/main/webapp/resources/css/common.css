@@ -339,6 +339,18 @@ h2 { margin: 28px 0 8px; font-size: 16px; font-weight: 600; }
 .join-scope { margin: -10px 0 16px; font-size: 13px; }
 .join-note { margin: 12px 0 0; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
 .empty-note { margin: 12px 0 0; padding: 18px; text-align: center; font-size: 13px; color: var(--text-muted); border: 1px dashed var(--line); border-radius: var(--radius); }
+
+/* 권한 없음·오래된 화면 안내 (common/access-denied.jsp) */
+.denied { max-width: 440px; margin: 48px auto; padding: 36px 28px 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-card); }
+.denied-icon { width: 56px; height: 56px; margin-bottom: 6px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-bg); }
+.denied h1 { margin: 0; font-size: 20px; font-weight: 700; }
+.denied p { margin: 0; font-size: 14px; line-height: 1.7; color: var(--text-sub); }
+.denied-actions { margin-top: 14px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+@media (max-width: 480px) {
+  .denied { margin: 24px auto; padding: 28px 20px 22px; }
+  .denied-actions { width: 100%; }
+  .denied-actions .btn { flex: 1; justify-content: center; }
+}
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 /* 표의 관리 칸 버튼: 좁은 표가 칸을 줄이면 글자가 한 글자씩 줄바꿈되어 높이가 정해진 버튼 밖으로 넘쳐 겹친다. 한 줄로 두고 표가 옆으로 밀리게 한다 */
 .row-actions .btn { white-space: nowrap; }
