@@ -1,0 +1,73 @@
+/* 장애·문의 접수 화면 (/ticket/new, ticket/new.jsp + js/ticket/it-service.js) 전용 스타일. 색·둥글기는 common.css 변수를 쓴다.
+   기안 작성 화면(css/approval/write.css)과 같은 틀이다 */
+
+/* 넓은 작성 칸 + 좁은 안내 칸. 한글이 낱자에서 끊기지 않게 단어 단위로 줄을 바꾼다 */
+#view-ticket-new { word-break: keep-all; overflow-wrap: anywhere; }
+.tk-write { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.tk-form { display: flex; flex-direction: column; gap: 22px; padding: 20px 22px 18px; }
+
+/* 1. 구분: 설명이 붙은 버튼 2개 */
+.tk-types { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tk-type { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.tk-type:hover { border-color: #c5cfdc; }
+.tk-type strong { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.tk-type small { font-size: 12px; color: var(--text-muted); }
+.tk-type[aria-checked="true"] { border-color: var(--accent); background: var(--accent-bg); }
+.tk-type[aria-checked="true"] strong, .tk-type[aria-checked="true"] small { color: var(--accent); }
+.tk-type:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 2. 묶음(어디서 생겼나요·무슨 일인가요)과 한 줄 */
+.tk-group { display: flex; flex-direction: column; gap: 12px; }
+.tk-group-line { padding-top: 18px; border-top: 1px solid var(--line); }
+.tk-group-title { margin: 0; font-size: 13px; font-weight: 700; color: var(--text); }
+.tk-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; font-size: 13px; }
+.tk-row > label { color: var(--text-sub); }
+.tk-row-top { align-items: start; }
+.tk-row-top > label { padding-top: 12px; }
+.tk-row-sub { margin-top: -6px; }
+.tk-row-sub:has(.tk-hint:empty) { display: none; }
+.tk-row .input, .tk-row .filter-select { width: 100%; min-width: 0; }
+.tk-body { min-height: 140px; }
+.tk-hint { margin: 0; font-size: 12px; color: var(--text-muted); }
+.tk-hint.is-warn { color: var(--danger); }
+.tk-count { margin: 4px 0 0; text-align: right; font-size: 11px; color: var(--text-muted); }
+
+/* 3. 아래 버튼 줄 + 한 줄 요약 */
+.tk-form .form-error:empty { display: none; }
+.tk-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+.tk-actions .btn { height: 40px; padding: 0 18px; font-size: 14px; }
+.tk-summary { flex: 1; min-width: 0; margin: 0 8px 0 0; font-size: 13px; color: var(--text-sub); }
+.tk-summary strong { color: var(--text); font-weight: 600; }
+.tk-summary.is-todo { color: var(--text-muted); }
+
+/* 4. 오른쪽: 처리 중인 내 티켓 + 처리 순서 */
+.tk-side { display: flex; flex-direction: column; gap: 16px; }
+.tk-open { padding: 18px 20px; gap: 2px; color: inherit; text-decoration: none; transition: border-color .12s; }
+.tk-open:hover { border-color: var(--accent); }
+.tk-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tk-open small { font-size: 12px; color: var(--text-sub); }
+.tk-open strong { font-size: 28px; font-weight: 700; color: var(--text); }
+.tk-open strong .unit { margin-left: 3px; font-size: 14px; font-weight: 500; color: var(--text-sub); }
+.tk-open-sub { font-size: 12px; color: var(--text-muted); }
+.tk-open.is-alert strong { color: var(--accent); }
+.tk-guide h2 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 16px 20px 0; font-size: 14px; font-weight: 600; }
+.tk-steps { display: flex; flex-wrap: wrap; gap: 4px 0; margin: 12px 20px 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-sub); }
+.tk-steps li { display: inline-flex; align-items: center; }
+.tk-steps li:not(:last-child)::after { content: "→"; margin: 0 6px; color: var(--text-muted); }
+.tk-steps li:last-child { color: var(--accent); font-weight: 600; }
+.tk-guide-list { margin: 0; padding: 10px 20px 18px 36px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.6; color: var(--text-sub); }
+
+/* 좁은 화면: 한 칸으로, 내 티켓 카드를 위로 */
+@media (max-width: 1000px) {
+  .tk-write { grid-template-columns: minmax(0, 1fr); }
+  .tk-side { order: -1; }
+}
+@media (max-width: 560px) {
+  .tk-form { padding: 16px; }
+  .tk-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .tk-row-sub > span:first-child { display: none; }
+  .tk-row-top > label { padding-top: 0; }
+  .tk-actions { flex-wrap: wrap; }
+  .tk-summary { flex-basis: 100%; margin: 0 0 4px; }
+  .tk-actions .btn { flex: 1; justify-content: center; }
+}
