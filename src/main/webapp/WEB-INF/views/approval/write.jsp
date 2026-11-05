@@ -49,7 +49,7 @@
                 </div>
               </div>
               <div class="ea-row ea-row-sub"><span></span><p class="ea-days" id="eaDays" aria-live="polite"></p></div>
-              <div class="ea-row"><label for="eaLeaveReason">사유</label><input class="input" id="eaLeaveReason" maxlength="100" autocomplete="off" placeholder="예: 가족 행사 (선택)"></div>
+              <div class="ea-row"><label for="eaLeaveReason">사유</label><input class="input" id="eaLeaveReason" maxlength="100" autocomplete="off" placeholder="예: 가족 행사"></div>
             </div>
 
             <div class="ea-group" id="eaEquipFields" hidden>
