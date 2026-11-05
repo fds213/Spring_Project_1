@@ -174,10 +174,11 @@ function eaSyncForm() {
   const leave = form === 'DOC_LEAVE';
   eaEl('eaLeaveFields').hidden = !leave;
   eaEl('eaEquipFields').hidden = leave;
-  document.querySelectorAll('.ea-tab').forEach(t => t.setAttribute('aria-selected', t.dataset.form === form));
+  // 탭·라디오 묶음: Tab은 고른 버튼에만 멈추고, 묶음 안에서는 화살표로 옮긴다(eaArrowKeys)
+  document.querySelectorAll('.ea-tab').forEach(t => { t.setAttribute('aria-selected', t.dataset.form === form); t.tabIndex = t.dataset.form === form ? 0 : -1; });
 
   const kind = eaEl('eaLeaveKind').value;
-  document.querySelectorAll('#eaLeaveSeg [data-kind]').forEach(b => b.setAttribute('aria-checked', b.dataset.kind === kind));
+  document.querySelectorAll('#eaLeaveSeg [data-kind]').forEach(b => { b.setAttribute('aria-checked', b.dataset.kind === kind); b.tabIndex = b.dataset.kind === kind ? 0 : -1; });
   const half = kind !== 'LV_FULL';
   const from = eaEl('eaLeaveFrom');
   const to = eaEl('eaLeaveTo');
@@ -313,6 +314,20 @@ document.querySelectorAll('#eaLeaveSeg [data-kind]').forEach(b => b.addEventList
   eaEl('eaLeaveKind').value = b.dataset.kind;
   eaSyncForm();
 }));
+// 양식 탭(role="tab")과 구분 버튼(role="radio")은 화면 읽기 프로그램에 탭·라디오로 읽히므로, 화살표로 옮겨 고르게 한다
+function eaArrowKeys(box, selector) {
+  box?.addEventListener('keydown', e => {
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const btns = [...box.querySelectorAll(selector)];
+    const next = btns[(btns.indexOf(document.activeElement) + step + btns.length) % btns.length];
+    next.click();
+    next.focus();
+  });
+}
+eaArrowKeys(document.querySelector('#view-approval-write .ea-tabs'), '.ea-tab');
+eaArrowKeys(eaEl('eaLeaveSeg'), '[data-kind]');
 eaEl('eaLeaveFrom')?.addEventListener('change', () => {
   // 시작일을 종료일 뒤로 옮기면 종료일을 시작일에 맞춘다 (빈 종료일도 시작일로 채운다)
   const from = eaEl('eaLeaveFrom').value;
@@ -353,8 +368,8 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
       eaState.initial = eaSnapshot();
       toastAndGo(`${EA_FORMS[c.form]}를 제출했습니다. 첫 결재자에게 넘어갔습니다`, pageHref('/approval/list'));
     })
-    .fail(xhr => { err.textContent = apiMessage(xhr); })
-    .always(() => { btn.disabled = false; });
+    // 성공하면 버튼을 풀지 않는다: 결재함으로 넘어가기 전에 한 번 더 눌러 같은 문서가 두 번 올라가지 않게. 실패했을 때만 다시 누를 수 있게 푼다
+    .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
 });
 
 // ---------- 결재함 ----------
