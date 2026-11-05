@@ -32,7 +32,7 @@ public class ChatServerEndpoint {
     public void sessionClose(Session session) {
         try {
             session.close(new CloseReason(CloseReason.CloseCodes.VIOLATED_POLICY, "채팅 연결 권한이 없습니다."));
-        } catch (IOException e) {
+        } catch (IOException | IllegalStateException e) {
             System.err.println("채팅 연결 종료 실패: " + session.getId());
         }
     }
@@ -85,8 +85,20 @@ public class ChatServerEndpoint {
 
     /** 해당 연결의 전송 대기열에 메시지를 넣는다 */
     private void send(Session session, String json) {
-        Outbox outbox = (Outbox) session.getUserProperties().get("chatOutbox");
-        if (outbox != null && session.isOpen()) outbox.offer(json);
+        Outbox ready = enqueue(session, json);
+        if (ready != null) ready.advance(true);
+    }
+
+    /** 메시지를 예약하고 첫 전송을 시작해야 할 대기열을 반환한다 */
+    private Outbox enqueue(Session session, String json) {
+        Outbox outbox;
+        try {
+            outbox = (Outbox) session.getUserProperties().get("chatOutbox");
+        } catch (IllegalStateException e) {
+            // 수신자를 고른 뒤 닫힌 연결은 건너뛴다.
+            return null;
+        }
+        return outbox != null && session.isOpen() && outbox.offer(json) ? outbox : null;
     }
 
     /** 권한을 확인한 수신자에게 방 이벤트를 전달한다 */
@@ -94,12 +106,33 @@ public class ChatServerEndpoint {
         Set<Session> sessions = roomSessions.get(roomId);
         if (sessions == null) return;
 
-        List<Session> recipients = new ArrayList<>();
         List<Session> denied = new ArrayList<>();
+        List<Outbox> ready;
+        if (payload == null) {
+            // 같은 방의 접속자 목록은 스냅샷을 만든 순서대로 대기열에 넣는다.
+            synchronized (sessions) {
+                ready = enqueueBroadcast(roomId, sessions, null, denied);
+            }
+        } else {
+            ready = enqueueBroadcast(roomId, sessions, payload, denied);
+        }
+        ready.forEach(outbox -> outbox.advance(true));
+        denied.forEach(this::sessionClose);
+    }
+
+    /** 수신 가능한 연결에 이벤트를 예약하고 전송을 시작할 대기열을 반환한다 */
+    private List<Outbox> enqueueBroadcast(Long roomId, Set<Session> sessions, Map<String, Object> payload,
+                                          List<Session> denied) {
+        List<Session> recipients = new ArrayList<>();
         Set<String> names = new TreeSet<>();
         for (Session session : List.copyOf(sessions)) {
             if (!session.isOpen()) continue;
-            LoginUser user = (LoginUser) session.getUserProperties().get("loginUser");
+            LoginUser user;
+            try {
+                user = (LoginUser) session.getUserProperties().get("loginUser");
+            } catch (IllegalStateException e) {
+                continue;
+            }
             if (user == null || !cService.canAccessRoom(user.getCompanyId(), roomId, user.getEmployeeId())) {
                 denied.add(session);
                 continue;
@@ -108,8 +141,12 @@ public class ChatServerEndpoint {
             names.add(user.getName());
         }
         String json = GSON.toJson(payload == null ? Map.of("type", "MEMBERS", "members", names) : payload);
-        recipients.forEach(session -> send(session, json));
-        denied.forEach(this::sessionClose);
+        List<Outbox> ready = new ArrayList<>();
+        for (Session session : recipients) {
+            Outbox outbox = enqueue(session, json);
+            if (outbox != null) ready.add(outbox);
+        }
+        return ready;
     }
 
     /** 현재 방에 연결된 참여자 이름을 전송한다 */
@@ -223,35 +260,31 @@ public class ChatServerEndpoint {
             remote.setSendTimeout(5_000);
         }
 
-        /** 연결별로 한 건씩 비동기 전송하고, 뒤처진 연결의 대기열 크기를 제한한다 */
-        void offer(String json) {
-            synchronized (this) {
-                if (overflow) return;
-                if (sending) {
-                    if (pending.size() == MAX_PENDING) {
-                        overflow = true;
-                        pending.clear();
-                    } else {
-                        pending.add(json);
-                    }
-                    return;
-                }
-                sending = true;
+        /** 대기열에 추가하고 새 전송을 시작할 차례인지 반환한다 */
+        synchronized boolean offer(String json) {
+            if (overflow) return false;
+            if (pending.size() == MAX_PENDING) {
+                overflow = true;
+                pending.clear();
+                return false;
             }
-            write(json);
+            pending.add(json);
+            if (sending) return false;
+            sending = true;
+            return true;
         }
 
         /** 전송 완료 콜백에서 다음 메시지를 시작한다 */
         private void write(String json) {
             try {
-                remote.sendText(json, result -> complete(result.isOK()));
-            } catch (IllegalStateException e) {
-                complete(false);
+                remote.sendText(json, result -> advance(result.isOK()));
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                advance(false);
             }
         }
 
-        /** 전송이 실패하거나 밀린 연결을 닫아 재접속 시 저장된 대화를 복구하게 한다 */
-        private void complete(boolean success) {
+        /** 다음 메시지를 보내거나 실패한 연결을 닫아 재접속으로 복구하게 한다 */
+        private void advance(boolean success) {
             String next;
             synchronized (this) {
                 if (!success) overflow = true;

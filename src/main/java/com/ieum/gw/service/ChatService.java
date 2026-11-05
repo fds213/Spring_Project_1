@@ -106,6 +106,10 @@ public class ChatService {
         if (text.codePointCount(0, text.length()) > 1000) {
             throw new IllegalArgumentException("메시지는 1,000자까지 보낼 수 있습니다.");
         }
+        if (text.codePoints().anyMatch(codePoint ->
+                codePoint >= Character.MIN_SURROGATE && codePoint <= Character.MAX_SURROGATE)) {
+            throw new IllegalArgumentException("메시지에 올바르지 않은 문자가 있습니다.");
+        }
 
         validateClientKey(dto.getClientMessageKey());
 

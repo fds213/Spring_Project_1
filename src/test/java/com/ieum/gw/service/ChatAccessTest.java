@@ -158,6 +158,14 @@ class ChatAccessTest {
     }
 
     @Test
+    @DisplayName("짝이 없는 서로게이트가 포함된 메시지는 저장하지 않는다")
+    void rejectsUnpairedSurrogate() {
+        ChatMessageDTO dto = message(COMPANY);
+        dto.setMessageText("x" + Character.MIN_HIGH_SURROGATE);
+        assertThrows(IllegalArgumentException.class, () -> service.insertMessage(dto));
+    }
+
+    @Test
     @DisplayName("열린 웹소켓에서도 업체가 만료되면 메시지 저장을 거절하고 연결을 닫는다")
     void rejectsSendOnOpenSocketAfterExpiry() throws Exception {
         ChatServerEndpoint endpoint = new ChatServerEndpoint();
