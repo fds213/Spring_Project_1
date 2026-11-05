@@ -19,38 +19,134 @@ const itCell = (label, ...parts) => {
   td.dataset.label = label; // 폰에서 값 앞에 붙는 열 이름
   return td;
 };
-const itNew = { opts: null };
+const itNew = { opts: null, initial: undefined };
 const itMine = { filter: 'all', open: null, items: [] };
 const itAsset = { items: [], waiting: [] };
 
 // ---------- 장애·문의 접수 ----------
+// 구분(ticketType)의 값은 숨긴 select에 두고, 화면에는 설명이 붙은 버튼 두 개로 보인다
+const TICKET_INPUT_IDS = ['ticketType', 'ticketAsset', 'ticketBranch', 'ticketTitle', 'ticketBody'];
+const itSnapshot = () => JSON.stringify(TICKET_INPUT_IDS.map(id => itEl(id).value.trim())); // [취소] 때 쓰던 내용이 있는지 견줄 값
+
 function openTicketNewView() {
   itEl('ticketError').textContent = '';
+  syncTicketType();
   api.get('/ticket/api/form-options')
     .done(o => {
       itNew.opts = o;
-      itEl('ticketAsset').replaceChildren(new Option('(해당 없음)', ''), ...o.assets.map(a => new Option(assetLabel(a), a.id)));
-      itEl('ticketBranch').replaceChildren(...o.branches.map(b => new Option(b.name, b.id)));
+      itEl('ticketAsset').replaceChildren(new Option('관련 자산 없음', ''), ...o.assets.map(a => new Option(assetLabel(a), a.id)));
+      // 지점이 하나도 없으면 빈 칸 대신 '등록된 지점 없음'을 보인다 (고를 수 없는 안내 문구)
+      const none = new Option('등록된 지점 없음', '');
+      none.disabled = true;
+      itEl('ticketBranch').replaceChildren(...(o.branches.length ? o.branches.map(b => new Option(b.name, b.id)) : [none]));
       syncTicketBranch();
+      itNew.initial = itSnapshot();
     })
     .fail(xhr => { itEl('ticketError').textContent = apiMessage(xhr, '접수에 필요한 정보를 불러오지 못했습니다'); });
+  // 진행 중인 내 티켓 수: 접수·배정·처리 중 (내 티켓 화면과 같은 자료). 받은 뒤에 카드를 보인다. 못 받아도 접수는 할 수 있어 카드를 숨긴 채 둔다
+  api.get('/ticket/api/tickets').done(items => {
+    itEl('ticketOpenCard').hidden = false;
+    const open = (items || []).filter(t => TICKET_GROUP[t.status] !== 'DONE');
+    const waiting = (items || []).filter(t => t.status === 'RESOLVED').length; // 처리 완료, 내 [확인]을 기다림
+    itEl('ticketOpenCount').textContent = open.length;
+    itEl('ticketOpenCard').classList.toggle('is-alert', open.length > 0 || waiting > 0);
+    itEl('ticketOpenSub').textContent = waiting ? `처리 완료 ${waiting}건이 내 [확인]을 기다립니다`
+      : open.length ? '같은 문제면 새로 접수하지 말고 내 티켓에 댓글로 남겨 주세요' : '지금 처리 중인 티켓이 없습니다';
+  }).fail(() => { itEl('ticketOpenCard').hidden = true; });
+}
+
+// 구분 버튼과 숨긴 select를 맞추고, 내용 칸 예시를 구분에 맞게 바꾼다
+function syncTicketType() {
+  const type = itEl('ticketType').value;
+  document.querySelectorAll('.tk-type').forEach(b => {
+    b.setAttribute('aria-checked', b.dataset.type === type);
+    b.tabIndex = b.dataset.type === type ? 0 : -1; // 라디오 묶음: Tab은 고른 버튼에만 멈추고, 묶음 안에서는 화살표로 옮긴다
+  });
+  const incident = type === 'TK_INCIDENT';
+  itEl('ticketTitle').placeholder = incident ? '예: 노트북 화면이 켜지지 않아요' : '예: 공용 프린터 연결 방법이 궁금해요';
+  itEl('ticketBody').placeholder = incident
+    ? '언제부터, 어떤 증상인지, 오류 메시지가 있으면 그대로 적어 주세요'
+    : '무엇을 하려는지, 어디서 막혔는지 적어 주세요';
+  syncTicketSummary();
 }
 
 // 접수 지점 기본값: 고른 자산이 있는 지점. 자산이 없으면 사원의 근무 지점(서버가 정한 기본 지점).
 // 실제 장애가 난 곳이 다르면 사원이 바꿔 접수한다.
 // 채울 지점이 목록에 없으면(근무 지점이 없음, 자산의 지점이 사용 중지) 첫 지점을 대신 고르지 않고 비워 둔다. 비운 채 접수하면 제출 검사가 막는다
 function syncTicketBranch() {
-  const o = itNew.opts || { assets: [], defaultBranchId: '' };
+  const o = itNew.opts || { assets: [], branches: [], defaultBranchId: '' };
   // 서버의 ID 는 숫자, select 값은 글자라서 글자로 맞춰 비교한다
   const asset = o.assets.find(a => String(a.id) === itEl('ticketAsset').value);
   const want = String(asset ? asset.branchId : o.defaultBranchId ?? '');
   const sel = itEl('ticketBranch');
   const found = [...sel.options].some(x => x.value === want);
   if (found) sel.value = want; else sel.selectedIndex = -1;
-  itEl('ticketBranchHint').textContent = !found ? '접수 지점을 골라 주세요'
+  const hint = itEl('ticketBranchHint');
+  hint.classList.toggle('is-warn', !found);
+  hint.textContent = !o.branches.length ? '등록된 지점이 없습니다. 업체 관리자에게 지점 등록을 요청해 주세요'
+    : !found ? '접수 지점을 골라 주세요'
     : asset ? '고른 자산이 있는 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요' : '근무 지점으로 채웠습니다. 장애가 난 곳이 다르면 바꿔 주세요';
+  syncTicketSummary();
 }
+
+// [접수] 옆 한 줄 요약: 비어 있는 칸, 다 채우면 무엇을 어디로 접수하는지
+function syncTicketSummary() {
+  const el = itEl('ticketSummary');
+  if (!el) return;
+  itEl('ticketTitleCount').textContent = `${itEl('ticketTitle').value.length} / ${TICKET_TITLE_MAX}`;
+  itEl('ticketBodyCount').textContent = `${itEl('ticketBody').value.length} / ${TICKET_BODY_MAX}`;
+  const sel = itEl('ticketBranch');
+  const branch = sel.value ? sel.options[sel.selectedIndex].text : '';
+  const todo = [];
+  if (!branch) todo.push('접수 지점');
+  if (!itEl('ticketTitle').value.trim()) todo.push('제목');
+  if (!itEl('ticketBody').value.trim()) todo.push('내용');
+  el.classList.toggle('is-todo', !!todo.length);
+  if (todo.length) { el.textContent = `아직 비어 있음: ${todo.join(' · ')}`; return; }
+  const a = itEl('ticketAsset');
+  const asset = a.value ? a.options[a.selectedIndex].text : '';
+  el.replaceChildren(itNode('strong', '', TICKET_TYPE[itEl('ticketType').value]), ` · ${branch}${asset ? ` · ${asset}` : ''} → IT 담당자에게 전달`);
+}
+
+document.querySelectorAll('.tk-type').forEach(b => b.addEventListener('click', () => {
+  itEl('ticketType').value = b.dataset.type;
+  syncTicketType();
+}));
+// 구분 버튼(role="radio")은 화면 읽기 프로그램에 라디오로 읽히므로, 라디오처럼 화살표로 옮겨 고르게 한다
+itEl('view-ticket-new')?.querySelector('.tk-types')?.addEventListener('keydown', e => {
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  const btns = [...document.querySelectorAll('.tk-type')];
+  const next = btns[(btns.indexOf(document.activeElement) + step + btns.length) % btns.length];
+  next.click();
+  next.focus();
+});
 itEl('ticketAsset')?.addEventListener('change', syncTicketBranch);
+itEl('ticketBranch')?.addEventListener('change', () => {
+  itEl('ticketBranchHint').textContent = '';
+  syncTicketSummary();
+});
+['ticketTitle', 'ticketBody'].forEach(id => itEl(id)?.addEventListener('input', () => {
+  itEl('ticketError').textContent = '';
+  syncTicketSummary();
+}));
+
+// 확인 창(<dialog>)을 열고, 누른 버튼이 '확인'(value="ok")이면 true. Esc로 닫으면 false
+function itConfirm(id) {
+  const dlg = itEl(id);
+  return new Promise(resolve => {
+    let ok = false;
+    dlg.querySelectorAll('button').forEach(b => { b.onclick = () => { ok = b.value === 'ok'; dlg.close(); }; });
+    dlg.addEventListener('close', () => resolve(ok), { once: true });
+    dlg.showModal();
+  });
+}
+itEl('ticketCancel')?.addEventListener('click', async () => {
+  const dirty = itNew.initial !== undefined && itSnapshot() !== itNew.initial;
+  if (dirty && !(await itConfirm('ticketLeaveDialog'))) return;
+  location.href = pageHref('/ticket/mine');
+});
 
 itEl('ticketForm')?.addEventListener('submit', e => {
   e.preventDefault();
@@ -61,22 +157,23 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   const branchId = itEl('ticketBranch').value;
   // 서버도 같은 검사를 다시 한다. 화면은 먼저 알려 줄 뿐이다
   if (!['TK_INCIDENT', 'TK_QUESTION'].includes(type)) { err.textContent = '구분을 골라 주세요'; return; }
+  if (!branchId) { err.textContent = '접수 지점을 골라 주세요'; itEl('ticketBranch').focus(); return; }
   if (!title) { err.textContent = '제목을 입력해 주세요'; itEl('ticketTitle').focus(); return; }
   if (title.length > TICKET_TITLE_MAX) { err.textContent = `제목은 ${TICKET_TITLE_MAX}자까지 쓸 수 있습니다`; return; }
   if (!body) { err.textContent = '내용을 입력해 주세요'; itEl('ticketBody').focus(); return; }
   if (body.length > TICKET_BODY_MAX) { err.textContent = `내용은 ${TICKET_BODY_MAX}자까지 쓸 수 있습니다`; return; }
-  if (!branchId) { err.textContent = '접수 지점을 골라 주세요'; return; }
   const btn = itEl('ticketForm').querySelector('[type="submit"]');
-  if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
+  if (btn.disabled) return;
+  btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
   const assetId = itEl('ticketAsset').value;
   api.post('/ticket/api/tickets', { type, title, body, branchId: Number(branchId), assetId: assetId ? Number(assetId) : null })
     .done(t => {
-      itEl('ticketForm').reset();
       err.textContent = '';
+      itNew.initial = itSnapshot(); // 접수했으니 나갈 때 묻지 않는다
       toastAndGo(`${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`, pageHref('/ticket/mine'));
     })
-    .fail(xhr => { err.textContent = apiMessage(xhr); })
-    .always(() => { if (btn) btn.disabled = false; });
+    // 성공하면 버튼을 풀지 않는다: 내 티켓 화면으로 넘어가기 전에 한 번 더 눌러 같은 티켓이 두 건 생기지 않게. 실패했을 때만 다시 누를 수 있게 푼다
+    .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
 });
 
 // ---------- 내 티켓 ----------
