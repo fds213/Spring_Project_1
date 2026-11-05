@@ -4,5 +4,6 @@ package com.ieum.gw.code;
 public enum MailType {
 	MT_TRIAL_VERIFY,
 	MT_INQUIRY_RECEIPT,
-	MT_INQUIRY_REPLY
+	MT_INQUIRY_REPLY,
+	MT_PASSWORD_RESET
 }
