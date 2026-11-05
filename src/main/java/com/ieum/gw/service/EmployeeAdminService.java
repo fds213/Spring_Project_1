@@ -199,9 +199,9 @@ public class EmployeeAdminService {
                     throw new IllegalStateException("빈 자리가 없습니다. 구매 인원을 늘리거나 다른 계정을 비활성화해 주세요");
                 }
             }
-            // ⑦ 비활성일 때만 켠다
+            // 0행: 이미 켜졌거나, 기다리는 사이 다른 사람이 퇴사로 저장했다 (SQL이 재직 상태를 다시 본다)
             if (dao.reactivateAccount(companyId, t.getEmployeeId()) == 0) {
-                throw new IllegalStateException("이미 사용 중인 계정입니다. 화면을 새로 고쳐 주세요");
+                throw new IllegalStateException("이미 사용 중이거나 퇴사 처리된 계정입니다. 화면을 새로 고쳐 주세요");
             }
         }
 

@@ -211,7 +211,7 @@
         AND status_code = 'ACTIVE'
     </update>
 
-    <!-- 계정 다시 사용: 비활성일 때만 -->
+    <!-- 계정 다시 사용: 비활성이고 재직 중일 때만 (퇴사 저장과 거의 동시에 눌러도 퇴사자가 켜지지 않게, #139 리뷰) -->
     <update id="reactivateAccount">
         UPDATE user_account
         SET status_code = 'ACTIVE',
@@ -219,6 +219,10 @@
         WHERE company_id = #{companyId}
         AND employee_id = #{employeeId}
         AND status_code = 'RETIRED'
+        AND EXISTS (SELECT 1 FROM employee e
+                    WHERE e.company_id = user_account.company_id
+                      AND e.employee_id = user_account.employee_id
+                      AND e.employment_status = 'ST_SERVING')
     </update>
 
     <!-- 이 사람이 부서장인 부서의 부서장 칸 비우기 (비활성화·퇴사 때, #111 리뷰) -->

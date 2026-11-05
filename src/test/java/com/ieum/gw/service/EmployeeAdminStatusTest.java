@@ -27,6 +27,7 @@ class EmployeeAdminStatusTest {
 	static class FakeEmployeeDao extends EmployeeDAO {
 		Map<String, EmployeeHeadTargetDTO> people = new HashMap<>();
 		Map<Long, String> status = new HashMap<>();
+		Map<Long, String> work = new HashMap<>(); // 재직 상태 (employeeId → ST_SERVING 등)
 		Long deptHead = null;
 		int lockCalls = 0;
 
@@ -55,7 +56,7 @@ class EmployeeAdminStatusTest {
 
 		@Override
 		public int reactivateAccount(Long companyId, Long employeeId) {
-			if (!"RETIRED".equals(status.get(employeeId))) {
+			if (!"RETIRED".equals(status.get(employeeId)) || !"ST_SERVING".equals(work.get(employeeId))) {
 				return 0;
 			}
 			status.put(employeeId, "ACTIVE");
@@ -158,6 +159,7 @@ class EmployeeAdminStatusTest {
 		t.setEmploymentStatus(work);
 		dao.people.put(no, t);
 		dao.status.put(id, status);
+		dao.work.put(id, work);
 	}
 
 	private static LoginUser user(Long employeeId, String role) {
@@ -302,5 +304,14 @@ class EmployeeAdminStatusTest {
 		assertThrows(IllegalArgumentException.class, () -> service.setHrInfo(hr, "20260002", "EMP_REGULAR", "ST_LEAVE", ""));
 		
 		assertThrows(IllegalArgumentException.class, () -> service.setHrInfo(hr, "20260002", "X", "ST_SERVING", ""));
+	}
+	
+	@Test
+	@DisplayName("다시 사용을 기다리는 사이 퇴사 저장이 먼저 끝나면, 계정을 켜지 않고 409다")
+	void reactivateAfterRetiredMeanwhile() {
+		dao.work.put(503L, "ST_RETIRED"); // 화면은 재직으로 봤지만 그사이 다른 사람이 퇴사로 저장했다
+
+		assertThrows(IllegalStateException.class, () -> service.setStatus(admin, "20260003", "on"));
+		assertEquals("RETIRED", dao.status.get(503L));
 	}
 }
