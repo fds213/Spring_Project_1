@@ -283,7 +283,7 @@
 		FROM ${kind.table} o
 		WHERE o.company_id = #{companyId}
 		  AND o.use_yn = 'Y'
-		ORDER BY o.sort_order, o.${kind.nameCol}
+		ORDER BY o.sort_order, o.${kind.idCol}
 	</select>
 
 	<!-- 쓰기 전에 그 업체의 목록 행을 잠근다 (동시에 추가·순서 바꾸기·삭제해도 꼬이지 않게) -->
