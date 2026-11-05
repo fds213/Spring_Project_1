@@ -241,4 +241,13 @@ class EmployeeAdminStatusTest {
 		assertThrows(IllegalArgumentException.class, () -> service.setStatus(otherAdmin, "20260002", "off"));
 		assertEquals("ACTIVE", dao.status.get(502L));
 	}
+	
+	@Test
+	@DisplayName("본인 계정은 스스로 다시 사용으로 바꿀 수 없다(409)")
+	void selfOn() {
+		LoginUser retiredHr = user(503L, "ROLE_HR"); // 꺼진 박휴직이 인사 담당이라고 치고, 기존 세션으로 자기를 켜려는 경우
+
+		assertThrows(IllegalStateException.class, () -> service.setStatus(retiredHr, "20260003", "on"));
+		assertEquals("RETIRED", dao.status.get(503L));
+	}
 }

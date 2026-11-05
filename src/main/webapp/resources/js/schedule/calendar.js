@@ -17,56 +17,54 @@ const schDayKey = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.ge
 const schFromKey = k => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
 
 const schState = {
-  month: null,  // { y, m } 보고 있는 달
-  selected: '', // 선택한 날짜 'YYYY-MM-DD'
+  month: null,  // { y, m } 화면에 보이는 달. 늘 data와 같은 달이다(응답이 와야 바뀐다)
+  selected: '', // 화면에서 고른 날짜 'YYYY-MM-DD'
   show: { PERSONAL: true, DEPT: true, COMPANY: true, LEAVE: true },
   data: null,   // 서버에서 받은 그달 것
-  loaded: null, // data가 어느 달 것인지 { y, m }. 달을 옮기다 실패하면 이 달로 되돌린다
+  pending: null, // 받아 오는 중인 달과 응답이 오면 고를 날짜 { month, selected }. 응답 전에는 month·selected를 바꾸지 않는다
   jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
   jumpTimer: null,
   reqSeq: 0,    // 달력 요청 번호. 가장 마지막에 보낸 요청의 응답만 쓴다
-  shownSelected: '', // 화면에 마지막으로 그린 고른 날짜. 달을 옮기다 실패하면 이 날짜로 되돌린다
 };
-const schMonthParam = () => `${schState.month.y}-${pad2(schState.month.m + 1)}`;
+const schMonthParam = mo => `${mo.y}-${pad2(mo.m + 1)}`;
+const schMonthOf = key => { const d = schFromKey(key); return { y: d.getFullYear(), m: d.getMonth() }; };
+const schSameMonth = (a, b) => !!a && !!b && a.y === b.y && a.m === b.m;
 
 // 화면을 열 때 (JSP 페이지가 열리면 부른다). "오늘" 버튼도 이것을 부른다
 function openScheduleView() {
   const now = new Date();
-  schState.month = { y: now.getFullYear(), m: now.getMonth() };
-  schState.selected = schDayKey(now);
-  renderSchedule();
+  loadMonth({ y: now.getFullYear(), m: now.getMonth() }, schDayKey(now));
 }
 
-// 보고 있는 달을 서버에서 다시 받아 그린다 (다른 탭에서 바뀌었을 때도 이것을 부른다)
-function renderSchedule() {
-  if (!schState.month) return openScheduleView();
-  const month = schMonthParam();
-  // 요청마다 번호를 붙이고, 그사이 새 요청을 보냈으면 늦게 온 앞 응답은 성공·실패 모두 버린다.
-  // (달 이름으로 거르면 11월 → [>][>][<]에서 첫 12월 요청의 실패가 마지막 12월 요청 대신 처리돼 11월에 남았다)
+// 그달을 서버에서 받아, 응답이 오면 그때 보이는 달과 고른 날짜를 바꾸고 그린다.
+// 응답 전에는 화면의 달·고른 날짜·자료를 그대로 둔다. 그래서 그사이 날짜를 누르거나 보기를 바꾸거나 [+ 일정 추가]를 눌러도
+// 화면과 어긋나지 않고, 실패하면 아무것도 되돌릴 필요 없이 보던 화면 그대로다.
+// 요청마다 번호를 붙여 가장 마지막에 보낸 요청의 응답만 쓴다(빠른 [>][>][<]에서 늦게 온 앞 응답은 성공·실패 모두 버린다)
+function loadMonth(month, selected) {
   const seq = ++schState.reqSeq;
-  api.get('/schedule/api/schedules', { month })
+  schState.pending = { month, selected };
+  api.get('/schedule/api/schedules', { month: schMonthParam(month) })
     .done(r => {
       if (seq !== schState.reqSeq) return;
+      schState.month = month;
+      schState.selected = schState.pending.selected; // 같은 달을 다시 받는 사이 날짜를 누르면 그 날짜가 들어 있다
+      schState.pending = null;
       schState.data = r;
-      schState.loaded = { ...schState.month };
       drawSchedule();
     })
     .fail(xhr => {
       if (seq !== schState.reqSeq) return; // 그사이 새 요청을 보냈다 (그 응답이 따로 온다)
+      schState.pending = null;
       showToast(apiMessage(xhr, '일정을 불러오지 못했습니다'));
-      // 달을 옮기다 실패하면 화면은 앞 달인데 속으로는 다음 달이 되어, 한 번 더 넘기면 두 달을 건너뛴다.
-      // 그래서 화면에 보이는 달(받아 둔 달)과 그때 고른 날짜로 되돌린다
-      const shown = schState.loaded;
-      if (!shown) return; // 처음 열 때 실패: 되돌릴 달이 없다
-      schState.month = { ...shown };
-      if (schState.shownSelected) schState.selected = schState.shownSelected;
-      const sel = schFromKey(schState.selected);
-      if (sel.getFullYear() !== shown.y || sel.getMonth() !== shown.m) {
-        const now = new Date();
-        schState.selected = now.getFullYear() === shown.y && now.getMonth() === shown.m ? schDayKey(now) : schDayKey(new Date(shown.y, shown.m, 1));
-      }
-      drawSchedule();
     });
+}
+
+// 보고 있는 달을 다시 받아 그린다 (일정 추가·삭제 뒤). 받아 오는 중인 달이 있으면 그 달을 다시 받는다
+function renderSchedule() {
+  const p = schState.pending;
+  if (p) return loadMonth(p.month, p.selected);
+  if (!schState.month) return openScheduleView();
+  loadMonth(schState.month, schState.selected);
 }
 
 // 한 날짜의 칸에 들어갈 것: 휴일, 내 연차, 일정 (보기 선택에 맞춰 거른다)
@@ -82,10 +80,18 @@ function schItemsOn(key) {
 }
 const schIsHoliday = key => schState.data.holidays.some(h => h.date === key);
 
+// 날짜 고르기. 같은 달을 다시 받는 중(일정 추가·삭제 뒤)이면 응답이 와도 이 날짜가 남게 한다.
+// 다른 달을 받는 중이면 응답이 오면 그 달로 넘어가므로 그대로 둔다
+function schSelect(key) {
+  schState.selected = key;
+  const p = schState.pending;
+  if (p && schSameMonth(p.month, schState.month)) p.selected = key;
+  drawSchedule();
+}
+
 // 받아 둔 값으로 달력과 날짜 칸을 그린다 (보기 선택·날짜 선택은 서버에 다시 묻지 않는다)
 function drawSchedule() {
   if (!schState.data) return;
-  schState.shownSelected = schState.selected;
   const { y, m } = schState.month;
   schEl('schMonthLabel').textContent = `${y}년 ${m + 1}월`;
 
@@ -99,13 +105,12 @@ function drawSchedule() {
     cell.type = 'button';
     cell.setAttribute('aria-label', `${date.getMonth() + 1}월 ${date.getDate()}일 (다른 달)`);
     cell.addEventListener('click', () => {
-      schState.month = { y: date.getFullYear(), m: date.getMonth() };
-      schState.selected = schDayKey(date);
+      const key = schDayKey(date);
       // 방금 앞뒤 달 칸을 눌러 달력이 바뀌었다고 잠깐 적어 둔다 (빠르게 한 번 더 누르면 이 날짜로 팝업을 연다)
-      schState.jumped = schState.selected;
+      schState.jumped = key;
       clearTimeout(schState.jumpTimer);
       schState.jumpTimer = setTimeout(() => { schState.jumped = ''; }, 500);
-      renderSchedule();
+      loadMonth({ y: date.getFullYear(), m: date.getMonth() }, key);
     });
     return cell;
   };
@@ -123,8 +128,8 @@ function drawSchedule() {
     cell.append(schNode('span', 'sch-num', String(d)));
     items.slice(0, SCH_SHOW_MAX).forEach(it => cell.append(schNode('span', `sch-chip chip-${it.type.toLowerCase()}`, it.title)));
     if (items.length > SCH_SHOW_MAX) cell.append(schNode('span', 'sch-more', `+${items.length - SCH_SHOW_MAX}개 더`));
-    cell.addEventListener('click', () => { schState.selected = key; drawSchedule(); });
-    cell.addEventListener('dblclick', () => { schState.selected = key; drawSchedule(); openAddDialog(key); }); // 두 번 누르면 그 날짜로 추가 팝업
+    cell.addEventListener('click', () => schSelect(key));
+    cell.addEventListener('dblclick', () => { schSelect(key); openAddDialog(key); }); // 두 번 누르면 그 날짜로 추가 팝업
     cells.push(cell);
   }
   for (let d = 1; cells.length % 7 !== 0; d++) cells.push(otherDay(new Date(y, m + 1, d)));
@@ -230,14 +235,14 @@ function deleteSchedule(s, btn) {
   dlg.showModal();
 }
 
-// 달을 옮기면 그달의 오늘(없으면 1일)을 선택한다 (받아 오는 것은 그달 것뿐이다)
+// 달을 옮기면 그달의 오늘(없으면 1일)을 선택한다 (받아 오는 것은 그달 것뿐이다).
+// 받아 오는 중인 달이 있으면 그 달에서 한 달 더 옮긴다([>]를 빠르게 두 번 누르면 두 달 넘어가게)
 const schMoveMonth = step => {
-  const { y, m } = schState.month;
-  const d = new Date(y, m + step, 1);
-  schState.month = { y: d.getFullYear(), m: d.getMonth() };
   const now = new Date();
-  schState.selected = now.getFullYear() === d.getFullYear() && now.getMonth() === d.getMonth() ? schDayKey(now) : schDayKey(d);
-  renderSchedule();
+  const base = (schState.pending && schState.pending.month) || schState.month || { y: now.getFullYear(), m: now.getMonth() };
+  const d = new Date(base.y, base.m + step, 1);
+  const month = { y: d.getFullYear(), m: d.getMonth() };
+  loadMonth(month, schSameMonth(month, { y: now.getFullYear(), m: now.getMonth() }) ? schDayKey(now) : schDayKey(d));
 };
 // 앞뒤 달 칸을 두 번 빠르게 누르면, 첫 클릭에 달력이 새로 그려져 두 번째 클릭이 새 달의 다른 칸에 떨어진다.
 // 그 두 번째 클릭은 칸에 닿기 전에(capture) 막고, 처음 누른 날짜로 추가 팝업을 연다
@@ -284,11 +289,8 @@ schEl('schForm').addEventListener('submit', e => {
       schEl('schTitle').value = '';
       schEl('schMemo').value = '';
       err.textContent = '';
-      schState.selected = s.date;
-      const d = schFromKey(s.date);
-      schState.month = { y: d.getFullYear(), m: d.getMonth() }; // 다른 달 날짜로 추가해도 그 달로 옮겨 보여 준다
       showToast('일정을 추가했습니다');
-      renderSchedule();
+      loadMonth(schMonthOf(s.date), s.date); // 다른 달 날짜로 추가해도 그 달로 옮겨 보여 준다
     })
     .fail(xhr => { err.textContent = apiMessage(xhr); })
     .always(() => { if (btn) btn.disabled = false; });
