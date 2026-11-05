@@ -3,12 +3,18 @@ package com.ieum.gw.mapper;
 import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import com.ieum.gw.dto.AssetAdminAssignmentDTO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
 import com.ieum.gw.dto.AssetListDTO;
 
 @Mapper
 public interface AssetAllocationMapper {
+	/** 같은 업체 자산의 지급·회수 이력과 관련 직원 이름을 조회한다. */
+	List<AssetAdminAssignmentDTO> selectAssignments(@Param("companyId") Long companyId, 
+													@Param("assetId") Long assetId);
+	
 	/** 같은 업체의 전체 상태 자산을 조회한다. */
 	List<AssetListDTO> selectList(@Param("companyId") Long companyId);
 	

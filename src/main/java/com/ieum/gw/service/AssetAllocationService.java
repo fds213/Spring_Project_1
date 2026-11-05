@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dao.AssetAllocationDAO;
+import com.ieum.gw.dto.AssetAdminAssignmentDTO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
 import com.ieum.gw.dto.AssetListDTO;
@@ -37,6 +38,22 @@ public class AssetAllocationService {
     				  "branches", branchService.getBranchDetails(companyId));
     }
 
+    /** 같은 업체 자산의 지급·회수 이력을 관리자에게 제공한다. */
+    @Transactional(readOnly = true)
+    public List<AssetAdminAssignmentDTO> getAssignments(LoginUser user, Long assetId) {
+    	requireOperator(user);
+    	requireId(assetId);
+    	
+    	Long companyId = user.getCompanyId();
+    	AssetAllocationDTO asset = dao.detail(companyId, assetId);
+    	
+    	if (asset == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "자산을 찾을 수 없습니다.");
+		}
+    	
+    	return dao.selectAssignments(companyId, assetId);
+    }
+    
     /** 로그인한 IT 담당자·관리자에게 같은 업체의 전체 자산 목록을 제공한다. */
     @Transactional(readOnly = true)
     public List<AssetListDTO> getAssetList(LoginUser user) {

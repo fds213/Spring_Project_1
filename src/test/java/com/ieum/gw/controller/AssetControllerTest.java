@@ -15,6 +15,7 @@ import org.springframework.security.web.method.annotation.AuthenticationPrincipa
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieum.gw.dao.AssetDAO;
@@ -66,7 +67,11 @@ class AssetControllerTest {
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
+        InternalResourceViewResolver views = new InternalResourceViewResolver();
+        views.setPrefix("/WEB-INF/views/");
+        views.setSuffix(".jsp");
         mvc = MockMvcBuilders.standaloneSetup(new AssetController(new AssetService(dao)))
+                .setViewResolvers(views)
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver()).build();
         login(7L, 9L);
     }
@@ -89,6 +94,20 @@ class AssetControllerTest {
         var result = mvc.perform(get("/asset/mine")).andReturn();
         assertEquals(200, result.getResponse().getStatus());
         assertEquals("asset/mine", result.getModelAndView().getViewName());
+        assertEquals(0, dao.reads);
+    }
+
+    @Test
+    @DisplayName("자산 관리 화면 주소는 관리자 목록 JSP를 선택하고 DB를 조회하지 않는다")
+    void opensAdminAssetsScreen() throws Exception {
+        var result = mvc.perform(get("/asset/admin/list")).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        assertNotNull(result.getModelAndView());
+        String viewName = result.getModelAndView().getViewName();
+        assertNotNull(viewName);
+        assertEquals("asset/admin/list", viewName.replaceFirst("^/", ""));
+        assertEquals("/WEB-INF/views/asset/admin/list.jsp", result.getResponse().getForwardedUrl()
+                .replaceAll("/{2,}", "/"));
         assertEquals(0, dao.reads);
     }
 
