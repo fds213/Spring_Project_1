@@ -13,4 +13,8 @@ public class ChatRoomDTO {
     private String roomType;
     private String roomName;
     private String displayName;
+    private int unreadCount;
+    private Long createdByEmployeeId;
+    private Long directEmployeeLow;
+    private Long directEmployeeHigh;
 }
