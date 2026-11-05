@@ -6,9 +6,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.AfterEach;
@@ -96,7 +98,9 @@ class AssetAdminOptionsTest {
         row.setCompanyId(7L);
         row.setEmployeeId(id);
         row.setEmployeeName(name);
+        row.setDepartmentId(31L);
         row.setDepartmentName(department);
+        row.setJobGradeId(41L);
         row.setGradeName(grade);
         return row;
     }
@@ -106,8 +110,17 @@ class AssetAdminOptionsTest {
         BranchDetailDTO row = new BranchDetailDTO();
         row.setBranchId(id);
         row.setBranchName(name);
+        row.setAddress("응답에서 제외할 주소");
+        row.setDetailAddress("응답에서 제외할 상세 주소");
         row.setUseYn(useYn);
         return row;
+    }
+
+    /** null 필드를 포함하여 허용한 JSON 키만 존재하는지 확인한다. */
+    private void assertFields(JsonNode node, Set<String> expected) {
+        Set<String> actual = new HashSet<>();
+        node.fieldNames().forEachRemaining(actual::add);
+        assertEquals(expected, actual);
     }
 
     @Test
@@ -126,6 +139,9 @@ class AssetAdminOptionsTest {
             assertEquals(2, data.size());
             assertFalse(data.has("employee"));
             assertEquals(2, data.path("employees").size());
+            for (JsonNode employee : data.path("employees")) {
+                assertFields(employee, Set.of("employeeId", "employeeName", "departmentName", "gradeName"));
+            }
             JsonNode self = data.path("employees").get(0);
             assertEquals(9L, self.path("employeeId").asLong());
             assertEquals("로그인한 직원", self.path("employeeName").asText());
@@ -134,9 +150,11 @@ class AssetAdminOptionsTest {
             assertEquals("개발팀", data.path("employees").get(1).path("departmentName").asText());
             assertEquals("대리", data.path("employees").get(1).path("gradeName").asText());
             assertEquals(2, data.path("branches").size());
+            for (JsonNode branch : data.path("branches")) {
+                assertFields(branch, Set.of("branchId", "branchName"));
+            }
             assertEquals(20L, data.path("branches").get(1).path("branchId").asLong());
             assertEquals("사용 중지 지점", data.path("branches").get(1).path("branchName").asText());
-            assertEquals("N", data.path("branches").get(1).path("useYn").asText());
         }
         assertEquals(List.of(7L, 7L), employeeQueries);
         assertEquals(employeeQueries, branchQueries);

@@ -1,5 +1,7 @@
 package com.ieum.gw.service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +15,8 @@ import com.ieum.gw.dto.AssetAdminAssignmentDTO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
 import com.ieum.gw.dto.AssetListDTO;
+import com.ieum.gw.dto.BranchDetailDTO;
+import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.code.AssetStatus;
 import com.ieum.gw.code.AssetType;
 import com.ieum.gw.dto.LoginUser;
@@ -27,15 +31,36 @@ public class AssetAllocationService {
     private final BranchService branchService;
     private final EmployeeService employeeService;
     
-    /** 자산 지급 대상 직원과 기존 자산의 지점 표시용 목록을 제공한다. */
+    /** 자산 관리에 필요한 직원·지점 정보만 골라 선택 목록으로 제공한다. */
     @Transactional(readOnly = true)
     public Map<String, Object> getFormOptions(LoginUser user) {
-    	requireOperator(user);
-    	
-    	Long companyId = user.getCompanyId();
-    	
-    	return Map.of("employees", employeeService.listActiveEmp(companyId, null),
-    				  "branches", branchService.getBranchDetails(companyId));
+        requireOperator(user);
+
+        Long companyId = user.getCompanyId();
+
+        List<Map<String, Object>> employees = new ArrayList<>();
+
+        for (EmpSummaryDTO employee : employeeService.listActiveEmp(companyId, null)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("employeeId", employee.getEmployeeId());
+            item.put("employeeName", employee.getEmployeeName());
+            item.put("departmentName", employee.getDepartmentName());
+            item.put("gradeName", employee.getGradeName());
+
+            employees.add(item);
+        }
+
+        List<Map<String, Object>> branches = new ArrayList<>();
+
+        for (BranchDetailDTO branch : branchService.getBranchDetails(companyId)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("branchId", branch.getBranchId());
+            item.put("branchName", branch.getBranchName());
+
+            branches.add(item);
+        }
+
+        return Map.of("employees", employees, "branches", branches);
     }
 
     /** 같은 업체 자산의 지급·회수 이력을 관리자에게 제공한다. */
