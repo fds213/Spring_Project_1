@@ -112,6 +112,16 @@ function eaHolidayState(from, to) {
 }
 const eaIsHoliday = key => { const v = eaState.holidays[key.slice(0, 7)]; return v instanceof Set && v.has(key); };
 
+// 주말만 뺀 날 수 (휴일 목록을 못 받았을 때도 주말만 고른 신청은 막으려고 따로 센다)
+function eaWeekdayCount(from, to) {
+  if (!from || !to || to < from) return 0;
+  let n = 0;
+  for (let d = new Date(`${from}T00:00:00`), end = new Date(`${to}T00:00:00`); d <= end; d.setDate(d.getDate() + 1)) {
+    if (d.getDay() !== 0 && d.getDay() !== 6) n++;
+  }
+  return n;
+}
+
 // 신청 일수: 주말과 (받아 둔) 등록 휴일을 뺀 날 수. 반차는 그날이 쉬는 날이 아니면 0.5일
 function eaRequestDays(f) {
   const half = f.leaveType !== 'LV_FULL';
@@ -266,7 +276,9 @@ function eaCheck(c) {
   if (c.form === 'DOC_LEAVE') {
     if (!f.fromDate) return '시작일을 입력해 주세요';
     if (f.leaveType === 'LV_FULL' && (!f.toDate || f.toDate < f.fromDate)) return '종료일은 시작일 이후여야 합니다';
-    if (!eaRequestDays(f) && eaHolidayState(f.fromDate, f.leaveType === 'LV_FULL' ? f.toDate : f.fromDate) === 'ok') return '고른 날이 모두 주말이나 휴일입니다. 기간을 다시 골라 주세요';
+    // 주말만 고른 것은 휴일 목록과 상관없이 막고, 휴일까지 겹쳐 0일인 것은 휴일 목록을 받은 뒤에 막는다
+    const lastDay = f.leaveType === 'LV_FULL' ? f.toDate : f.fromDate;
+    if (!eaWeekdayCount(f.fromDate, lastDay) || (!eaRequestDays(f) && eaHolidayState(f.fromDate, lastDay) === 'ok')) return '고른 날이 모두 주말이나 휴일입니다. 기간을 다시 골라 주세요';
     if (!f.reason) return '사유를 입력해 주세요'; // 서버도 사유가 없으면 거절한다
   } else {
     if (!f.assetType) return '장비 종류를 골라 주세요';
@@ -312,7 +324,7 @@ eaEl('eaLeaveTo')?.addEventListener('change', eaSyncForm);
 eaEl('eaAppr1')?.addEventListener('change', () => { eaFillAppr2(); eaSummary(); });
 eaEl('eaEquipReason')?.addEventListener('input', () => { eaEl('eaEquipCount').textContent = `${eaEl('eaEquipReason').value.length} / ${EA_REASON_MAX}`; });
 ['eaAppr2', 'eaEquipKind', 'eaEquipBranch'].forEach(id => eaEl(id)?.addEventListener('change', eaSummary));
-['eaEquipQty', 'eaEquipReason'].forEach(id => eaEl(id)?.addEventListener('input', eaSummary));
+['eaEquipQty', 'eaEquipReason', 'eaLeaveReason'].forEach(id => eaEl(id)?.addEventListener('input', eaSummary));
 eaEl('eaForm')?.addEventListener('input', () => { eaEl('eaError').textContent = ''; });
 
 eaEl('eaCancel')?.addEventListener('click', async () => {
