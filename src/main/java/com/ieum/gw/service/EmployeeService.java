@@ -23,6 +23,8 @@ import com.ieum.gw.dto.EmployeeDTO;
 import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.IdNameDTO;
+import com.ieum.gw.dto.OrgDeptDTO;
+import com.ieum.gw.dto.OrgMemberDTO;
 
 /**
  * 사원이 다른 모듈에 주는 메서드(연동 계약, 10/30). 이름·인자·반환값을 바꿀 때는 부르는 담당과 먼저 맞춘다.
@@ -266,6 +268,24 @@ public class EmployeeService {
 			return null;
 		}
 		return dao.getLoginInfo(companyId, employeeId);
+	}
+	
+	/** 조직도(요구분석서 3.4): 부서 카드마다 재직 중인 사용 계정. 부서 없는 사람은 맨 끝 departmentId가 null인 묶음 */
+	public List<OrgDeptDTO> getOrgChart(Long companyId) {
+		List<OrgDeptDTO> depts = dao.listOrgDepartments(companyId);
+		Map<Long, OrgDeptDTO> byId = new LinkedHashMap<>();
+		for (OrgDeptDTO d : depts) {
+			byId.put(d.getDepartmentId(), d);
+		}
+		OrgDeptDTO none = new OrgDeptDTO(); // 부서 미지정 (id·이름 null)
+		for (OrgMemberDTO m : dao.listOrgMembers(companyId)) {
+			// 부서가 없거나 사용 중 부서가 아니면 미지정 묶음으로
+			byId.getOrDefault(m.getDepartmentId(), none).getMembers().add(m);
+		}
+		if (!none.getMembers().isEmpty()) {
+			depts.add(none);
+		}
+		return depts;
 	}
 
 	/** (id, name) 목록 → Map */
