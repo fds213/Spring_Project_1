@@ -69,7 +69,9 @@ function eaFillSelects() {
   const o = eaState.opts || { approvers: [], branches: [], equipKinds: [] };
   const a1 = eaEl('eaAppr1');
   const keep = a1.value;
-  a1.replaceChildren(new Option('1단계 결재자 선택', ''), ...o.approvers.map(eaApproverOption));
+  const pickHint = new Option('1단계 결재자 선택', '');
+  pickHint.dataset.placeholder = ''; // 안내 문구: 펼친 목록에는 넣지 않는다(select.js). '2단계 없음'은 고를 수 있는 항목이다
+  a1.replaceChildren(pickHint, ...o.approvers.map(eaApproverOption));
   if ([...a1.options].some(x => x.value === keep)) a1.value = keep;
   eaFillAppr2();
   eaEl('eaEquipBranch').replaceChildren(...o.branches.map(b => new Option(b.branchName, b.branchId)));

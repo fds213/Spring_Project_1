@@ -112,7 +112,7 @@ a { color: inherit; text-decoration: none; }
 .join-open-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
 .join-open-head .join-note { margin: 0; }
 .join-open-actions { display: flex; gap: 8px; align-items: center; }
-.join-open-actions .select, .join-open-actions select { min-width: 110px; }
+.join-open-actions .select-trigger { min-width: 110px; }
 .join-open-actions .btn { height: 42px; white-space: nowrap; }
 .join-open-pick { margin-top: 14px; padding: 14px; border-radius: var(--radius); background: var(--bg-sub); }
 .join-open-pick-title { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--text-sub); }
@@ -134,33 +134,45 @@ a { color: inherit; text-decoration: none; }
 /* 비활성 입력칸(계정 생성·비밀번호 찾기 화면): 회색 바탕 */
 .join-form select:disabled, .join-form input:disabled, .join-form .select-trigger:disabled { background: var(--bg-sub); color: var(--text-sub); }
 
-/* 직접 만든 드롭다운 (js/select.js): 원래 select 는 숨겨 값만 들고, 이 버튼과 목록이 보여 준다.
-   열면 목록이 아래로 펼쳐지고 화살표가 위를 향한다 */
-.select { position: relative; }
-.select-native { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+/* 모든 드롭다운 (js/select.js): 원래 select 는 숨겨 값만 들고, 이 버튼과 목록이 보여 준다.
+   감싸는 .select 는 상자를 만들지 않아(display: contents) 버튼이 원래 select 자리의 크기 규칙(class)을 그대로 받는다.
+   열면 목록이 버튼 아래(자리가 모자라면 위)에 화면 기준으로 떠서 표·창 안에서도 잘리지 않는다 */
+.select { display: contents; }
+.select > .select-native {
+  position: absolute; width: 1px; height: 1px; min-width: 0; margin: 0; padding: 0; border: 0;
+  overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none;
+}
 .select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
+/* 거르기 칸은 원래 select 처럼 글자만큼(가장 긴 항목은 select.js 가 min-width 로 지킨다) */
+.select-trigger.filter-select { width: auto; }
 .select-trigger .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-trigger.is-placeholder .select-value { color: var(--text-muted); }
 .select-trigger:disabled { cursor: default; }
 .select-arrow { flex: none; color: var(--text-sub); transition: transform 0.22s ease, color 0.22s ease; }
 .select.open .select-trigger { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
 .select.open .select-arrow { transform: rotate(180deg); color: var(--accent); }
+/* 펼친 목록: 자리(top·left·min-width·max-height)는 select.js 가 연 순간 버튼에 맞춰 정한다 */
 .select-list {
-  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 30;
-  margin: 0; padding: 6px; list-style: none; max-height: 240px; overflow-y: auto;
+  position: fixed; top: 0; left: 0; z-index: 1000; box-sizing: border-box; max-width: calc(100vw - 16px);
+  margin: 0; padding: 6px; list-style: none; max-height: 280px; overflow-y: auto; overscroll-behavior: contain;
   background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1), 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15, 23, 42, 0.06);
   opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.98); transform-origin: top center;
   transition: opacity 0.16s ease, transform 0.16s ease, visibility 0s linear 0.16s;
 }
+/* 아래 자리가 모자라 위로 열 때: 위에서 아래로가 아니라 아래에서 위로 펼쳐진다 */
+.select-list.is-up { transform: translateY(6px) scale(0.98); transform-origin: bottom center; }
 .select.open .select-list { opacity: 1; visibility: visible; transform: none; transition: opacity 0.18s ease, transform 0.18s ease; }
 .select-option {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  padding: 9px 10px; border-radius: 6px; font-size: 14px; color: var(--text); cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 38px; padding: 8px 10px; border-radius: 6px; font-size: 14px; line-height: 1.4;
+  color: var(--text); cursor: pointer;
 }
-.select.open .select-option { animation: select-option-in 0.2s ease both; animation-delay: calc(var(--i) * 25ms); }
+.select-option + .select-option { margin-top: 2px; }
+.select.open .select-option { animation: select-option-in 0.2s ease both; animation-delay: calc(min(var(--i), 8) * 20ms); }
 .select-option.is-active { background: var(--bg-sub); }
-.select-option[aria-selected="true"] { color: var(--accent); font-weight: 600; }
+.select-option[aria-selected="true"] { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+.select-option[aria-disabled="true"] { color: var(--text-muted); cursor: default; }
 .select-check { flex: none; opacity: 0; transform: scale(0.6); transition: opacity 0.15s ease, transform 0.15s ease; }
 .select-option[aria-selected="true"] .select-check { opacity: 1; transform: none; }
 @keyframes select-option-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
@@ -828,7 +840,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .dev-key .input { font-family: Consolas, "Courier New", monospace; letter-spacing: 0.5px; }
 .dev-body .org-add { max-width: none; width: 100%; }
 .dev-body .form-error:empty { display: none; } /* 오류가 없을 때 아래 빈 줄을 남기지 않는다 */
-.dev-body .org-add .select { flex: 1 1 200px; min-width: 0; }
+.dev-body .org-add .select-trigger { flex: 1 1 200px; min-width: 0; }
 /* 휴일 관리: 날짜 칸은 고정 폭, 이름 칸이 남는 폭 */
 .hol-add .hol-date { flex: 0 0 170px; }
 /* 근태·연차 관리: 열이 많아 이름·부서가 한 글자씩 꺾이지 않게 (좁으면 표가 옆으로 밀린다) */
