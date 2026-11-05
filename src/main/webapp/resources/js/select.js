@@ -1,6 +1,8 @@
 // 모든 드롭다운을 같은 모양으로 그린다(디자인 2안). 기본 select의 펼친 목록은 운영체제마다 모양이 달라 꾸밀 수 없어서,
 // select는 페이지에 (숨긴 채) 남아 값의 기준이 되고, 그 자리에 버튼과 목록을 그린다.
 // 다른 스크립트는 전처럼 select의 .value·.selectedIndex·.disabled를 읽고 바꾸고 option을 더하면 된다(버튼이 따라 그려진다).
+// 꾸민 뒤에 option.selected = true 로 직접 바꾸면 버튼이 따라 그려지지 않으니 .value 로 바꾼다(꾸미기 전 pickSelect 처럼은 괜찮다).
+// select 를 replaceWith·remove 하지 말고 감싼 칸(.select)째 바꾼다(버튼·목록이 옆에 붙어 있다).
 //
 // - 대상: 화면에 있는 select와 나중에 스크립트가 더하는 select 모두.
 //   빼는 것: multiple·size가 있는 목록, hidden인 select(다른 버튼이 값을 정하는 칸), data-ui="native"
@@ -19,7 +21,7 @@
   const LIST_MAX = 280; // 목록 최대 높이
   const VALUE = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value');
   const INDEX = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
-  let openOne = null; // 한 번에 목록 하나만 연다
+  let opened = null; // 지금 열린 목록 { wrap, close }. 한 번에 하나만 연다
   const measure = document.createElement('canvas').getContext('2d'); // 글자 너비 재기
 
   const skip = s => s.multiple || s.size > 1 || s.hidden || s.dataset.ui === 'native' || s.classList.contains('select-native');
@@ -155,7 +157,7 @@
 
     function open() {
       if (select.disabled || wrap.classList.contains('open')) return;
-      if (openOne) openOne();
+      if (opened) opened.close();
       draw();
       wrap.classList.add('open');
       button.setAttribute('aria-expanded', 'true');
@@ -164,7 +166,7 @@
       highlight(sel >= 0 ? sel : 0);
       window.addEventListener('scroll', onMove, true);
       window.addEventListener('resize', onMove);
-      openOne = close;
+      opened = { wrap, close };
     }
 
     function close() {
@@ -174,11 +176,12 @@
       button.removeAttribute('aria-activedescendant');
       window.removeEventListener('scroll', onMove, true);
       window.removeEventListener('resize', onMove);
-      if (openOne === close) openOne = null;
+      if (opened && opened.close === close) opened = null;
     }
 
-    // 목록 안을 굴리는 것은 그대로 두고, 화면·표가 움직이면 따라간다
+    // 목록 안을 굴리는 것은 그대로 두고, 화면·표가 움직이면 따라간다. 열린 채 화면에서 빠졌으면(다시 그림) 닫는다
     function onMove(e) {
+      if (!wrap.isConnected) { close(); return; }
       if (e && e.type === 'scroll' && list.contains(e.target)) return;
       place();
     }
@@ -216,14 +219,19 @@
         close();
       }
     });
-    document.addEventListener('pointerdown', e => { if (!wrap.contains(e.target)) close(); });
-
     select.addEventListener('change', draw);
     // 나중에 더해지는 option과 다른 스크립트가 바꾸는 disabled
     new MutationObserver(draw).observe(select, { childList: true, attributes: true, attributeFilter: ['disabled'] });
     select.form?.addEventListener('reset', () => setTimeout(draw));
     draw();
+    // 웹폰트가 아직 오지 않았으면 대신 쓰인 글꼴로 잰 너비라 좁을 수 있다: 다 오면 한 번 더 잰다
+    if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(fitWidth);
   }
+
+  // 목록 밖을 누르면 열린 목록을 닫는다. select마다 달지 않고 하나만 둔다(다시 그리는 화면에서 리스너가 쌓이지 않게)
+  document.addEventListener('pointerdown', e => {
+    if (opened && !opened.wrap.contains(e.target)) opened.close();
+  });
 
   // 지금 있는 select와, 화면 스크립트가 나중에 더하는 select(상세·창 안의 고르기 칸)를 모두 바꾼다
   const enhanceIn = root => {
