@@ -230,6 +230,18 @@
         AND head_employee_id = #{employeeId}
     </update>
     
+    	<!-- 인사 정보 저장. 퇴사로 바꾸면 퇴사일을 오늘로(이미 있으면 그대로), 재직으로 돌리면 퇴사일을 비운다 -->
+	<update id="updateHrInfo">
+		UPDATE employee
+		SET employment_type = #{empType},
+		    employment_status = #{work},
+		    gender_code = #{gender},
+		    retire_date = CASE WHEN #{work} = 'ST_RETIRED' THEN NVL(retire_date, TRUNC(<include refid="now" />)) ELSE NULL END,
+		    updated_at = <include refid="now" />
+		WHERE company_id = #{companyId}
+		  AND employee_id = #{employeeId}
+	</update>
+	
     	<!-- 화면 공통 값: 헤더 업체명·부서·직급, 사이드바 부서장 여부 (부서장이 아니면 head_dept_name은 null) -->
 	<select id="getLoginInfo" resultType="com.ieum.gw.dto.EmployeeLoginInfoDTO">
 		SELECT c.company_name,

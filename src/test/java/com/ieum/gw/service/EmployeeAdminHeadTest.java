@@ -69,7 +69,7 @@ class EmployeeAdminHeadTest {
 		dao.people.put("20260002", person(502L, "김개발", DEPT, "ACTIVE"));
 		dao.people.put("20260003", person(503L, "박퇴사", DEPT, "RETIRED"));
 		dao.people.put("20260004", person(504L, "이무소속", null, "ACTIVE"));
-		service = new EmployeeAdminService(dao, null, null); // setHead는 DAO만 쓴다
+		service = new EmployeeAdminService(dao, null, null, null); // setHead는 DAO만 쓴다
 		admin = user(COMPANY, "ROLE_ADMIN");
 	}
 

@@ -25,10 +25,14 @@ public class EmployeeAdminService {
 
     private static final Set<String> MANAGERS = Set.of("ROLE_ADMIN", "ROLE_HR");
     private static final Set<String> ACTIONS = Set.of("on", "off");
+    private static final Set<String> EMP_TYPES = Set.of("EMP_REGULAR", "EMP_CONTRACT", "EMP_DISPATCH", "EMP_INTERN");
+    private static final Set<String> WORKS = Set.of("ST_SERVING", "ST_RETIRED"); // 휴직은 이번 범위에서 쓰지 않는다(공통 코드 N)
+    private static final Set<String> GENDERS = Set.of("GD_MALE", "GD_FEMALE", "GD_OTHER");
     
     private final EmployeeDAO dao;
     private final EmployeeService employeeService;          // 사용 중 계정 수 (결제·가입 승인과 같은 기준)
     private final SubscriptionService subscriptionService;  // 구매 인원·만료
+    private final ApprovalService approvalService;          // 비활성화·퇴사 때 결재 차례 자동 반려
 
     /** 사원 관리 목록 (GET /employee/admin/api/employees) */
     public Map<String, Object> getList(LoginUser user) {
@@ -177,9 +181,8 @@ public class EmployeeAdminService {
             if (dao.retireAccount(companyId, t.getEmployeeId()) == 0) {
                 throw new IllegalStateException("이미 비활성 계정입니다. 화면을 새로 고쳐 주세요");
             }
-            // ⑦ 부서장이었으면 그 칸도 비운다 (#111 리뷰)
-            dao.clearHeadOf(companyId, t.getEmployeeId());
-            // shortcut: 이 사람이 결재할 차례였던 휴가 자동 반려는 결재 모듈 메서드가 생기면 연결, 그 전까지 0
+            // ⑦ 부서장 칸 비우기, 결재 차례 자동 반려
+            released = afterTurnedOff(companyId, t.getEmployeeId());
         	} else {
             // 본인 계정은 스스로 켤 수 없다 (#127 리뷰: 꺼진 인사 담당이 기존 세션으로 자기를 되살리던 것)
             if (t.getEmployeeId().equals(user.getEmployeeId())) {
@@ -207,5 +210,60 @@ public class EmployeeAdminService {
         result.put("name", t.getEmployeeName());
         result.put("released", released);
         return result;
+    }
+    
+    /** 인사 정보 저장 (POST /employee/admin/api/employees/{empNo}/hr). 퇴사로 바꾸면 계정도 끈다 */
+    @Transactional
+    public Map<String, Object> setHrInfo(LoginUser user, String empNo, String empType, String work, String gender) {
+        // ① 권한
+        if (!MANAGERS.contains(user.getRole())) {
+            throw new AccessDeniedException("사원 관리는 업체 관리자와 인사 담당만 할 수 있습니다");
+        }
+        // ② 값 검사 (성별은 선택: 빈 값이면 null)
+        String genderCode = (gender == null || gender.isEmpty()) ? null : gender;
+        if (empType == null || !EMP_TYPES.contains(empType)) {
+            throw new IllegalArgumentException("고용 형태를 다시 골라 주세요");
+        }
+        if (work == null || !WORKS.contains(work)) {
+            throw new IllegalArgumentException("재직 상태를 다시 골라 주세요");
+        }
+        if (genderCode != null && !GENDERS.contains(genderCode)) {
+            throw new IllegalArgumentException("성별을 다시 골라 주세요");
+        }
+        Long companyId = user.getCompanyId();
+
+        // ③ 대상
+        EmployeeHeadTargetDTO t = dao.getHeadTarget(companyId, empNo);
+        if (t == null) {
+            throw new IllegalArgumentException("없는 사원입니다");
+        }
+        // ④ 업체 관리자와 본인은 퇴사로 바꿀 수 없다 (목록의 canRetire와 같은 기준)
+        boolean retiring = "ST_RETIRED".equals(work) && !"ST_RETIRED".equals(t.getEmploymentStatus());
+        if (retiring && ("ROLE_ADMIN".equals(t.getRoleCode()) || t.getEmployeeId().equals(user.getEmployeeId()))) {
+            throw new IllegalStateException("업체 관리자와 본인은 퇴사로 바꿀 수 없습니다");
+        }
+
+        // ⑤ 저장
+        dao.updateHrInfo(companyId, t.getEmployeeId(), empType, work, genderCode);
+
+        // ⑥ 이번에 퇴사가 됐으면 계정도 끄고 정리한다 (재직으로 돌려도 계정은 다시 사용으로 따로 켠다: 자리 확인)
+        boolean turnedOff = false;
+        int released = 0;
+        if (retiring) {
+            turnedOff = dao.retireAccount(companyId, t.getEmployeeId()) == 1;
+            released = afterTurnedOff(companyId, t.getEmployeeId());
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", t.getEmployeeName());
+        result.put("turnedOff", turnedOff);
+        result.put("released", released);
+        return result;
+    }
+
+    /** 계정이 꺼진 뒤 정리: 부서장 칸 비우기, 이 사람이 결재할 차례인 문서 자동 반려. 반려한 건수 */
+    private int afterTurnedOff(Long companyId, Long employeeId) {
+        dao.clearHeadOf(companyId, employeeId);
+        return approvalService.rejectWaitingForRetired(companyId, employeeId);
     }
 }

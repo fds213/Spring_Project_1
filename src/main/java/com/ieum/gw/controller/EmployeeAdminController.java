@@ -71,6 +71,15 @@ public class EmployeeAdminController {
 		return Map.of("success", true, "data", employeeAdminService.setStatus(loginUser, empNo, body.get("action")));
 	}
 	
+	/** 인사 정보 저장 (업체 관리자·인사 담당, Service에서 확인) */
+	@PostMapping("/employee/admin/api/employees/{empNo}/hr")
+	@ResponseBody
+	public Map<String, Object> hr(@PathVariable String empNo, @RequestBody Map<String, String> body,
+			@AuthenticationPrincipal LoginUser loginUser) {
+		return Map.of("success", true, "data", employeeAdminService.setHrInfo(loginUser, empNo,
+				body.get("empType"), body.get("work"), body.get("gender")));
+	}
+	
 	/** 부서·직급 목록 (CFG-01, 업체 관리자만) */
 	@GetMapping("/employee/admin/api/{kind}")
 	@ResponseBody
