@@ -8,24 +8,42 @@
         FROM chat_member
         WHERE chat_room_id = #{roomId}
           AND employee_id = #{employeeId}
+          AND company_id = #{companyId}
           AND left_at IS NULL
+    </select>
+
+    <select id="lockRoom" resultType="long" useCache="false" flushCache="true">
+        SELECT chat_room_id
+        FROM chat_room
+        WHERE company_id = #{companyId}
+          AND chat_room_id = #{roomId}
+        FOR UPDATE
     </select>
 
     <insert id="insertMessage" parameterType="com.ieum.gw.dto.ChatMessageDTO">
         <selectKey keyProperty="chatMessageId" resultType="long" order="BEFORE">
             SELECT sq_chat_message.NEXTVAL FROM dual
         </selectKey>
-        INSERT INTO chat_message (company_id, chat_message_id, chat_room_id, sender_employee_id, message_type, message_text, client_message_key, created_at)
-        VALUES (#{companyId}, #{chatMessageId}, #{chatRoomId}, #{senderEmployeeId}, #{messageType}, #{messageText}, #{clientMessageKey}, default)
+        INSERT INTO chat_message (company_id, chat_message_id, chat_room_id, sender_employee_id, message_type,
+        message_text, attachment_id, client_message_key, created_at)
+        VALUES (#{companyId}, #{chatMessageId}, #{chatRoomId}, #{senderEmployeeId}, #{messageType}, #{messageText,jdbcType=VARCHAR}, #{attachmentId,jdbcType=NUMERIC},
+        #{clientMessageKey}, default)
     </insert>
 
     <!-- 본인이 참여중인 대화방 목록 -->
     <select id="getRoomList" resultType="com.ieum.gw.dto.ChatRoomDTO">
-        SELECT r.chat_room_id, r.room_type,
+        SELECT r.chat_room_id,
+               r.room_type,
                CASE
                    WHEN r.room_type = 'ROOM_DIRECT' THEN e.employee_name
                    ELSE
-                       r.room_name END AS display_name
+                       r.room_name END                                      AS display_name,
+               (SELECT COUNT(*)
+                FROM chat_message msg
+                WHERE msg.company_id = m.company_id
+                  AND msg.chat_room_id = m.chat_room_id
+                  AND msg.sender_employee_id != m.employee_id
+                  AND msg.chat_message_id > NVL(m.last_read_message_id, 0)) AS unread_count
         FROM chat_room r
                  JOIN chat_member m ON m.company_id = r.company_id AND m.chat_room_id = r.chat_room_id
                  LEFT JOIN employee e
@@ -34,10 +52,153 @@
                                                        WHEN r.direct_employee_low = m.employee_id
                                                            THEN r.direct_employee_high
                                                        ELSE r.direct_employee_low
-                                                        END
+                                   END
         WHERE m.company_id = #{companyId}
           AND m.employee_id = #{employeeId}
           AND m.left_at IS NULL
+    </select>
+
+    <select id="getMessages"
+            resultType="com.ieum.gw.dto.ChatMessageDTO">
+        SELECT chat_message_id, company_id, chat_room_id,
+        sender_employee_id, message_type, message_text, attachment_id,
+        client_message_key, created_at
+        FROM chat_message
+        WHERE company_id = #{companyId}
+        AND chat_room_id = #{roomId}
+        <if test="beforeMessageId != null">
+            AND chat_message_id &lt; #{beforeMessageId}
+        </if>
+        ORDER BY chat_message_id DESC
+        FETCH FIRST 50 ROWS ONLY
+    </select>
+
+    <select id="getMessagesAfter"
+            resultType="com.ieum.gw.dto.ChatMessageDTO">
+        SELECT chat_message_id, company_id, chat_room_id,
+               sender_employee_id, message_type, message_text, attachment_id,
+               client_message_key, created_at
+        FROM chat_message
+        WHERE company_id = #{companyId}
+          AND chat_room_id = #{roomId}
+          AND chat_message_id > #{afterMessageId}
+        ORDER BY chat_message_id ASC
+            FETCH FIRST 50 ROWS ONLY
+    </select>
+
+    <update id="markRead">
+        UPDATE chat_member
+        SET last_read_message_id =
+                GREATEST(NVL(last_read_message_id, 0), #{messageId}),
+            updated_at =
+                CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND chat_room_id = #{roomId}
+          AND employee_id = #{employeeId}
+          AND left_at IS NULL
+          AND EXISTS (
+            SELECT 1
+            FROM chat_message msg
+            WHERE msg.company_id = #{companyId}
+              AND msg.chat_room_id = #{roomId}
+              AND msg.chat_message_id = #{messageId}
+        )
+    </update>
+
+    <select id="countUnread" resultType="int">
+        SELECT COUNT(*)
+        FROM chat_member member
+                 JOIN chat_message msg
+                      ON msg.company_id = member.company_id
+                          AND msg.chat_room_id = member.chat_room_id
+        WHERE member.company_id = #{companyId}
+          AND member.employee_id = #{employeeId}
+          AND member.left_at IS NULL
+          AND msg.sender_employee_id != #{employeeId}
+          AND msg.chat_message_id >
+              NVL(member.last_read_message_id, 0)
+    </select>
+
+    <select id="getOtherLastReadId" resultType="long">
+        SELECT NVL(MAX(member.last_read_message_id), 0)
+        FROM chat_room room
+                 JOIN chat_member member
+                      ON member.company_id = room.company_id
+                          AND member.chat_room_id = room.chat_room_id
+        WHERE room.company_id = #{companyId}
+          AND room.chat_room_id = #{roomId}
+          AND room.room_type = 'ROOM_DIRECT'
+          AND member.employee_id =
+              CASE
+                  WHEN room.direct_employee_low = #{employeeId}
+                      THEN room.direct_employee_high
+                  ELSE room.direct_employee_low
+                  END
+          AND member.left_at IS NULL
+    </select>
+
+    <select id="findDirectRoom" resultType="long">
+        SELECT chat_room_id
+        FROM chat_room
+        WHERE company_id = #{companyId}
+          AND room_type = 'ROOM_DIRECT'
+          AND direct_employee_low = #{directEmployeeLow}
+          AND direct_employee_high = #{directEmployeeHigh}
+    </select>
+
+    <insert id="insertRoom">
+        <selectKey keyProperty="chatRoomId" resultType="long" order="BEFORE">
+            SELECT sq_chat_room.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO chat_room (
+        company_id, chat_room_id, room_type, room_name,
+        created_by_employee_id,
+        direct_employee_low, direct_employee_high
+        )
+        VALUES (
+        #{companyId}, #{chatRoomId}, #{roomType}, #{roomName},
+        #{createdByEmployeeId},
+        #{directEmployeeLow}, #{directEmployeeHigh}
+        )
+    </insert>
+
+    <insert id="insertMember">
+        INSERT INTO chat_member (
+            company_id, chat_room_id, employee_id, joined_at
+        )
+        VALUES (
+                   #{companyId}, #{roomId}, #{employeeId},
+                   CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+               )
+    </insert>
+
+    <select id="findByClientKey"
+            resultType="com.ieum.gw.dto.ChatMessageDTO">
+        SELECT chat_message_id, company_id, chat_room_id,
+               sender_employee_id, message_type, message_text, attachment_id,
+               client_message_key, created_at
+        FROM chat_message
+        WHERE company_id = #{companyId}
+          AND sender_employee_id = #{senderEmployeeId}
+          AND client_message_key = #{clientMessageKey}
+    </select>
+
+    <select id="findImageAttachmentId" resultType="long">
+        SELECT attachment_id
+        FROM chat_message
+        WHERE company_id = #{companyId}
+          AND chat_room_id = #{roomId}
+          AND chat_message_id = #{messageId}
+          AND message_type = 'MSG_IMAGE'
+          AND deleted_at IS NULL
+    </select>
+
+    <select id="getRoomMemberIds" resultType="long">
+        SELECT employee_id
+        FROM chat_member
+        WHERE company_id = #{companyId}
+          AND chat_room_id = #{roomId}
+          AND left_at IS NULL
     </select>
 
 </mapper>
