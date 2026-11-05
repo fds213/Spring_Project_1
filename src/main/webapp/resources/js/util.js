@@ -92,6 +92,7 @@ function pickSelect(label, first, options, selected) {
       return o;
     }));
   s.firstChild.value = '';
+  s.firstChild.dataset.placeholder = ''; // 안내 문구: 펼친 목록에는 넣지 않는다(select.js)
   s.setAttribute('aria-label', label);
   return s;
 }
