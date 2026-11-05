@@ -248,4 +248,86 @@
 		WHERE e.company_id = #{companyId}
 		  AND e.employee_id = #{employeeId}
 	</select>
+	
+		<!-- ===== 부서·직급 관리 (CFG-01). ${kind.*}는 EmployeeOrgKind의 고정값만 들어간다 ===== -->
+
+	<!-- 목록: 사용 중인 것만, 정한 순서대로. 인원·가입 요청 수, 부서면 형태·부서장 이름 -->
+	<select id="listOrgItems" resultType="com.ieum.gw.dto.EmployeeOrgItemDTO">
+		SELECT o.${kind.idCol} AS id, o.${kind.nameCol} AS name,
+		       (SELECT COUNT(*) FROM employee e JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+		         WHERE e.company_id = o.company_id AND e.${kind.idCol} = o.${kind.idCol} AND a.status_code = 'ACTIVE') AS in_use,
+		       (SELECT COUNT(*) FROM employee e JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+		         WHERE e.company_id = o.company_id AND e.${kind.idCol} = o.${kind.idCol} AND a.status_code != 'ACTIVE') AS retired,
+		       (SELECT COUNT(*) FROM account_request r
+		         WHERE r.company_id = o.company_id AND r.${kind.idCol} = o.${kind.idCol} AND r.status_code = 'REQUESTED') AS requests
+		       <if test="kind.dept">
+		       , o.department_type AS type
+		       , (SELECT h.employee_name FROM employee h WHERE h.company_id = o.company_id AND h.employee_id = o.head_employee_id) AS head_name
+		       </if>
+		FROM ${kind.table} o
+		WHERE o.company_id = #{companyId}
+		  AND o.use_yn = 'Y'
+		ORDER BY o.sort_order, o.${kind.nameCol}
+	</select>
+
+	<!-- 부서·직급을 바꾸기 전에 업체 행을 잠근다. 목록 행만 잠그면 그사이 새로 생긴 행을 못 봐서 동시 추가가 개수·이름 검사를 뚫는다 -->
+	<select id="lockCompanyForOrg" resultType="java.lang.Long">
+		SELECT company_id FROM company WHERE company_id = #{companyId} FOR UPDATE
+	</select>
+
+	<!-- 쓰기 전에 그 업체의 목록 행을 잠근다 (동시에 추가·순서 바꾸기·삭제해도 꼬이지 않게) -->
+	<select id="lockOrgItems" resultType="com.ieum.gw.dto.EmployeeOrgItemDTO">
+		SELECT ${kind.idCol} AS id, ${kind.nameCol} AS name
+		FROM ${kind.table}
+		WHERE company_id = #{companyId}
+		  AND use_yn = 'Y'
+		ORDER BY sort_order, ${kind.idCol}
+		FOR UPDATE
+	</select>
+
+	<!-- 예전에 지운 같은 이름 (되살리기용). 없으면 null -->
+	<select id="findDeletedOrgId" resultType="java.lang.Long">
+		SELECT ${kind.idCol}
+		FROM ${kind.table}
+		WHERE company_id = #{companyId}
+		  AND ${kind.nameCol} = #{name}
+		  AND use_yn = 'N'
+	</select>
+
+	<insert id="insertOrg">
+		INSERT INTO ${kind.table} (company_id, ${kind.nameCol}, sort_order)
+		VALUES (#{companyId}, #{name}, #{sortOrder})
+	</insert>
+
+	<update id="reviveOrg">
+		UPDATE ${kind.table}
+		SET use_yn = 'Y', sort_order = #{sortOrder}, updated_at = <include refid="now" />
+		WHERE company_id = #{companyId} AND ${kind.idCol} = #{id} AND use_yn = 'N'
+	</update>
+
+	<update id="renameOrg">
+		UPDATE ${kind.table}
+		SET ${kind.nameCol} = #{name}, updated_at = <include refid="now" />
+		WHERE company_id = #{companyId} AND ${kind.idCol} = #{id} AND use_yn = 'Y'
+	</update>
+
+	<update id="updateOrgSortOrder">
+		UPDATE ${kind.table}
+		SET sort_order = #{sortOrder}, updated_at = <include refid="now" />
+		WHERE company_id = #{companyId} AND ${kind.idCol} = #{id}
+	</update>
+
+	<!-- 삭제 = 사용 안 함. 부서면 가입 활성화와 부서장도 비운다 -->
+	<update id="deleteOrg">
+		UPDATE ${kind.table}
+		SET use_yn = 'N', updated_at = <include refid="now" />
+				<if test="kind.dept">, join_open_until = NULL, join_opened_by = NULL, head_employee_id = NULL, department_type = NULL</if>
+		WHERE company_id = #{companyId} AND ${kind.idCol} = #{id} AND use_yn = 'Y'
+	</update>
+
+	<update id="updateDeptType">
+		UPDATE department
+		SET department_type = #{type}, updated_at = <include refid="now" />
+		WHERE company_id = #{companyId} AND department_id = #{id} AND use_yn = 'Y'
+	</update>
 </mapper>
