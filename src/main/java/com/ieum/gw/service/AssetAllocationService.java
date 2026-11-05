@@ -1,6 +1,8 @@
 package com.ieum.gw.service;
 
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -23,6 +25,17 @@ public class AssetAllocationService {
     private final AssetAllocationDAO dao;
     private final BranchService branchService;
     private final EmployeeService employeeService;
+    
+    /** 자산 지급 대상 직원과 기존 자산의 지점 표시용 목록을 제공한다. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getFormOptions(LoginUser user) {
+    	requireOperator(user);
+    	
+    	Long companyId = user.getCompanyId();
+    	
+    	return Map.of("employees", employeeService.listActiveEmp(companyId, null),
+    				  "branches", branchService.getBranchDetails(companyId));
+    }
 
     /** 로그인한 IT 담당자·관리자에게 같은 업체의 전체 자산 목록을 제공한다. */
     @Transactional(readOnly = true)

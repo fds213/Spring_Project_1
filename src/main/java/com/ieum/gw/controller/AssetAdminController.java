@@ -20,6 +20,13 @@ import lombok.Setter;
 public class AssetAdminController {
     private final AssetAllocationService service;
 
+    /** 자산 관리 화면에서 사용할 직원·지점 목록을 JSON으로 반환한다. */
+    @GetMapping("/form-options")
+    public Map<String, Object> formOptions(@AuthenticationPrincipal LoginUser user) {
+    	return Map.of("success", true,
+				  	  "data", service.getFormOptions(user));
+    }
+    
     /** 같은 업체의 관리자용 자산 목록을 JSON으로 반환한다. */
     @GetMapping
     public Map<String, Object> list(@AuthenticationPrincipal LoginUser user) {
