@@ -107,4 +107,6 @@ public interface EmployeeMapper {
 	int updateHrInfo(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,
 			@Param("empType") String empType, @Param("work") String work, @Param("gender") String gender);
 	
+	/** 부서·직급을 바꾸기 전에 업체 행 잠금 (동시 추가 직렬화) */
+	Long lockCompanyForOrg(@Param("companyId") Long companyId);
 }

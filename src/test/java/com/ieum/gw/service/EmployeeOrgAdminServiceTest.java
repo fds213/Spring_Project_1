@@ -37,6 +37,7 @@ class EmployeeOrgAdminServiceTest {
 		boolean active = true;
 		int sort;
 		int inUse;
+		int retired;
 		int requests;
 	}
 
@@ -44,7 +45,9 @@ class EmployeeOrgAdminServiceTest {
 	static class FakeEmployeeDao extends EmployeeDAO {
 		List<Row> rows = new ArrayList<>();
 		long nextId = 1;
-
+		List<String> calls = new ArrayList<>(); // 잠금 순서 확인용
+		boolean duplicateOnInsert = false;      // 고유 제약 오류 흉내
+		
 		FakeEmployeeDao() {
 			super(null);
 		}
@@ -72,11 +75,18 @@ class EmployeeOrgAdminServiceTest {
 				o.setId(r.id);
 				o.setName(r.name);
 				o.setInUse(r.inUse);
+				o.setRetired(r.retired);
 				o.setRequests(r.requests);
 				return o;
 			}).collect(Collectors.toList());
 		}
 
+		@Override
+		public Long lockCompanyForOrg(Long companyId) {
+			calls.add("company");
+			return companyId;
+		}
+		
 		@Override
 		public List<EmployeeOrgItemDTO> listOrgItems(Long companyId, EmployeeOrgKind kind) {
 			return active();
@@ -84,6 +94,7 @@ class EmployeeOrgAdminServiceTest {
 
 		@Override
 		public List<EmployeeOrgItemDTO> lockOrgItems(Long companyId, EmployeeOrgKind kind) {
+			calls.add("items");
 			return active();
 		}
 
@@ -95,6 +106,9 @@ class EmployeeOrgAdminServiceTest {
 
 		@Override
 		public int insertOrg(Long companyId, EmployeeOrgKind kind, String name, int sortOrder) {
+			if (duplicateOnInsert) {                                                 
+				throw new org.springframework.dao.DuplicateKeyException("UQ_03_02");  
+			}                                                                         
 			put(name, 0, 0).sort = sortOrder;
 			return 1;
 		}
@@ -234,5 +248,57 @@ class EmployeeOrgAdminServiceTest {
 				() -> service.rename(admin, DEPT, "없는팀", "새이름"));
 		assertEquals(HttpStatus.NOT_FOUND, e.getStatus());
 		assertThrows(AccessDeniedException.class, () -> service.list(user("ROLE_HR"), DEPT));
+	}
+	
+	@Test
+	@DisplayName("비활성 계정만 남은 부서도 지울 수 없고, 지우면 남은 순서를 0부터 다시 매긴다")
+	void deleteRetiredAndRenumber() {
+		dao.put("가", 0, 0);
+		Row b = dao.put("나", 0, 0);
+		dao.put("다", 0, 0);
+		b.retired = 1;
+
+		assertThrows(IllegalStateException.class, () -> service.delete(admin, DEPT, "나"));
+
+		b.retired = 0;
+		service.delete(admin, DEPT, "나");
+		assertEquals(0, dao.row("가").sort);
+		assertEquals(1, dao.row("다").sort);
+	}
+
+	@Test
+	@DisplayName("점(.)만으로 된 이름은 400 (주소에서 지워져 바꾸거나 지울 수 없게 된다)")
+	void dotOnlyName() {
+		assertThrows(IllegalArgumentException.class, () -> service.add(admin, DEPT, "."));
+		assertThrows(IllegalArgumentException.class, () -> service.add(admin, DEPT, ".."));
+		service.add(admin, DEPT, "a.b"); // 점이 섞인 이름은 된다
+	}
+
+	@Test
+	@DisplayName("부서가 0개인 새 업체도 추가 전에 업체 행을 먼저 잠그고, 그다음 목록을 읽는다(동시 추가 직렬화)")
+	void lockCompanyFirstOnEmpty() {
+		service.add(admin, DEPT, "개발팀");
+
+		assertEquals(List.of("company", "items"), dao.calls);
+	}
+
+	@Test
+	@DisplayName("최대 개수 경계: 29개에서는 추가되고, 30개가 되면 다음 추가는 409")
+	void maxBoundary() {
+		for (int i = 0; i < 29; i++) {
+			dao.put("부서" + i, 0, 0);
+		}
+		service.add(admin, DEPT, "서른번째");
+		assertEquals(30, dao.rows.size());
+
+		assertThrows(IllegalStateException.class, () -> service.add(admin, DEPT, "서른한번째"));
+	}
+
+	@Test
+	@DisplayName("잠금을 뚫고 같은 이름이 먼저 들어가 고유 제약 오류가 나도 500이 아니라 409다")
+	void duplicateKeyIs409() {
+		dao.duplicateOnInsert = true;
+
+		assertThrows(IllegalStateException.class, () -> service.add(admin, DEPT, "개발팀"));
 	}
 }

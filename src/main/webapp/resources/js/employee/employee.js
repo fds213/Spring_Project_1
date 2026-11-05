@@ -212,7 +212,7 @@ document.querySelectorAll('#empStateDialog button').forEach(b => b.addEventListe
       showToast(`${r.name} 계정을 다시 사용합니다`);
       return;
     }
-    showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : ''));
+    showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 문서 ${r.released}건은 자동 반려했습니다` : ''));
   });
 }));
 
@@ -268,7 +268,7 @@ function saveHrInfo(btn) {
     .done(r => {
       dialog.close();
       hrInfoTarget = null;
-      const note = r.turnedOff ? ' 계정도 비활성으로 바꿨습니다' + (r.released ? ` · 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : '') : '';
+      const note = r.turnedOff ? ' 계정도 비활성으로 바꿨습니다' + (r.released ? ` · 결재할 차례였던 문서 ${r.released}건은 자동 반려했습니다` : '') : '';
       showToast(`${r.name}님 인사 정보를 저장했습니다.${note}`);
       rerenderStaffViews();
     })
