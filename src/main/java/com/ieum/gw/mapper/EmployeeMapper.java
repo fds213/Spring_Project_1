@@ -102,4 +102,7 @@ public interface EmployeeMapper {
 
 	/** 부서 형태 바꾸기 (null = 일반) */
 	int updateDeptType(@Param("companyId") Long companyId, @Param("id") Long id, @Param("type") String type);
-	}
+	
+	/** 부서·직급을 바꾸기 전에 업체 행 잠금 (동시 추가 직렬화) */
+	Long lockCompanyForOrg(@Param("companyId") Long companyId);
+}

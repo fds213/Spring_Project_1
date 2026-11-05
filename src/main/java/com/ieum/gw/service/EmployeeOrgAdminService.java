@@ -67,6 +67,7 @@ public class EmployeeOrgAdminService {
         String name = cleanName(kind, rawName);
         Long companyId = user.getCompanyId();
 
+        dao.lockCompanyForOrg(companyId);
         List<EmployeeOrgItemDTO> items = dao.lockOrgItems(companyId, kind);
         if (items.size() >= kind.getMax()) {
             throw new IllegalStateException("최대 " + kind.getMax() + "개까지 만들 수 있습니다");
@@ -75,10 +76,14 @@ public class EmployeeOrgAdminService {
 
         // 지운 행도 남아 있어 같은 이름으로 새로 넣으면 (업체, 이름) 고유 제약에 걸린다 → 되살린다
         Long deletedId = dao.findDeletedOrgId(companyId, kind, name);
-        if (deletedId != null) {
-            dao.reviveOrg(companyId, kind, deletedId, items.size());
-        } else {
-            dao.insertOrg(companyId, kind, name, items.size());
+        try {
+            if (deletedId != null) {
+                dao.reviveOrg(companyId, kind, deletedId, items.size());
+            } else {
+                dao.insertOrg(companyId, kind, name, items.size());
+            }
+        } catch (DuplicateKeyException e) {
+            throw new IllegalStateException("이미 있는 이름입니다");
         }
         return Map.of("name", name);
     }
@@ -90,6 +95,7 @@ public class EmployeeOrgAdminService {
         String to = cleanName(kind, rawTo);
         Long companyId = user.getCompanyId();
 
+        dao.lockCompanyForOrg(companyId);
         List<EmployeeOrgItemDTO> items = dao.lockOrgItems(companyId, kind);
         EmployeeOrgItemDTO target = find(items, kind, from);
         if (!to.equals(from)) {
@@ -114,6 +120,7 @@ public class EmployeeOrgAdminService {
         requireAdmin(user);
         Long companyId = user.getCompanyId();
 
+        dao.lockCompanyForOrg(companyId);
         List<EmployeeOrgItemDTO> items = dao.lockOrgItems(companyId, kind);
         EmployeeOrgItemDTO target = find(items, kind, name);
         if (items.size() <= 1) {
@@ -121,12 +128,20 @@ public class EmployeeOrgAdminService {
         }
         // 인원은 잠근 뒤에 다시 센다 (화면을 연 사이 누가 들어왔을 수 있다)
         for (EmployeeOrgItemDTO o : dao.listOrgItems(companyId, kind)) {
-            if (o.getId().equals(target.getId()) && (o.getInUse() > 0 || o.getRequests() > 0)) {
-                throw new IllegalStateException("사용 중 계정 " + o.getInUse() + "명, 가입 요청 " + o.getRequests()
-                        + "건이 있어 지울 수 없습니다");
+            // 비활성 계정도 센다 (CFG-01: 지운 부서에 남은 사람을 다시 사용하면 목록에 없는 부서에 남게 된다)
+            if (o.getId().equals(target.getId()) && (o.getInUse() > 0 || o.getRetired() > 0 || o.getRequests() > 0)) {
+                throw new IllegalStateException("사용 중 " + o.getInUse() + "명, 비활성 " + o.getRetired() + "명, 가입 요청 "
+                        + o.getRequests() + "건이 있어 지울 수 없습니다. 이름은 바꿀 수 있습니다");
             }
         }
         dao.deleteOrg(companyId, kind, target.getId());
+        // 빈자리가 남지 않게 남은 순서를 0부터 다시 매긴다 (다음 추가가 맨 끝에 오도록)
+        int order = 0;
+        for (EmployeeOrgItemDTO o : items) {
+            if (!o.getId().equals(target.getId())) {
+                dao.updateOrgSortOrder(companyId, kind, o.getId(), order++);
+            }
+        }
         return Map.of("name", name);
     }
 
@@ -139,6 +154,7 @@ public class EmployeeOrgAdminService {
         }
         Long companyId = user.getCompanyId();
 
+        dao.lockCompanyForOrg(companyId);
         List<EmployeeOrgItemDTO> items = new ArrayList<>(dao.lockOrgItems(companyId, kind));
         EmployeeOrgItemDTO target = find(items, kind, name);
         int from = items.indexOf(target);
@@ -163,6 +179,7 @@ public class EmployeeOrgAdminService {
         }
         Long companyId = user.getCompanyId();
 
+        dao.lockCompanyForOrg(companyId);
         EmployeeOrgItemDTO target = find(dao.lockOrgItems(companyId, EmployeeOrgKind.DEPT), EmployeeOrgKind.DEPT, name);
         dao.updateDeptType(companyId, target.getId(), code);
 
@@ -193,6 +210,11 @@ public class EmployeeOrgAdminService {
                 throw new IllegalArgumentException("이름에 / \\ ; % 는 쓸 수 없습니다");
             }
         }
+        // '.'·'..'는 브라우저가 주소에서 지워 버려 바꾸거나 지울 수 없게 된다
+        if (name.matches("\\.+")) {
+            throw new IllegalArgumentException("점(.)만으로 된 이름은 쓸 수 없습니다");
+        }
+        
         if (!kind.isDept() && norm(name).equals("관리자")) {
             throw new IllegalArgumentException("'관리자'는 최초 관리자 표시에 쓰여 직급 이름으로 쓸 수 없습니다");
         }

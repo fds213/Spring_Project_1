@@ -148,6 +148,10 @@ public class EmployeeDAO {
     }
     
     // ── 부서·직급 관리 (CFG-01) ──
+    /** 부서·직급을 바꾸기 전에 업체 행 잠금 (동시 추가 직렬화) */
+    public Long lockCompanyForOrg(Long companyId) {
+        return mapper.lockCompanyForOrg(companyId);
+    }
 
     /** 목록 (사용 중인 것만, 순서대로, 인원·요청 수 포함) */
     public List<EmployeeOrgItemDTO> listOrgItems(Long companyId, EmployeeOrgKind kind) {
