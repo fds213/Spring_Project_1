@@ -168,6 +168,29 @@
 		ORDER BY d.sort_order, d.department_name, e.employee_no
 	</select>
 	
+		<!-- 조직도 부서 카드: 사용 중 부서를 부서 관리 화면과 같은 순서로 -->
+	<select id="listOrgDepartments" resultType="com.ieum.gw.dto.OrgDeptDTO">
+		SELECT department_id, department_name
+		FROM department
+		WHERE company_id = #{companyId}
+		  AND use_yn = 'Y'
+		ORDER BY sort_order, department_id
+	</select>
+
+	<!-- 조직도 사람: 재직 + 계정 사용 중. 부서장 먼저, 직급 높은 순(직급 순서가 큰 쪽), 이름순 -->
+	<select id="listOrgMembers" resultType="com.ieum.gw.dto.OrgMemberDTO">
+		SELECT e.department_id, e.employee_id, e.employee_name, g.grade_name,
+		       CASE WHEN d.head_employee_id = e.employee_id THEN 1 ELSE 0 END AS head
+		FROM employee e
+		JOIN user_account a    ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+		LEFT JOIN department d ON d.department_id = e.department_id AND d.company_id = e.company_id
+		LEFT JOIN job_grade g  ON g.job_grade_id = e.job_grade_id AND g.company_id = e.company_id
+		WHERE e.company_id = #{companyId}
+		  AND e.employment_status = 'ST_SERVING'
+		  AND a.status_code = 'ACTIVE'
+		ORDER BY head DESC, g.sort_order DESC NULLS LAST, e.employee_name, e.employee_id
+	</select>
+	
 	    <!-- 사원 관리 대상(부서장 지정·켜기/끄기): 사번으로 같은 업체 사원 1명 -->
     <select id="getHeadTarget" resultType="com.ieum.gw.dto.EmployeeHeadTargetDTO">
 		SELECT e.employee_id, e.employee_name, e.department_id,

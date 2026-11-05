@@ -14,6 +14,8 @@ import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.EmployeeOrgItemDTO;
 import com.ieum.gw.dto.IdNameDTO;
+import com.ieum.gw.dto.OrgDeptDTO;
+import com.ieum.gw.dto.OrgMemberDTO;
 import com.ieum.gw.mapper.EmployeeMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -110,6 +112,16 @@ public class EmployeeDAO {
     /** 사원 관리 목록 (사원증 있는 사람만) */
     public List<EmployeeAdminRowDTO> listAdminRows(Long companyId) {
         return mapper.listAdminRows(companyId);
+    }
+    
+    /** 조직도 부서 카드: 사용 중 부서 (관리 화면 순서) */
+    public List<OrgDeptDTO> listOrgDepartments(Long companyId) {
+        return mapper.listOrgDepartments(companyId);
+    }
+
+    /** 조직도 사람: 재직 + 계정 사용 중 (부서장 → 직급 높은 순 → 이름) */
+    public List<OrgMemberDTO> listOrgMembers(Long companyId) {
+        return mapper.listOrgMembers(companyId);
     }
     
     /** 부서장 지정 대상. 같은 업체에 그 사번이 없으면 null */

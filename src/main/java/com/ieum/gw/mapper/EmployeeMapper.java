@@ -15,6 +15,8 @@ import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.dto.EmployeeOrgItemDTO;
 import com.ieum.gw.dto.IdNameDTO;
+import com.ieum.gw.dto.OrgDeptDTO;
+import com.ieum.gw.dto.OrgMemberDTO;
 
 @Mapper
 public interface EmployeeMapper {
@@ -54,6 +56,12 @@ public interface EmployeeMapper {
 
 	List<EmployeeAdminRowDTO> listAdminRows(@Param("companyId") Long companyId);
 
+	/** 조직도 부서 카드: 사용 중 부서 (관리 화면 순서) */
+	List<OrgDeptDTO> listOrgDepartments(@Param("companyId") Long companyId);
+
+	/** 조직도 사람: 재직 + 계정 사용 중 (부서장 → 직급 높은 순 → 이름) */
+	List<OrgMemberDTO> listOrgMembers(@Param("companyId") Long companyId);
+	
 	EmployeeHeadTargetDTO getHeadTarget(@Param("companyId") Long companyId, @Param("employeeNo") String employeeNo);
 
 	int setDeptHead(@Param("companyId") Long companyId, @Param("departmentId") Long departmentId,
