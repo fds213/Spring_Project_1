@@ -31,6 +31,13 @@ public interface EmployeeMapper {
     int insertEmployee(EmployeeDTO dto);
     int insertAccount(AccountDTO dto);
 
+    /** 비밀번호 변경: 본인 계정의 지금 비밀번호 해시 (사용 중 계정만, 없으면 null) */
+    String findPasswordHash(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId);
+
+    /** 비밀번호 바꾸기: 확인한 해시가 그대로일 때만. 바뀐 행 수 */
+    int updatePassword(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId,
+            @Param("oldHash") String oldHash, @Param("newHash") String newHash);
+    
     int markAccountEmailVerified(@Param("companyId") Long companyId, @Param("userAccountId") Long userAccountId,
             @Param("verifiedAt") java.time.LocalDateTime verifiedAt);
 
