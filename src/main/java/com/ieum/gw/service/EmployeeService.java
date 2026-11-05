@@ -33,7 +33,8 @@ public class EmployeeService {
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final int MAX_SERIAL = 9999;          // 사번 뒤 4자리 (CK_14_01)
     private static final int MAX_PASSWORD_BYTES = 72;    // BCrypt가 보는 최대 길이
-
+    private static final int MIN_PASSWORD_LENGTH = 8;    // 가입·찾기와 같은 기준 (ACC-07)
+    
     @Autowired
     private EmployeeDAO dao;
     @Autowired
@@ -75,6 +76,30 @@ public class EmployeeService {
         dao.markAccountEmailVerified(companyId, userAccountId, verifiedAt);
     }
 
+    /** 본인 비밀번호 변경(ACC-07). 현재 비밀번호가 맞아야 하고, 새 비밀번호는 8자 이상·지금과 달라야 한다 */
+    public void changePassword(Long companyId, Long userAccountId, String current, String newPassword) {
+        if (current == null || current.isEmpty()) {
+            throw new IllegalArgumentException("현재 비밀번호를 입력해 주세요");
+        }
+        if (newPassword == null || newPassword.length() < MIN_PASSWORD_LENGTH) {
+            throw new IllegalArgumentException("새 비밀번호는 8자 이상으로 정해 주세요");
+        }
+        String oldHash = dao.findPasswordHash(companyId, userAccountId);
+        if (oldHash == null) {
+            throw new IllegalStateException("사용 중인 계정이 아닙니다. 다시 로그인해 주세요");
+        }
+        if (!passwordEncoder.matches(current, oldHash)) {
+            throw new IllegalArgumentException("현재 비밀번호가 맞지 않습니다");
+        }
+        if (passwordEncoder.matches(newPassword, oldHash)) {
+            throw new IllegalArgumentException("지금 쓰는 비밀번호와 다르게 정해 주세요");
+        }
+        // 확인한 해시가 그대로일 때만 바뀐다. 그사이 다른 창에서 바꿨으면 0행
+        if (dao.updatePassword(companyId, userAccountId, oldHash, hashPassword(newPassword)) == 0) {
+            throw new IllegalStateException("그사이 비밀번호가 바뀌었습니다. 다시 확인해 주세요");
+        }
+    }
+    
     /**
      * 체험 신청 때 업체 관리자(ROLE_ADMIN) 사원과 계정을 만든다. 체험 신청 트랜잭션 안에서 부른다(AGENTS.md 52줄).
      * 계정은 바로 사용 중(ACTIVE)으로 만든다. 이메일 인증 전 로그인은 로그인 검사가 업체 인증 시각으로 거절한다(ACC-06).

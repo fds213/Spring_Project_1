@@ -57,6 +57,16 @@ public class EmployeeDAO {
     public int insertAccount(AccountDTO dto) {
         return mapper.insertAccount(dto);
     }
+    
+    /** 비밀번호 변경: 본인 계정의 지금 비밀번호 해시 (사용 중 계정만, 없으면 null) */
+    public String findPasswordHash(Long companyId, Long userAccountId) {
+        return mapper.findPasswordHash(companyId, userAccountId);
+    }
+
+    /** 비밀번호 바꾸기: 확인한 해시가 그대로일 때만. 바뀐 행 수 */
+    public int updatePassword(Long companyId, Long userAccountId, String oldHash, String newHash) {
+        return mapper.updatePassword(companyId, userAccountId, oldHash, newHash);
+    }
 
     /** 계정 이메일 인증 시각. 이미 인증한 계정이면 0 */
     public int markAccountEmailVerified(Long companyId, Long userAccountId, java.time.LocalDateTime verifiedAt) {

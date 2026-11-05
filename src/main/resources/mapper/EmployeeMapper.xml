@@ -74,6 +74,27 @@
              CASE WHEN #{statusCode} = 'ACTIVE' THEN <include refid="now"/> END)
     </insert>
 
+	    <!-- 비밀번호 변경: 본인 계정의 지금 비밀번호 해시 (사용 중 계정만) -->
+    <select id="findPasswordHash" resultType="string">
+        SELECT password_hash
+        FROM user_account
+        WHERE company_id = #{companyId}
+        AND user_account_id = #{userAccountId}
+        AND status_code = 'ACTIVE'
+    </select>
+
+    <!-- 비밀번호 바꾸기: 확인한 해시가 그대로일 때만 (그사이 다른 창에서 바꿨으면 0행) -->
+    <update id="updatePassword">
+        UPDATE user_account
+        SET password_hash = #{newHash},
+            password_changed_at = <include refid="now" />,
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND user_account_id = #{userAccountId}
+        AND status_code = 'ACTIVE'
+        AND password_hash = #{oldHash}
+    </update>
+
     <!-- 같은 업체 재직자인가 (사원 재직 + 계정 사용 중) -->
     <select id="countActiveEmployee" resultType="int">
         SELECT COUNT(*)
