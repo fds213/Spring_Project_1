@@ -24,6 +24,12 @@ public class AssetController {
     private static final Logger logger = LoggerFactory.getLogger(AssetController.class);
     private final AssetService assetService;
 
+    /** IT 담당자·관리자가 사용하는 자산 관리 화면을 연다. */
+    @GetMapping("/asset/admin/list")
+    public String adminList() {
+    	return "/asset/admin/list";
+    }
+    
     @GetMapping("/asset/mine")
     public String mine() {
         return "asset/mine";

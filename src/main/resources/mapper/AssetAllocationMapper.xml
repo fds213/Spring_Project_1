@@ -1,6 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.mapper.AssetAllocationMapper">
+	<!-- 같은 업체 자산의 현재·과거 지급 건을 최신 지급순으로 조회한다. -->
+	<select id="selectAssignments" resultType="com.ieum.gw.dto.AssetAdminAssignmentDTO">
+	    SELECT aa.asset_assignment_id AS assetAssignmentId,
+	           aa.asset_id AS assetId,
+	           aa.employee_id AS employeeId,
+	           receiver.employee_name AS employeeName,
+	           aa.it_ticket_id AS itTicketId,
+	           aa.issued_by AS issuedBy,
+	           issuer.employee_name AS issuedByName,
+	           aa.issued_at AS issuedAt,
+	           aa.returned_by AS returnedBy,
+	           returner.employee_name AS returnedByName,
+	           aa.returned_at AS returnedAt
+	      FROM asset_assignment aa
+	
+	      LEFT JOIN employee receiver
+	        ON receiver.company_id = aa.company_id
+	       AND receiver.employee_id = aa.employee_id
+	
+	      LEFT JOIN user_account issue_account
+	        ON issue_account.company_id = aa.company_id
+	       AND issue_account.user_account_id = aa.issued_by
+	
+	      LEFT JOIN employee issuer
+	        ON issuer.company_id = issue_account.company_id
+	       AND issuer.employee_id = issue_account.employee_id
+	
+	      LEFT JOIN user_account return_account
+	        ON return_account.company_id = aa.company_id
+	       AND return_account.user_account_id = aa.returned_by
+	
+	      LEFT JOIN employee returner
+	        ON returner.company_id = return_account.company_id
+	       AND returner.employee_id = return_account.employee_id
+	
+	     WHERE aa.company_id = #{companyId}
+	       AND aa.asset_id = #{assetId}
+	     ORDER BY aa.issued_at DESC,
+	              aa.asset_assignment_id DESC
+	</select>
+
 	<!-- 같은 업체의 전체 상태 자산을 조회한다. -->
 	<select id="selectList" resultType="com.ieum.gw.dto.AssetListDTO">
 		select asset_id as id,
