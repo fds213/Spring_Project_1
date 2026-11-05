@@ -99,14 +99,15 @@
     }
 
     // 거르기 칸(filter-select)은 원래 select처럼 가장 긴 항목 너비를 지킨다(고를 때마다 칸 너비가 바뀌지 않게).
-    // 입력칸(input)은 줄 너비를 채우므로 재지 않는다
+    // 입력칸(input)은 줄 너비를 채우므로 재지 않는다.
+    // 너비는 CSS 변수(--fit-w)로만 넘긴다: 화면 CSS가 칸을 줄이라고 하면(.tk-row·.ea-row 의 min-width: 0) 그 규칙이 이긴다
     function fitWidth() {
       if (!button.classList.contains('filter-select')) return;
       const cs = getComputedStyle(button);
       measure.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
       const widest = Math.max(0, ...[...select.options].map(o => measure.measureText(o.text).width));
       // 글자 + 좌우 여백(10·10) + 화살표(18) + 사이(8) + 테두리(2)
-      button.style.minWidth = `${Math.ceil(widest) + 48}px`;
+      button.style.setProperty('--fit-w', `${Math.ceil(widest) + 48}px`);
     }
 
     // 다른 스크립트가 select.value·selectedIndex를 바꾸면 버튼도 다시 그린다

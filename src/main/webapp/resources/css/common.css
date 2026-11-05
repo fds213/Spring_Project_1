@@ -143,8 +143,9 @@ a { color: inherit; text-decoration: none; }
   overflow: hidden; clip-path: inset(50%); opacity: 0; pointer-events: none;
 }
 .select-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; cursor: pointer; }
-/* 거르기 칸은 원래 select 처럼 글자만큼(가장 긴 항목은 select.js 가 min-width 로 지킨다) */
-.select-trigger.filter-select { width: auto; }
+/* 거르기 칸은 원래 select 처럼 글자만큼. 가장 긴 항목 너비는 select.js 가 --fit-w 로 넘긴다.
+   화면 CSS의 '.○○ .filter-select { width: 100%; min-width: 0 }'이 뒤에 오면 그쪽이 이겨 좁은 칸에서도 줄어든다 */
+.select-trigger.filter-select { width: auto; min-width: var(--fit-w, 0); }
 .select-trigger .select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .select-trigger.is-placeholder .select-value { color: var(--text-muted); }
 .select-trigger:disabled { cursor: default; }
