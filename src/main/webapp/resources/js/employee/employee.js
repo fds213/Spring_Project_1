@@ -19,10 +19,13 @@ const deptTypeLabel = type => DEPT_TYPE[type] || '일반';
 // 고용 형태 (EMP_TYPE), 성별 (GENDER): 사원 관리 > 인사 정보에서 정한다. 성별은 넣지 않아도 된다
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
-// 상태 (STATUS): 휴직 중에도 계정은 쓸 수 있어야 해서 두 칸에 나눠 담는다.
+// 상태 (STATUS): 계정 상태와 재직 상태를 두 칸에 나눠 담는다.
 //   계정 상태 status (ACCOUNT_STATUS): ACTIVE 사용 중 / RETIRED 비활성 / REQUESTED 승인 대기 / ST_SUSPENDED 운영 차단 (계정은 지우지 않고 비활성화만 한다)
-//   재직 상태 work:   ST_SERVING 재직 / ST_LEAVE 휴직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
+//   재직 상태 work:   ST_SERVING 재직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
+//   휴직(ST_LEAVE)은 이번 범위에서 쓰지 않는다: 공통 코드가 N이고, 재직이 아니면 계정 상태 검사(#131)가 로그인을 끊어 서버가 400으로 거절한다.
+//   목록 표시용 이름표에는 남겨 옛 자료가 코드 그대로 보이지 않게 하고, 인사 정보 창의 선택지(WORK_CHOICES)에서만 뺀다.
 const WORK_STATUS = { ST_SERVING: '재직', ST_LEAVE: '휴직', ST_RETIRED: '퇴사' };
+const WORK_CHOICES = { ST_SERVING: '재직', ST_RETIRED: '퇴사' };
 const EMP_STATUS = { REQUESTED: '승인 대기', ACTIVE: '사용 중', RETIRED: '비활성', ST_SUSPENDED: '운영 차단' };
 // 꺼진 계정: 비활성·운영 차단 (로그인 불가)
 const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
@@ -231,7 +234,7 @@ function openHrInfo(e) {
       + Object.entries(map).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
     dialog.innerHTML = '<h2></h2><p class="muted"></p><div class="hr-info-fields">'
       + `<label class="field"><span>고용 형태</span><select class="input" id="hrEmpType">${options(EMP_TYPE)}</select></label>`
-      + `<label class="field"><span>재직 상태</span><select class="input" id="hrWork">${options(WORK_STATUS)}</select></label>`
+      + `<label class="field"><span>재직 상태</span><select class="input" id="hrWork">${options(WORK_CHOICES)}</select></label>`
       + `<label class="field"><span>성별 <span class="muted">(선택)</span></span><select class="input" id="hrGender">${options(GENDER, '입력 안 함')}</select></label>`
       + '</div><p class="form-error" id="hrInfoError" role="alert"></p>'
       + '<div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="button" class="btn btn-primary" value="ok" data-write>저장</button></div>';
@@ -245,7 +248,8 @@ function openHrInfo(e) {
   dialog.querySelector('h2').textContent = `${e.name}님 인사 정보`;
   dialog.querySelector('p').textContent = `${dotJoin(`사번 ${e.empNo}`, e.dept, e.rank)}. 퇴사로 바꾸면 계정도 비활성이 되어 로그인할 수 없습니다.`;
   $j('hrEmpType').value = e.empType || 'EMP_REGULAR';
-  $j('hrWork').value = e.work || 'ST_SERVING';
+  // 선택지에 없는 값(옛 휴직 자료)이면 재직으로 둔다. 비워 두면 저장할 때 서버가 400으로 거절한다
+  $j('hrWork').value = WORK_CHOICES[e.work] ? e.work : 'ST_SERVING';
   $j('hrGender').value = e.gender || '';
   // 업체 관리자의 자리는 고정이고, 누구도 이것으로 자기 계정을 끌 수 없다
   document.querySelector('#hrWork option[value="ST_RETIRED"]').disabled = !e.canRetire;

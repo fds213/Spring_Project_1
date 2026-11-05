@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Repository;
 
+import com.ieum.gw.code.EmployeeOrgKind;
 import com.ieum.gw.dto.AccountDTO;
 import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.dto.EmployeeAdminRowDTO;
@@ -11,6 +12,7 @@ import com.ieum.gw.dto.EmployeeDTO;
 import com.ieum.gw.dto.EmployeeHeadTargetDTO;
 import com.ieum.gw.dto.EmployeeLoginInfoDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
+import com.ieum.gw.dto.EmployeeOrgItemDTO;
 import com.ieum.gw.dto.IdNameDTO;
 import com.ieum.gw.mapper.EmployeeMapper;
 
@@ -54,6 +56,16 @@ public class EmployeeDAO {
     /** 계정 1행. 성공하면 dto.userAccountId에 새 번호 */
     public int insertAccount(AccountDTO dto) {
         return mapper.insertAccount(dto);
+    }
+    
+    /** 비밀번호 변경: 본인 계정의 지금 비밀번호 해시 (사용 중 계정만, 없으면 null) */
+    public String findPasswordHash(Long companyId, Long userAccountId) {
+        return mapper.findPasswordHash(companyId, userAccountId);
+    }
+
+    /** 비밀번호 바꾸기: 확인한 해시가 그대로일 때만. 바뀐 행 수 */
+    public int updatePassword(Long companyId, Long userAccountId, String oldHash, String newHash) {
+        return mapper.updatePassword(companyId, userAccountId, oldHash, newHash);
     }
 
     /** 계정 이메일 인증 시각. 이미 인증한 계정이면 0 */
@@ -143,5 +155,61 @@ public class EmployeeDAO {
     /** 이 사람이 부서장인 부서의 부서장 칸 비우기 */
     public int clearHeadOf(Long companyId, Long employeeId) {
         return mapper.clearHeadOf(companyId, employeeId);
+    }
+    
+    // ── 부서·직급 관리 (CFG-01) ──
+    /** 부서·직급을 바꾸기 전에 업체 행 잠금 (동시 추가 직렬화) */
+    public Long lockCompanyForOrg(Long companyId) {
+        return mapper.lockCompanyForOrg(companyId);
+    }
+
+    /** 목록 (사용 중인 것만, 순서대로, 인원·요청 수 포함) */
+    public List<EmployeeOrgItemDTO> listOrgItems(Long companyId, EmployeeOrgKind kind) {
+        return mapper.listOrgItems(companyId, kind);
+    }
+
+    /** 쓰기 전에 그 업체의 목록 행을 잠그고 순서대로 */
+    public List<EmployeeOrgItemDTO> lockOrgItems(Long companyId, EmployeeOrgKind kind) {
+        return mapper.lockOrgItems(companyId, kind);
+    }
+
+    /** 예전에 지운 같은 이름의 번호. 없으면 null */
+    public Long findDeletedOrgId(Long companyId, EmployeeOrgKind kind, String name) {
+        return mapper.findDeletedOrgId(companyId, kind, name);
+    }
+
+    /** 새로 추가 */
+    public int insertOrg(Long companyId, EmployeeOrgKind kind, String name, int sortOrder) {
+        return mapper.insertOrg(companyId, kind, name, sortOrder);
+    }
+
+    /** 지운 것을 되살리기 */
+    public int reviveOrg(Long companyId, EmployeeOrgKind kind, Long id, int sortOrder) {
+        return mapper.reviveOrg(companyId, kind, id, sortOrder);
+    }
+
+    /** 이름 바꾸기 */
+    public int renameOrg(Long companyId, EmployeeOrgKind kind, Long id, String name) {
+        return mapper.renameOrg(companyId, kind, id, name);
+    }
+
+    /** 순서 번호 저장 */
+    public int updateOrgSortOrder(Long companyId, EmployeeOrgKind kind, Long id, int sortOrder) {
+        return mapper.updateOrgSortOrder(companyId, kind, id, sortOrder);
+    }
+
+    /** 삭제(사용 안 함). 부서면 가입 활성화·부서장도 비움 */
+    public int deleteOrg(Long companyId, EmployeeOrgKind kind, Long id) {
+        return mapper.deleteOrg(companyId, kind, id);
+    }
+
+    /** 부서 형태 바꾸기 (null = 일반) */
+    public int updateDeptType(Long companyId, Long id, String type) {
+        return mapper.updateDeptType(companyId, id, type);
+    }
+    
+    /** 인사 정보 저장 (고용 형태·재직 상태·성별, 퇴사일) */
+    public int updateHrInfo(Long companyId, Long employeeId, String empType, String work, String gender) {
+        return mapper.updateHrInfo(companyId, employeeId, empType, work, gender);
     }
 }
