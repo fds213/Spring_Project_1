@@ -9,6 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.service.AssetAllocationService;
+
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
@@ -19,6 +20,13 @@ import lombok.Setter;
 public class AssetAdminController {
     private final AssetAllocationService service;
 
+    /** 같은 업체의 관리자용 자산 목록을 JSON으로 반환한다. */
+    @GetMapping
+    public Map<String, Object> list(@AuthenticationPrincipal LoginUser user) {
+    	return Map.of("success", true,
+    				  "data", service.getAssetList(user));
+    }
+    
     @GetMapping("/{id}")
     public Map<String, Object> detail(@AuthenticationPrincipal LoginUser user, @PathVariable Long id) {
         return Map.of("success", true, "data", service.detail(user, id));
