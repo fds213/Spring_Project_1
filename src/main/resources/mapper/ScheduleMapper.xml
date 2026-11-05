@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.schedule.mapper.ScheduleMapper">
+<mapper namespace="com.ieum.gw.mapper.ScheduleMapper">
 
 	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
 	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
 
 	<!-- 기간 안의 일정: 개인 일정은 본인 것만, 전사 일정은 업체 전체. 휴가 일정(EV_LEAVE)은 '내 연차'로 따로 읽는다.
 	     DATE는 Oracle 예약어라 별칭을 따옴표로 감싼다 -->
-	<select id="selectEvents" resultType="com.ieum.gw.schedule.dto.ScheduleDTO">
+	<select id="selectEvents" resultType="com.ieum.gw.dto.ScheduleDTO">
 		SELECT e.calendar_event_id AS id,
 		       CASE e.scope_code WHEN 'SCOPE_PERSONAL' THEN 'PERSONAL'
 		                         WHEN 'SCOPE_COMPANY'  THEN 'COMPANY'
@@ -30,7 +30,7 @@
 
 	<!-- 내 휴가 일정: 휴가 신청 일자(LEAVE_REQUEST_DAY)의 종류로 연차·오전 반차·오후 반차를 나눈다.
 	     FROM·TO도 예약어라 따옴표로 감싼다 -->
-	<select id="selectLeaveEvents" resultType="com.ieum.gw.schedule.dto.ScheduleLeaveDTO">
+	<select id="selectLeaveEvents" resultType="com.ieum.gw.dto.ScheduleLeaveDTO">
 		SELECT TO_CHAR(d.leave_date, 'YYYY-MM-DD') AS "from",
 		       TO_CHAR(d.leave_date, 'YYYY-MM-DD') AS "to",
 		       CASE d.leave_type WHEN 'LV_FULL' THEN 'FULL'
@@ -59,7 +59,7 @@
 	</select>
 
 	<!-- 일정 한 건 (삭제 권한 확인용). 개인 일정은 쓴 본인만 지울 수 있어 구분도 같이 읽는다 -->
-	<select id="selectEvent" resultType="com.ieum.gw.schedule.dto.ScheduleDTO">
+	<select id="selectEvent" resultType="com.ieum.gw.dto.ScheduleDTO">
 		SELECT calendar_event_id AS id,
 		       CASE scope_code WHEN 'SCOPE_PERSONAL' THEN 'PERSONAL'
 		                       WHEN 'SCOPE_COMPANY'  THEN 'COMPANY'

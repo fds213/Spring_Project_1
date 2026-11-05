@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.ticket.mapper.TicketMapper">
+<mapper namespace="com.ieum.gw.mapper.TicketMapper">
     <!-- UQ_44_01만 건너뛴다. 다른 고유 제약·FK·DB 오류는 숨기지 않는다.
          PK는 테이블의 SQ_IT_TICKET 기본값으로 발급한다. 상태는 RECEIVED 기본값을 쓴다. -->
     <insert id="insertEquipmentTicket">
@@ -11,7 +11,7 @@
                 #{branchId}, 'TK_EQUIPMENT', '장비 지급 요청', #{purpose})
     </insert>
 
-    <select id="selectEquipmentTicket" resultType="com.ieum.gw.ticket.dto.EquipmentTicketDTO">
+    <select id="selectEquipmentTicket" resultType="com.ieum.gw.dto.EquipmentTicketDTO">
         SELECT it_ticket_id AS itTicketId, requester_employee_id AS requesterEmployeeId,
                branch_id AS branchId, content
           FROM it_ticket

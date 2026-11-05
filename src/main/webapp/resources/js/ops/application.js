@@ -26,7 +26,6 @@ function buildDetail(o) {
     ['업체명', o.company],
     ['이용 인원', `${o.users}명`],
     ['이메일', o.email],
-    // TODO(ACC-06): 인증 메일을 붙여 인증 전 로그인을 막으면 발송 시각과 '인증 전 로그인 불가'를 함께 보인다
     ['이메일 인증', !o.emailVerified ? '대기' : o.verifiedAt ? `완료 (${whenFull(o.verifiedAt)})` : '완료'],
   ]);
 

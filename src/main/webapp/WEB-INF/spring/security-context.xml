@@ -12,13 +12,16 @@
 
 	<!-- 로그인 검사기: 잠금 → 비밀번호 → 상태 순서 (계정당 5회 실패 시 10분 잠금) -->
 	<bean id="loginAuthenticationProvider"
-		class="com.ieum.gw.common.security.LoginAuthenticationProvider">
+		class="com.ieum.gw.security.LoginAuthenticationProvider">
 		<property name="userDetailsService" ref="customUserDetailsService" />
 		<property name="passwordEncoder" ref="bCryptPasswordEncoder" />
 	</bean>
-	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.common.security.AjaxAwareEntryPoint">
+	<bean id="ajaxAwareEntryPoint" class="com.ieum.gw.security.AjaxAwareEntryPoint">
     <constructor-arg value="/login" />
 </bean>
+	
+	<!-- 로그인했지만 권한이 없을 때(403): AJAX는 JSON, 화면은 /access-denied 안내 -->
+	<bean id="ajaxAwareAccessDeniedHandler" class="com.ieum.gw.security.AjaxAwareAccessDeniedHandler" />
 
 	<!-- 근태 단말기(지문 시뮬레이터) 전용 /api/** 체인 (AGENTS.md URL 규칙). 로그인 세션·CSRF 없이 받고,
 	     X-Device-Key 단말기 키로 업체를 확인하는 일은 근태 Service 가 요청마다 한다(키가 없거나 틀리면 401).
@@ -59,6 +62,7 @@
 		<security:intercept-url pattern="/attendance/admin/**" access="hasAnyRole('HR','ADMIN')" />
 
 		<!-- 4. 그 밖의 관리 화면 (부서·역할 관리 등) -->
+		<security:intercept-url pattern="/employee/admin/api/employees/**" access="hasAnyRole('HR','ADMIN')" />
 		<security:intercept-url pattern="/*/admin/**"        access="hasRole('ADMIN')" />
 
 		<!-- 5. 나머지는 로그인한 사람 (가입 승인·이용 결제는 서버가 요청마다 따로 확인) -->
@@ -74,6 +78,8 @@
 
 		<security:logout logout-url="/logout"
 			logout-success-url="/login?logout" invalidate-session="true" />
+
+		<security:access-denied-handler ref="ajaxAwareAccessDeniedHandler" />
 
 		<security:csrf />
 	</security:http>

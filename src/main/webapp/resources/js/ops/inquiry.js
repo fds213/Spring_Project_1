@@ -1,17 +1,24 @@
 // 이음 운영자: 비회원 접수 (views/ops/inquiry-guest.jsp). 페이지가 열리면 openInquiryView('guest')를 부른다.
-// 소개 사이트 도입 문의(WEB-02)로 들어온 접수를 본다. 회원 접수(장애 문의, OPS-04)는 이번 구현 범위에서 빠졌다.
-// TODO(WEB-03): 답변 발송. 메일 기능이 들어오면 guestDetail에 입력칸과 발송 결과를 붙인다(발송 화면 코드는 0c694fd의 이 파일에 있다).
+// 소개 사이트 도입 문의(WEB-02)로 들어온 접수를 보고 메일로 답변한다(WEB-03). 회원 접수(장애 문의, OPS-04)는 이번 구현 범위에서 빠졌다.
 // 작은 DOM 도구(h, span, small, dlOf, cardOf, inqCell, titleBtn, dataRow, detailTr, emptyTr)는 util.js에 있다.
 // 목록은 한 번에 받고, 카드·검색·기간·"답변 없음"으로 좁히는 것은 화면에서 한다. 메뉴 배지(inquiryGuest)는 common.js 의 /badges 가 채운다.
 // 접수 내용은 바깥 사람이 쓴 글이라 textContent로만 넣는다 (innerHTML을 쓰지 않는다).
 
-// 상태는 공통 코드 INQUIRY_STATUS다. 지금은 답변이 없어 IQ_RECEIVED만 쌓인다
+// 상태는 공통 코드 INQUIRY_STATUS다. 답변 메일이 나가면 IQ_ANSWERED가 된다
 const GUEST_STATE = {
   IQ_RECEIVED: { label: '답변 대기', tone: 'wait' },
   IQ_PROCESSING: { label: '확인 중', tone: 'wait' },
   IQ_ANSWERED: { label: '답변 완료', tone: 'done' },
   IQ_CLOSED: { label: '종료', tone: 'done' },
 };
+// 답변 한 건의 발송 상태는 공통 코드 MAIL_STATUS다. stale은 결과를 남기지 못한 채 멈춘 발송이다(메일이 나갔는지 알 수 없다)
+const REPLY_STATE = {
+  MAIL_PENDING: { label: '발송 중', tone: 'wait' },
+  MAIL_SENT: { label: '발송 성공', tone: 'done' },
+  MAIL_FAILED: { label: '발송 실패', tone: 'failed' },
+};
+const REPLY_STALE = { label: '결과 확인 불가', tone: 'failed' };
+const INQ_ANSWER_MAX = 4000; // 서버(OpsReplyService)와 같은 값
 const INQ_PATH = { guest: '/ops/api/guest-inquiries' };
 
 const setCount = (id, n) => { document.getElementById(id).textContent = `${n}건`; };
@@ -27,6 +34,8 @@ const freshView = () => ({ filter: 'all', open: null, query: '', period: 'all', 
 const inq = { guest: freshView() };
 // 서버에서 받은 목록
 const inqItems = { guest: [] };
+// 적던 답변 (접수번호별). 목록을 다시 그려도 적던 글이 지워지지 않게 둔다
+const inqDrafts = { guest: {} };
 
 // "최근 7일" = 오늘과 그 앞 6일, 0시부터
 function inPeriod(iso, period) {
@@ -81,6 +90,11 @@ function loadInquiries(kind) {
     .fail(xhr => showToast(apiMessage(xhr, '접수 목록을 불러오지 못했습니다')));
 }
 
+// 받은 한 건으로 목록의 같은 건을 바꾼다
+function replaceInquiry(kind, q) {
+  inqItems[kind] = inqItems[kind].map(x => (x.no === q.no ? q : x));
+}
+
 function wireFilters(boxId, kind, render) {
   document.querySelectorAll(`#${boxId} .card-filter`).forEach(b => b.addEventListener('click', () => {
     // 검색어는 그대로 둔다: 카드와 검색은 함께 목록을 좁힌다
@@ -98,13 +112,96 @@ function wireSearch(kind, render) {
 
 const guestNeedsReply = q => q.state === 'IQ_RECEIVED';
 
+// ---------- 답변 발송: 답변은 메일로 나간다 ----------
+const lastReply = q => q.replies[q.replies.length - 1];
+const replyState = r => (r.stale ? REPLY_STALE : REPLY_STATE[r.status]);
+// 지금 보내는 중인 답변이 있나. 멈춘 발송은 치지 않는다
+const replyInFlight = r => !!r && r.status === 'MAIL_PENDING' && !r.stale;
+
+// 한 번에 메일 하나만 보낸다. 보내는 동안 버튼을 막는다. 그래도 겹친 요청은 서버가 409로 거절해 메일은 한 통이다
+let sendingNo = null;
+
+// retryId === null: 새 답변(answerText)을 보낸다. 아니면 그 답변을 같은 발송 기록으로 다시 보낸다
+function deliverGuest(q, retryId, answerText) {
+  if (sendingNo) return;
+  sendingNo = q.no;
+  renderGuest();
+  const path = `${INQ_PATH.guest}/${encodeURIComponent(q.no)}/replies`;
+  const last = lastReply(q);
+  const req = retryId === null
+    ? api.post(path, { body: answerText, lastReplyId: last ? last.id : null }) // 내가 본 마지막 답변. 그사이 다른 답변이 있으면 서버가 거절한다
+    : api.post(`${path}/${encodeURIComponent(retryId)}/resend`);
+  req
+    .done(res => {
+      replaceInquiry('guest', res.inquiry);
+      if (retryId === null) delete inqDrafts.guest[q.no]; // 답변은 저장됐다(실패여도 기록에 남아 다시 보낼 수 있다). 적던 글을 비운다
+      if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges(); // 메뉴의 할 일 수
+      showToast(res.sent ? '답변 메일을 보냈습니다' : `발송 실패: ${res.reason}`);
+    })
+    .fail(xhr => {
+      showToast(apiMessage(xhr, '답변을 보내지 못했습니다'));
+      if (xhr.status === 404 || xhr.status === 409) loadInquiries('guest'); // 다른 운영자가 먼저 답했으면 그 답변을 보여 준다. 적던 글은 그대로 둔다
+    })
+    .always(() => { sendingNo = null; renderGuest(); });
+}
+
+function replyItem(q, r) {
+  const state = replyState(r);
+  const li = h('li', '', h('div', 'reply-meta', span(state.label, `status status-${state.tone}`), span(whenFull(r.at))), h('div', 'reply-text', r.body));
+  if (r.status === 'MAIL_SENT') return li;
+  // 목록을 받을 때 보내는 중이었던 답변이다(이 화면이 보내는 동안에는 응답이 와서 바뀐다). 결과는 새로 받아야 보인다
+  if (replyInFlight(r)) { li.append(h('p', 'inq-hint', '보내는 중입니다. 잠시 뒤 화면을 새로 고치면 결과가 보입니다.')); return li; }
+  li.append(h('p', 'reply-fail', r.stale ? '서버가 발송 결과를 남기지 못했습니다. 이미 받았을 수 있으니 확인한 뒤 다시 보내 주세요.' : `실패 사유: ${r.reason}`));
+  // 가장 최근 답변만 다시 보낼 수 있다. 앞선 실패는 그 뒤에 보낸 답변으로 대신되었다
+  if (r === lastReply(q)) {
+    const retry = h('button', 'btn', sendingNo === q.no ? '보내는 중…' : '다시 보내기');
+    retry.type = 'button';
+    retry.disabled = !!sendingNo;
+    retry.addEventListener('click', () => deliverGuest(q, r.id, null));
+    li.append(retry);
+  }
+  return li;
+}
+
 function guestDetail(q) {
   const left = cardOf('접수 내용',
-    dlOf([['접수번호', q.no], ['접수 시각', whenFull(q.at)], ...(q.company ? [['회사명', q.company]] : []), ['이름', q.name],
-      ['이메일', q.email], ...(q.phone ? [['휴대전화', q.phone]] : []), ['제목', q.title], ['내용', text(q.body)]]));
-  const right = cardOf('답변', h('div', 'inq-body',
-    h('p', 'inq-hint', '답변 메일은 메일 기능을 붙인 뒤에 보낼 수 있습니다. 그동안은 접수 내용의 이메일로 직접 연락해 주세요.')));
-  return h('div', 'inq-grid', left, right);
+    dlOf([['접수번호', q.no], ['접수 시각', whenFull(q.at)], ...(q.company ? [['회사명', q.company]] : []), ['이름', q.name || '-'],
+      ['이메일', q.email], ...(q.phone ? [['휴대전화', q.phone]] : []), ['제목', q.title || '-'], ['내용', text(q.body)]]),
+    h('p', 'inq-body inq-hint', '답변은 위 이메일로 보냅니다. 발송 성공은 메일 서버가 받았다는 뜻이라, 없는 주소면 나중에 반송될 수 있습니다.'));
+
+  const log = q.replies.length
+    ? h('ul', 'reply-log', ...q.replies.map(r => replyItem(q, r)))
+    : h('p', 'inq-hint', '아직 보낸 답변이 없습니다.');
+
+  const hasSent = q.replies.some(r => r.status === 'MAIL_SENT');
+  const busy = !!sendingNo || replyInFlight(lastReply(q));
+  const ta = h('textarea', 'inq-text');
+  ta.maxLength = INQ_ANSWER_MAX;
+  ta.value = inqDrafts.guest[q.no] ?? '';
+  ta.setAttribute('aria-label', hasSent ? '추가 답변' : '답변');
+  ta.placeholder = hasSent ? '추가로 보낼 답변을 입력하세요' : '답변을 입력하세요';
+  ta.disabled = busy;
+  ta.addEventListener('input', () => { inqDrafts.guest[q.no] = ta.value; });
+  const send = h('button', 'btn btn-primary', sendingNo === q.no ? '보내는 중…' : hasSent ? '추가 답변 보내기' : '답변 보내기');
+  send.type = 'button';
+  send.disabled = busy;
+  send.addEventListener('click', () => {
+    const body = ta.value.trim();
+    // 서버도 같은 검사를 다시 한다
+    if (!body) { showToast('답변 내용을 입력하세요'); ta.focus(); return; }
+    deliverGuest(q, null, body);
+  });
+  const compose = h('div', 'inq-body', ta,
+    h('p', 'inq-hint', '이미 나간 메일은 고칠 수 없어서, 정정은 추가 답변으로 보냅니다.'),
+    h('div', 'inq-actions', send));
+  return h('div', 'inq-grid', left, cardOf('답변', h('div', 'inq-body', log), compose));
+}
+
+// 목록의 상태 칸: 마지막 답변이 나가지 못했으면 그것을 먼저 보인다(답변 대기로만 보이면 실패를 놓친다)
+function guestRowState(q) {
+  if (sendingNo === q.no) return REPLY_STATE.MAIL_PENDING;
+  const last = lastReply(q);
+  return last && last.status !== 'MAIL_SENT' ? replyState(last) : GUEST_STATE[q.state];
 }
 
 function renderGuest() {
@@ -121,11 +218,13 @@ function renderGuest() {
   showSearchInfo('guest', shown.length);
   const rows = shown.flatMap(q => {
     const isOpen = inq.guest.open === q.no;
+    const state = guestRowState(q);
     const tr = dataRow(isOpen, () => { inq.guest.open = isOpen ? null : q.no; renderGuest(); },
       inqCell('접수 시각', span(when(q.at))),
-      inqCell('보낸 사람', span(q.company ? `${q.name} · ${q.company}` : q.name), small(q.email)),
-      inqCell('제목', titleBtn(q.title, isOpen), small(q.no)),
-      inqCell('상태', span(GUEST_STATE[q.state].label, `status status-${GUEST_STATE[q.state].tone}`)));
+      // 이름 칸은 11/2 스키마 패치 전에 받은 문의에는 비어 있다(REQUESTER_NAME 은 나중에 더한 칸)
+      inqCell('보낸 사람', span([q.name, q.company].filter(Boolean).join(' · ') || '-'), small(q.email)),
+      inqCell('제목', titleBtn(q.title || '(제목 없음)', isOpen), small(q.no)),
+      inqCell('상태', span(state.label, `status status-${state.tone}`)));
     return isOpen ? [tr, detailTr(4, guestDetail(q))] : [tr];
   });
   document.getElementById('guestList').replaceChildren(...(rows.length ? rows : [emptyTr(4, narrowed('guest') ? '조건에 맞는 접수가 없습니다' : '해당하는 접수가 없습니다')]));

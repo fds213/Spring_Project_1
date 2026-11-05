@@ -337,8 +337,9 @@ function confirmToss() {
       renderBilling();
     })
     .fail(xhr => {
-      // 보안 토큰이 바뀌었다(CSRF 403). 같은 토큰으로는 계속 거절되니 새로 고치게 한다. 주소에 값이 남아 있어 다시 확인된다
-      if (!xhr.responseJSON && xhr.status === 403) {
+      // 보안 토큰이 바뀌었다(CSRF 403). 같은 토큰으로는 계속 거절되니 새로 고치게 한다. 주소에 값이 남아 있어 다시 확인된다.
+      // Security 403 처리(#156)가 있으면 CSRF 403도 JSON으로 오고 expired: true 로 알려 준다. 없으면 JSON이 아닌 403이다
+      if (xhr.status === 403 && (!xhr.responseJSON || xhr.responseJSON.expired)) {
         text.textContent = '화면이 오래되어 확인하지 못했습니다. 이 화면을 새로 고쳐 주세요';
         return;
       }

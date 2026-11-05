@@ -1,22 +1,26 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.approval.mapper.ApprovalMapper">
+<mapper namespace="com.ieum.gw.mapper.ApprovalMapper">
 
 
     <select id="sumPendingLeaveDays" resultType="java.math.BigDecimal">
+        <bind name="docLeave" value="@com.ieum.gw.code.ApprovalDocumentType@DOC_LEAVE.name()"/>
+        <bind name="docInProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
         SELECT NVL(SUM(d.deduct_days), 0)
         FROM approval_document ad
                  JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
         WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
-          AND ad.document_type = 'DOC_LEAVE' AND ad.status_code = 'IN_PROGRESS'
+          AND ad.document_type = #{docLeave} AND ad.status_code = #{docInProgress}
     </select>
 
-    <select id="selectPendingLeaveDays" resultType="com.ieum.gw.attendance.dto.LeaveDayDTO">
+    <select id="selectPendingLeaveDays" resultType="com.ieum.gw.dto.LeaveDayDTO">
+        <bind name="docLeave" value="@com.ieum.gw.code.ApprovalDocumentType@DOC_LEAVE.name()"/>
+        <bind name="docInProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
         SELECT d.leave_date, d.leave_type, d.deduct_days
         FROM approval_document ad
                  JOIN leave_request_day d ON d.approval_document_id = ad.approval_document_id AND d.company_id = ad.company_id
         WHERE ad.company_id = #{companyId} AND ad.author_employee_id = #{employeeId}
-          AND ad.document_type = 'DOC_LEAVE' AND ad.status_code = 'IN_PROGRESS'
+          AND ad.document_type = #{docLeave} AND ad.status_code = #{docInProgress}
           AND d.leave_date &gt;= TO_DATE(#{fromDate}, 'YYYY-MM-DD')
           AND d.leave_date &lt;= TO_DATE(#{toDate}, 'YYYY-MM-DD')
     </select>
@@ -24,7 +28,7 @@
     <!-- ===== 상신 저장: 문서 → 결재선 → 이력 → 휴가 상세 → 휴가 날짜 (한 트랜잭션) ===== -->
 
     <!-- 문서. 새 번호를 먼저 받아 DTO의 approvalDocumentId에 채운다(뒤 저장들이 이 번호를 쓴다) -->
-    <insert id="insertDocument" parameterType="com.ieum.gw.approval.dto.ApprovalDocumentDTO">
+    <insert id="insertDocument" parameterType="com.ieum.gw.dto.ApprovalDocumentDTO">
         <selectKey keyProperty="approvalDocumentId" resultType="long" order="BEFORE">
             SELECT sq_approval_document.NEXTVAL FROM dual
         </selectKey>
@@ -35,13 +39,13 @@
     </insert>
 
     <!-- 결재선 한 단계. 번호는 DB 기본값(sq_approval_step), 상태는 기본값 WAITING -->
-    <insert id="insertStep" parameterType="com.ieum.gw.approval.dto.ApprovalStepDTO">
+    <insert id="insertStep" parameterType="com.ieum.gw.dto.ApprovalStepDTO">
         INSERT INTO approval_step (company_id, approval_document_id, step_no, approver_employee_id)
         VALUES (#{companyId}, #{approvalDocumentId}, #{stepNo}, #{approverEmployeeId})
     </insert>
 
     <!-- 처리 이력 한 줄. 이전 상태·의견은 비어 있을 수 있다 -->
-    <insert id="insertHistory" parameterType="com.ieum.gw.approval.dto.ApprovalHistoryDTO">
+    <insert id="insertHistory" parameterType="com.ieum.gw.dto.ApprovalHistoryDTO">
         INSERT INTO approval_history (company_id, approval_document_id, actor_account_id, action_code,
                                       before_status, after_status, opinion)
         VALUES (#{companyId}, #{approvalDocumentId}, #{actorAccountId}, #{actionCode},
@@ -49,7 +53,7 @@
     </insert>
 
     <!-- 휴가 상세. PK는 문서 번호 -->
-    <insert id="insertLeaveRequest" parameterType="com.ieum.gw.approval.dto.ApprovalLeaveDTO">
+    <insert id="insertLeaveRequest" parameterType="com.ieum.gw.dto.ApprovalLeaveDTO">
         INSERT INTO leave_request (approval_document_id, company_id, reason, requested_days)
         VALUES (#{approvalDocumentId}, #{companyId}, #{reason}, #{requestedDays})
     </insert>
@@ -61,7 +65,7 @@
     </insert>
 
     <!-- 장비 신청 상세. PK는 문서 번호. 지점은 (업체, 지점) 복합 FK라 다른 업체 지점은 DB도 막는다 -->
-    <insert id="insertEquipmentRequest" parameterType="com.ieum.gw.approval.dto.ApprovalEquipmentDTO">
+    <insert id="insertEquipmentRequest" parameterType="com.ieum.gw.dto.ApprovalEquipmentDTO">
         INSERT INTO equipment_request (approval_document_id, company_id, branch_id, asset_type, quantity, purpose)
         VALUES (#{approvalDocumentId}, #{companyId}, #{branchId}, #{assetType}, #{quantity}, #{purpose})
     </insert>
@@ -69,12 +73,14 @@
     <!-- ===== 다른 모듈에 주는 조회 ===== -->
 
     <!-- 결재 완료된 장비 신청의 지급 정보. 결재 중·반려 문서와 다른 업체 문서는 나오지 않는다 -->
-    <select id="selectApprovedEquipment" resultType="com.ieum.gw.approval.dto.ApprovedEquipmentDTO">
+    <select id="selectApprovedEquipment" resultType="com.ieum.gw.dto.ApprovedEquipmentDTO">
+        <bind name="docEquipment" value="@com.ieum.gw.code.ApprovalDocumentType@DOC_EQUIPMENT.name()"/>
+        <bind name="docApproved" value="@com.ieum.gw.code.ApprovalDocumentStatus@APPROVED.name()"/>
         SELECT er.asset_type, er.quantity, er.purpose
         FROM equipment_request er
                  JOIN approval_document ad ON ad.approval_document_id = er.approval_document_id AND ad.company_id = er.company_id
         WHERE er.company_id = #{companyId} AND er.approval_document_id = #{approvalDocumentId}
-          AND ad.document_type = 'DOC_EQUIPMENT' AND ad.status_code = 'APPROVED'
+          AND ad.document_type = #{docEquipment} AND ad.status_code = #{docApproved}
     </select>
 
     <!-- ===== 결재함 조회 ===== -->
@@ -82,29 +88,34 @@
     <!-- 결재함에 보이는 문서 (임시저장 제외): 내가 기안했거나, 내가 이미 처리(승인·반려)했거나, 지금 내 순번인 문서.
          내 순번이 아직 안 온 2차 결재자에게는 보이지 않는다. 서브쿼리 별칭은 rs -->
     <sql id="boxRelated">
-        ad.company_id = #{companyId} AND ad.status_code != 'DRAFT'
+        <bind name="docDraft" value="@com.ieum.gw.code.ApprovalDocumentStatus@DRAFT.name()"/>
+        <bind name="stepWaiting" value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+        ad.company_id = #{companyId} AND ad.status_code != #{docDraft}
         AND (ad.author_employee_id = #{employeeId}
              OR EXISTS (SELECT 1 FROM approval_step rs
                         WHERE rs.company_id = ad.company_id AND rs.approval_document_id = ad.approval_document_id
-                          AND rs.approver_employee_id = #{employeeId} AND rs.status_code != 'WAITING')
+                          AND rs.approver_employee_id = #{employeeId} AND rs.status_code != #{stepWaiting})
              OR (<include refid="boxMyTurn"/>))
     </sql>
 
     <!-- 내 순번: 문서 진행 중, 내 단계 WAITING, 내 앞 단계가 모두 APPROVED -->
     <sql id="boxMyTurn">
-        ad.status_code = 'IN_PROGRESS'
+        <bind name="docInProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+        <bind name="stepWaiting" value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+        <bind name="stepApproved" value="@com.ieum.gw.code.ApprovalStepStatus@APPROVED.name()"/>
+        ad.status_code = #{docInProgress}
         AND EXISTS (SELECT 1 FROM approval_step ms
                     WHERE ms.company_id = ad.company_id AND ms.approval_document_id = ad.approval_document_id
-                      AND ms.approver_employee_id = #{employeeId} AND ms.status_code = 'WAITING'
+                      AND ms.approver_employee_id = #{employeeId} AND ms.status_code = #{stepWaiting}
                       AND NOT EXISTS (SELECT 1 FROM approval_step ps
                                       WHERE ps.company_id = ms.company_id AND ps.approval_document_id = ms.approval_document_id
-                                        AND ps.step_no &lt; ms.step_no AND ps.status_code != 'APPROVED'))
+                                        AND ps.step_no &lt; ms.step_no AND ps.status_code != #{stepApproved}))
     </sql>
 
     <!-- fields: 컬럼 앞에 f_ 를 붙여 ApprovalFieldsDTO에 담는다 -->
-    <resultMap id="boxDocumentMap" type="com.ieum.gw.approval.dto.ApprovalBoxDTO" autoMapping="true">
+    <resultMap id="boxDocumentMap" type="com.ieum.gw.dto.ApprovalBoxDTO" autoMapping="true">
         <id property="approvalDocumentId" column="approval_document_id"/>
-        <association property="fields" javaType="com.ieum.gw.approval.dto.ApprovalFieldsDTO" columnPrefix="f_" autoMapping="true"/>
+        <association property="fields" javaType="com.ieum.gw.dto.ApprovalFieldsDTO" columnPrefix="f_" autoMapping="true"/>
     </resultMap>
 
     <select id="selectBoxDocuments" resultMap="boxDocumentMap">
@@ -130,7 +141,7 @@
         ORDER BY ad.submitted_at DESC, ad.approval_document_id DESC
     </select>
 
-    <select id="selectBoxSteps" resultType="com.ieum.gw.approval.dto.ApprovalBoxStepDTO">
+    <select id="selectBoxSteps" resultType="com.ieum.gw.dto.ApprovalBoxStepDTO">
         SELECT s.approval_document_id, s.approver_employee_id, e.employee_name, s.status_code
         FROM approval_step s
                  JOIN approval_document ad ON ad.company_id = s.company_id AND ad.approval_document_id = s.approval_document_id
@@ -140,7 +151,7 @@
     </select>
 
     <!-- 처리한 사람은 계정 ID로 저장돼 있어 계정 → 사원 순으로 이름을 찾는다 -->
-    <select id="selectBoxHistory" resultType="com.ieum.gw.approval.dto.ApprovalBoxHistoryDTO">
+    <select id="selectBoxHistory" resultType="com.ieum.gw.dto.ApprovalBoxHistoryDTO">
         SELECT h.approval_document_id, TO_CHAR(h.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
                e.employee_name, h.action_code, h.opinion
         FROM approval_history h
@@ -155,6 +166,128 @@
         SELECT COUNT(*)
         FROM approval_document ad
         WHERE ad.company_id = #{companyId} AND <include refid="boxMyTurn"/>
+    </select>
+
+    <select id="lockDocument" resultType="com.ieum.gw.dto.ApprovalDocumentDTO">
+        SELECT * FROM approval_document
+        WHERE company_id = #{companyId} AND approval_document_id = #{documentId}
+        FOR UPDATE OF approval_document_id WAIT 5
+    </select>
+
+    <select id="selectDocumentSteps" resultType="com.ieum.gw.dto.ApprovalStepDTO">
+        SELECT * FROM approval_step
+        WHERE company_id = #{companyId} AND approval_document_id = #{documentId} ORDER BY step_no ASC
+    </select>
+    
+    <update id="approveStep">
+        <bind name="approved" value="@com.ieum.gw.code.ApprovalStepStatus@APPROVED.name()"/>
+        <bind name="waiting" value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+
+        UPDATE approval_step
+        SET
+        status_code = #{approved},
+        opinion = #{opinion,jdbcType=VARCHAR},
+        processed_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+        updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND approver_employee_id = #{employeeId}
+        AND step_no = #{stepNo}
+        AND status_code = #{waiting}
+    </update>
+
+    <update id="approveDocument">
+        <bind name="approved" value="@com.ieum.gw.code.ApprovalDocumentStatus@APPROVED.name()"/>
+        <bind name="inProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+
+        UPDATE approval_document
+        SET
+            status_code = #{approved},
+            finished_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND status_code = #{inProgress}
+
+    </update>
+
+
+    <update id="rejectStep">
+        <bind name="rejected" value="@com.ieum.gw.code.ApprovalStepStatus@REJECTED.name()"/>
+        <bind name="waiting" value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+
+        UPDATE approval_step
+        SET
+        status_code = #{rejected},
+        opinion = #{opinion,jdbcType=VARCHAR},
+        processed_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+        updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND approver_employee_id = #{employeeId}
+        AND step_no = #{stepNo}
+        AND status_code = #{waiting}
+    </update>
+
+    <update id="rejectDocument">
+        <bind name="rejected" value="@com.ieum.gw.code.ApprovalDocumentStatus@REJECTED.name()"/>
+        <bind name="inProgress" value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+
+        UPDATE approval_document
+        SET
+            status_code = #{rejected},
+            finished_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+        AND approval_document_id = #{documentId}
+        AND status_code = #{inProgress}
+
+    </update>
+
+    <select id="selectLeaveDays" resultType="com.ieum.gw.dto.LeaveDayDTO">
+        SELECT leave_request_day_id, leave_date, leave_type, deduct_days
+        FROM leave_request_day
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{documentId}
+        ORDER BY leave_date ASC
+    </select>
+
+    <select id="selectEquipmentRequest" resultType="com.ieum.gw.dto.ApprovalEquipmentDTO">
+        SELECT approval_document_id, company_id, branch_id, asset_type, quantity, purpose
+        FROM equipment_request
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{documentId}
+    </select>
+
+    <select id="selectWaitingDocumentIds" resultType="java.lang.Long">
+        <bind name="inProgress"
+              value="@com.ieum.gw.code.ApprovalDocumentStatus@IN_PROGRESS.name()"/>
+        <bind name="waiting"
+              value="@com.ieum.gw.code.ApprovalStepStatus@WAITING.name()"/>
+        <bind name="approved"
+              value="@com.ieum.gw.code.ApprovalStepStatus@APPROVED.name()"/>
+
+        SELECT ad.approval_document_id
+        FROM approval_document ad
+        WHERE ad.company_id = #{companyId}
+        AND ad.status_code = #{inProgress}
+        AND EXISTS (
+        SELECT 1
+        FROM approval_step ms
+        WHERE ms.company_id = ad.company_id
+        AND ms.approval_document_id = ad.approval_document_id
+        AND ms.approver_employee_id = #{employeeId}
+        AND ms.status_code = #{waiting}
+        AND NOT EXISTS (
+        SELECT 1
+        FROM approval_step ps
+        WHERE ps.company_id = ms.company_id
+        AND ps.approval_document_id = ms.approval_document_id
+        AND ps.step_no &lt; ms.step_no
+        AND ps.status_code != #{approved}
+        )
+        )
+        ORDER BY ad.approval_document_id ASC
     </select>
 
 </mapper>

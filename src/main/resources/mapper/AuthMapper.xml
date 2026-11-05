@@ -1,12 +1,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.common.mapper.AuthMapper">
+<mapper namespace="com.ieum.gw.mapper.AuthMapper">
 
 	<!-- 서울 시각 (테이블 기본값과 같은 기준) -->
 	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
 
 	<!-- 업체 코드 + 사번으로 로그인 계정 1건 -->
-	<select id="getInfo" resultType="com.ieum.gw.common.dto.AuthEmpDTO">
+	<select id="getInfo" resultType="com.ieum.gw.dto.AuthEmpDTO">
 		SELECT a.user_account_id, a.company_id, a.employee_id,
 		       c.company_code   AS compcode,
 		       e.employee_no    AS empnum,
@@ -14,7 +14,8 @@
 		       a.password_hash  AS pw,
 		       a.role_code      AS role,
 		       a.status_code    AS status,
-		       CASE WHEN a.locked_until > <include refid="now"/> THEN 1 ELSE 0 END AS locked
+		       CASE WHEN a.locked_until > <include refid="now"/> THEN 1 ELSE 0 END AS locked,
+		       CASE WHEN c.email_verified_at IS NULL THEN 0 ELSE 1 END AS email_verified
 		FROM user_account a
 		JOIN company  c ON c.company_id  = a.company_id
 		JOIN employee e ON e.employee_id = a.employee_id

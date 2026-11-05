@@ -4,8 +4,9 @@
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성뿐이다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
-// 승인 뒤 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(ieum-joined-id, 한 번 읽고 지움).
+// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성과 비밀번호 찾기다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
+// 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(승인 뒤 ieum-joined-id, 비밀번호를 바꾼 뒤 ieum-pw-reset-id,
+// 둘 다 login.jsp 가 한 번 읽고 지움).
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
 // 서버는 공통 코드 테이블에서 읽는다.
@@ -19,10 +20,13 @@ const deptTypeLabel = type => DEPT_TYPE[type] || '일반';
 // 고용 형태 (EMP_TYPE), 성별 (GENDER): 사원 관리 > 인사 정보에서 정한다. 성별은 넣지 않아도 된다
 const EMP_TYPE = { EMP_REGULAR: '정규직', EMP_CONTRACT: '계약직', EMP_DISPATCH: '파견직', EMP_INTERN: '인턴' };
 const GENDER = { GD_MALE: '남성', GD_FEMALE: '여성', GD_OTHER: '기타' };
-// 상태 (STATUS): 휴직 중에도 계정은 쓸 수 있어야 해서 두 칸에 나눠 담는다.
+// 상태 (STATUS): 계정 상태와 재직 상태를 두 칸에 나눠 담는다.
 //   계정 상태 status (ACCOUNT_STATUS): ACTIVE 사용 중 / RETIRED 비활성 / REQUESTED 승인 대기 / ST_SUSPENDED 운영 차단 (계정은 지우지 않고 비활성화만 한다)
-//   재직 상태 work:   ST_SERVING 재직 / ST_LEAVE 휴직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
+//   재직 상태 work:   ST_SERVING 재직 / ST_RETIRED 퇴사 (퇴사로 바꾸면 계정도 비활성이 된다)
+//   휴직(ST_LEAVE)은 이번 범위에서 쓰지 않는다: 공통 코드가 N이고, 재직이 아니면 계정 상태 검사(#131)가 로그인을 끊어 서버가 400으로 거절한다.
+//   목록 표시용 이름표에는 남겨 옛 자료가 코드 그대로 보이지 않게 하고, 인사 정보 창의 선택지(WORK_CHOICES)에서만 뺀다.
 const WORK_STATUS = { ST_SERVING: '재직', ST_LEAVE: '휴직', ST_RETIRED: '퇴사' };
+const WORK_CHOICES = { ST_SERVING: '재직', ST_RETIRED: '퇴사' };
 const EMP_STATUS = { REQUESTED: '승인 대기', ACTIVE: '사용 중', RETIRED: '비활성', ST_SUSPENDED: '운영 차단' };
 // 꺼진 계정: 비활성·운영 차단 (로그인 불가)
 const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
@@ -30,9 +34,11 @@ const offStatus = s => s === 'RETIRED' || s === 'ST_SUSPENDED';
 // ---------- 화면 도구 ----------
 const $j = id => document.getElementById(id);
 const pathPart = encodeURIComponent; // 주소에 넣는 값
+// 값이 있는 것만 ' · '로 잇는다 (체험 신청으로 만든 업체 관리자는 부서·직급이 없다)
+const dotJoin = (...parts) => parts.filter(Boolean).join(' · ');
 // 화면이 지금 보이는지 (view 섹션에 class on이 있고, hidden 요소 안에 있지 않다)
 const viewShown = id => { const v = $j(id); return !!v && v.classList.contains('on') && !v.closest('[hidden]'); };
-// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 403으로 한다)
+// 읽기 전용 업체인지 (버튼을 흐리게 하는 데만 쓴다. 막는 것은 서버가 409로 한다: 공통 검사 ReadOnlyInterceptor)
 const readOnlyUi = () => document.body.classList.contains('is-readonly');
 const hhmm = iso => { const d = new Date(iso); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const minsUntil = iso => Math.max(1, Math.ceil((new Date(iso).getTime() - Date.now()) / 60000));
@@ -134,7 +140,7 @@ function drawEmployees(d) {
     tr.classList.toggle('is-inactive', offStatus(e.status));
     tr.append(
       cellOf('이름', whoCell(e)),
-      cellOf('부서·직급', `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''} · ${e.rank}`),
+      cellOf('부서·직급', dotJoin(e.dept && `${e.dept}${e.deptType ? ` (${DEPT_TYPE[e.deptType]})` : ''}${e.head ? ' · 부서장' : ''}`, e.rank) || '-'),
       cellOf('계정 형태', ROLE_CODE[e.role] || '-'),
       cellOf('인사 정보', hrInfoText(e)),
       cellOf('상태', statusChip(e)),
@@ -210,7 +216,7 @@ document.querySelectorAll('#empStateDialog button').forEach(b => b.addEventListe
       showToast(`${r.name} 계정을 다시 사용합니다`);
       return;
     }
-    showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : ''));
+    showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 문서 ${r.released}건은 자동 반려했습니다` : ''));
   });
 }));
 
@@ -229,7 +235,7 @@ function openHrInfo(e) {
       + Object.entries(map).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
     dialog.innerHTML = '<h2></h2><p class="muted"></p><div class="hr-info-fields">'
       + `<label class="field"><span>고용 형태</span><select class="input" id="hrEmpType">${options(EMP_TYPE)}</select></label>`
-      + `<label class="field"><span>재직 상태</span><select class="input" id="hrWork">${options(WORK_STATUS)}</select></label>`
+      + `<label class="field"><span>재직 상태</span><select class="input" id="hrWork">${options(WORK_CHOICES)}</select></label>`
       + `<label class="field"><span>성별 <span class="muted">(선택)</span></span><select class="input" id="hrGender">${options(GENDER, '입력 안 함')}</select></label>`
       + '</div><p class="form-error" id="hrInfoError" role="alert"></p>'
       + '<div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="button" class="btn btn-primary" value="ok" data-write>저장</button></div>';
@@ -241,9 +247,10 @@ function openHrInfo(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님 인사 정보`;
-  dialog.querySelector('p').textContent = `사번 ${e.empNo} · ${e.dept} · ${e.rank}. 퇴사로 바꾸면 계정도 비활성이 되어 로그인할 수 없습니다.`;
+  dialog.querySelector('p').textContent = `${dotJoin(`사번 ${e.empNo}`, e.dept, e.rank)}. 퇴사로 바꾸면 계정도 비활성이 되어 로그인할 수 없습니다.`;
   $j('hrEmpType').value = e.empType || 'EMP_REGULAR';
-  $j('hrWork').value = e.work || 'ST_SERVING';
+  // 선택지에 없는 값(옛 휴직 자료)이면 재직으로 둔다. 비워 두면 저장할 때 서버가 400으로 거절한다
+  $j('hrWork').value = WORK_CHOICES[e.work] ? e.work : 'ST_SERVING';
   $j('hrGender').value = e.gender || '';
   // 업체 관리자의 자리는 고정이고, 누구도 이것으로 자기 계정을 끌 수 없다
   document.querySelector('#hrWork option[value="ST_RETIRED"]').disabled = !e.canRetire;
@@ -266,7 +273,7 @@ function saveHrInfo(btn) {
     .done(r => {
       dialog.close();
       hrInfoTarget = null;
-      const note = r.turnedOff ? ' 계정도 비활성으로 바꿨습니다' + (r.released ? ` · 결재할 차례였던 휴가 ${r.released}건은 자동 반려했습니다` : '') : '';
+      const note = r.turnedOff ? ' 계정도 비활성으로 바꿨습니다' + (r.released ? ` · 결재할 차례였던 문서 ${r.released}건은 자동 반려했습니다` : '') : '';
       showToast(`${r.name}님 인사 정보를 저장했습니다.${note}`);
       rerenderStaffViews();
     })
@@ -483,7 +490,7 @@ function drawJoin(d) {
     );
     tr.append(
       cellOf('이름', e.name),
-      cellOf('부서·직급', `${e.dept} · ${e.rank}`),
+      cellOf('부서·직급', dotJoin(e.dept, e.rank) || '-'),
       cellOf('이메일', e.email),
       cellOf('요청 시각', whenAt(e.requestAt)),
       cellOf('처리', actions),
@@ -522,7 +529,7 @@ function openApprove(e) {
     document.body.append(dialog);
   }
   dialog.querySelector('h2').textContent = `${e.name}님의 가입을 승인할까요?`;
-  dialog.querySelector('p').textContent = `${e.dept} · ${e.rank} · ${e.email}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
+  dialog.querySelector('p').textContent = `${dotJoin(e.dept, e.rank, e.email)}. 승인하면 사번 ${d.nextEmpNo}이 붙고 바로 계정이 만들어집니다. 직원은 요청할 때 정한 비밀번호로 로그인합니다.`;
   if (!dialog.open) dialog.showModal();
 }
 
@@ -583,7 +590,6 @@ document.addEventListener('visibilitychange', tickJoin);
 // 한 양식, 세 상태: 요청(가입이 열린 동안 업체 확인, 입력, 비밀번호, 승인 요청) → 대기("승인 요청을 하였습니다") →
 // 승인(계정이 만들어짐: 사번과 로그인으로 가는 버튼). 이번 범위(단순화 ①)는 직원 이메일 인증 코드 없이 요청한다.
 // 이 기기는 자기 요청을 기억한다(MY_JOIN_KEY).
-const loginForm = $j('loginForm');
 const joinForm = $j('joinForm');
 const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinPw', 'joinPw2'];
 let checkedCompany = ''; // 확인으로 맞춘 업체 코드 ('' = 아직)
@@ -847,7 +853,7 @@ joinForm?.addEventListener('submit', ev => {
 joinForm?.addEventListener('input', () => { if (joinNotice && !loadMyJoin()) { joinNotice = ''; setJoinStatus('', ''); } });
 if (joinForm) setInterval(() => { if (!document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
 
-// ---------- 로그인 화면: 비밀번호 찾기 ----------
+// ---------- 비밀번호 찾기 화면 (/join/password, common/join-password.jsp) ----------
 // 업체 코드 + 사번 → 계정을 만들 때의 이메일로 6자리 코드 → 맞으면 새 비밀번호(8자 이상, 두 번)로 바꾼다. 지금 비밀번호는 보여 주지 않는다
 // (서버는 BCrypt 해시만 둔다). 운영자(ieum0000)는 대상이 아니다.
 // 계정이 있든 없든 화면은 똑같이 답한다(ACC-07): 코드는 쓰는 계정에만 가고, 그 밖에는 맞는 코드가 없다.
@@ -878,19 +884,11 @@ function syncPwReset() {
   $j('btnPwReset').disabled = !(pwVerified && pw.length >= 8 && pw === $j('pwNew2').value);
 }
 
-function showPwFind(open) {
-  loginForm.hidden = open;
-  joinForm.hidden = true;
-  pwForm.hidden = !open;
-  if (open) {
-    resetPwForm();
-    $j('pwCompany').value = $j('loginCompany').value;
-    $j('pwId').value = $j('loginId').value;
-    ($j('pwCompany').value ? $j('pwId') : $j('pwCompany')).focus();
-  }
+// 화면을 열면 로그인 화면에서 마지막에 쓴 업체 코드를 채워 둔다(login.jsp 의 ieum-last-company)
+if (pwForm) {
+  try { $j('pwCompany').value = localStorage.getItem('ieum-last-company') || ''; } catch { /* 저장소가 막혔다 */ }
+  ($j('pwCompany').value ? $j('pwId') : $j('pwCompany')).focus();
 }
-$j('btnPwFind')?.addEventListener('click', () => showPwFind(true));
-$j('btnPwBack')?.addEventListener('click', () => showPwFind(false));
 
 $j('btnPwSend')?.addEventListener('click', () => {
   const company = $j('pwCompany').value.trim().toLowerCase();
@@ -954,15 +952,14 @@ pwForm?.addEventListener('submit', ev => {
   error.textContent = pw.length < 8 ? '비밀번호는 8자 이상으로 정해 주세요' : pw !== $j('pwNew2').value ? '비밀번호 확인이 맞지 않습니다' : '';
   if (error.textContent || !pwVerified || !resetToken) return;
   whileSending($j('btnPwReset'), api.post('/join/api/password/reset', { resetToken, password: pw }))
+    // 로그인 화면으로 가서 업체 코드와 사번을 채우고 안내한다. 계정 생성처럼 주소에 사번을 싣지 않고 브라우저 저장소로 넘긴다.
+    // 비밀번호는 넘기지 않는다
     .done(r => {
-      ['pwCompany', 'pwId'].forEach(x => { $j(x).disabled = false; });
-      showPwFind(false);
-      $j('loginCompany').value = r.companyCode;
-      $j('loginId').value = r.empNo;
-      $j('loginPw').value = '';
-      $j('loginError').textContent = '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
-      $j('loginError').classList.add('is-ok');
-      $j('loginPw').focus();
+      try {
+        localStorage.setItem('ieum-last-company', r.companyCode);
+        sessionStorage.setItem('ieum-pw-reset-id', r.empNo);
+      } catch { /* 저장소가 막혔다: 로그인 화면에서 직접 넣는다 */ }
+      location.href = pageHref('/login');
     })
     .fail(xhr => {
       const msg = apiMessage(xhr);

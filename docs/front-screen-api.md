@@ -1,6 +1,6 @@
 # 프론트 화면 정리
 
-dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했다. 범위는 요구분석서 3장 '이번 구현 범위'(11/13 마감)를 따른다.
+dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했다. 범위는 요구분석서 3장 '이번 구현 범위'(11/12 마감)를 따른다.
 화면 JS는 시안(feature/front-prototype, 이제 화면 참고용)에서 가져와 dev2에 맞게 고쳤다.
 
 > API(주소·요청·응답)는 모듈 담당이 Controller → Service → DAO → Mapper 한 세트로 정한다. 프론트는 그 코드에 맞춰 화면 JS를 고친다.
@@ -42,6 +42,7 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/employee/join` | `employee/join` |
 | `/employee/admin/dept` | `employee/admin/dept` |
 | `/employee/admin/rank` | `employee/admin/rank` |
+| `/employee/org` | `employee/org` (조직도. 업체 직원 모두) |
 | `/subscription/billing` | `subscription/billing` |
 | `/board/notice`, `/board/notice/view/{id}`, `/board/notice/write`, `/board/notice/edit/{id}` | `board/notice` (네 주소 모두 같은 JSP) |
 | `/board/dept`, `/board/dept/view/{id}`, `/board/dept/write`, `/board/dept/edit/{id}` | `board/dept` (네 주소 모두 같은 JSP) |
@@ -62,6 +63,6 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | 보내는 값 | GET은 쿼리 문자열, POST는 JSON 본문 (`Content-Type: application/json`) |
 | 받는 값 (성공) | 팀 공통 모양 `{ "success": true, "message": "...", "data": ... }` → `api`가 `data`만 화면에 넘긴다. 감싸지 않은 데이터 JSON도 그대로 된다 |
 | 실패 | HTTP 상태 코드 + `{ "message": "안내 문구" }` (또는 `{ "success": false, "message": ... }`). 화면은 `message`를 그대로 보여 준다. 200 + `success: false`도 실패로 처리한다 |
-| 상태 코드 | 400 잘못된 값, 401 로그인 필요(로그인 화면으로 이동), 403 권한 없음·읽기 전용, 404 없음(볼 수 없는 것 포함), 409 충돌, 410 시간 지남, 429 너무 잦음 |
+| 상태 코드 | 400 잘못된 값, 401 로그인 필요(로그인 화면으로 이동), 403 권한 없음, 404 없음(볼 수 없는 것 포함), 409 충돌·읽기 전용(만료 업체의 쓰기), 410 시간 지남, 429 너무 잦음 |
 | CSRF | POST에 `common.js`가 토큰 헤더를 붙인다 (`layout.tag`의 `_csrf` meta) |
 | 날짜 | ISO 문자열 (`2026-10-30T09:20:00`) |

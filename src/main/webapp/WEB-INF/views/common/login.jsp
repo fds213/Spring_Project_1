@@ -80,6 +80,10 @@
         <c:if test="${param.logout ne null}">
           <p class="login-help" role="status">로그아웃했습니다</p>
         </c:if>
+        <%-- 비밀번호를 맞힌 세션의 업체에만 간다(TrialVerifyController). 다른 업체를 고르는 값은 보내지 않는다 --%>
+        <c:if test="${param.unverified ne null}">
+          <button class="btn btn-block" type="button" id="btnResendVerify">인증 메일 다시 보내기</button>
+        </c:if>
         <button class="btn btn-primary btn-block" type="submit" id="btnLogin">로그인</button>
         <%-- 직원 계정 생성과 이메일 인증 비밀번호 찾기. 둘 다 로그인 없이 여는 /join/** 아래에 둔다 --%>
         <p class="login-help"><a class="link-btn" href="${ctx}/join">계정 생성</a> / <a class="link-btn" href="${ctx}/join/password">비밀번호 찾기</a></p>
@@ -98,13 +102,18 @@
       var button = document.getElementById('btnLogin');
       var sending = false;
       try { if (!company.value) company.value = localStorage.getItem('ieum-last-company') || ''; } catch (e) { /* 저장소 막힘 */ }
-      // 계정 생성(/join)에서 승인된 뒤 넘어오면 사번을 채우고 안내한다(employee.js 가 넘긴 값, 한 번만 쓴다)
+      // 계정 생성(/join)에서 승인된 뒤, 비밀번호 찾기(/join/password)에서 새 비밀번호를 저장한 뒤 넘어오면
+      // 사번을 채우고 안내한다(employee.js 가 넘긴 값, 한 번만 쓴다)
       try {
         var joined = sessionStorage.getItem('ieum-joined-id');
-        if (joined) {
-          sessionStorage.removeItem('ieum-joined-id');
-          document.getElementById('loginId').value = joined;
-          error.textContent = '계정이 만들어졌습니다. 사번 ' + joined + '와 요청할 때 정한 비밀번호로 로그인하세요.';
+        var reset = sessionStorage.getItem('ieum-pw-reset-id');
+        sessionStorage.removeItem('ieum-joined-id');
+        sessionStorage.removeItem('ieum-pw-reset-id');
+        if (joined || reset) {
+          document.getElementById('loginId').value = joined || reset;
+          error.textContent = joined
+            ? '계정이 만들어졌습니다. 사번 ' + joined + '와 요청할 때 정한 비밀번호로 로그인하세요.'
+            : '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
           error.classList.add('is-ok');
           form.addEventListener('input', function () { error.classList.remove('is-ok'); }, { once: true });
           document.getElementById('loginPw').focus();
@@ -125,6 +134,26 @@
         sending = true;
         button.disabled = true;
       });
+      // 인증 메일 다시 보내기 (ACC-06). 이 화면에는 jQuery가 없어 fetch로 보낸다
+      var resend = document.getElementById('btnResendVerify');
+      if (resend) {
+        resend.addEventListener('click', function () {
+          resend.disabled = true;
+          fetch(document.body.dataset.ctx + '/trial/api/verify/resend', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ _csrf: form.elements._csrf.value })
+          }).then(function (res) {
+            return res.json().then(function (data) { return { ok: res.ok, message: data.message }; });
+          }).then(function (r) {
+            error.textContent = r.message;
+            error.classList.toggle('is-ok', r.ok);
+          }).catch(function () {
+            error.textContent = '인증 메일을 보내지 못했습니다. 잠시 뒤 다시 시도해 주세요.';
+            error.classList.remove('is-ok');
+          }).then(function () { resend.disabled = false; });
+        });
+      }
       // 뒤로 가기로 이 화면이 그대로 다시 보이면(브라우저가 저장해 둔 화면) 다시 누를 수 있게 푼다
       window.addEventListener('pageshow', function () {
         sending = false;

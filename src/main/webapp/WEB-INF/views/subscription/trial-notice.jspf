@@ -1,0 +1,40 @@
+<%-- tag 파일(layout.tag)이 include 하므로 page 지시어 대신 tag 지시어를 쓴다 --%>
+<%@ tag pageEncoding="UTF-8" %>
+<%--
+  업체 직원에게 그날 처음 연 화면에서 띄우는 팝업. 띄우는 동작은 trial-notice.js
+  - 체험 중: 남은 일수 (DEM-02). 관리자는 [즉시 구매], 직원은 관리자 문의 안내
+  - 만료(읽기 전용): 체험 만료(DEM-03)·유료 만료(SUB-04). readOnly·paidExpired 는 layout.tag 가 정한다
+    체험 만료만 관리자에게 [결제하기]를 보인다. 유료 만료는 다시 결제할 수 없어(재구매는 이번 범위 밖) 결제 버튼·안내를 넣지 않는다
+  companyBilling 이 없으면(이용 상태를 못 읽음) 그리지 않는다. 헤더 띠(header.jspf)와 같은 값·문구를 쓴다
+--%>
+<c:if test="${not isOps and not empty companyBilling and (companyBilling.status eq 'TRIAL' or readOnly)}">
+  <dialog class="modal" id="trialNoticeDialog" aria-labelledby="trialNoticeTitle" aria-describedby="trialNoticeText" data-account="${loginUser.compcode}-${loginUser.empnum}">
+    <c:choose>
+      <c:when test="${readOnly}">
+        <%-- 체험 만료와 유료 만료는 무엇이 끝났는지와 결제 안내만 다르다 --%>
+        <h2 id="trialNoticeTitle">${paidExpired ? '이용 기간 만료 안내' : '무료 체험 만료 안내'}</h2>
+        <p id="trialNoticeText">
+          <strong>${paidExpired ? '이용 기간이' : '무료 체험이'} 끝나 읽기 전용입니다</strong> (<c:out value="${companyBilling.endDate}" /> 만료).
+          <br>자료 조회와 내려받기는 그대로 됩니다.
+          <c:if test="${not paidExpired}"><br>${isAdmin ? '결제하면 바로 이어서 쓸 수 있습니다.' : '업체 관리자가 결제하면 바로 이어서 쓸 수 있습니다.'}</c:if>
+        </p>
+      </c:when>
+      <c:otherwise>
+        <h2 id="trialNoticeTitle">무료 체험 안내</h2>
+        <p id="trialNoticeText">
+          <c:choose>
+            <c:when test="${companyBilling.daysLeft eq 0}"><strong>오늘 무료 체험이 끝납니다</strong> (<c:out value="${companyBilling.endDate}" />).</c:when>
+            <c:otherwise><strong>무료 체험이 ${companyBilling.daysLeft}일 남았습니다</strong> (<c:out value="${companyBilling.endDate}" /> 만료).</c:otherwise>
+          </c:choose>
+          <br>결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀝니다.
+          <c:if test="${not isAdmin}"><br>결제는 업체 관리자에게 문의해 주세요.</c:if>
+        </p>
+      </c:otherwise>
+    </c:choose>
+    <div class="modal-actions">
+      <button type="button" class="btn" value="cancel">닫기</button>
+      <c:if test="${isAdmin and not paidExpired}"><a class="btn btn-primary" href="${ctx}/subscription/billing">${readOnly ? '결제하기' : '즉시 구매'}</a></c:if>
+    </div>
+  </dialog>
+  <script src="${ctx}/resources/js/subscription/trial-notice.js"></script>
+</c:if>

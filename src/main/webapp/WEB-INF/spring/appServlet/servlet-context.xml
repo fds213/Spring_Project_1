@@ -27,6 +27,25 @@
 	<resources mapping="/service-worker.js"
 		location="/resources/js/" />
 	<resources mapping="/manifest.json" location="/" />
+	
+	<interceptors>
+		<!-- 계정 상태 검사: 비활성화·퇴사한 계정의 기존 세션을 끊는다 (AccountStatusInterceptor). 만료 검사보다 먼저 -->
+		<interceptor>
+			<mapping path="/**" />
+			<exclude-mapping path="/resources/**" />
+			<beans:ref bean="accountStatusInterceptor" />
+		</interceptor>
+		<!-- 만료 읽기 전용 검사: 만료 업체의 쓰기 요청 거절 (ReadOnlyInterceptor) -->
+		<interceptor>
+			<mapping path="/**" />
+			<exclude-mapping path="/resources/**" />
+			<!-- 공개 주소(가입 신청·체험 신청·도입 문의)는 로그인한 채 보내도 막지 않는다. 각 Service가 업체 상태를 본다 -->
+			<exclude-mapping path="/join/**" />
+			<exclude-mapping path="/trial/**" />
+			<exclude-mapping path="/inquiry/**" />
+			<beans:ref bean="readOnlyInterceptor" />
+		</interceptor>
+	</interceptors>
 		<!-- 파일 업로드. id는 반드시 multipartResolver -->
 	<beans:bean id="multipartResolver"
 		class="org.springframework.web.multipart.support.StandardServletMultipartResolver" />

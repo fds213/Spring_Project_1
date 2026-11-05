@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.MailMapper">
+
+    <sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+    <!-- 발송 전 기록. 상태는 DB 기본값(MAIL_PENDING). 본문은 넣지 않는다(TEMPLATE_DATA는 비워 둔다) -->
+    <insert id="insertOutbox" parameterType="com.ieum.gw.dto.MailMessageDTO">
+        <selectKey keyProperty="mailOutboxId" resultType="long" order="BEFORE">
+            SELECT SQ_MAIL_OUTBOX.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO mail_outbox
+            (mail_outbox_id, company_id, user_account_id, email_verification_id, public_inquiry_id, public_reply_id,
+             mail_type, recipient_email, subject, dedupe_key)
+        VALUES
+            (#{mailOutboxId}, #{companyId, jdbcType=NUMERIC}, #{userAccountId, jdbcType=NUMERIC},
+             #{emailVerificationId, jdbcType=NUMERIC}, #{publicInquiryId, jdbcType=NUMERIC},
+             #{publicReplyId, jdbcType=NUMERIC}, #{mailType}, #{recipientEmail}, #{subject}, #{dedupeKey})
+    </insert>
+
+    <!-- 발송 결과. 기록 번호로만 찾는다: 요청에서 온 값이 아니라 방금 저장한 번호다 -->
+    <update id="updateResult">
+        UPDATE mail_outbox
+        SET status_code = #{status},
+            attempt_count = attempt_count + 1,
+            sent_at = CASE WHEN #{success} = 'Y' THEN <include refid="now"/> ELSE sent_at END,
+            last_error = #{error, jdbcType=VARCHAR},
+            updated_at = <include refid="now"/>
+        WHERE mail_outbox_id = #{mailOutboxId}
+    </update>
+
+    <!-- 이번 시도 이력. 순번은 바로 앞에서 올린 시도 횟수다 -->
+    <insert id="insertAttempt">
+        INSERT INTO mail_attempt (mail_outbox_id, attempt_no, success_yn, error_message, attempted_at)
+        SELECT mail_outbox_id, attempt_count, #{success}, #{error, jdbcType=VARCHAR}, <include refid="now"/>
+        FROM mail_outbox
+        WHERE mail_outbox_id = #{mailOutboxId}
+    </insert>
+    <!-- 다시 보내기: 같은 기록을 대기로 되돌린다. 실패했거나, 서버가 꺼지는 등으로 결과를 남기지 못한 채 오래 멈춘 기록만.
+         조건부 UPDATE라 동시에 눌러도 한 요청만 1행을 받아 메일은 한 통이다 -->
+    <update id="claimRetry">
+        UPDATE mail_outbox
+        SET status_code = 'MAIL_PENDING', last_error = NULL, updated_at = <include refid="now"/>
+        WHERE mail_outbox_id = #{mailOutboxId}
+          AND (status_code = 'MAIL_FAILED'
+               OR (status_code = 'MAIL_PENDING'
+                   AND updated_at &lt; <include refid="now"/> - NUMTODSINTERVAL(#{staleMinutes}, 'MINUTE')))
+    </update>
+
+    <!-- 공개 폼 횟수 제한: 그날 이 주소로 기록된 이 종류의 메일 수 -->
+    <select id="countForRecipient" resultType="int">
+        SELECT COUNT(*)
+        FROM mail_outbox
+        WHERE mail_type = #{mailType} AND recipient_email = #{recipientEmail} AND created_at &gt;= #{from}
+    </select>
+</mapper>

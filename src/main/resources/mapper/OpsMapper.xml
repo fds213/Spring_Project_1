@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.ops.mapper.OpsMapper">
+<mapper namespace="com.ieum.gw.mapper.OpsMapper">
 
     <!-- 업체 + 업체 관리자(업체당 1명, UX_ACCOUNT_ADMIN). 관리자가 빠진 자료도 업체 줄은 보이게 LEFT JOIN -->
     <sql id="companySelect">
@@ -14,18 +14,18 @@
     </sql>
 
     <!-- 모든 업체, 최신 신청 순 (AGENTS.md: 운영자 화면은 신청일·company_id로 정렬) -->
-    <select id="listCompanies" resultType="com.ieum.gw.ops.dto.OpsCompanyRowDTO">
+    <select id="listCompanies" resultType="com.ieum.gw.dto.OpsCompanyRowDTO">
         <include refid="companySelect" />
         ORDER BY c.trial_requested_at DESC, c.company_id DESC
     </select>
 
-    <select id="getCompany" resultType="com.ieum.gw.ops.dto.OpsCompanyRowDTO">
+    <select id="getCompany" resultType="com.ieum.gw.dto.OpsCompanyRowDTO">
         <include refid="companySelect" />
         WHERE c.company_code = #{companyCode}
     </select>
 
     <!-- 업체의 계정 목록, 사번 순. 사번이 나오기 전의 가입 요청은 사원 행이 없어 빠진다. 이메일은 화면에 없어 읽지 않는다 -->
-    <select id="listEmployees" resultType="com.ieum.gw.ops.dto.OpsEmployeeDTO">
+    <select id="listEmployees" resultType="com.ieum.gw.dto.OpsEmployeeDTO">
         SELECT e.employee_name AS name, e.employee_no AS emp_no, d.department_name AS dept,
                a.status_code AS status, NVL(cc.code_name, a.status_code) AS status_label
         FROM user_account a
@@ -37,7 +37,7 @@
     </select>
 
     <!-- 업체별 첫 결제 시각과 실패한 결제 수 -->
-    <select id="listPaymentStats" resultType="com.ieum.gw.ops.dto.OpsPaymentStatDTO">
+    <select id="listPaymentStats" resultType="com.ieum.gw.dto.OpsPaymentStatDTO">
         SELECT company_id,
                MIN(CASE WHEN status_code = 'PAY_APPROVED' THEN approved_at END) AS paid_at,
                COUNT(CASE WHEN status_code = 'PAY_FAILED' THEN 1 END) AS failed_payments
@@ -45,14 +45,60 @@
         GROUP BY company_id
     </select>
 
-    <!-- 비회원 접수 전체, 최신 접수 순. 업체 자료가 아니라 company_id가 없다. 화면이 한 번에 받아 좁힌다 -->
-    <select id="listGuestInquiries" resultType="com.ieum.gw.ops.dto.OpsGuestInquiryDTO">
+    <sql id="guestInquirySelect">
         SELECT public_inquiry_id AS no, TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at,
                company_name AS company, requester_name AS name, email, phone, title,
                content AS body, status_code AS state
         FROM public_inquiry
+    </sql>
+
+    <!-- 비회원 접수 전체, 최신 접수 순. 업체 자료가 아니라 company_id가 없다. 화면이 한 번에 받아 좁힌다 -->
+    <select id="listGuestInquiries" resultType="com.ieum.gw.dto.OpsGuestInquiryDTO">
+        <include refid="guestInquirySelect" />
         ORDER BY created_at DESC, public_inquiry_id DESC
     </select>
+
+    <select id="getGuestInquiry" resultType="com.ieum.gw.dto.OpsGuestInquiryDTO">
+        <include refid="guestInquirySelect" />
+        WHERE public_inquiry_id = #{no}
+    </select>
+
+    <select id="lockGuestInquiry" resultType="com.ieum.gw.dto.OpsGuestInquiryDTO">
+        <include refid="guestInquirySelect" />
+        WHERE public_inquiry_id = #{no}
+        FOR UPDATE
+    </select>
+
+    <!-- 답변과 그 발송 기록(답변 하나에 하나, 같은 트랜잭션에서 저장한다). 번호 순이 곧 보낸 순이다: 접수 행을 잠그고 저장한다.
+         stale: 결과를 남기지 못한 채 멈춘 발송. 조회라 상태를 바꾸지 않고 계산만 한다 -->
+    <select id="listGuestReplies" resultType="com.ieum.gw.dto.OpsGuestReplyDTO">
+        SELECT r.public_reply_id AS id, r.public_inquiry_id AS inquiry_no, r.content AS body,
+               o.mail_outbox_id, o.status_code AS status, o.last_error AS reason,
+               TO_CHAR(o.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at,
+               CASE WHEN o.status_code = 'MAIL_PENDING'
+                         AND o.updated_at &lt; CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP) - NUMTODSINTERVAL(#{staleMinutes}, 'MINUTE')
+                    THEN 1 ELSE 0 END AS stale
+        FROM public_reply r
+        JOIN mail_outbox o ON o.public_reply_id = r.public_reply_id
+        <where>
+            <if test="no != null">r.public_inquiry_id = #{no}</if>
+        </where>
+        ORDER BY r.public_reply_id
+    </select>
+
+    <insert id="insertGuestReply" parameterType="com.ieum.gw.dto.OpsGuestReplySaveDTO">
+        <selectKey keyProperty="replyId" resultType="long" order="BEFORE">
+            SELECT SQ_PUBLIC_REPLY.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO public_reply (public_reply_id, public_inquiry_id, operator_account_id, content)
+        VALUES (#{replyId}, #{no}, #{operatorAccountId}, #{body, jdbcType=CLOB})
+    </insert>
+
+    <update id="markGuestInquiryAnswered">
+        UPDATE public_inquiry
+        SET status_code = 'IQ_ANSWERED', updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE public_inquiry_id = #{no} AND status_code IN ('IQ_RECEIVED', 'IQ_PROCESSING')
+    </update>
 
     <!-- 아직 답하지 않은 비회원 접수 수 -->
     <select id="countWaitingGuestInquiries" resultType="int">

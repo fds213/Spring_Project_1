@@ -10,9 +10,9 @@
   - 범위·정책: `docs/이음_요구분석서.md`. 구현 명세(화면·주소·상태 값·확인 기준)는 짝 문서 `docs/이음_기능명세서.md`에 있다.
   - 실행(업무 흐름·상태 규칙·기술·역할·일정·검증): `docs/사내_그룹웨어_IT_Service_Hub_통합_프로젝트_계획서.md`.
   - 둘이 다르면 요구분석서를 따른다. 요구분석서에 없는 그룹웨어 세부(흐름 A·B·C, 결재·티켓 상태 규칙, 동시 처리, 감사 로그, 알림 읽음, 첨부 규칙)는 계획서를 따른다.
-  - 11/13 마감까지 만드는 범위는 요구분석서 3장 '이번 구현 범위' 표를 따른다. 표에서 미루거나 뺀 기능은 요구사항 문장이 있어도 만들지 않고, 단순화한 항목(직원 계정 승인 즉시 사용, 구매 인원을 넘는 승인 거절)은 표대로 만든다.
+  - 11/12 마감까지 만드는 범위는 요구분석서 3장 '이번 구현 범위' 표를 따른다. 표에서 미루거나 뺀 기능은 요구사항 문장이 있어도 만들지 않고, 단순화한 항목(직원 계정 승인 즉시 사용, 구매 인원을 넘는 승인 거절)은 표대로 만든다.
 - 문서에 없는 기능·테이블·컬럼·화면을 임의로 만들지 않는다. 요구가 불분명하거나 문서와 다르면 추측하지 말고 사람에게 묻는다.
-- 일정: 필수 기능 통합 11/6, 기능 추가 마감 11/9, 프로젝트 마감 11/13(발표일은 따로 정한다). 필수 기능이 끝나기 전에는 범위 표의 '핵심 뒤 추가'와 계획서 12장의 '추가 기능'을 작업하지 않는다. 필수 안의 우선순위는 계획서 11장을 따른다.
+- 일정: 필수 기능 통합 11/6, 기능 추가 마감 11/9, 프로젝트 마감 11/12, 발표 11/13. 필수 기능이 끝나기 전에는 범위 표의 '핵심 뒤 추가'와 계획서 12장의 '추가 기능'을 작업하지 않는다. 필수 안의 우선순위는 계획서 11장을 따른다.
 
 ## 기술 스택
 
@@ -20,7 +20,7 @@
 - 외부 연동: 토스페이먼츠 테스트 결제(실제 대금 없음), 이메일 발송(Spring `JavaMailSender` + SMTP, 팀 공용 Gmail 계정의 앱 비밀번호), 카카오 지도.
 - 정해진 시각에 도는 작업(연차 새 주기 부여, 오류 로그 ZIP, 만료 자료 삭제 등)은 Spring `@Scheduled`로 만든다.
 - 쓰지 않는다: Spring Boot, JPA·Hibernate, React·Vue, Gradle, Kotlin.
-- `pom.xml`의 의존성 추가·버전 변경은 하지 않는다. 필요하면 이유를 정리해 사람에게 요청한다. 메일 발송 의존성(`spring-context-support`, `com.sun.mail:javax.mail`)과 `@Scheduled` 설정은 담당 1이 추가한다.
+- `pom.xml`의 의존성 추가·버전 변경은 하지 않는다. 필요하면 이유를 정리해 사람에게 요청한다. `@Scheduled` 설정은 담당 1이 추가한다.
 - Oracle은 XE 21c를 쓰고, PK는 SEQUENCE로 만든다(테이블마다 시퀀스 1개).
 - DB는 공용 Oracle 서버 한 대에 모두 접속한다. 테이블 변경은 DDL 스크립트로 Git에 올리고 DB 리드가 공용 DB에 반영한다. TODO(회의): 공용 DB·중앙 서버를 둘 곳과 고정 HTTPS 주소(PWA 설치와 카카오 지도 도메인 등록에 필요).
 - WebSocket은 `@ServerEndpoint` 방식이다. `SpringConfigurator`를 상속한 Configurator로 Service를 주입받고, 핸드셰이크 때 서버의 인증 정보에서 로그인 사용자를 넘긴다. 채팅 담당이 사전 구현에서 확인해 공유한 공통 예제를 따르고, 이 방식이 안 되면 Spring `WebSocketHandler`로 바꾼다. `spring-websocket` 의존성은 담당 1이 추가한다.
@@ -44,15 +44,15 @@
 
 ## 패키지·이름 규칙
 
-- 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 모듈 패키지는 그 아래에 둔다(예: `com.ieum.gw.approval.controller`).
-- 모듈 패키지(15개):
+- 루트 패키지: `com.ieum.gw`. 수업 템플릿의 `com.test.java`는 이 이름으로 바꾸고, 그 아래에 계층 패키지를 둔다(예: `com.ieum.gw.controller`). 모듈로는 패키지를 나누지 않는다.
+- 모듈(15개). 담당·주소·JSP 폴더·화면 JS 폴더를 나누는 단위다:
   - 그룹웨어 업무: `employee`(사원·조직·가입 승인·사번 발급·이메일 인증), `approval`, `attendance`(근태·연차·반차·휴일·단말기 API), `ticket`, `asset`, `location`(지점·지도), `schedule`, `board`, `chat`, `notification`
   - 운영 플랫폼: `site`(상품 홈페이지·체험 신청·도입 문의 접수), `subscription`(업체·업체 코드·이용 상태·결제·구독·증설), `ops`(운영자 화면: 업체·신청 현황·문의 답변·오류 로그·결제 복구·삭제 업체 관리자 재발급), `support`(이음 장애 문의·운영자 지원 허가)
   - 공통: `common`(인증·권한·파일 저장·메일 발송·만료 읽기 전용 검사)
 - 체험 신청은 `site`가 흐름만 맡는다. 업체 생성은 `subscription`, 관리자 계정·사번 발급은 `employee`의 Service를 불러 한 트랜잭션으로 묶는다.
-- 모듈 안 구조: `controller`, `service`, `dao`, `mapper`, `dto`. JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
-- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.approval.mapper.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
-- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. URL은 아래 'URL·요청 방식'을 따른다.
+- 패키지: `controller`, `service`, `dao`, `mapper`, `dto`. 그 밖에 `security`(로그인 처리), `code`(공통 상태 코드 enum), `server`(WebSocket)가 있다. Mapper 인터페이스는 `mapper`, DAO는 `dao`에 둔다. 테스트도 같은 패키지에 둔다(계층 폴더 없는 `attendance`·`test`는 그대로 둔다). JSP는 `src/main/webapp/WEB-INF/views/<모듈>/`. 공통 설정(담당 1)이 정한 위치와 다르면 공통 설정을 따른다.
+- Mapper XML은 모듈별 하위 폴더 없이 `src/main/resources/mapper/`에 바로 둔다. 파일 이름은 짝이 되는 Mapper 인터페이스 이름과 같게 하고(예: `ApprovalMapper.xml`), namespace는 그 인터페이스의 전체 이름(예: `com.ieum.gw.mapper.ApprovalMapper`)으로 쓴다. 한 모듈에 Mapper가 더 필요하면 인터페이스와 XML을 한 쌍씩 더 만든다(예: `ApprovalLineMapper`).
+- 클래스 이름: `ApprovalController`, `ApprovalService`, `ApprovalDAO`, `ApprovalMapper`, `ApprovalDTO`. 패키지가 모듈로 나뉘지 않아 같은 계층에 같은 이름을 둘 수 없고, 이름이 곧 그 클래스의 모듈을 알려 준다. 새 클래스는 모듈을 알 수 있는 말로 시작한다. URL은 아래 'URL·요청 방식'을 따른다.
 - DB 테이블·컬럼은 스네이크 케이스(`emp_id`), Java 필드는 카멜 케이스(`empId`). Oracle 예약어(`DATE`, `USER`, `LEVEL`, `COMMENT`, `SIZE`, `ORDER`, `GROUP` 등)를 이름으로 쓰지 않는다.
 
 ## URL·요청 방식
@@ -67,11 +67,15 @@
 
 ## 수정 범위
 
-- 자기 담당 모듈 안에서만 수정한다. 서버 담당은 그 모듈의 패키지와 Mapper XML 파일, 화면 담당은 그 모듈의 JSP 폴더(`WEB-INF/views/<모듈>/`)와 화면 JS 폴더(`resources/js/<모듈>/`)다. 담당은 아래 표를 따른다.
+- 자기 담당 모듈 안에서만 수정한다. 서버 담당은 그 모듈의 클래스(패키지가 아니라 이름으로 찾는다. `.github/CODEOWNERS`에 이름별 담당이 있다)와 Mapper XML 파일, 화면 담당은 그 모듈의 JSP 폴더(`WEB-INF/views/<모듈>/`)와 화면 JS 폴더(`resources/js/<모듈>/`)다. 담당은 아래 표를 따른다.
 - 다른 모듈의 기능이 필요하면 그 모듈 Service의 공개 메서드를 호출한다. Controller끼리 호출하지 않는다. 필요한 메서드가 없으면 직접 만들지 말고, 담당자에게 요청할 메서드 이름·입력·반환값을 정리해 사람에게 알린다.
+- 다른 모듈의 표를 조회 JOIN으로 읽는 것은 된다(예: 목록에 작성자·수령인 이름 붙이기). 이때
+  - JOIN한 표에도 업체 조건(`company_id = #{companyId}`)을 건다.
+  - 화면에 필요한 칸만 가져온다. `USER_ACCOUNT.PASSWORD_HASH`는 가져오지 않고, 로그인 보안 칸(`FAILED_LOGIN_COUNT`·`LOCKED_UNTIL`·`PASSWORD_CHANGED_AT`·`LAST_LOGIN_AT`)은 로그인 처리에서만, `EMAIL`은 가입 승인처럼 이메일이 꼭 필요한 화면에서만 쓴다. 성별·입사일·이전 경력·고용 형태·퇴사일 같은 인사 정보는 인사 화면에서만 쓴다.
+  - 다른 모듈의 표를 바꾸는 문장(INSERT·UPDATE·DELETE)은 두지 않고 그 모듈 Service를 부른다. 권한·재직 여부처럼 업무 규칙이 든 판단도 그 모듈 Service의 메서드를 쓴다.
 - 헤더·팝업처럼 모든 화면이 쓰는 값도 각 모듈 Service의 메서드로 받는다. 업체 이용 상태는 `subscription` 담당이, 오늘 출퇴근은 `attendance` 담당이 메서드를 만든다. 이용 상태는 요청마다 한 번 읽어 만료 읽기 전용 검사와 같이 쓴다.
 - 아래 공통 파일은 담당자만 수정한다. 에이전트는 수정하지 않고 필요한 변경 내용만 제안한다.
-  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 메일·스케줄러 설정, `common` 패키지 → 담당 1
+  - `pom.xml`, `web.xml`, `root-context.xml`, `servlet-context.xml`, Security 설정 XML, 로그 설정(`logback.xml`), 스케줄러 설정, `common` 모듈의 클래스(메일 발송은 담당 6) → 담당 1
   - 공통 레이아웃 JSP(`WEB-INF/views/common/`, `WEB-INF/tags/`), CSS, 공통 화면 JS(`util.js`·`common.js`), PWA 파일 → 프론트 리드
   - DDL·초기 데이터 스크립트 → DB 담당
   - `AGENTS.md`, `docs/`의 계획서·요구분석서 → 팀 합의
@@ -80,12 +84,12 @@
 
 | 담당 | 모듈 | 이름 |
 |---|---|---|
-| 1 | `employee`, `common`(인증·권한·파일·메일·만료 읽기 전용 검사, `/home`·`/badges`) | 김상준 |
+| 1 | `employee`, `common`(인증·권한·파일·만료 읽기 전용 검사, `/home`·`/badges`) | 김상준 |
 | 2 | `approval`, `chat` | 서장호 |
 | 3 | `attendance`(근태·연차·반차·휴일·단말기 API) | 홍동국 |
 | 4 | `ticket`, `asset`, `location`의 지점 | 정상욱 |
 | 5 | `board`(공지 게시판), `schedule`, `location`의 공통 지도 | 이동희 |
-| 6 | `site`, `subscription`, `notification`, `ops` | 최준원 |
+| 6 | `site`, `subscription`, `notification`, `ops`, `common`의 메일 발송(`MailService`·메일 설정) | 최준원 |
 | 추가 구현 범위 | `support`(이음 장애 문의 최소판, 요구분석서 3장) | 자기 파트를 끝낸 사람 |
 
 - 화면(JSP·화면 JS)은 프론트(홍동국·이동희)가 맡는다. 근태(홍동국), 채팅(서장호), 공지 게시판·일정·공통 지도(이동희)는 한 사람이 화면부터 서버까지 맡는다. 메뉴만 있고 화면이 없던 필수 화면(티켓 처리·자산 관리·홈·알림 목록)은 홍동국이 만든다.
@@ -134,7 +138,7 @@
 
 ## 상태 코드
 
-DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코드는 `common`의 enum 한 곳에서만 정의하고, 문자열을 코드 곳곳에 직접 쓰지 않는다. 아래 코드값을 쓴다.
+DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코드는 `code` 패키지의 enum 한 곳에서만 정의하고, 문자열을 코드 곳곳에 직접 쓰지 않는다. 아래 코드값을 쓴다.
 
 - 결재 문서: `DRAFT`(임시저장) → `IN_PROGRESS`(진행) → `APPROVED`(완료) 또는 `REJECTED`(반려)
 - 결재선: `WAITING`(대기), `APPROVED`(승인), `REJECTED`(반려)
@@ -237,4 +241,6 @@ DB에는 영문 코드를 저장하고 화면에는 한글로 표시한다. 코�
 - 여러 모듈이나 공통 파일에 걸친 큰 변경은 하지 않는다. 필요하면 먼저 계획을 사람에게 보여 준다.
 - 작업이 끝나면 무엇을 왜 바꿨는지 짧게 요약한다. 담당자가 그 코드를 직접 설명할 수 있어야 한다(팀원별 AI 사용 기록·발표 질의 대비).
 - 답변·주석·문서는 한국어로 쓴다.
+- 메서드를 만들 때 바로 위에 무슨 역할인지 한 줄로 주석을 단다. 역할을 짐작할 수 있을 만큼만 짧게 쓴다(예: `/** 본인의 단말기 사용자 번호 연결을 끊는다 */`). 테스트 메서드는 `@DisplayName`이 그 역할을 하니 달지 않아도 된다.
+- 메서드와 메서드 사이에는 빈 줄을 넣는다. DAO처럼 `{ return mapper.issue(row); }` 한 줄로 끝나는 메서드도 줄줄이 붙여 쓰지 않고, 필드와 첫 메서드 사이도 띄운다.
 - 개인 지침 파일(`CLAUDE.local.md` 등)은 각자 판단해 만든다.

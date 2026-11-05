@@ -96,7 +96,7 @@
       <div class="wrap inq-done" id="inqDone" hidden tabindex="-1">
         <img class="done-mark" src="${ctx}/resources/img/logo-mark.svg" alt="">
         <h2>문의가 접수되었습니다</h2>
-        <p>답변은 입력하신 이메일로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
+        <p id="doneGuide">답변은 입력하신 이메일로 보내 드립니다. 주소가 맞는지 아래에서 확인해 주세요.</p>
         <p class="done-no">접수번호 <strong id="doneNo"></strong></p>
         <dl class="inq-summary" id="summary"></dl>
         <div class="done-actions">

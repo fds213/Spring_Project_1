@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.ieum.gw.asset.mapper.AssetMapper">
+<mapper namespace="com.ieum.gw.mapper.AssetMapper">
     <!-- 목록과 홈 건수에서 업체·사원·회수 여부·사용 중 조건을 함께 쓴다. -->
     <sql id="myAssets">
           FROM asset a
@@ -11,7 +11,7 @@
            AND a.status_code = 'AS_IN_USE'
     </sql>
 
-    <select id="selectMyAssets" resultType="com.ieum.gw.asset.dto.AssetDTO">
+    <select id="selectMyAssets" resultType="com.ieum.gw.dto.AssetDTO">
         SELECT a.asset_id AS assetId, a.asset_no AS assetNo, a.asset_name AS assetName,
                a.asset_type AS assetType, a.serial_no AS serialNo, a.branch_id AS branchId,
                aa.it_ticket_id AS itTicketId, aa.issued_at AS issuedAt
@@ -25,7 +25,7 @@
     </select>
 
     <!-- 회수 여부에 관계없이 본인 지급 건만 읽는다. 다른 수령인의 지급 건은 공개하지 않는다. -->
-    <select id="selectMyAssignments" resultType="com.ieum.gw.asset.dto.AssetAssignmentDTO">
+    <select id="selectMyAssignments" resultType="com.ieum.gw.dto.AssetAssignmentDTO">
         SELECT asset_assignment_id AS assetAssignmentId, asset_id AS assetId,
                it_ticket_id AS itTicketId, issued_at AS issuedAt, returned_at AS returnedAt
           FROM asset_assignment

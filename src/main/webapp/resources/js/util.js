@@ -32,7 +32,9 @@ try {
 
 // ---------- 화면 만들기 도구 (여러 모듈의 화면 JS가 같이 쓴다) ----------
 // h(태그, class, ...자식): 요소를 만든다. 글자는 textContent로 들어가므로 사용자가 쓴 글도 그대로 넣어도 된다
-const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
+// 서버가 빈 칸을 null로 보내도 화면에 'null'·'undefined' 글자가 찍히지 않게 null·undefined 자식은 건너뛴다(0과 '' 는 그대로 넣는다).
+// 빈 칸에 '-' 같은 안내가 필요하면 부르는 쪽에서 값 || '-' 로 넣는다
+const h = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids.filter(k => k != null)); return e; };
 const span = (text, cls) => h('span', cls, text);
 const small = text => h('small', 'cell-sub', text);
 const dlOf = rows => h('dl', 'detail', ...rows.flatMap(([k, v]) => [h('dt', '', k), h('dd', '', v)]));
@@ -90,6 +92,7 @@ function pickSelect(label, first, options, selected) {
       return o;
     }));
   s.firstChild.value = '';
+  s.firstChild.dataset.placeholder = ''; // 안내 문구: 펼친 목록에는 넣지 않는다(select.js)
   s.setAttribute('aria-label', label);
   return s;
 }
@@ -116,7 +119,7 @@ function el(tag, attrs = {}, text) {
 }
 const emptyRow = emptyTr; // 옛 이름 (board.js 가 쓴다)
 
-// 다른 화면(내 장비, 결재함의 재기안·이어서 쓰기)에서 기안 작성을 채워서 연다. 페이지가 바뀌므로 sessionStorage로 넘긴다
+// 다른 화면(내 장비, 결재함의 재기안)에서 기안 작성을 채워서 연다. 페이지가 바뀌므로 sessionStorage로 넘긴다
 const APPROVAL_PRE_KEY = 'ieum-approval-pre';
 function startApprovalWrite(form, pre) {
   try { sessionStorage.setItem(APPROVAL_PRE_KEY, JSON.stringify({ form, ...pre })); } catch (e) { /* 저장소 막힘: 빈 양식으로 연다 */ }
