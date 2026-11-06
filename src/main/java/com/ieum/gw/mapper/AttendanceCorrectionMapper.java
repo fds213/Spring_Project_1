@@ -36,6 +36,9 @@ public interface AttendanceCorrectionMapper {
     List<AttendanceCorrectionDTO> selectInbox(@Param("companyId") Long companyId, @Param("approverId") Long approverId,
                                               @Param("admin") boolean admin);
 
+    /** 정정 요청 알림을 받을 업체 관리자 사원 번호 (사용 중인 관리자 계정·재직 중, 요청자 본인 제외) */
+    List<Long> selectAdminEmployeeIds(@Param("companyId") Long companyId, @Param("exceptEmployeeId") Long exceptEmployeeId);
+
     /** 대기 중인 요청을 요청자 본인이 취소한다 */
     int cancelCorrection(@Param("companyId") Long companyId, @Param("id") Long id, @Param("employeeId") Long employeeId);
 
