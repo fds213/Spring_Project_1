@@ -64,17 +64,27 @@
   const pageCat = (document.querySelector('.rail-item.on') || {}).dataset;
   let flyoutTimer = null;
   let suppressFocusOpen = false;
+  /** 펼침 모드에서는 화면 낭독기가 메뉴 칸이 열렸는지 알도록 aria-expanded 를 단다(펼친 아이콘만 true).
+   *  좁은 화면(서랍)에서는 아이콘이 펼침 버튼이 아니므로 뗀다. aria-pressed(지금 고른 묶음)는 따로 둔다 */
+  function markExpanded(btn) {
+    document.querySelectorAll('.rail-item').forEach(b => {
+      if (flyout.matches) b.setAttribute('aria-expanded', b === btn);
+      else b.removeAttribute('aria-expanded');
+    });
+  }
   function openFlyout(btn) {
     clearTimeout(flyoutTimer);
     showCat(btn.dataset.cat);
     document.querySelectorAll('.rail-item').forEach(b => b.classList.toggle('is-peek', b === btn));
     sidebar.classList.add('is-open');
+    markExpanded(btn);
   }
   function shutFlyout() {
     clearTimeout(flyoutTimer);
     sidebar.classList.remove('is-open');
     document.querySelectorAll('.rail-item.is-peek').forEach(b => b.classList.remove('is-peek'));
     if (pageCat) showCat(pageCat.cat);
+    markExpanded(null);
   }
   /** now: 바로 닫는다(Esc·창 크기 바뀜). 아니면 잠깐 뒤에, 마우스·포커스가 사이드바 밖일 때만 닫는다 */
   function closeFlyout(now) {
@@ -115,8 +125,9 @@
         }
       }
     });
-    // 창을 줄여 서랍 모드가 되면 펼침 상태를 푼다
+    // 창을 줄여 서랍 모드가 되면 펼침 상태를 푼다(넓히면 접힌 상태 aria-expanded="false"로 시작)
     flyout.addEventListener('change', () => closeFlyout(true));
+    markExpanded(null);
   }
 
   // ---------- 4) 배지: 15초마다 요청 한 번으로 모든 [data-badge="<name>"]를 채운다 (가이드 7장 알림과 배지) ----------
