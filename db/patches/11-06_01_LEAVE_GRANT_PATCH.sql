@@ -1,0 +1,142 @@
+-- 연차 추가 부여: 기존 DB 전용 1회 패치.
+-- 앱의 관련 쓰기를 멈추고 미확정 작업이 없는 별도 연결에서 실행한다.
+-- DDL은 자동 확정된다. 일부 실패 시 처음부터 다시 실행하지 않는다.
+-- 코드 INSERT는 모든 DDL 뒤에 수행하며 자동 COMMIT하지 않는다.
+
+SET DEFINE OFF
+SET SERVEROUTPUT ON
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+
+-- 변경 전 예상 구조와 기존 데이터 호환성을 확인한다.
+DECLARE
+    v_count NUMBER;
+BEGIN
+    SELECT COUNT(*) INTO v_count
+      FROM USER_TAB_COLUMNS
+     WHERE TABLE_NAME = 'LEAVE_LEDGER'
+       AND COLUMN_NAME = 'NOTE';
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'NOTE가 이미 있습니다. 적용 상태를 확인하세요.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_CONSTRAINTS
+     WHERE TABLE_NAME = 'LEAVE_LEDGER'
+       AND CONSTRAINT_NAME = 'UQ_33_01'
+       AND CONSTRAINT_TYPE = 'U'
+       AND STATUS = 'ENABLED'
+       AND VALIDATED = 'VALIDATED';
+
+    IF v_count <> 1 THEN
+        RAISE_APPLICATION_ERROR(-20002, '기존 UQ_33_01 상태가 예상과 다릅니다.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_CONSTRAINTS
+     WHERE CONSTRAINT_TYPE = 'R'
+       AND R_OWNER = USER
+       AND R_CONSTRAINT_NAME = 'UQ_33_01';
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20003, 'UQ_33_01을 참조하는 외래키가 있습니다.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_CONSTRAINTS
+     WHERE TABLE_NAME = 'LEAVE_LEDGER'
+       AND CONSTRAINT_NAME IN ('CK_33_01', 'CK_33_02')
+       AND STATUS = 'ENABLED'
+       AND VALIDATED = 'VALIDATED';
+
+    IF v_count <> 2 THEN
+        RAISE_APPLICATION_ERROR(-20004, '기존 CHECK 제약 상태가 예상과 다릅니다.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_OBJECTS
+     WHERE OBJECT_NAME = 'UX_33_01';
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20005, 'UX_33_01 이름이 이미 사용 중입니다.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM COMMON_CODE
+     WHERE CODE = 'LEAVE_CHANGE';
+
+    IF v_count <> 1 THEN
+        RAISE_APPLICATION_ERROR(-20006, '상위 코드 LEAVE_CHANGE가 없습니다.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM COMMON_CODE
+     WHERE CODE = 'LC_GRANT';
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20007, 'LC_GRANT가 이미 있습니다. 적용 상태를 확인하세요.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM LEAVE_LEDGER
+     WHERE LEAVE_REQUEST_DAY_ID IS NULL
+        OR CHANGE_TYPE NOT IN ('LC_USE', 'LC_RESTORE')
+        OR (CHANGE_TYPE = 'LC_USE' AND DELTA_DAYS >= 0)
+        OR (CHANGE_TYPE = 'LC_RESTORE' AND DELTA_DAYS <= 0)
+        OR MOD(DELTA_DAYS, 0.5) <> 0;
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20008, '새 제약과 맞지 않는 기존 원장 데이터가 있습니다.');
+    END IF;
+END;
+/
+
+ALTER TABLE LEAVE_LEDGER MODIFY (LEAVE_REQUEST_DAY_ID NULL);
+
+ALTER TABLE LEAVE_LEDGER ADD (
+    NOTE VARCHAR2(500 CHAR)
+);
+
+COMMENT ON COLUMN LEAVE_LEDGER.NOTE IS '부여 사유';
+
+ALTER TABLE LEAVE_LEDGER DROP CONSTRAINT CK_33_01;
+
+ALTER TABLE LEAVE_LEDGER ADD CONSTRAINT CK_33_01 CHECK (
+    (CHANGE_TYPE = 'LC_USE'
+        AND DELTA_DAYS < 0
+        AND LEAVE_REQUEST_DAY_ID IS NOT NULL)
+ OR (CHANGE_TYPE = 'LC_RESTORE'
+        AND DELTA_DAYS > 0
+        AND LEAVE_REQUEST_DAY_ID IS NOT NULL)
+ OR (CHANGE_TYPE = 'LC_GRANT'
+        AND DELTA_DAYS <> 0
+        AND LEAVE_REQUEST_DAY_ID IS NULL
+        AND NOTE IS NOT NULL)
+);
+
+ALTER TABLE LEAVE_LEDGER DROP CONSTRAINT UQ_33_01 DROP INDEX;
+
+CREATE UNIQUE INDEX UX_33_01 ON LEAVE_LEDGER (
+    CASE WHEN LEAVE_REQUEST_DAY_ID IS NOT NULL
+         THEN LEAVE_REQUEST_DAY_ID END,
+    CASE WHEN LEAVE_REQUEST_DAY_ID IS NOT NULL
+         THEN CHANGE_TYPE END
+);
+
+-- DML은 모든 DDL 뒤에 수행한다.
+INSERT INTO COMMON_CODE (
+    CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER
+)
+SELECT 'LC_GRANT',
+       'LEAVE_CHANGE',
+       '추가 부여',
+       '관리자가 기본 연차 외에 더 주거나(+) 잘못 준 것을 되돌린(-) 일수',
+       'Y',
+       3
+  FROM DUAL
+ WHERE NOT EXISTS (
+    SELECT 1 FROM COMMON_CODE WHERE CODE = 'LC_GRANT'
+);
+
+-- 11-06_02_LEAVE_GRANT_CHECK.sql 확인 후 같은 연결에서 직접 COMMIT.
+-- 오류가 나면 중단한다. ROLLBACK으로 앞선 DDL은 취소되지 않는다.
