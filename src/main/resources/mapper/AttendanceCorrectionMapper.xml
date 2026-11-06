@@ -4,7 +4,7 @@
 <mapper namespace="com.ieum.gw.mapper.AttendanceCorrectionMapper">
 
 	<!-- 근태 정정 요청 (attendance_correction, 11/2 패치). 승인은 전자결재가 아니라 근태 안에서: 요청자 부서장, 없거나 본인이면 업체 관리자.
-	     이번 1차는 퇴근 누락(출근만 있는 지난 날) 정정만 받는다. 단말기 원본(attendance_event)에는 쓰지 않는다 -->
+	     퇴근 누락(출근만 있는 날 → 퇴근 시각)과 결근(기록 없는 근무일 → 출근·퇴근 시각). 단말기 원본(attendance_event)에는 쓰지 않는다 -->
 
 	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
 
@@ -19,6 +19,7 @@
 		c.attendance_id,
 		TO_CHAR(c.origin_check_in_at, 'HH24:MI:SS')   AS origin_check_in,
 		TO_CHAR(c.origin_check_out_at, 'HH24:MI:SS')  AS origin_check_out,
+		TO_CHAR(c.req_check_in_at, 'HH24:MI')         AS req_check_in,
 		TO_CHAR(c.req_check_out_at, 'HH24:MI')        AS req_check_out,
 		c.reason, c.status_code,
 		ap.employee_name                              AS approver_name,
@@ -61,6 +62,25 @@
 		       #{reason}
 		FROM attendance a
 		WHERE a.company_id = #{companyId} AND a.employee_id = #{employeeId} AND a.attendance_id = #{attendanceId}
+	</insert>
+
+	<!-- 결근 정정 전에: 입사일 전 날은 근무일이 아니다 (입사일이 비면 null) -->
+	<select id="selectHireDate" resultType="string">
+		SELECT TO_CHAR(hire_date, 'YYYY-MM-DD') FROM employee
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+	</select>
+
+	<!-- 결근 정정: 그날 근태가 없어 근태 번호·원래 값 없이 요청한 출근·퇴근 시각만 (CK_82_07: 근태가 없으면 요청 출근 필수) -->
+	<insert id="insertAbsenceCorrection" parameterType="com.ieum.gw.dto.AttendanceCorrectionDTO">
+		<selectKey keyProperty="attendanceCorrectionId" resultType="long" order="BEFORE">
+			SELECT sq_attendance_correction.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO attendance_correction (attendance_correction_id, company_id, employee_id, work_date, attendance_id,
+		                                   req_check_in_at, req_check_out_at, reason)
+		VALUES (#{attendanceCorrectionId}, #{companyId}, #{employeeId}, TO_DATE(#{workDate}, 'YYYY-MM-DD'), NULL,
+		        TO_TIMESTAMP(#{workDate} || ' ' || #{reqCheckIn}, 'YYYY-MM-DD HH24:MI'),
+		        TO_TIMESTAMP(#{workDate} || ' ' || #{reqCheckOut}, 'YYYY-MM-DD HH24:MI'),
+		        #{reason})
 	</insert>
 
 	<select id="selectMyCorrections" resultType="com.ieum.gw.dto.AttendanceCorrectionDTO">
@@ -121,4 +141,13 @@
 		  AND (a.attendance_id, a.work_date) IN (SELECT c.attendance_id, c.work_date FROM attendance_correction c
 		                                         WHERE c.company_id = #{companyId} AND c.attendance_correction_id = #{id})
 	</update>
+
+	<!-- 결근 정정 승인: 요청한 출근·퇴근으로 그날 근태를 새로 만든다. 그새 그날 근태가 생겼으면 UQ_36_01 -->
+	<insert id="insertAttendanceFromCorrection">
+		INSERT INTO attendance (company_id, employee_id, work_date, check_in_at, check_out_at)
+		SELECT c.company_id, c.employee_id, c.work_date, c.req_check_in_at, c.req_check_out_at
+		FROM attendance_correction c
+		WHERE c.company_id = #{companyId} AND c.attendance_correction_id = #{id}
+		  AND c.attendance_id IS NULL AND c.req_check_in_at IS NOT NULL
+	</insert>
 </mapper>

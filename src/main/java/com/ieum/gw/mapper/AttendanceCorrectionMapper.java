@@ -8,7 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import com.ieum.gw.dto.AttendanceCorrectionDTO;
 import com.ieum.gw.dto.AttendanceDTO;
 
-/** 근태 정정 요청 (attendance_correction). 승인하면 근태(attendance)의 퇴근 시각을 채운다 */
+/** 근태 정정 요청 (attendance_correction). 승인하면 근태(attendance)의 퇴근 시각을 채우거나(퇴근 누락) 그날 근태를 만든다(결근) */
 @Mapper
 public interface AttendanceCorrectionMapper {
 
@@ -18,6 +18,12 @@ public interface AttendanceCorrectionMapper {
 
     /** 정정 요청 1건을 넣는다. 원래 출퇴근은 화면 값이 아니라 근태 행에서 복사한다 */
     int insertCorrection(AttendanceCorrectionDTO dto);
+
+    /** 결근 정정 요청 1건을 넣는다 (그날 근태가 없어 요청한 출근·퇴근 시각만) */
+    int insertAbsenceCorrection(AttendanceCorrectionDTO dto);
+
+    /** 직원 입사일 (YYYY-MM-DD, 비었으면 null) */
+    String selectHireDate(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
     /** 직원 본인의 그 달 정정 요청 (최근 순) */
     List<AttendanceCorrectionDTO> selectMyCorrections(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,
@@ -39,4 +45,7 @@ public interface AttendanceCorrectionMapper {
 
     /** 승인: 요청한 퇴근 시각을 그날 근태에 넣는다 (퇴근이 비어 있을 때만) */
     int applyCheckOut(@Param("companyId") Long companyId, @Param("id") Long id);
+
+    /** 결근 정정 승인: 요청한 출근·퇴근으로 그날 근태를 만든다 */
+    int insertAttendanceFromCorrection(@Param("companyId") Long companyId, @Param("id") Long id);
 }

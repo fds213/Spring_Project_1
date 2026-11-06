@@ -22,6 +22,12 @@ public class AttendanceCorrectionDAO {
     /** 정정 요청 1건을 넣는다(원래 출퇴근은 근태 행에서 복사) */
     public int insertCorrection(AttendanceCorrectionDTO dto) { return mapper.insertCorrection(dto); }
 
+    /** 결근 정정 요청 1건을 넣는다(요청한 출근·퇴근만) */
+    public int insertAbsenceCorrection(AttendanceCorrectionDTO dto) { return mapper.insertAbsenceCorrection(dto); }
+
+    /** 직원 입사일을 읽는다(비었으면 null) */
+    public String selectHireDate(Long companyId, Long employeeId) { return mapper.selectHireDate(companyId, employeeId); }
+
     /** 직원 본인의 그 달 정정 요청을 읽는다 */
     public List<AttendanceCorrectionDTO> selectMyCorrections(Long companyId, Long employeeId, String month) { return mapper.selectMyCorrections(companyId, employeeId, month); }
 
@@ -39,4 +45,7 @@ public class AttendanceCorrectionDAO {
 
     /** 승인한 요청의 퇴근 시각을 그날 근태에 넣는다 */
     public int applyCheckOut(Long companyId, Long id) { return mapper.applyCheckOut(companyId, id); }
+
+    /** 결근 정정을 승인해 그날 근태를 만든다 */
+    public int insertAttendanceFromCorrection(Long companyId, Long id) { return mapper.insertAttendanceFromCorrection(companyId, id); }
 }

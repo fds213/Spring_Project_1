@@ -37,11 +37,11 @@ public class AttendanceCorrectionController {
         return service.myCorrections(user, month);
     }
 
-    /** 퇴근 누락 정정 요청 { date, outTime, reason } */
+    /** 정정 요청 { date, inTime(결근만), outTime, reason }. 근무일로부터 7일까지 */
     @PostMapping("/attendance/api/corrections")
     @ResponseBody
     public Map<String, Object> request(@AuthenticationPrincipal LoginUser user, @RequestBody Map<String, Object> body) {
-        return service.request(user, str(body.get("date")), str(body.get("outTime")), str(body.get("reason")));
+        return service.request(user, str(body.get("date")), str(body.get("inTime")), str(body.get("outTime")), str(body.get("reason")));
     }
 
     /** 처리 전인 내 요청 취소 */

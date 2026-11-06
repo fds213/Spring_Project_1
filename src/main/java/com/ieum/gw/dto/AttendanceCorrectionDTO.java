@@ -18,6 +18,7 @@ public class AttendanceCorrectionDTO {
     private Long attendanceId;        // 그날 근태 (퇴근 누락이면 있음)
     private String originCheckIn;     // HH24:MI:SS, 요청 당시 원래 출근
     private String originCheckOut;    // HH24:MI:SS, 요청 당시 원래 퇴근 (퇴근 누락이면 null)
+    private String reqCheckIn;        // HH24:MI, 요청한 출근 (결근 정정만, 퇴근 누락이면 null)
     private String reqCheckOut;       // HH24:MI, 요청한 퇴근 (저장할 때 넘기는 값도 이 모양)
     private String reason;
     private String statusCode;        // ACR_REQUESTED·ACR_APPROVED·ACR_REJECTED·ACR_CANCELED

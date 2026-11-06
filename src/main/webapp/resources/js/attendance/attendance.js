@@ -5,11 +5,13 @@
 // "업체·단말기 사용자 번호·사번 계정의 연결"이다. 이 화면에서는 본인이 번호를 연결한다 (원래는 인사 담당자·서버가 관리할 일이다).
 // 승인된 연차가 있는 날은 기록의 비고에 연차 구분을 적는다.
 //
-// 근태 정정(퇴근 누락 1차): '퇴근 누락' 날의 비고에 [정정 요청]. 요청하면 '정정 대기'와 [취소], 반려되면 반려 사유와 [다시 요청],
-// 승인되면 그날 퇴근이 채워지고 '정정 반영'. 처리자(요청자 부서장, 없거나 본인이면 업체 관리자)에게는 '처리할 근태 정정' 목록이 보인다.
-//   GET  /attendance/api/corrections?month=YYYY-MM → { month, items: [{ id, date, in, outTime, reason, status, at, decidedBy, decidedAt, rejectReason }] } 최근 순
-//   POST /attendance/api/corrections { date, outTime(HH:mm), reason } · POST …/{id}/cancel
-//   GET  /attendance/api/corrections/inbox → { items: [{ id, name, employeeNo, dept, date, in, outTime, reason, at, … }] } 오래된 순
+// 근태 정정: 근무일로부터 7일 안의 지난 날만(팀장님 11/6 결정). '퇴근 누락' 날은 퇴근 시각, 기록 없는 근무일(주말·휴일·종일 연차 제외)은
+// 출근·퇴근 시각을 요청한다. 비고에 [정정 요청] → '정정 대기'와 [취소], 반려되면 반려 사유와 [다시 요청], 승인되면 그날 근태가 채워지고 '정정 반영'.
+// 처리자(요청자 부서장, 없거나 본인이면 업체 관리자)에게는 '처리할 근태 정정' 목록이 보인다.
+//   GET  /attendance/api/corrections?month=YYYY-MM → { month, items: [{ id, kind(NO_OUT·ABSENT), date, in, inTime, outTime, reason, status, at,
+//        decidedBy, decidedAt, rejectReason }] } 최근 순
+//   POST /attendance/api/corrections { date, inTime(결근만), outTime(HH:mm), reason } · POST …/{id}/cancel
+//   GET  /attendance/api/corrections/inbox → { items: [{ id, kind, name, employeeNo, dept, date, in, inTime, outTime, reason, at, … }] } 오래된 순
 //   POST …/{id}/approve · POST …/{id}/reject { reason }   거절은 { message } (400 값, 403 권한, 404 없음, 409 상태)
 
 const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴', NO_OUT: '퇴근 누락' }; // NO_OUT: 지난 날 출근만 있고 퇴근이 없음
@@ -77,7 +79,7 @@ function renderAttRecords(r, corrections = []) {
       attNode('td', '', rec ? rec.in : '-'),
       attNode('td', '', rec && rec.out ? rec.out : '-'),
       attNode('td', '', status ? attNode('span', `status ${status === '정상' ? 'status-active' : 'status-waiting'}`, status) : '-'),
-      attNode('td', 'att-note', attNode('div', 'att-note-box', ...(note ? [note] : []), ...corrParts(day, rec, corrByDate[day.date]))));
+      attNode('td', 'att-note', attNode('div', 'att-note-box', ...(note ? [note] : []), ...corrParts(day, rec, corrByDate[day.date], r.today.date))));
     tr.querySelectorAll('td').forEach((td, i) => { td.dataset.label = ['날짜', '출근', '퇴근', '상태', '비고'][i]; });
     return tr;
   });
@@ -85,55 +87,80 @@ function renderAttRecords(r, corrections = []) {
   placeAttList();
 }
 
-// ---------- 근태 정정 (퇴근 누락) ----------
+// ---------- 근태 정정 (퇴근 누락·결근) ----------
 
-const attCorr = { day: null, reject: null }; // 요청 창을 연 날 { date, in }, 반려 창을 연 요청
+const ATT_CORR_DAYS = 7; // 정정 요청 기한: 근무일로부터 7일 (서버 AttendanceCorrectionService.REQUEST_DAYS 와 같다)
+const attCorr = { day: null, reject: null }; // 요청 창을 연 날 { date, in(퇴근 누락이면 출근 시각, 결근이면 '') }, 반려 창을 연 요청
 const attDayLabel = date => `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일`;
+/** 'YYYY-MM-DD' 에서 며칠 전 날짜 */
+const attDaysBefore = (date, n) => { const d = new Date(`${date}T00:00:00`); d.setDate(d.getDate() - n); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+/** 요청 시각 글자: 결근은 '09:00~18:00', 퇴근 누락은 '18:00' */
+const attCorrTimes = c => (c.inTime ? `${c.inTime}~${c.outTime}` : c.outTime);
 
-/** 비고 칸의 정정 표시: 반영·대기(+취소)·반려(+다시 요청), 퇴근 누락이면 [정정 요청] */
-function corrParts(day, rec, c) {
-  if (c && c.status === 'APPROVED') return [span(`정정 반영 ${c.outTime}`, 'status status-active')];
+/** 그날 정정을 요청할 수 있는지: 'NO_OUT'(퇴근 누락)·'ABSENT'(기록 없는 근무일)·null. 오늘 전, 7일 안만 */
+function corrKind(day, rec, today) {
+  if (day.date >= today || day.date < attDaysBefore(today, ATT_CORR_DAYS)) return null;
+  if (rec) return rec.outStatus === 'NO_OUT' ? 'NO_OUT' : null;
+  const weekend = day.weekday === 0 || day.weekday === 6;
+  return weekend || day.holiday || day.leave === 'FULL' ? null : 'ABSENT';
+}
+
+/** 비고 칸의 정정 표시: 반영·대기(+취소)·반려(+다시 요청), 요청할 수 있는 날이면 [정정 요청], 기한이 지난 퇴근 누락은 안내 */
+function corrParts(day, rec, c, today) {
+  if (c && c.status === 'APPROVED') return [span(`정정 반영 ${attCorrTimes(c)}`, 'status status-active')];
   if (c && c.status === 'REQUESTED') {
-    return [span(`정정 대기 ${c.outTime}`, 'status status-waiting'),
+    return [span(`정정 대기 ${attCorrTimes(c)}`, 'status status-waiting'),
       writeBtn('취소', 'btn', b => cancelCorrection(c, b))];
   }
-  if (!rec || rec.outStatus !== 'NO_OUT') return [];
   const parts = [];
   if (c && c.status === 'REJECTED') parts.push(span('정정 반려', 'status status-rejected'), span(`사유: ${c.rejectReason}`, 'cell-sub'));
-  const again = c && c.status === 'REJECTED';
-  const go = writeBtn(again ? '다시 요청' : '정정 요청', 'btn', () => openCorrection(day, rec));
-  go.setAttribute('aria-label', `${attDayLabel(day.date)} 퇴근 누락 정정 ${again ? '다시 요청' : '요청'}`);
-  parts.push(go);
+  const kind = corrKind(day, rec, today);
+  if (kind) {
+    const again = c && c.status === 'REJECTED';
+    const go = writeBtn(again ? '다시 요청' : '정정 요청', 'btn', () => openCorrection(day, rec, kind));
+    go.setAttribute('aria-label', `${attDayLabel(day.date)} ${kind === 'NO_OUT' ? '퇴근 누락' : '출퇴근 기록 없음'} 정정 ${again ? '다시 요청' : '요청'}`);
+    parts.push(go);
+  } else if (rec && rec.outStatus === 'NO_OUT' && day.date < attDaysBefore(today, ATT_CORR_DAYS)) {
+    parts.push(span(`정정 기한(${ATT_CORR_DAYS}일) 지남`, 'cell-sub'));
+  }
   return parts;
 }
 
-/** 정정 요청 창을 연다 (그날 출근 시각을 보여 준다) */
-function openCorrection(day, rec) {
-  attCorr.day = { date: day.date, in: rec.in };
+/** 정정 요청 창을 연다. 퇴근 누락은 그날 출근을 보여 주고 퇴근만, 결근은 출근·퇴근을 받는다 */
+function openCorrection(day, rec, kind) {
+  const absent = kind === 'ABSENT';
+  attCorr.day = { date: day.date, in: absent ? '' : rec.in };
   attEl('attCorrForm').reset();
   attEl('attCorrError').textContent = '';
-  attEl('attCorrWho').textContent = `${attDayLabel(day.date)} (${ATT_WEEKDAYS[day.weekday]}) · 출근 ${rec.in} · 퇴근 기록 없음`;
+  attEl('attCorrTitle').textContent = absent ? '출퇴근 기록 정정 요청' : '퇴근 누락 정정 요청';
+  attEl('attCorrWho').textContent = `${attDayLabel(day.date)} (${ATT_WEEKDAYS[day.weekday]}) · `
+    + (absent ? '출퇴근 기록 없음' : `출근 ${rec.in} · 퇴근 기록 없음`);
+  attEl('attCorrInRow').hidden = !absent;
   attEl('attCorrDialog').showModal();
-  attEl('attCorrOut').focus();
+  attEl(absent ? 'attCorrIn' : 'attCorrOut').focus();
 }
 
 attEl('attCorrForm').addEventListener('submit', ev => {
   ev.preventDefault();
   const d = attCorr.day;
+  const absent = !d.in;
+  const inTime = absent ? attEl('attCorrIn').value : '';
   const out = attEl('attCorrOut').value;
   const reason = attEl('attCorrReason').value.trim();
   const error = attEl('attCorrError');
+  const from = absent ? inTime : d.in.slice(0, 5);
   // 서버도 같은 검사를 다시 한다
-  error.textContent = !out ? '퇴근 시각을 넣어 주세요'
-    : out < d.in.slice(0, 5) ? `퇴근 시각은 출근 시각(${d.in.slice(0, 5)})보다 늦어야 합니다`
+  error.textContent = absent && !inTime ? '출근 시각을 넣어 주세요'
+    : !out ? '퇴근 시각을 넣어 주세요'
+    : out < from ? `퇴근 시각은 출근 시각(${from})보다 늦어야 합니다`
     : !reason ? '사유를 넣어 주세요' : '';
   if (error.textContent) return;
   const btn = attEl('attCorrSubmit');
   btn.disabled = true;
-  api.post('/attendance/api/corrections', { date: d.date, outTime: out, reason })
+  api.post('/attendance/api/corrections', { date: d.date, ...(absent ? { inTime } : {}), outTime: out, reason })
     .done(() => {
       attEl('attCorrDialog').close();
-      showToast(`${attDayLabel(d.date)} 퇴근을 ${out}으로 정정해 달라고 요청했습니다`);
+      showToast(`${attDayLabel(d.date)} ${absent ? `출퇴근을 ${inTime}~${out}` : `퇴근을 ${out}`}으로 정정해 달라고 요청했습니다`);
       loadAttRecords();
     })
     .fail(xhr => { error.textContent = apiMessage(xhr, '정정을 요청하지 못했습니다'); })
@@ -162,8 +189,8 @@ function renderAttInbox(items) {
   attEl('attInbox').hidden = !items.length;
   attEl('attInboxList').replaceChildren(...items.map(c => h('tr', '',
     inqCell('요청자', c.name, ...(c.dept ? [small(c.dept)] : [])),
-    inqCell('날짜', attDayLabel(c.date)),
-    inqCell('출근', c.in),
+    inqCell('날짜', attDayLabel(c.date), small(c.kind === 'ABSENT' ? '기록 없음' : '퇴근 누락')),
+    inqCell('출근', c.kind === 'ABSENT' ? `${c.inTime} (요청)` : c.in),
     inqCell('요청 퇴근', c.outTime),
     inqCell('사유', h('span', 'att-corr-reason', c.reason)),
     inqCell('요청일', whenFull(c.at)),
@@ -172,11 +199,11 @@ function renderAttInbox(items) {
       writeBtn('반려', 'btn', () => openReject(c)))))));
 }
 
-/** 승인: 요청한 퇴근 시각이 그날 근태에 들어간다 */
+/** 승인: 퇴근 누락은 요청한 퇴근 시각이, 결근은 요청한 출퇴근이 그날 근태에 들어간다 */
 function approveCorrection(c, btn) {
   btn.disabled = true;
   api.post(`/attendance/api/corrections/${c.id}/approve`)
-    .done(() => showToast(`${c.name}님 ${attDayLabel(c.date)} 퇴근을 ${c.outTime}으로 정정했습니다`))
+    .done(() => showToast(`${c.name}님 ${attDayLabel(c.date)} ${c.kind === 'ABSENT' ? `출퇴근을 ${attCorrTimes(c)}` : `퇴근을 ${c.outTime}`}으로 정정했습니다`))
     .fail(xhr => showToast(apiMessage(xhr, '승인하지 못했습니다')))
     .always(() => loadAttInbox());
 }
@@ -186,7 +213,7 @@ function openReject(c) {
   attCorr.reject = c;
   attEl('attRejectForm').reset();
   attEl('attRejectError').textContent = '';
-  attEl('attRejectWho').textContent = `${c.name} · ${attDayLabel(c.date)} · 요청 퇴근 ${c.outTime}`;
+  attEl('attRejectWho').textContent = `${c.name} · ${attDayLabel(c.date)} · 요청 ${c.kind === 'ABSENT' ? `출퇴근 ${attCorrTimes(c)}` : `퇴근 ${c.outTime}`}`;
   attEl('attRejectDialog').showModal();
   attEl('attRejectReason').focus();
 }
@@ -210,7 +237,7 @@ attEl('attRejectForm').addEventListener('submit', ev => {
     .always(() => { btn.disabled = false; });
 });
 attEl('attRejectCancel').addEventListener('click', () => attEl('attRejectDialog').close());
-['attCorrOut', 'attCorrReason', 'attRejectReason'].forEach(id =>
+['attCorrIn', 'attCorrOut', 'attCorrReason', 'attRejectReason'].forEach(id =>
   attEl(id).addEventListener('input', () => { attEl(id.startsWith('attReject') ? 'attRejectError' : 'attCorrError').textContent = ''; }));
 
 // 목록 위치: 달을 새로 열 때만 맞춘다(탭으로 돌아와 다시 받을 때는 보던 자리 그대로).

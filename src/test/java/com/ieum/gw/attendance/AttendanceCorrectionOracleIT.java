@@ -130,7 +130,7 @@ class AttendanceCorrectionOracleIT {
     @DisplayName("요청 → 부서장 승인: 원래 출근을 근태에서 복사하고, 승인하면 그날 퇴근이 채워진다(CK_82_*·CK_36_02 통과)")
     void requestAndApprove() {
         String d = noOut(member, 3, "09:07");
-        Long id = ((Number) service.request(member, d, "18:25", "단말기 고장").get("id")).longValue();
+        Long id = ((Number) service.request(member, d, null, "18:25", "단말기 고장").get("id")).longValue();
         assertEquals("ACR_REQUESTED", col(id, "status_code"));
         assertNotNull(col(id, "origin_check_in_at"));
         assertNull(col(id, "origin_check_out_at"));
@@ -145,20 +145,20 @@ class AttendanceCorrectionOracleIT {
         assertEquals(String.valueOf(head.getEmployeeId()), col(id, "approver_employee_id"));
         assertNotNull(col(id, "decided_at"));
         assertEquals(409, status(() -> service.reject(head, id, "늦은 반려")));
-        assertEquals(409, status(() -> service.request(member, d, "19:00", "이미 퇴근이 있는 날")));
+        assertEquals(409, status(() -> service.request(member, d, null, "19:00", "이미 퇴근이 있는 날")));
     }
 
     @Test
     @DisplayName("같은 날 대기 하나만(UX_82_01), 취소 뒤 다시 요청, 반려는 사유를 남기고 근태는 그대로")
     void duplicateCancelReject() {
         String d = noOut(member, 4, "08:58");
-        Long first = ((Number) service.request(member, d, "18:00", "첫 요청").get("id")).longValue();
-        assertEquals(409, status(() -> service.request(member, d, "18:10", "두 번째")));
+        Long first = ((Number) service.request(member, d, null, "18:00", "첫 요청").get("id")).longValue();
+        assertEquals(409, status(() -> service.request(member, d, null, "18:10", "두 번째")));
         assertEquals(404, status(() -> service.cancel(head, first)));
         service.cancel(member, first);
         assertEquals("ACR_CANCELED", col(first, "status_code"));
 
-        Long second = ((Number) service.request(member, d, "18:10", "다시 요청").get("id")).longValue();
+        Long second = ((Number) service.request(member, d, null, "18:10", "다시 요청").get("id")).longValue();
         assertEquals(400, status(() -> service.reject(head, second, " ")));
         service.reject(head, second, "그날 일찍 나간 것으로 압니다");
         assertEquals("ACR_REJECTED", col(second, "status_code"));
@@ -174,14 +174,14 @@ class AttendanceCorrectionOracleIT {
     @DisplayName("부서장 본인 요청은 업체 관리자가, 부서장이 휴직이면 그 부서원 요청도 업체 관리자가 처리한다")
     void adminDecides() {
         String hd = noOut(head, 5, "09:00");
-        Long own = ((Number) service.request(head, hd, "18:00", "부서장 본인").get("id")).longValue();
+        Long own = ((Number) service.request(head, hd, null, "18:00", "부서장 본인").get("id")).longValue();
         assertTrue(inboxIds(admin).contains(own));
         assertEquals(403, status(() -> service.approve(head, own)));
         service.approve(admin, own);
         assertEquals("18:00", checkOut(head, hd));
 
         String md = noOut(member, 6, "09:00");
-        Long id = ((Number) service.request(member, md, "18:40", "부서장 휴직 중").get("id")).longValue();
+        Long id = ((Number) service.request(member, md, null, "18:40", "부서장 휴직 중").get("id")).longValue();
         jdbc.update("UPDATE employee SET employment_status = 'ST_LEAVE' WHERE company_id = ? AND employee_id = ?", head.getCompanyId(), head.getEmployeeId());
         try {
             assertTrue(inboxIds(admin).contains(id));
@@ -194,11 +194,34 @@ class AttendanceCorrectionOracleIT {
     }
 
     @Test
-    @DisplayName("오늘은 409, 기록 없는 날은 409, 출근보다 이른 퇴근은 400 (실제 근태 행 기준)")
+    @DisplayName("오늘은 409, 7일 지난 날은 409, 출근보다 이른 퇴근은 400 (실제 근태 행 기준)")
     void rejectedBeforeInsert() {
-        assertEquals(409, status(() -> service.request(member, today.toString(), "18:00", "오늘")));
-        assertEquals(409, status(() -> service.request(member, today.minusDays(9).toString(), "18:00", "기록 없음")));
+        assertEquals(409, status(() -> service.request(member, today.toString(), null, "18:00", "오늘")));
+        assertEquals(409, status(() -> service.request(member, today.minusDays(9).toString(), "09:00", "18:00", "기한 지남")));
         String d = noOut(member, 7, "10:30");
-        assertEquals(400, status(() -> service.request(member, d, "10:00", "출근보다 이름")));
+        assertEquals(400, status(() -> service.request(member, d, null, "10:00", "출근보다 이름")));
+    }
+
+    @Test
+    @DisplayName("결근 정정: 기록 없는 근무일에 출근·퇴근을 요청하고(CK_82_07), 승인하면 그날 근태가 새로 생긴다")
+    void absenceRequestAndApprove() {
+        // 1~7일 전 중 이 테스트들이 근태를 넣지 않는 평일 (부서원은 3·4·6·7일 전을 쓴다)
+        String d = null;
+        for (int i = 1; i <= 7 && d == null; i++) {
+            LocalDate x = today.minusDays(i);
+            boolean weekday = x.getDayOfWeek().getValue() <= 5;
+            if (weekday && !List.of(3, 4, 6, 7).contains(i)) d = x.toString();
+        }
+        assertNotNull(d);
+        String day = d;
+        assertEquals(400, status(() -> service.request(member, day, null, "18:00", "출근 시각 없음")));
+        Long id = ((Number) service.request(member, day, "09:10", "18:20", "외근 뒤 바로 퇴근").get("id")).longValue();
+        assertNull(col(id, "attendance_id"));
+        assertNotNull(col(id, "req_check_in_at"));
+        service.approve(head, id);
+        assertEquals("18:20", checkOut(member, day));
+        assertEquals("09:10", jdbc.queryForObject("SELECT TO_CHAR(check_in_at, 'HH24:MI') FROM attendance WHERE company_id = ? AND employee_id = ? "
+                + "AND work_date = TO_DATE(?, 'YYYY-MM-DD')", String.class, member.getCompanyId(), member.getEmployeeId(), day));
+        assertEquals("ACR_APPROVED", col(id, "status_code"));
     }
 }

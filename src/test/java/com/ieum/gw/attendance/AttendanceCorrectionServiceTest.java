@@ -78,7 +78,7 @@ class AttendanceCorrectionServiceTest {
 
     /** 102 의 10/29 퇴근 누락을 18:20 으로 요청하고 번호를 돌려준다 */
     private Long request102() {
-        return (Long) service.request(EMP_102, "2026-10-29", "18:20", "단말기 고장으로 못 찍음").get("id");
+        return (Long) service.request(EMP_102, "2026-10-29", null, "18:20", "단말기 고장으로 못 찍음").get("id");
     }
 
     @Test
@@ -94,19 +94,64 @@ class AttendanceCorrectionServiceTest {
     }
 
     @Test
-    @DisplayName("요청 거절: 오늘·앞날 409, 시각·날짜·사유 형식 400, 기록 없음·퇴근 있음 409, 출근보다 이른 퇴근 400, 퇴사자 403")
+    @DisplayName("요청 거절: 오늘·앞날 409, 시각·날짜·사유 형식 400, 출근 없는 날에 출근 시각 없음 400, 퇴근 있음 409, 출근보다 이른 퇴근 400, 퇴사자 403")
     void requestRejected() {
-        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-30", "18:00", "사유")));
-        assertEquals(409, status(() -> service.request(EMP_102, "2026-11-02", "18:00", "사유")));
-        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", "6pm", "사유")));
-        assertEquals(400, status(() -> service.request(EMP_102, "2026/10/29", "18:00", "사유")));
-        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", "18:00", "  ")));
-        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", "18:00", "가".repeat(501))));
-        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-27", "18:00", "기록 없는 날(결근)")));
-        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-28", "19:00", "퇴근 있음")));
-        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", "09:00", "출근보다 이름")));
-        assertEquals(403, status(() -> service.request(user(105L, "ROLE_EMP"), "2026-10-29", "18:00", "퇴사자")));
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-30", null, "18:00", "사유")));
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-11-02", null, "18:00", "사유")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", null, "6pm", "사유")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026/10/29", null, "18:00", "사유")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", null, "18:00", "  ")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", null, "18:00", "가".repeat(501))));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-27", null, "18:00", "기록 없는 날(결근)인데 출근 시각 없음")));
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-28", null, "19:00", "퇴근 있음")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", null, "09:00", "출근보다 이름")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-29", "08:00", "18:00", "퇴근 누락 날에 출근까지")));
+        assertEquals(403, status(() -> service.request(user(105L, "ROLE_EMP"), "2026-10-29", null, "18:00", "퇴사자")));
         assertTrue(mapper.rows.isEmpty());
+    }
+
+    @Test
+    @DisplayName("기한: 근무일로부터 7일까지(오늘 10/30 → 10/23 까지), 8일 전은 409")
+    void requestWindow() {
+        AttendanceException late = assertThrows(AttendanceException.class,
+                () -> service.request(EMP_102, "2026-10-22", "09:00", "18:00", "8일 전"));
+        assertEquals(409, late.getStatus());
+        assertTrue(late.getMessage().contains("7일"));
+        service.request(EMP_102, "2026-10-23", "09:00", "18:00", "딱 7일 전(결근)");
+        assertEquals(1, mapper.rows.size());
+    }
+
+    @Test
+    @DisplayName("결근 정정: 기록 없는 근무일에 출근·퇴근 시각을 받고, 승인하면 그날 근태가 생긴다")
+    @SuppressWarnings("unchecked")
+    void absenceApprove() {
+        Long id = (Long) service.request(EMP_102, "2026-10-27", "09:00", "18:05", "외근 후 바로 퇴근").get("id");
+        AttendanceCorrectionDTO c = mapper.byId(id);
+        assertNull(c.getAttendanceId());
+        assertEquals("09:00", c.getReqCheckIn());
+        assertEquals("ABSENT", ((List<Map<String, Object>>) (List<?>) service.inbox(HEAD_103).get("items")).get(0).get("kind"));
+        service.approve(HEAD_103, id);
+        AttendanceDTO made = mapper.att.get("102/2026-10-27");
+        assertEquals("09:00:00", made.getCheckIn());
+        assertEquals("18:05:00", made.getCheckOut());
+        assertEquals("ACR_APPROVED", mapper.byId(id).getStatusCode());
+    }
+
+    @Test
+    @DisplayName("결근 정정 거절: 주말·휴일 409, 퇴근이 출근보다 이르면 400. 승인 전에 그날 근태가 생기면 409(UQ_36_01)")
+    void absenceRejected() {
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-25", "09:00", "18:00", "일요일")));
+        attMapper.holidays.put(java.time.LocalDate.parse("2026-10-26"), "임시 휴일");
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-26", "09:00", "18:00", "휴일")));
+        assertEquals(400, status(() -> service.request(EMP_102, "2026-10-27", "18:00", "09:00", "거꾸로")));
+        mapper.hire.put(102L, "2026-10-28");
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-27", "09:00", "18:00", "입사 전 날")));
+        mapper.hire.put(102L, "2026-10-27"); // 입사일 당일은 된다
+
+        Long id = (Long) service.request(EMP_102, "2026-10-27", "09:00", "18:00", "결근 정정").get("id");
+        mapper.attendance(102L, "2026-10-27", "09:30", null); // 그새 그날 근태가 생겼다
+        assertEquals(409, status(() -> service.approve(HEAD_103, id)));
+        assertEquals("ACR_REQUESTED", mapper.byId(id).getStatusCode());
     }
 
     @Test
@@ -142,11 +187,11 @@ class AttendanceCorrectionServiceTest {
         assertEquals(403, status(() -> service.approve(EMP_104, id)));    // 상관없는 직원
         assertEquals(403, status(() -> service.approve(ADMIN_900, id)));  // 부서장이 있으면 관리자 아님
 
-        Long headOwn = (Long) service.request(HEAD_103, "2026-10-29", "18:00", "부서장 본인").get("id");
+        Long headOwn = (Long) service.request(HEAD_103, "2026-10-29", null, "18:00", "부서장 본인").get("id");
         assertEquals(403, status(() -> service.approve(HEAD_103, headOwn)));
         service.approve(ADMIN_900, headOwn);
 
-        Long noHead = (Long) service.request(EMP_104, "2026-10-29", "18:30", "부서장 없는 부서").get("id");
+        Long noHead = (Long) service.request(EMP_104, "2026-10-29", null, "18:30", "부서장 없는 부서").get("id");
         assertEquals(403, status(() -> service.approve(HEAD_103, noHead)));
         service.approve(ADMIN_900, noHead);
         assertEquals("18:30:00", mapper.att.get("104/2026-10-29").getCheckOut());
@@ -201,8 +246,8 @@ class AttendanceCorrectionServiceTest {
     @SuppressWarnings("unchecked")
     void inbox() {
         request102();
-        service.request(HEAD_103, "2026-10-29", "18:00", "부서장 본인");
-        service.request(EMP_104, "2026-10-29", "18:00", "부서장 없는 부서");
+        service.request(HEAD_103, "2026-10-29", null, "18:00", "부서장 본인");
+        service.request(EMP_104, "2026-10-29", null, "18:00", "부서장 없는 부서");
         List<Map<String, Object>> head = (List<Map<String, Object>>) service.inbox(HEAD_103).get("items");
         assertEquals(List.of(102L), head.stream().map(m -> mapper.byId((Long) m.get("id")).getEmployeeId()).collect(Collectors.toList()));
         List<Map<String, Object>> admin = (List<Map<String, Object>>) service.inbox(ADMIN_900).get("items");
@@ -265,6 +310,30 @@ class AttendanceCorrectionServiceTest {
             dto.setStatusCode("ACR_REQUESTED");
             dto.setCreatedAt("2026-10-30T10:00:" + (seq % 60 < 10 ? "0" : "") + (seq % 60));
             rows.add(dto);
+            return 1;
+        }
+
+        @Override public int insertAbsenceCorrection(AttendanceCorrectionDTO dto) {
+            if (rows.stream().anyMatch(r -> r.getEmployeeId().equals(dto.getEmployeeId()) && r.getWorkDate().equals(dto.getWorkDate())
+                    && "ACR_REQUESTED".equals(r.getStatusCode()))) {
+                throw new DuplicateKeyException("UX_82_01");
+            }
+            dto.setAttendanceCorrectionId(seq++);
+            dto.setStatusCode("ACR_REQUESTED");
+            dto.setCreatedAt("2026-10-30T10:00:" + (seq % 60 < 10 ? "0" : "") + (seq % 60));
+            rows.add(dto);
+            return 1;
+        }
+
+        final Map<Long, String> hire = new HashMap<>(); // 직원 → 입사일 (없으면 null)
+
+        @Override public String selectHireDate(Long companyId, Long employeeId) { return hire.get(employeeId); }
+
+        @Override public int insertAttendanceFromCorrection(Long companyId, Long id) {
+            AttendanceCorrectionDTO r = byId(id);
+            if (r == null || r.getReqCheckIn() == null) return 0;
+            if (att.containsKey(r.getEmployeeId() + "/" + r.getWorkDate())) throw new DuplicateKeyException("UQ_36_01");
+            attendance(r.getEmployeeId(), r.getWorkDate(), r.getReqCheckIn() + ":00", r.getReqCheckOut() + ":00");
             return 1;
         }
 

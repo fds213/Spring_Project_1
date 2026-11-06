@@ -6,7 +6,8 @@
   서버가 감싸 보낸 응답({ success, message, data })은 common.js 의 api 가 푼다(docs/front-screen-api.md 2장).
   화면 JS는 util.js(같이 쓰는 도구)와 이 화면 모듈의 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다.
   연차는 따로 연차 화면(/attendance/leave)에 있다.
-  근태 정정: '퇴근 누락' 날의 [정정 요청]으로 퇴근 시각을 요청하고, 부서장(없거나 본인이면 업체 관리자)이 '처리할 근태 정정'에서 승인·반려한다.
+  근태 정정: 근무일로부터 7일 안의 '퇴근 누락' 날(퇴근 시각)과 기록 없는 근무일(출근·퇴근 시각)에 [정정 요청]을 두고,
+  부서장(없거나 본인이면 업체 관리자)이 '처리할 근태 정정'에서 승인·반려한다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:layout title="근태" crumb="근무" menu="attendance">
@@ -53,9 +54,11 @@
 
     <%-- 퇴근 누락 정정 요청: 그날 퇴근 시각과 사유 --%>
     <dialog class="modal att-corr" id="attCorrDialog" aria-labelledby="attCorrTitle">
-      <h2 id="attCorrTitle">퇴근 누락 정정 요청</h2>
+      <h2 id="attCorrTitle">근태 정정 요청</h2>
       <p id="attCorrWho"></p>
       <form class="leave-form" id="attCorrForm" novalidate>
+        <%-- 출근 시각은 결근(기록 없는 날) 정정에만 보인다. 퇴근 누락은 단말기 출근 기록을 그대로 둔다 --%>
+        <div class="leave-row" id="attCorrInRow" hidden><label for="attCorrIn">출근 시각</label><input class="input" id="attCorrIn" type="time" step="60"></div>
         <div class="leave-row"><label for="attCorrOut">퇴근 시각</label><input class="input" id="attCorrOut" type="time" step="60"></div>
         <div class="leave-row leave-row-top"><label for="attCorrReason">사유</label>
           <textarea class="inq-text" id="attCorrReason" maxlength="500" placeholder="예: 퇴근할 때 단말기를 찍지 못했습니다"></textarea></div>
