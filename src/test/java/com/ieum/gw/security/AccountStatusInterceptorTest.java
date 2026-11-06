@@ -25,13 +25,14 @@ import com.ieum.gw.service.EmployeeService;
 /** 계정 상태 검사: 꺼진 계정의 기존 세션은 끊고, 사용 중이거나 로그인하지 않은 요청은 통과 (가짜 직원 Service, DB 없음) */
 class AccountStatusInterceptorTest {
 
-	/** 지금도 사용 중인지 마음대로 정해 주는 가짜 */
+	/** 지금도 사용 중인지, DB의 역할이 무엇인지 마음대로 정해 주는 가짜 */
 	static class FakeEmployeeService extends EmployeeService {
 		boolean active = true;
+		String role = "ROLE_HR";   // login()의 세션 역할과 같게 시작
 
 		@Override
-		public boolean isActiveEmployee(Long companyId, Long employeeId) {
-			return active;
+		public String getActiveRole(Long companyId, Long employeeId) {
+			return active ? role : null;
 		}
 	}
 
@@ -103,6 +104,29 @@ class AccountStatusInterceptorTest {
 	void inactiveAjax() throws IOException {
 		login();
 		employees.active = false;
+
+		assertFalse(send("/employee/admin/api/employees/20260002/status", true));
+		assertEquals(401, response.getStatus());
+		assertTrue(session.isInvalid());
+	}
+
+	@Test
+	@DisplayName("역할이 바뀐 계정이 기존 세션으로 화면을 열면 세션을 끊고 다시 로그인 안내(?changed)로 보낸다")
+	void roleChangedPage() throws IOException {
+		login();                       // 세션 역할 ROLE_HR
+		employees.role = "ROLE_EMP";   // 관리자가 직원으로 내림
+
+		assertFalse(send("/home", false));
+		assertEquals("/gw/login?changed", response.getRedirectedUrl());
+		assertTrue(session.isInvalid());
+		assertNull(SecurityContextHolder.getContext().getAuthentication());
+	}
+
+	@Test
+	@DisplayName("역할이 바뀐 계정이 옛 권한으로 API(Ajax)를 부르면 401이고 세션을 끊는다 (#175 리뷰: 인사 담당→직원 뒤 비활성화 요청)")
+	void roleChangedAjax() throws IOException {
+		login();
+		employees.role = "ROLE_EMP";
 
 		assertFalse(send("/employee/admin/api/employees/20260002/status", true));
 		assertEquals(401, response.getStatus());

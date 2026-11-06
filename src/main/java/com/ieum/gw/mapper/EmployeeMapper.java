@@ -45,6 +45,10 @@ public interface EmployeeMapper {
 
     // ── 연동 확인 ──
     int countActiveEmployee(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+    
+    /** 사용 중인 재직자의 지금 역할. 사용 중이 아니면 null */
+    String getActiveRole(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
+    
     int countRole(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,
                   @Param("roleCodes") List<String> roleCodes);
     

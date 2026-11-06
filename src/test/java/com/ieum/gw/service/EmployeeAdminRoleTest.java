@@ -143,4 +143,14 @@ class EmployeeAdminRoleTest {
 		assertThrows(IllegalStateException.class, () -> service.setRole(admin, "20260003", "ROLE_EMP"));
 		assertEquals("ROLE_ADMIN", dao.roles.get(503L));
 	}
+
+	@Test
+	@DisplayName("사용 중이 아닌(비활성) 계정은 409이고 역할은 바뀌지 않는다 (#175 리뷰)")
+	void notActive() {
+		dao.add("20260004", 504L, "최퇴사", "ROLE_EMP");
+		dao.people.get("20260004").setStatusCode("RETIRED");
+
+		assertThrows(IllegalStateException.class, () -> service.setRole(admin, "20260004", "ROLE_IT"));
+		assertEquals("ROLE_EMP", dao.roles.get(504L));
+	}
 }

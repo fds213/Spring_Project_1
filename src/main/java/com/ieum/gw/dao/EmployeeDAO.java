@@ -82,6 +82,11 @@ public class EmployeeDAO {
         return mapper.countActiveEmployee(companyId, employeeId);
     }
 
+    /** 사용 중인 재직자의 지금 역할. 사용 중이 아니면 null */
+    public String getActiveRole(Long companyId, Long employeeId) {
+        return mapper.getActiveRole(companyId, employeeId);
+    }
+
     /** 역할이 목록 중 하나면 1, 아니면 0 */
     public int countRole(Long companyId, Long employeeId, List<String> roleCodes) {
         return mapper.countRole(companyId, employeeId, roleCodes);
