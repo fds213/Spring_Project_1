@@ -139,6 +139,11 @@ public class EmployeeDAO {
         return mapper.getHeadTarget(companyId, employeeNo);
     }
 
+    /** 역할 바꾸기 (직원·IT 담당·인사 담당끼리만). 업체 관리자 계정이면 0 */
+    public int updateRole(Long companyId, Long employeeId, String roleCode) {
+        return mapper.updateRole(companyId, employeeId, roleCode);
+    }
+
     /** 그 부서의 부서장을 이 사람으로 */
     public int setDeptHead(Long companyId, Long departmentId, Long employeeId) {
         return mapper.setDeptHead(companyId, departmentId, employeeId);

@@ -28,6 +28,7 @@ public class EmployeeAdminService {
     private static final Set<String> EMP_TYPES = Set.of("EMP_REGULAR", "EMP_CONTRACT", "EMP_DISPATCH", "EMP_INTERN");
     private static final Set<String> WORKS = Set.of("ST_SERVING", "ST_RETIRED"); // 휴직은 이번 범위에서 쓰지 않는다(공통 코드 N)
     private static final Set<String> GENDERS = Set.of("GD_MALE", "GD_FEMALE", "GD_OTHER");
+    private static final Set<String> GRANTABLE_ROLES = Set.of("ROLE_EMP", "ROLE_IT", "ROLE_HR"); // 업체가 줄 수 있는 역할
     
     private final EmployeeDAO dao;
     private final EmployeeService employeeService;          // 사용 중 계정 수 (결제·가입 승인과 같은 기준)
@@ -143,6 +144,41 @@ public class EmployeeAdminService {
         result.put("dept", t.getDepartmentName());
         return result;
     }
+    
+
+    /** 역할 바꾸기 (POST /employee/admin/api/employees/{empNo}/role, CFG-01). 업체 관리자만, 직원·IT 담당·인사 담당끼리 */
+    public Map<String, Object> setRole(LoginUser user, String empNo, String role) {
+        // ① 권한: 인사 담당도 이 주소까지는 들어오지만(Security), 역할은 업체 관리자만 정한다
+        if (!"ROLE_ADMIN".equals(user.getRole())) {
+            throw new AccessDeniedException("역할은 업체 관리자만 정할 수 있습니다");
+        }
+        // ② 줄 수 있는 역할만
+        if (role == null || !GRANTABLE_ROLES.contains(role)) {
+            throw new IllegalArgumentException("역할은 직원·IT 담당·인사 담당 중에서 골라 주세요");
+        }
+        Long companyId = user.getCompanyId();
+
+        // ③ 대상 (다른 업체 사번이면 찾지 못한다)
+        EmployeeHeadTargetDTO t = dao.getHeadTarget(companyId, empNo);
+        if (t == null) {
+            throw new IllegalArgumentException("없는 사원입니다");
+        }
+        // ④ 업체 관리자·본인 계정은 바꾸지 않는다
+        if ("ROLE_ADMIN".equals(t.getRoleCode()) || t.getEmployeeId().equals(user.getEmployeeId())) {
+            throw new IllegalStateException("업체 관리자와 본인 계정의 역할은 바꿀 수 없습니다");
+        }
+        // ⑤ 조건부 UPDATE: 그사이 관리자가 됐으면 0행
+        if (dao.updateRole(companyId, t.getEmployeeId(), role) == 0) {
+            throw new IllegalStateException("역할을 바꿀 수 없는 계정입니다. 화면을 새로 고쳐 주세요");
+        }
+
+        // ⑥ 화면 토스트용 (바뀐 역할은 그 사람이 다시 로그인해야 메뉴에 반영된다)
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("name", t.getEmployeeName());
+        result.put("role", role);
+        return result;
+    }
+    
     
     /** 계정 비활성화·다시 사용 (POST /employee/admin/api/employees/{empNo}/status). 업체 관리자·인사 담당 */
     @Transactional
