@@ -71,6 +71,10 @@ public interface EmployeeMapper {
 	
 	EmployeeHeadTargetDTO getHeadTarget(@Param("companyId") Long companyId, @Param("employeeNo") String employeeNo);
 
+	/** 역할 바꾸기 (업체 관리자 계정은 0행) */
+	int updateRole(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId,
+			@Param("roleCode") String roleCode);
+	
 	int setDeptHead(@Param("companyId") Long companyId, @Param("departmentId") Long departmentId,
 			@Param("employeeId") Long employeeId);
 

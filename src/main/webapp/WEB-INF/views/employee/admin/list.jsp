@@ -19,7 +19,7 @@
            체험 중에는 관리자 포함 10명, 결제하면 구매 인원까지다. 실제 한도는 서버가 계정 수를 세서 막는다 --%>
       <div class="page-head"><h1>사원 관리</h1></div>
       <%-- 사원 등록은 없다: 직원은 로그인 화면의 계정 생성로 승인을 요청하고, 승인되면 사번이 순서대로 붙는다 --%>
-      <p class="muted join-scope">직원은 로그인 화면의 "계정 생성"로 승인을 요청합니다. 가입 승인에서 승인하면 사번이 순서대로 붙고 바로 로그인할 수 있습니다(직원은 요청할 때 비밀번호를 정합니다).</p>
+      <p class="muted join-scope">직원은 로그인 화면의 "계정 생성"으로 가입을 요청하고, 가입 승인에서 승인하면 사번이 붙어 바로 로그인합니다.</p>
       <div class="cards">
         <div class="card"><small>전체 계정</small><strong id="empTotal">-</strong></div>
         <div class="card"><small>사용 중</small><strong id="empActive">-</strong></div>

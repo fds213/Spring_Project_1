@@ -78,7 +78,7 @@ public class JoinDAO {
     public Long findGradeId(Long companyId, String gradeName) {
         return mapper.findGradeId(companyId, gradeName);
     }
-    
+
     /** 같은 업체에서 이 이메일로 대기 중이거나 쓰는 계정 수 (반려·취소 제외) */
     public int countLiveEmail(Long companyId, String email) {
         return mapper.countLiveEmail(companyId, email);
@@ -93,17 +93,17 @@ public class JoinDAO {
     public int insertRequest(JoinRequestDTO dto) {
         return mapper.insertRequest(dto);
     }
-    
+
     /** 요청 1건 보기 (업체 코드와 요청 키 해시가 둘 다 맞아야). 없으면 null */
     public JoinRequestViewDTO getRequestView(String companyCode, String keyHash) {
         return mapper.getRequestView(companyCode, keyHash);
     }
-    
+
     /** 요청 취소 (대기 중일 때만). 0이면 이미 처리된 요청 */
     public int cancelRequest(Long requestId, Long companyId) {
         return mapper.cancelRequest(requestId, companyId);
     }
-    
+
     /** 그 요청의 계정도 취소 (대기 중일 때만) */
     public int cancelAccount(Long userAccountId, Long companyId) {
         return mapper.cancelAccount(userAccountId, companyId);

@@ -20,8 +20,7 @@
     <section class="view on" id="view-asset-admin">
       <div class="page-head"><h1>자산 관리</h1></div>
       <p class="muted join-scope">
-        같은 장비는 한 사람에게만 지급됩니다. 회수하면 다시 지급할 수 있는 상태로 돌아갑니다.
-        장비 지급 신청으로 생긴 지급은 티켓 처리에서 합니다.
+        장비는 한 사람에게만 지급되고, 회수하면 다시 지급할 수 있습니다. 지급 신청 티켓은 티켓 처리에서 지급합니다.
       </p>
 
       <%-- 상태 카드: 개수와 거르기는 asset-admin.js 가 받은 목록으로 채운다 --%>

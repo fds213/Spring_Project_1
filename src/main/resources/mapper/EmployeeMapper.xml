@@ -225,6 +225,16 @@
 		WHERE e.company_id = #{companyId}
 		AND e.employee_no = #{employeeNo}
     </select>
+    
+    <!-- 역할 바꾸기 (CFG-01). 업체 관리자는 바꾸지 않는다: 그사이 관리자가 됐으면 0행 -->
+    <update id="updateRole">
+        UPDATE user_account
+        SET role_code = #{roleCode},
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND employee_id = #{employeeId}
+        AND role_code IN ('ROLE_EMP', 'ROLE_IT', 'ROLE_HR')
+    </update>
 
     <!-- 부서장 지정: 그 부서의 부서장 칸을 이 사람으로 (전 부서장은 덮어써져 빠진다) -->
     <update id="setDeptHead">
