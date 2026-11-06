@@ -1,6 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ieum.gw.mapper.AssetAllocationMapper">
+	<!-- 같은 업체 자산의 모든 상태 장애 티켓을 최신 접수순으로 조회한다. -->
+	<select id="selectIncidents" resultType="com.ieum.gw.dto.AssetAdminIncidentDTO">
+		SELECT it.it_ticket_id AS id,
+			   	it.title,
+				it.STATUS_CODE AS status, 
+				rt.EMPLOYEE_NAME AS requesterName, 
+				asn.EMPLOYEE_NAME  AS assigneeName, 
+				it.CREATED_AT AS createdAt
+		FROM it_ticket it
+		
+		LEFT JOIN EMPLOYEE rt
+		  ON rt.COMPANY_ID = it.COMPANY_ID 
+		 AND rt.EMPLOYEE_ID = it.REQUESTER_EMPLOYEE_ID
+		
+		LEFT JOIN EMPLOYEE asn
+		  ON asn.COMPANY_ID = it.COMPANY_ID 
+		 AND asn.EMPLOYEE_ID = it.ASSIGNEE_EMPLOYEE_ID
+		
+		WHERE it.company_id = #{companyId}
+	      AND it.asset_id = #{assetId}
+	      AND it.ticket_type = #{ticketType}
+	    ORDER BY it.CREATED_AT DESC,
+	    		 it.it_ticket_id DESC
+	</select>
+
 	<!-- 같은 업체 자산의 현재·과거 지급 건을 최신 지급순으로 조회한다. -->
 	<select id="selectAssignments" resultType="com.ieum.gw.dto.AssetAdminAssignmentDTO">
 	    SELECT aa.asset_assignment_id AS assetAssignmentId,
