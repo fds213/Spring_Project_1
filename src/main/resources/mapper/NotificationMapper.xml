@@ -12,14 +12,20 @@
     </select>
 
     <!-- 알림 1행. 번호·전달 경로(NC_IN_APP)·시각은 컬럼 기본값을 쓴다.
-         같은 받는 계정에 같은 키면 고유 제약(UQ_69_01)에 걸린다 -->
+         같은 받는 계정에 같은 키면 고유 제약(UQ_69_01)에 걸린다.
+         attendance_correction_id는 근태 정정 알림일 때만 넣는다: 그 칸을 더하는 DB 패치를 아직 돌리지 않은 DB에서도
+         결재·티켓 알림 저장은 그대로 되게 한다(패치 전에 넣으면 ORA-00904로 결재·티켓 처리까지 취소된다) -->
     <insert id="insertNotification" parameterType="com.ieum.gw.dto.NotificationSaveDTO">
         INSERT INTO notification
             (company_id, receiver_account_id, notification_type, title, message,
-             approval_document_id, it_ticket_id, dedupe_key)
+             approval_document_id, it_ticket_id,
+             <if test="attendanceCorrectionId != null">attendance_correction_id,</if>
+             dedupe_key)
         VALUES
             (#{companyId}, #{receiverAccountId}, #{notificationType}, #{title}, #{message},
-             #{approvalDocumentId}, #{itTicketId}, #{dedupeKey})
+             #{approvalDocumentId}, #{itTicketId},
+             <if test="attendanceCorrectionId != null">#{attendanceCorrectionId},</if>
+             #{dedupeKey})
     </insert>
 
     <!-- 본인 알림 한 페이지 (최신 순) -->
