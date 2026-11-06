@@ -25,6 +25,8 @@
     (hasRole 은 ROLE_ 접두사를 붙여 찾는다)
   - companyBilling (request 속성, 업체 직원만): status(TRIAL / PAID / EXPIRED), paid(지금, 만료면 마지막 기간이 유료면 true), endDate("2026.11.08"), daysLeft(0 = 마지막 날)
   - todayPunch (request 속성, 업체 직원만): inTime("08:52"), outTime(없으면 비움)
+  채팅(업체 직원만): chat.css 와 채팅 스크립트(updates·room-list·conversation)를 모든 화면에 불러 둔다.
+  채팅 화면(menu="chat")이 아니면 오른쪽 아래 채팅 버튼·메시지 패널을 붙인다(#chatDock, chat/dock.js).
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <%-- request 범위: 이 태그 안의 화면 본문에서도 ${loginUser.name} 처럼 쓸 수 있다 --%>
@@ -53,6 +55,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="${ctx}/resources/css/common.css">
+  <c:if test="${not isOps}"><link rel="stylesheet" href="${ctx}/resources/css/chat/chat.css"></c:if>
 </head>
 <%-- data-ctx: JS가 주소 앞에 붙일 컨텍스트 경로. is-readonly: 체험·유료 기간이 끝난 업체(쓰기 동작을 흐리게) --%>
 <body data-ctx="${ctx}" data-mode="${isOps ? 'OPS' : 'EMPLOYEE'}" data-admin="${isAdmin}" data-paid-expired="${paidExpired}"${readOnly ? ' class="is-readonly"' : ''}>
@@ -72,6 +75,9 @@
   </div>
 
   <div class="toast" id="toast" role="status" hidden></div>
+  <c:if test="${not isOps and menu ne 'chat'}">
+    <div class="chat-dock" id="chatDock" data-me="${loginUser.employeeId}"></div>
+  </c:if>
 
   <%-- 헤더의 "비밀번호 변경" 창. 현재 비밀번호가 맞아야 새 비밀번호(8자 이상, 두 번 같게)로 바꾼다 (common.js 7) --%>
   <dialog class="modal" id="pwChangeDialog">
@@ -100,6 +106,12 @@
   <%-- 선택 상자 부품: <select data-ui="select"> 를 디자인 2안 모양으로 바꾼다 --%>
   <script src="${ctx}/resources/js/select.js"></script>
   <script src="${ctx}/resources/js/install.js"></script>
+  <c:if test="${not isOps}">
+    <script src="${ctx}/resources/js/chat/updates.js"></script>
+    <script src="${ctx}/resources/js/chat/room-list.js"></script>
+    <script src="${ctx}/resources/js/chat/conversation.js"></script>
+    <c:if test="${menu ne 'chat'}"><script src="${ctx}/resources/js/chat/dock.js"></script></c:if>
+  </c:if>
   <jsp:invoke fragment="scripts" />
   <%@ include file="/WEB-INF/views/subscription/trial-notice.jspf" %>
 </body>
