@@ -184,6 +184,25 @@ class LeaveServiceTest {
     }
 
     @Test
+    @DisplayName("관리 표의 남은 연차는 연차 화면과 같은 부여 행(입사일이 들어 있는 행)을 쓴다: 기간이 끝난 예전 행이어도 기본 15일로 보이지 않는다")
+    void grantsAtHireMatchesLeaveScreen() {
+        // 예전 방식으로 만든 행: 입사일부터 1년, 오늘은 이미 지났다. 하루 썼다
+        LeaveCycleDTO old = new LeaveCycleDTO();
+        old.setCompanyId(CO);
+        old.setEmployeeId(EMP);
+        old.setStartsOn("2024-03-04");
+        old.setEndsOn("2025-03-04");
+        old.setGrantedDays(BigDecimal.valueOf(15));
+        leaveMapper.insertCycle(old);
+        leaveMapper.insertLedgerUse(CO, old.getLeaveCycleId(), 1L, new BigDecimal("-1"), ACTOR);
+
+        LeaveCycleDTO row = leave.grantsAtHire(CO).get(EMP);
+        assertEquals(old.getLeaveCycleId(), row.getLeaveCycleId());
+        assertEquals(0, new BigDecimal("14").compareTo(LeaveService.remainingOf(row, "2024-03-04")));
+        assertEquals(0, leave.getRemainingLeaveDays(CO, EMP).compareTo(LeaveService.remainingOf(row, "2024-03-04")));
+    }
+
+    @Test
     @DisplayName("결재가 저장하기 전의 날짜(행 ID 없음)는 차감하지 않는다")
     void needsSavedDays() {
         LeaveDayDTO unsaved = day("2026-11-03", "LV_FULL", 1);
@@ -493,7 +512,17 @@ class LeaveServiceTest {
             return mine;
         }
 
-        @Override public List<LeaveCycleDTO> selectCompanyCyclesOn(Long companyId, String day) { return List.of(); }
+        @Override public List<LeaveCycleDTO> selectCompanyCyclesAtHire(Long companyId) {
+            List<LeaveCycleDTO> rows = new ArrayList<>();
+            hires.forEach((emp, h) -> {
+                if (h.getHireDate() == null) return;
+                LeaveCycleDTO c = selectCycleOn(companyId, emp, h.getHireDate());
+                if (c == null) return;
+                c.setLedgerDays(selectLedgerSum(companyId, c.getLeaveCycleId()));
+                rows.add(c);
+            });
+            return rows;
+        }
 
         @Override public List<LeaveSlotDTO> selectTakenSlots(Long companyId, Long employeeId, List<String> days) {
             return slots.stream().filter(s -> s.getEmployeeId().equals(employeeId) && days.contains(s.getLeaveDate().toString()))

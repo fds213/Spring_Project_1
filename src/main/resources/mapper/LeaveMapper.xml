@@ -86,8 +86,10 @@
 		ORDER BY l.created_at DESC, l.leave_ledger_id DESC
 	</select>
 
-	<!-- 근태·연차 관리: 업체 직원들의 부여 행과 사용 합을 한 번에 -->
-	<select id="selectCompanyCyclesOn" resultType="com.ieum.gw.dto.LeaveCycleDTO">
+	<!-- 근태·연차 관리: 업체 직원들의 부여 행과 내역 합을 한 번에.
+	     연차 화면·휴가 승인·추가 부여(selectCycleOn)와 같게 '입사일이 들어 있는 행'을 고른다.
+	     오늘 날짜로 고르면 예전 방식으로 만든 행(기간이 끝난 행)을 못 찾아 기본 15일로 보이는 직원이 생긴다 -->
+	<select id="selectCompanyCyclesAtHire" resultType="com.ieum.gw.dto.LeaveCycleDTO">
 		SELECT c.leave_cycle_id, c.company_id, c.employee_id,
 		       TO_CHAR(c.starts_on, 'YYYY-MM-DD') AS starts_on,
 		       TO_CHAR(c.ends_on, 'YYYY-MM-DD')   AS ends_on,
@@ -95,9 +97,10 @@
 		       (SELECT NVL(SUM(l.delta_days), 0) FROM leave_ledger l
 		        WHERE l.company_id = c.company_id AND l.leave_cycle_id = c.leave_cycle_id) AS ledger_days
 		FROM leave_cycle c
+		JOIN employee e ON e.employee_id = c.employee_id AND e.company_id = c.company_id
 		WHERE c.company_id = #{companyId}
-		  AND c.starts_on &lt;= TO_DATE(#{day}, 'YYYY-MM-DD')
-		  AND c.ends_on &gt; TO_DATE(#{day}, 'YYYY-MM-DD')
+		  AND c.starts_on &lt;= e.hire_date
+		  AND c.ends_on &gt; e.hire_date
 	</select>
 
 	<!-- 승인된 휴가가 이미 차지한 시간대 (그 날들 안에서) -->

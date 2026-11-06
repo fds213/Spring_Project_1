@@ -33,8 +33,8 @@ public class LeaveDAO {
     /** 그 날이 들어 있는 연차 부여 행을 잠그며 읽는다(같은 직원 동시 차감 막기) */
     public LeaveCycleDTO selectCycleOnForUpdate(Long companyId, Long employeeId, String day) { return mapper.selectCycleOnForUpdate(companyId, employeeId, day); }
 
-    /** 업체 직원들의 연차 부여 행과 사용 합을 한 번에 읽는다 */
-    public List<LeaveCycleDTO> selectCompanyCyclesOn(Long companyId, String day) { return mapper.selectCompanyCyclesOn(companyId, day); }
+    /** 업체 직원들의 입사일이 들어 있는 연차 부여 행과 내역 합을 한 번에 읽는다 */
+    public List<LeaveCycleDTO> selectCompanyCyclesAtHire(Long companyId) { return mapper.selectCompanyCyclesAtHire(companyId); }
 
     /** 연차 부여 행(15일)을 만든다 */
     public int insertCycle(LeaveCycleDTO cycle) { return mapper.insertCycle(cycle); }
