@@ -29,6 +29,18 @@
 
     function goLogin() { location.href = `${ctx}/login?expired`; }
 
+    /** 메시지·이미지 보내기 키(다시 보내도 한 번만 저장되게 서버가 이 키로 거른다. 서버 검사 [A-Za-z0-9_-]{1,64}).
+     *  crypto.randomUUID 는 HTTPS·localhost 에서만 있어, http 주소로 연 시연 서버에서는
+     *  http 에서도 되는 getRandomValues 로 같은 모양(UUID v4)을 만든다 */
+    function newMessageKey() {
+        if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+        const b = crypto.getRandomValues(new Uint8Array(16));
+        b[6] = (b[6] & 0x0f) | 0x40;
+        b[8] = (b[8] & 0x3f) | 0x80;
+        const h = Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+        return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+    }
+
     const IMAGE_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg>';
     const BACK_ICON = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>';
 
@@ -403,7 +415,7 @@
         function sendImage(done) {
             if (!attachFile || uploading || leaving || recovering
                 || !ws || ws.readyState !== WebSocket.OPEN) return;
-            if (!pendingImage) pendingImage = crypto.randomUUID();
+            if (!pendingImage) pendingImage = newMessageKey();
             const data = new FormData();
             data.append("clientMessageKey", pendingImage);
             data.append("image", attachFile);
@@ -706,7 +718,7 @@
                 el("sendStatus").text("메시지는 1,000자까지 보낼 수 있습니다.");
                 return;
             }
-            pendingSend = { clientMessageKey: crypto.randomUUID(), messageText: text };
+            pendingSend = { clientMessageKey: newMessageKey(), messageText: text };
             sendPending();
         }
 
