@@ -29,6 +29,7 @@ class EmployeeAdminRoleTest {
 		static final Set<String> CHANGEABLE = Set.of("ROLE_EMP", "ROLE_IT", "ROLE_HR");
 		Map<String, EmployeeHeadTargetDTO> people = new HashMap<>();
 		Map<Long, String> roles = new HashMap<>();   // employeeId → 지금 DB의 역할
+		Map<Long, String> statuses = new HashMap<>(); // employeeId → 지금 DB의 계정 상태
 		int updates = 0;
 
 		FakeEmployeeDao() {
@@ -43,7 +44,8 @@ class EmployeeAdminRoleTest {
 
 		@Override
 		public int updateRole(Long companyId, Long employeeId, String roleCode) {
-			if (!COMPANY.equals(companyId) || !CHANGEABLE.contains(roles.get(employeeId))) {
+			if (!COMPANY.equals(companyId) || !"ACTIVE".equals(statuses.get(employeeId))
+					|| !CHANGEABLE.contains(roles.get(employeeId))) {
 				return 0;
 			}
 			roles.put(employeeId, roleCode);
@@ -60,6 +62,7 @@ class EmployeeAdminRoleTest {
 			t.setStatusCode("ACTIVE");
 			people.put(empNo, t);
 			roles.put(id, role);
+			statuses.put(id, "ACTIVE");
 		}
 	}
 
@@ -152,5 +155,14 @@ class EmployeeAdminRoleTest {
 
 		assertThrows(IllegalStateException.class, () -> service.setRole(admin, "20260004", "ROLE_IT"));
 		assertEquals("ROLE_EMP", dao.roles.get(504L));
+	}
+
+	@Test
+	@DisplayName("확인한 뒤 그사이 비활성화된 계정이면 UPDATE가 0행이라 409이고 역할은 바뀌지 않는다 (#178 리뷰)")
+	void retiredMeanwhile() {
+		dao.statuses.put(502L, "RETIRED"); // 찾을 때는 사용 중, DB는 이미 비활성
+
+		assertThrows(IllegalStateException.class, () -> service.setRole(admin, "20260002", "ROLE_IT"));
+		assertEquals("ROLE_EMP", dao.roles.get(502L));
 	}
 }
