@@ -25,6 +25,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AccountStatusInterceptor implements HandlerInterceptor {
 
+    static final String MSG_DISABLED = "사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요";
+    static final String MSG_CHANGED = "역할이 바뀌어 다시 로그인해 주세요";
+    
     private final EmployeeService employeeService;
 
     /** 로그인한 계정이 지금도 사용 중이고 역할이 그대로인지 매 요청 확인. 아니면 세션을 끊고 AJAX는 401, 화면은 로그인 화면 */
@@ -49,11 +52,16 @@ public class AccountStatusInterceptor implements HandlerInterceptor {
         }
         SecurityContextHolder.clearContext();
 
-        // Ajax는 401(AjaxAwareEntryPoint와 같은 판별). 화면은 비활성이면 사용 중지 안내, 역할이 바뀌었으면 다시 로그인 안내
+        // Ajax는 401 + 이유(common.js가 같은 안내의 로그인 화면으로 보냄). 화면은 바로 그 로그인 화면으로
+        String reason = role == null ? "disabled" : "changed";
         if ("XMLHttpRequest".equals(request.getHeader("X-Requested-With"))) {
-            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json;charset=UTF-8");
+            // 문구는 아래 두 가지뿐이라 JSON 이스케이프가 필요 없다
+            String message = role == null ? MSG_DISABLED : MSG_CHANGED;
+            response.getWriter().write("{\"success\":false,\"reason\":\"" + reason + "\",\"message\":\"" + message + "\"}");
         } else {
-            response.sendRedirect(request.getContextPath() + (role == null ? "/login?disabled" : "/login?changed"));
+            response.sendRedirect(request.getContextPath() + "/login?" + reason);
         }
         return false;
     }

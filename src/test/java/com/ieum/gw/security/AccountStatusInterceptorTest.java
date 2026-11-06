@@ -108,6 +108,7 @@ class AccountStatusInterceptorTest {
 		assertFalse(send("/employee/admin/api/employees/20260002/status", true));
 		assertEquals(401, response.getStatus());
 		assertTrue(session.isInvalid());
+		assertTrue(response.getContentAsString().contains("\"reason\":\"disabled\""));
 	}
 
 	@Test
@@ -131,5 +132,6 @@ class AccountStatusInterceptorTest {
 		assertFalse(send("/employee/admin/api/employees/20260002/status", true));
 		assertEquals(401, response.getStatus());
 		assertTrue(session.isInvalid());
+		assertTrue(response.getContentAsString().contains("\"reason\":\"changed\""));
 	}
 }
