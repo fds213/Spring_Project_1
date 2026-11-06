@@ -346,10 +346,13 @@ public class LeaveService {
                 dao.selectLedgerSum(companyId, row.getLeaveCycleId()), dao.selectGrantSum(companyId, row.getLeaveCycleId()));
     }
 
-    /** 업체 직원들의 부여 행(사용 합 포함)을 직원 번호로. 행이 없는 직원은 빠진다 */
-    public Map<Long, LeaveCycleDTO> grantsOn(Long companyId, LocalDate day) {
+    /**
+     * 업체 직원들의 부여 행(내역 합 포함)을 직원 번호로. 행이 없는 직원은 빠진다.
+     * 연차 화면·휴가 승인·추가 부여(grantOf·lockGrant)와 같게 입사일이 들어 있는 행이라, 관리 표의 남은 연차가 직원 화면과 같다
+     */
+    public Map<Long, LeaveCycleDTO> grantsAtHire(Long companyId) {
         Map<Long, LeaveCycleDTO> map = new HashMap<>();
-        for (LeaveCycleDTO c : dao.selectCompanyCyclesOn(companyId, day.toString())) map.put(c.getEmployeeId(), c);
+        for (LeaveCycleDTO c : dao.selectCompanyCyclesAtHire(companyId)) map.put(c.getEmployeeId(), c);
         return map;
     }
 

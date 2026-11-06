@@ -40,7 +40,8 @@ public interface LeaveMapper {
     /** 직원 한 명의 추가 부여 내역 (최근 순) */
     List<LeaveGrantDTO> selectGrantHistory(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
-    List<LeaveCycleDTO> selectCompanyCyclesOn(@Param("companyId") Long companyId, @Param("day") String day);
+    /** 업체 직원들의 입사일이 들어 있는 부여 행과 내역 합 */
+    List<LeaveCycleDTO> selectCompanyCyclesAtHire(@Param("companyId") Long companyId);
 
     // 사용 기록
     List<LeaveSlotDTO> selectTakenSlots(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("days") List<String> days);
