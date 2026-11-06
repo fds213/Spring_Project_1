@@ -161,6 +161,7 @@ const EMP_ACTIONS = {
   off: e => allowedButton('비활성화', `${e.name} 비활성화`, () => confirmState(e, 'off')),
   head: e => writeButton(e.head ? '부서장 해제' : '부서장 지정', `${e.name} ${e.head ? '부서장 해제' : '부서장 지정'}`, ev => setHead(e, !e.head, ev.currentTarget)),
   on: e => writeButton('다시 사용', `${e.name} 다시 사용`, () => confirmState(e, 'on')),
+  role: e => writeButton('역할 변경', `${e.name} 역할 변경`, () => openRole(e)),
 };
 // 관리 칸: 계정 버튼, 그리고 인사 정보 (모든 계정. 업체 관리자와 본인 것도)
 function rowActions(e) {
@@ -219,6 +220,59 @@ document.querySelectorAll('#empStateDialog button').forEach(b => b.addEventListe
     showToast(`${r.name} 계정을 비활성화했습니다` + (r.released ? ` · 이 사람이 결재할 차례였던 문서 ${r.released}건은 자동 반려했습니다` : ''));
   });
 }));
+
+// ---------- 역할 변경: 직원 · IT 담당 · 인사 담당 (업체 관리자만, #175·#178) ----------
+// 버튼은 서버가 actions 에 'role' 을 넣은 줄에만 있다(업체 관리자가 보고, 사용 중인 계정이고, 관리자·본인이 아니고, 만료 아님).
+// 역할은 로그인할 때 세션에 담겨서, 바뀐 사람은 다음 요청에서 로그인이 끊기고 다시 로그인하면 새 메뉴가 보인다(/login?changed).
+// POST /employee/admin/api/employees/{사번}/role { role } → { name, role }. 400 역할 값 틀림, 409 관리자·본인·비활성 계정
+const ROLE_CHOICES = { ROLE_EMP: ROLE_CODE.ROLE_EMP, ROLE_IT: ROLE_CODE.ROLE_IT, ROLE_HR: ROLE_CODE.ROLE_HR };
+let roleTarget = null;
+function openRole(e) {
+  roleTarget = e;
+  let dialog = $j('roleDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'roleDialog';
+    dialog.className = 'modal';
+    dialog.innerHTML = '<h2></h2><p class="muted"></p><div class="hr-info-fields">'
+      + `<label class="field"><span>역할</span><select class="input" id="roleSelect">${Object.entries(ROLE_CHOICES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label>`
+      + '</div><p class="form-error" id="roleError" role="alert"></p>'
+      + '<div class="modal-actions"><button type="button" class="btn" value="cancel">취소</button><button type="button" class="btn btn-primary" value="ok" data-write>저장</button></div>';
+    dialog.querySelectorAll('.modal-actions button').forEach(b => b.addEventListener('click', () => {
+      if (b.value === 'ok') return saveRole(b);
+      dialog.close();
+      roleTarget = null;
+    }));
+    document.body.append(dialog);
+  }
+  dialog.querySelector('h2').textContent = `${e.name}님 역할 변경`;
+  dialog.querySelector('p').textContent = `${dotJoin(`사번 ${e.empNo}`, e.dept, e.rank)}. 바꾸면 이 직원은 다음 요청부터 다시 로그인하게 되고, 그때 새 역할의 메뉴가 보입니다.`;
+  $j('roleSelect').value = ROLE_CHOICES[e.role] ? e.role : 'ROLE_EMP';
+  $j('roleError').textContent = '';
+  if (!dialog.open) dialog.showModal();
+}
+// 저장되면 창을 닫고 목록을 다시 받는다. 안 되면 창 안에 이유를 보여 주고, 409(그새 바뀜)면 목록도 다시 받는다
+function saveRole(btn) {
+  const e = roleTarget;
+  const dialog = $j('roleDialog');
+  if (!e) { dialog.close(); return; }
+  const role = $j('roleSelect').value;
+  if (role === e.role) {
+    $j('roleError').textContent = '지금과 같은 역할입니다';
+    return;
+  }
+  whileSending(btn, api.post(`/employee/admin/api/employees/${pathPart(e.empNo)}/role`, { role }))
+    .done(r => {
+      dialog.close();
+      roleTarget = null;
+      showToast(`${r.name}님 역할을 ${ROLE_CODE[r.role] || r.role}(으)로 바꿨습니다. 다음 요청부터 다시 로그인하게 됩니다`);
+      rerenderStaffViews();
+    })
+    .fail(xhr => {
+      $j('roleError').textContent = apiMessage(xhr);
+      if (xhr.status === 409 || xhr.status === 404) rerenderStaffViews();
+    });
+}
 
 // ---------- 인사 정보: 고용 형태 · 재직 상태 · 성별 (사원 관리, 인사 담당과 업체 관리자) ----------
 // 퇴사로 바꾸면 쓰던 계정도 같이 비활성이 되어 로그인할 수 없다. 재직으로 돌려도 켜지지 않는다(다시 사용이 자리와 함께 켠다).

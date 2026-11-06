@@ -67,18 +67,31 @@
 	              aa.asset_assignment_id DESC
 	</select>
 
-	<!-- 같은 업체의 전체 상태 자산을 조회한다. -->
+	<!-- 같은 업체의 전체 자산과 현재 미회수 지급 정보를 조회한다. -->
 	<select id="selectList" resultType="com.ieum.gw.dto.AssetListDTO">
-		select asset_id as id,
-			   asset_no as assetNo,
-			   asset_name as name,
-			   serial_no as serial,
-			   asset_type as kind,
-			   status_code as status,
-			   branch_id as branchId,
-			   version
-		from asset where company_id = #{companyId} 
-		order by asset_no, asset_id
+		select a.asset_id as id,
+			   a.asset_no as assetNo,
+			   a.asset_name as name,
+			   a.serial_no as serial,
+			   a.asset_type as kind,
+			   a.status_code as status,
+			   a.branch_id as branchId,
+			   a.version,
+			   e.EMPLOYEE_NAME as employeeName,
+			   aas.ISSUED_AT as issuedAt
+		from asset a
+		
+		left join asset_assignment aas
+		  on aas.company_id = a.company_id
+		 and aas.asset_id = a.asset_id
+		 and aas.returned_at is null
+		
+		left join employee e
+		  on e.company_id = aas.company_id
+		 and e.employee_id = aas.employee_id
+		
+		where a.company_id = #{companyId} 
+		order by a.asset_no, a.asset_id
 	</select>
 	
     <select id="detail" resultType="com.ieum.gw.dto.AssetAllocationDTO">

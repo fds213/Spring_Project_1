@@ -38,7 +38,7 @@ import com.ieum.gw.dto.TicketWorkDTO;
 class TicketWorkServiceTest {
     static class Rows extends TicketWorkDAO {
         TicketWorkDTO row;
-        int updates, histories, comments, affected = 1;
+        int locks, updates, histories, comments, affected = 1;
         boolean failHistory;
         Map<String, Object> lastChange;
         String commentBody;
@@ -46,6 +46,7 @@ class TicketWorkServiceTest {
         List<TicketHistoryDTO> historyRows = new ArrayList<>();
         Rows() { super(null); }
         @Override public TicketWorkDTO lock(Long companyId, Long id) {
+            locks++;
             return row != null && companyId.equals(row.getCompanyId()) && id.equals(row.getId()) ? row : null;
         }
         @Override public List<TicketWorkDTO> selectMine(Long companyId, Long employeeId) {
@@ -397,6 +398,134 @@ class TicketWorkServiceTest {
         status(HttpStatus.NOT_FOUND,()->service.detailAdmin(user(9L,3L,"ROLE_IT"),10L));
         rows.row.setType("TK_EQUIPMENT");
         status(HttpStatus.CONFLICT,()->service.detailAdmin(user(1L,3L,"ROLE_IT"),10L));
+    }
+
+    @Test
+    @DisplayName("내 티켓 취소 표시는 장애·문의이면서 접수 상태일 때만 참이다")
+    void canCancelDependsOnTypeAndState() {
+        for (var type : com.ieum.gw.code.TicketType.values()) {
+            rows.row.setType(type.name());
+            for (var state : com.ieum.gw.code.TicketStatus.values()) {
+                rows.row.setStatus(state.name());
+                boolean expected = state == RECEIVED && (type == com.ieum.gw.code.TicketType.TK_INCIDENT
+                        || type == com.ieum.gw.code.TicketType.TK_QUESTION);
+                assertEquals(expected, service.listMine(user(1L, 2L, "ROLE_EMP")).get(0).get("canCancel"),
+                        type.name() + " / " + state.name());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("관리자 상세의 타인 장애·문의 티켓은 접수 상태여도 취소 가능으로 표시하지 않는다")
+    void canCancelRequiresRequesterEvenInAdminDetail() {
+        for (String type : List.of("TK_INCIDENT", "TK_QUESTION")) {
+            rows.row.setType(type);
+            assertEquals(false, service.detailAdmin(user(1L, 3L, "ROLE_ADMIN"), 10L).get("canCancel"));
+        }
+    }
+
+    @Test
+    @DisplayName("본인의 접수 상태 장애·문의는 취소 상태와 실행자·이력을 한 번 기록한다")
+    void cancelOwnIncidentAndQuestion() {
+        for (String type : List.of("TK_INCIDENT", "TK_QUESTION")) {
+            rows.row.setType(type);
+            service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form());
+            assertEquals(1L, rows.lastChange.get("companyId"));
+            assertEquals(10L, rows.lastChange.get("id"));
+            assertEquals(0L, rows.lastChange.get("version"));
+            assertEquals(RECEIVED.name(), rows.lastChange.get("beforeStatus"));
+            assertEquals(CANCELED.name(), rows.lastChange.get("afterStatus"));
+            assertEquals(102L, rows.lastChange.get("actorAccountId"));
+            assertEquals("요청자 취소", rows.lastChange.get("reason"));
+            assertEquals(50L, rows.lastChange.get("assetId"));
+            assertNull(rows.lastChange.get("afterAssigneeId"));
+            assertEquals(false, rows.lastChange.get("assignment"));
+            assertEquals(false, rows.lastChange.get("resolved"));
+            assertEquals(false, rows.lastChange.get("closed"));
+        }
+        assertEquals(2, rows.updates);
+        assertEquals(2, rows.histories);
+        assertEquals(0, notices.assigned);
+        assertEquals(0, notices.resolved);
+    }
+
+    @Test
+    @DisplayName("타인·다른 업체·없는 티켓의 취소는 404이며 관리자도 타인 취소는 할 수 없다")
+    void cancelRejectsNonOwnerAndOtherCompany() {
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 3L, "ROLE_EMP"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 3L, "ROLE_ADMIN"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(9L, 2L, "ROLE_EMP"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 999L, form()));
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("접수 이외 모든 상태와 장비 지급 티켓은 409로 취소를 거절한다")
+    void cancelRejectsStateAndEquipment() {
+        for (var state : com.ieum.gw.code.TicketStatus.values()) {
+            if (state == RECEIVED) { continue; }
+            rows.row.setStatus(state.name());
+            status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        }
+        rows.row.setStatus(RECEIVED.name());
+        rows.row.setType("TK_EQUIPMENT");
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("취소의 비로그인·잘못된 번호·누락 요청·누락 또는 음수 버전은 DB 잠금 전에 거절한다")
+    void cancelRejectsMalformedInput() {
+        status(HttpStatus.UNAUTHORIZED, () -> service.cancel(null, 10L, form()));
+        for (Long id : new Long[] {null, 0L, -1L}) {
+            status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), id, form()));
+        }
+        status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, null));
+        for (Long version : new Long[] {null, -1L}) {
+            TicketRequestDTO request = form();
+            request.setVersion(version);
+            status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, request));
+        }
+        assertEquals(0, rows.locks);
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("오래된 취소 버전과 조건부 갱신 충돌은 이력을 남기지 않는다")
+    void cancelRejectsVersionConflicts() {
+        rows.row.setVersion(1L);
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(1, rows.locks, "유효한 입력의 현재 버전 비교는 잠금 이후에 수행한다.");
+        assertEquals(0, rows.updates);
+        rows.row.setVersion(0L);
+        rows.affected = 0;
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(1, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("취소 이력 저장 실패는 트랜잭션 프록시의 롤백으로 전달된다")
+    void cancelRollsBackOnHistoryFailure() {
+        rows.failHistory = true;
+        Transactions tx = new Transactions();
+        assertThrows(IllegalStateException.class,
+                () -> proxy(tx).cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertTrue(tx.rolledBack);
+        assertFalse(tx.committed);
+    }
+
+    @Test
+    @DisplayName("취소 성공은 트랜잭션 프록시를 통해 커밋된다")
+    void cancelCommitsTransaction() {
+        Transactions tx = new Transactions();
+        proxy(tx).cancel(user(1L, 2L, "ROLE_EMP"), 10L, form());
+        assertTrue(tx.committed);
+        assertFalse(tx.rolledBack);
+        assertEquals(1, rows.histories);
     }
 
     static class Transactions extends AbstractPlatformTransactionManager {

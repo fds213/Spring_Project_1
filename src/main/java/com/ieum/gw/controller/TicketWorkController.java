@@ -76,6 +76,15 @@ public class TicketWorkController {
         return Map.of("success", true);
     }
 
+    /** 로그인한 요청자의 장애·문의 티켓 취소를 처리한다. */
+    @PostMapping("/ticket/api/tickets/{id}/cancel")
+    @ResponseBody
+    public Map<String, Object> cancel(@AuthenticationPrincipal LoginUser user, @PathVariable Long id, @RequestBody TicketRequestDTO form) {
+    	service.cancel(user, id, form);
+    	
+    	return Map.of("success", true);
+    }
+    
     @PostMapping("/ticket/admin/api/tickets/{id}/assign")
     @ResponseBody
     public Map<String, Object> assign(@AuthenticationPrincipal LoginUser user, @PathVariable Long id, @RequestBody TicketRequestDTO form) {

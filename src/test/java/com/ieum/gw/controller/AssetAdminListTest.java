@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 import java.lang.reflect.Proxy;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -99,7 +100,7 @@ class AssetAdminListTest {
         assertTrue(root.path("success").asBoolean());
         assertEquals(4, root.path("data").size());
         JsonNode first = root.path("data").get(0);
-        assertEquals(8, first.size());
+        assertEquals(10, first.size());
         assertTrue(first.path("id").isIntegralNumber());
         assertEquals(1L, first.path("id").asLong());
         assertEquals("A-1", first.path("assetNo").asText());
@@ -110,10 +111,56 @@ class AssetAdminListTest {
         assertEquals(10L, first.path("branchId").asLong());
         assertTrue(first.path("version").isIntegralNumber());
         assertEquals(0L, first.path("version").asLong());
+        assertTrue(first.has("employeeName"));
+        assertTrue(first.path("employeeName").isNull());
+        assertTrue(first.has("issuedAt"));
+        assertTrue(first.path("issuedAt").isNull());
         assertEquals("SN-2", root.path("data").get(1).path("serial").asText());
         for (int i = 0; i < rows.size(); i++) {
             assertEquals(rows.get(i).getStatus(), root.path("data").get(i).path("status").asText());
         }
+    }
+
+    @Test
+    @DisplayName("현재 지급된 자산의 사용자 이름과 지급 시각은 기존 목록 필드와 함께 반환한다")
+    void returnsCurrentAssigneeAndIssuedAt() throws Exception {
+        AssetListDTO assigned = asset(2L, AssetStatus.AS_IN_USE);
+        assigned.setEmployeeName("현재 사용자");
+        assigned.setIssuedAt(LocalDateTime.of(2026, 11, 6, 15, 20, 30, 123456000));
+        rows = List.of(asset(1L, AssetStatus.AS_AVAILABLE), assigned);
+        for (String role : List.of("ROLE_IT", "ROLE_ADMIN")) {
+            login(7L, 9L, 11L, role);
+            var result = mvc.perform(get(URL)).andReturn();
+            assertEquals(200, result.getResponse().getStatus());
+            JsonNode data = body(result).path("data");
+            assertEquals(2, data.size());
+            JsonNode available = data.get(0);
+            assertTrue(available.has("employeeName"));
+            assertTrue(available.path("employeeName").isNull());
+            assertTrue(available.has("issuedAt"));
+            assertTrue(available.path("issuedAt").isNull());
+            JsonNode current = data.get(1);
+            assertEquals(10, current.size());
+            assertEquals(2L, current.path("id").asLong());
+            assertEquals("AS_IN_USE", current.path("status").asText());
+            assertEquals("현재 사용자", current.path("employeeName").asText());
+            assertEquals("2026-11-06T15:20:30", current.path("issuedAt").asText());
+        }
+    }
+
+    @Test
+    @DisplayName("지급 기록의 사용자 이름을 찾지 못해도 자산과 지급 시각을 유지한다")
+    void preservesAssignmentWhenEmployeeNameIsNull() throws Exception {
+        AssetListDTO assigned = asset(2L, AssetStatus.AS_IN_USE);
+        assigned.setIssuedAt(LocalDateTime.of(2026, 11, 6, 15, 20));
+        rows = List.of(assigned);
+        var result = mvc.perform(get(URL)).andReturn();
+        assertEquals(200, result.getResponse().getStatus());
+        JsonNode current = body(result).path("data").get(0);
+        assertEquals(2L, current.path("id").asLong());
+        assertTrue(current.has("employeeName"));
+        assertTrue(current.path("employeeName").isNull());
+        assertEquals("2026-11-06T15:20:00", current.path("issuedAt").asText());
     }
 
     @Test

@@ -34,6 +34,8 @@ import lombok.RequiredArgsConstructor;
  *   지각·조퇴는 근태 화면·집계가 이 시각으로 다시 판단한다.
  *   반려·취소면 근태는 그대로다: 퇴근 누락은 '퇴근 누락'으로 남는다(팀장님 11/3 결정: 조퇴로 바꾸지 않는다).
  * - PR #54 검토의 서버 몫: 원래 출퇴근은 근태 행에서 복사, 남의 근태·다른 날 근태는 직원+날짜로 찾아 막고, 본인 처리·처리된 건 다시 처리를 막는다.
+ * - 알림(#174): 요청하면 처리자(부서장, 없거나 본인이면 업체 관리자 전원)에게, 승인·반려하면 요청한 직원에게 남긴다. 취소는 남기지 않는다.
+ *   알림은 같은 트랜잭션이라 저장이 실패하면 요청·처리도 취소된다(NotificationService 규칙).
  * 거절은 AttendanceException(상태, 문구): 400 값, 403 권한, 404 없는 요청·다른 업체, 409 상태가 맞지 않음.
  */
 @Service
@@ -57,6 +59,7 @@ public class AttendanceCorrectionService {
 
     private final AttendanceCorrectionDAO dao;
     private final AttendanceDAO attendanceDao;
+    private final NotificationService notificationService;
 
     // ===== 직원 =====
 
@@ -112,6 +115,7 @@ public class AttendanceCorrectionService {
         } catch (DuplicateKeyException e) {
             throw new AttendanceException(409, "그날 처리를 기다리는 정정 요청이 이미 있습니다");
         }
+        notifyDeciders(companyId, dto.getAttendanceCorrectionId());
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("id", dto.getAttendanceCorrectionId());
         res.put("date", day.toString());
@@ -207,6 +211,7 @@ public class AttendanceCorrectionService {
             }
         }
         decide(user, c, APPROVED, null);
+        notificationService.notifyAttendanceCorrectionDone(user.getCompanyId(), c.getEmployeeId(), id, c.getWorkDate(), true);
         return Map.of("id", id, "status", "APPROVED");
     }
 
@@ -216,10 +221,23 @@ public class AttendanceCorrectionService {
         String text = requireText(reason, "반려 사유를 넣어 주세요", "반려 사유는 ");
         AttendanceCorrectionDTO c = lockForDecision(user, id);
         decide(user, c, REJECTED, text);
+        notificationService.notifyAttendanceCorrectionDone(user.getCompanyId(), c.getEmployeeId(), id, c.getWorkDate(), false);
         return Map.of("id", id, "status", "REJECTED");
     }
 
     // ===== 도구 =====
+
+    /** 정정 요청 알림: 처리자에게 한 사람씩. 부서장이 있으면 부서장, 없거나 요청자 본인이면 업체 관리자 전원(요청자 빼고) */
+    private void notifyDeciders(Long companyId, Long id) {
+        AttendanceCorrectionDTO c = dao.selectCorrectionForUpdate(companyId, id);
+        Long head = c.getHeadEmployeeId();
+        List<Long> deciders = head != null && !head.equals(c.getEmployeeId())
+                ? List.of(head)
+                : dao.selectAdminEmployeeIds(companyId, c.getEmployeeId());
+        for (Long decider : deciders) {
+            notificationService.notifyAttendanceCorrectionRequest(companyId, decider, id, c.getEmployeeName(), c.getWorkDate());
+        }
+    }
 
     /** 처리 전 확인: 요청을 잠그고, 대기 중인지·내가 처리자인지 본다 */
     private AttendanceCorrectionDTO lockForDecision(LoginUser user, Long id) {

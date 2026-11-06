@@ -136,6 +136,10 @@ public class TicketWorkService {
                     "text", historyText(h, employeeNames))).collect(Collectors.toList()));
             item.put("canComment", !terminal(row));
             item.put("canClose", RESOLVED.name().equals(row.getStatus()));
+            // 본인이 접수한 장애·문의 중 접수 상태인 건만 취소할 수 있다.
+            item.put("canCancel", user.getEmployeeId().equals(row.getRequesterId())
+            						&& RECEIVED.name().equals(row.getStatus())
+            						&& isCancellableType(row.getType()));
             item.put("version", row.getVersion());
             return item;
     }
@@ -316,7 +320,29 @@ public class TicketWorkService {
         requireState(row, RESOLVED);
         change(user, row, CLOSED, row.getAssigneeId(), "요청자 확인", false);
     }
+    
+    /** 요청자가 직접 접수한 장애·문의 티켓을 접수 상태에서 취소한다. */
+    @Transactional
+    public void cancel(LoginUser user, Long id, TicketRequestDTO form) {
+    	requireLogin(user);
+    	requireForm(form);
 
+    	if (form.getVersion() == null || form.getVersion() < 0) {
+			throw bad("변경 버전이 필요합니다.");
+		}
+    	
+    	TicketWorkDTO row = locked(user, id);
+    	requireOwner(user, row);
+    	requireVersion(row, form);
+    	requireState(row, RECEIVED);
+    	
+    	if (!isCancellableType(row.getType())) {
+			throw conflict("직접 접수한 장애·문의 티켓만 취소할 수 있습니다.");
+		}
+    	
+    	change(user, row, CANCELED, row.getAssigneeId(), "요청자 취소", false);
+    }
+    
     @Transactional
     public void assign(LoginUser user, Long id, TicketRequestDTO form) {
         requireOperator(user);
@@ -435,6 +461,12 @@ public class TicketWorkService {
     }
     private static boolean admin(LoginUser user) { return "ROLE_ADMIN".equals(user.getRole()); }
     private static boolean terminal(TicketWorkDTO row) { return List.of(CLOSED.name(), CANCELED.name(), REJECTED.name()).contains(row.getStatus()); }
+    
+    /** 요청자가 직접 취소할 수 있는 장애·문의 종류인지 확인한다. */
+    private static boolean isCancellableType(String type) {
+    	return TicketType.TK_INCIDENT.name().equals(type) || TicketType.TK_QUESTION.name().equals(type);
+    }
+    
     private static void requireState(TicketWorkDTO row, TicketStatus expected) {
         if (!expected.name().equals(row.getStatus())) { throw conflict("현재 상태에서는 처리할 수 없습니다. 새로 불러와 주세요."); }
     }
