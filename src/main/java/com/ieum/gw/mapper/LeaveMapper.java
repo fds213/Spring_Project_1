@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 import com.ieum.gw.dto.AttendanceApprovalStepDTO;
 import com.ieum.gw.dto.EmployeeHireDTO;
 import com.ieum.gw.dto.LeaveCycleDTO;
+import com.ieum.gw.dto.LeaveGrantDTO;
 import com.ieum.gw.dto.LeaveRequestDTO;
 import com.ieum.gw.dto.LeaveSlotDTO;
 
@@ -25,6 +26,19 @@ public interface LeaveMapper {
     int insertCycle(LeaveCycleDTO cycle);
 
     BigDecimal selectLedgerSum(@Param("companyId") Long companyId, @Param("leaveCycleId") Long leaveCycleId);
+
+    // 연차 추가 부여 (LC_GRANT)
+
+    /** 부여 행의 추가 부여(±) 합 */
+    BigDecimal selectGrantSum(@Param("companyId") Long companyId, @Param("leaveCycleId") Long leaveCycleId);
+
+    /** 추가 부여(+)·되돌리기(-) 한 줄을 사유와 함께 넣는다 */
+    int insertLedgerGrant(@Param("companyId") Long companyId, @Param("leaveCycleId") Long leaveCycleId,
+                          @Param("deltaDays") BigDecimal deltaDays, @Param("actorAccountId") Long actorAccountId,
+                          @Param("note") String note);
+
+    /** 직원 한 명의 추가 부여 내역 (최근 순) */
+    List<LeaveGrantDTO> selectGrantHistory(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId);
 
     List<LeaveCycleDTO> selectCompanyCyclesOn(@Param("companyId") Long companyId, @Param("day") String day);
 
