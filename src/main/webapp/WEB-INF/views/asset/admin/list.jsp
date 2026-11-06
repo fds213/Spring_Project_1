@@ -4,10 +4,10 @@
 <%--
   자산 관리 화면 (/asset/admin/list, IT 담당·업체 관리자)
   - 요구분석서 3.4 IT 자산, 통합 계획서 4장 IT 자산
-  - 요청서 범위: 상태 카드로 거르는 자산 목록, 직원에게 지급·회수
+  - 요청서 범위: 상태 카드로 거르는 자산 목록(지금 쓰는 사람 포함), 직원에게 지급·회수, 상세의 지급·회수 이력과 장애 이력
   - 동작은 resources/js/asset/asset-admin.js (서버 주소·값은 그 파일 맨 위)
   - 이 주소를 받는 Controller 는 asset 모듈 담당이 만든다
-  - 자산 등록·지급 이력은 서버에 아직 없어 화면에도 없다
+  - 자산 등록은 서버에 아직 없어 화면에도 없다
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:layout title="자산 관리" crumb="IT 서비스" menu="asset-all">
@@ -46,6 +46,7 @@
                 <th>이름</th>
                 <th>일련번호</th>
                 <th>배치 지점</th>
+                <th>사용자</th>
                 <th>상태</th>
               </tr>
             </thead>

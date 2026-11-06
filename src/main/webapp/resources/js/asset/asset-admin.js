@@ -4,13 +4,18 @@
 //
 // 서버(asset 모듈, AssetAdminController)에 맞춘 주소·값
 //   GET  /asset/admin/api/assets
-//        → [{ id, assetNo, name, serial, kind, status, branchId, version }]  (모든 상태, 이 업체만)
+//        → [{ id, assetNo, name, serial, kind, status, branchId, version, employeeName, issuedAt }]  (모든 상태, 이 업체만)
+//          employeeName·issuedAt: 지금 쓰는 사람과 지급 시각(#181). 지급 중이 아니면 둘 다 null
 //   GET  /asset/admin/api/assets/{id}
 //        → { id, assetNo, name, serial, kind, status, branchId, version, actions: { assign, return } }
 //   POST /asset/admin/api/assets/{id}/assign  { employeeId, version }
 //   POST /asset/admin/api/assets/{id}/return  { version, reason (1~300자) }
 //   - kind: ASSET_TYPE 코드 (util.js assetTypeName 으로 이름을 붙인다)
 //   - status: ASSET_STATUS 코드 (AS_*)
+//   GET  /asset/admin/api/assets/{id}/assignments  (지급·회수 이력, #151, 최신순)
+//        → [{ employeeName, issuedByName, issuedAt, returnedByName, returnedAt, itTicketId }]  (회수 전이면 returned* 는 null)
+//   GET  /asset/admin/api/assets/{id}/incidents    (이 자산으로 접수한 장애 티켓, #168)
+//        → [{ id, title, status, requesterName, assigneeName, createdAt }]  (status: 티켓 상태, util.js TICKET_STATUS)
 //   - 실패: { message }. 409 는 다른 사람이 먼저 바꾼 것이다
 //
 // 지급할 직원과 지점 이름: 자산용 선택 목록 (IT 담당·업체 관리자, #157)
@@ -19,14 +24,13 @@
 //     branches:  사용 중지한 지점도 포함 [{ branchId, branchName }] — 이미 놓인 자산의 지점 이름을 보이려고
 //   - 지점 목록은 이름 표시에만 쓴다(새 지점을 고르는 칸이 아니다)
 //
-// 서버에는 있지만 화면에 아직 없는 것: 지급·회수 이력 (GET /asset/admin/api/assets/{id}/assignments, #151)
-// 서버에 없어 화면에도 없는 것: 목록의 현재 사용자·지급일, 자산 등록
+// 서버에 없어 화면에도 없는 것: 자산 등록
 // 상태를 바꾸는 요청에는 받은 version 을 같이 보낸다.
 //   같은 장비를 두 사람에게 동시에 지급하려 하면 서버가 409 로 거절하고 화면은 새로 받는다.
 // 장비 지급 신청서로 생긴 지급은 티켓 처리 화면에서 한다(그 티켓과 함께 끝나야 해서).
 //   여기 지급은 신청 없이 바로 주는 경우다.
 // util.js 의 h, span, inqCell, titleBtn, dataRow, detailTr, emptyTr, dlOf, cardOf,
-//   writeBtn, textBox, pickSelect, assetTypeName 을 쓴다.
+//   writeBtn, textBox, pickSelect, assetTypeName, historyList, whenFull, ymd, TICKET_STATUS, TICKET_CLASS 를 쓴다.
 (() => {
   // 공통 코드 ASSET_STATUS 이름 그대로
   const STATUS = {
@@ -48,13 +52,14 @@
     AS_IN_USE: '사용 중인 자산이 없습니다',
   };
   const REASON_MAX = 300; // 서버(AssetAllocationService.returnAsset)와 같은 값
-  const COLS = 6;
+  const COLS = 7;
 
   const $ = id => document.getElementById(id);
   const state = {
     filter: 'ALL',     // 고른 상태 카드
     open: null,        // 펼친 자산 id
     detail: null,      // 펼친 자산의 상세 응답
+    hist: null,        // 펼친 자산의 이력 { id, assignments, incidents } (null 은 받는 중, 'fail' 은 실패)
     seq: 0,            // 늦게 온 목록 응답을 버리기 위한 번호
     items: null,       // 받은 전체 목록
     people: [],        // 지급할 수 있는 직원
@@ -103,7 +108,7 @@
     // 열어 둔 자산이 바꾸면서 이 카드에서 빠져도(지급 가능 → 사용 중 등) 맨 위에 남겨 결과를 보게 한다
     const d = state.detail;
     if (state.open && d && d.id === state.open && !items.some(a => a.id === state.open)) {
-      items.unshift(d);
+      items.unshift(all.find(a => a.id === d.id) || d); // 목록 쪽 값(사용자·지급일)이 있으면 그것으로
     }
 
     const rows = items.flatMap(a => {
@@ -114,6 +119,7 @@
         inqCell('이름', span(a.name || '-')),
         inqCell('일련번호', span(a.serial || '-')),
         inqCell('배치 지점', span(branchName(a.branchId))),
+        inqCell('사용자', ...userCell(a)),
         inqCell('상태', statusBadge(a.status)));
       if (!isOpen) return [tr];
       const content = d && d.id === a.id ? detailView(d) : span('불러오는 중…', 'muted');
@@ -123,6 +129,10 @@
   }
 
   const statusBadge = s => span(STATUS[s] || s, `status status-${STATUS_CLASS[s] || 'requested'}`);
+  // 사용자 칸: 지금 쓰는 사람과 지급일. 지급 중이 아니면 '-'
+  const userCell = a => (a.employeeName ? [span(a.employeeName), span(a.issuedAt ? `${ymd(a.issuedAt)} 지급` : '', 'cell-sub')] : [span('-')]);
+  // 시각이 없으면 '-' (whenFull 은 빈 값을 NaN 으로 그린다)
+  const when = iso => (iso ? whenFull(iso) : '-');
 
   // 카드를 누르면 그 상태만 보이고, 열린 상세는 닫는다(목록은 이미 받아 두었다)
   document.querySelectorAll('#aaFilters .card-filter').forEach(b => b.addEventListener('click', () => {
@@ -134,8 +144,9 @@
   function toggle(id) {
     state.open = state.open === id ? null : id;
     state.detail = null;
+    state.hist = null;
     render();
-    if (state.open) loadDetail(id);
+    if (state.open) { loadDetail(id); loadHistory(id); }
   }
 
   function loadDetail(id) {
@@ -156,6 +167,7 @@
   function refresh() {
     const id = state.open;
     if (!id) { load(); return; }
+    loadHistory(id); // 지급·회수하면 이력도 바뀐다
     api.get(`/asset/admin/api/assets/${encodeURIComponent(id)}`)
       .done(d => { if (state.open === id) state.detail = d; })
       .fail(() => { state.open = null; state.detail = null; })
@@ -184,8 +196,53 @@
       right = cardOf('지급·회수', h('p', 'inq-body inq-hint', why));
     }
 
-    const grid = h('div', 'inq-grid', left, right);
-    grid.addEventListener('click', e => e.stopPropagation()); // 상세 안을 눌러도 줄이 접히지 않게
+    const box = h('div', '', h('div', 'inq-grid', left, right), historyView(d.id));
+    box.addEventListener('click', e => e.stopPropagation()); // 상세 안을 눌러도 줄이 접히지 않게
+    return box;
+  }
+
+  // ---------- 이력: 지급·회수(#151)와 장애(#168). 상세를 열 때와 지급·회수한 뒤에 같이 받는다 ----------
+  // 응답이 오면 이력 칸만 바꾼다: 표 전체를 다시 그리면 쓰던 회수 사유·고른 직원이 지워진다
+  function loadHistory(id) {
+    state.hist = { id, assignments: null, incidents: null };
+    const put = (key, v) => {
+      if (!state.hist || state.hist.id !== id) return; // 그사이 다른 자산을 열었다
+      state.hist[key] = v;
+      const box = $('aaHistory');
+      if (box && state.open === id) box.replaceWith(historyView(id)); // 상세가 아직 없으면 상세를 그릴 때 같이 그린다
+    };
+    ['assignments', 'incidents'].forEach(key => {
+      api.get(`/asset/admin/api/assets/${encodeURIComponent(id)}/${key}`)
+        .done(list => put(key, list || []))
+        .fail(() => put(key, 'fail'));
+    });
+  }
+
+  function historyView(id) {
+    const hs = state.hist && state.hist.id === id ? state.hist : {};
+    const body = (v, row, empty) => {
+      if (v == null) return h('p', 'inq-body inq-hint', '불러오는 중…');
+      if (v === 'fail') return h('p', 'inq-body inq-hint', '이력을 불러오지 못했습니다. 상세를 다시 열어 주세요.');
+      return historyList(v.map(row), empty);
+    };
+    // 한 줄은 왼쪽(무엇)·오른쪽(결과·때) 두 덩어리다(bill-history 는 두 칸을 양 끝에 둔다)
+    // 지급·회수: '홍길동 · 2026.11.03 09:12 지급(강아지) · 장비 지급 티켓 1021번' | '사용 중' 또는 '2026.11.05 18:00 회수(아무개)'
+    const assignment = a => [
+      h('span', '', h('strong', '', a.employeeName || '-'),
+        ` · ${when(a.issuedAt)} 지급${a.issuedByName ? `(${a.issuedByName})` : ''}${a.itTicketId ? ` · 장비 지급 티켓 ${a.itTicketId}번` : ''}`),
+      a.returnedAt
+        ? span(`${when(a.returnedAt)} 회수${a.returnedByName ? `(${a.returnedByName})` : ''}`, 'muted')
+        : span('사용 중', 'status status-active'),
+    ];
+    // 장애: '[처리 중] 1030번 화면이 깜빡임' | '요청 홍길동 · 담당 아무개 · 2026.11.04 10:20'
+    const incident = t => [
+      h('span', '', span(TICKET_STATUS[t.status] || t.status, `status status-${TICKET_CLASS[t.status] || 'requested'}`), ` ${t.id}번 ${t.title || ''}`),
+      span(`요청 ${t.requesterName || '-'} · 담당 ${t.assigneeName || '미배정'} · ${when(t.createdAt)}`, 'muted'),
+    ];
+    const grid = h('div', 'inq-grid',
+      cardOf('지급·회수 이력', body(hs.assignments, assignment, '아직 지급한 적이 없습니다')),
+      cardOf('장애 이력', body(hs.incidents, incident, '이 자산으로 접수한 장애가 없습니다')));
+    grid.id = 'aaHistory';
     return grid;
   }
 
