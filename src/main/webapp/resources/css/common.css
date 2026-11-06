@@ -829,6 +829,7 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .noti-ic { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--bg-sub); color: var(--text-sub); }
 .noti-ic.is-approval { background: var(--accent-bg); color: var(--accent); }
 .noti-ic.is-ticket { background: #fff4e5; color: #8a4b08; }
+.noti-ic.is-attendance { background: #e5f4e4; color: #2b6a2f; } /* 근태 정정 알림: 달력의 연차 칩과 같은 초록 */
 .noti-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .noti-head { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--text-muted); }
 .noti-type { font-weight: 600; color: var(--text-sub); }

@@ -37,6 +37,9 @@ public class AttendanceCorrectionDAO {
     /** 이 사람이 처리할 대기 요청을 읽는다 */
     public List<AttendanceCorrectionDTO> selectInbox(Long companyId, Long approverId, boolean admin) { return mapper.selectInbox(companyId, approverId, admin); }
 
+    /** 정정 요청 알림을 받을 업체 관리자 사원 번호를 읽는다(요청자 본인 제외) */
+    public List<Long> selectAdminEmployeeIds(Long companyId, Long exceptEmployeeId) { return mapper.selectAdminEmployeeIds(companyId, exceptEmployeeId); }
+
     /** 대기 중인 요청을 요청자 본인이 취소한다 */
     public int cancelCorrection(Long companyId, Long id, Long employeeId) { return mapper.cancelCorrection(companyId, id, employeeId); }
 
