@@ -7,7 +7,11 @@ const UA = navigator.userAgent;
 // 설치한 앱 안에서는 창이 곧 그룹웨어다. 소개 사이트 같은 페이지(site.tag 가 body.site 를 붙인다)가
 // 거기서 열리면 로그인 화면으로 보낸다. 이런 페이지를 연 채로 브라우저 메뉴에서 만든 앱도 여기서 처리된다:
 // 그런 앱은 manifest start_url(로그인) 대신 그 페이지에서 시작하기 때문이다.
-if (runningAsApp && document.body.classList.contains('site')) location.replace((document.body.dataset.ctx || '') + '/login');
+// 단 data-app-allowed 를 단 화면(이메일 인증 확인 site/verify.jsp)은 그대로 둔다: 앱을 설치한 PC에서는 메일 링크가
+// 앱 창으로 열려, 여기서 넘기면 [인증하기]를 누를 수 없다.
+if (runningAsApp && document.body.classList.contains('site') && !document.querySelector('[data-app-allowed]')) {
+  location.replace((document.body.dataset.ctx || '') + '/login');
+}
 const isIOS = /iphone|ipad|ipod/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
 // Chrome/Edge(PC, Android)는 페이지를 설치할 수 있을 때 이 이벤트를 보낸다. 버튼에 쓰려고 받아 둔다

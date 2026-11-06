@@ -25,7 +25,14 @@ public class AssetAdminController {
     public Map<String, Object> incident(@AuthenticationPrincipal LoginUser user, @PathVariable("id") Long assetId) {
     	return Map.of("success", true, "data", service.getIncident(user, assetId));
     }
-    
+
+    /** 자산 관리 화면에서 사용할 직원·지점 목록을 JSON으로 반환한다. */
+    @GetMapping("/form-options")
+    public Map<String, Object> formOptions(@AuthenticationPrincipal LoginUser user) {
+    	return Map.of("success", true,
+				  	  "data", service.getFormOptions(user));
+    }
+
     /** 관리자가 선택한 자산의 지급·회수 이력을 JSON으로 반환한다. */
     @GetMapping("/{id}/assignments")
     public Map<String, Object> assignments(@AuthenticationPrincipal LoginUser user, 
