@@ -26,10 +26,11 @@ import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.mapper.AttendanceCorrectionMapper;
 import com.ieum.gw.service.AttendanceCorrectionService;
 import com.ieum.gw.service.AttendanceException;
+import com.ieum.gw.service.NotificationService;
 
 /**
  * 근태 정정 요청 (퇴근 누락 1차). 오늘은 2026-10-30(AttendanceServiceTest.FakeMapper), 업체 10.
- * 직원 102·103 재직, 105 퇴사. 102·103의 부서장은 103, 104는 부서장 없는 부서. 900은 업체 관리자.
+ * 직원 102·103 재직, 105 퇴사. 102·103의 부서장은 103, 104는 부서장 없는 부서. 900·901은 업체 관리자.
  */
 class AttendanceCorrectionServiceTest {
 
@@ -37,6 +38,7 @@ class AttendanceCorrectionServiceTest {
 
     private FakeCorrectionMapper mapper;
     private AttendanceServiceTest.FakeMapper attMapper;
+    private RecordingNotifications notifications;
     private AttendanceCorrectionService service;
 
     @BeforeEach
@@ -44,7 +46,8 @@ class AttendanceCorrectionServiceTest {
         mapper = new FakeCorrectionMapper();
         attMapper = new AttendanceServiceTest.FakeMapper();
         attMapper.status.put(104L, "ST_SERVING");
-        service = new AttendanceCorrectionService(new AttendanceCorrectionDAO(mapper), new AttendanceDAO(attMapper));
+        notifications = new RecordingNotifications();
+        service = new AttendanceCorrectionService(new AttendanceCorrectionDAO(mapper), new AttendanceDAO(attMapper), notifications);
         mapper.attendance(102L, "2026-10-29", "09:05:00", null);   // 퇴근 누락
         mapper.attendance(102L, "2026-10-28", "08:50:00", "18:10:00");
         mapper.attendance(103L, "2026-10-29", "09:00:00", null);   // 부서장 본인의 퇴근 누락
@@ -269,6 +272,80 @@ class AttendanceCorrectionServiceTest {
         assertEquals(400, status(() -> service.myCorrections(EMP_102, "2026-13")));
     }
 
+    @Test
+    @DisplayName("알림(요청): 부서장이 있으면 부서장 한 명에게, 요청자 이름·근무일과 함께")
+    void notifyHeadOnRequest() {
+        Long id = request102();
+        assertEquals(List.of("REQUEST 103 " + id + " 직원102 2026-10-29"), notifications.sent);
+    }
+
+    @Test
+    @DisplayName("알림(요청): 부서장 본인 요청·부서장 없는 부서·부서장 퇴사면 업체 관리자 전원에게(요청자 본인은 빠진다)")
+    void notifyAdminsOnRequest() {
+        Long headOwn = (Long) service.request(HEAD_103, "2026-10-29", null, "18:00", "부서장 본인").get("id");
+        Long noHead = (Long) service.request(EMP_104, "2026-10-29", null, "18:30", "부서장 없는 부서").get("id");
+        mapper.leftHeads.add(103L);
+        Long headLeft = request102();
+        mapper.admins.add(102L); // 관리자가 본인 요청을 하면 본인에게는 가지 않는다
+        Long adminOwn = (Long) service.request(EMP_102, "2026-10-27", "09:00", "18:00", "관리자 본인(결근)").get("id");
+        assertEquals(List.of(
+                "REQUEST 900 " + headOwn + " 직원103 2026-10-29", "REQUEST 901 " + headOwn + " 직원103 2026-10-29",
+                "REQUEST 900 " + noHead + " 직원104 2026-10-29", "REQUEST 901 " + noHead + " 직원104 2026-10-29",
+                "REQUEST 900 " + headLeft + " 직원102 2026-10-29", "REQUEST 901 " + headLeft + " 직원102 2026-10-29",
+                "REQUEST 900 " + adminOwn + " 직원102 2026-10-27", "REQUEST 901 " + adminOwn + " 직원102 2026-10-27"),
+                notifications.sent);
+    }
+
+    @Test
+    @DisplayName("알림(처리): 승인·반려는 요청한 직원에게 결과와 함께")
+    void notifyRequesterOnDecision() {
+        Long approved = request102();
+        Long rejected = (Long) service.request(EMP_102, "2026-10-27", "09:00", "18:00", "결근 정정").get("id");
+        notifications.sent.clear();
+        service.approve(HEAD_103, approved);
+        service.reject(HEAD_103, rejected, "그날 외근 기록이 없습니다");
+        assertEquals(List.of("DONE 102 " + approved + " 2026-10-29 승인", "DONE 102 " + rejected + " 2026-10-27 반려"),
+                notifications.sent);
+    }
+
+    @Test
+    @DisplayName("알림 없음: 취소, 거절된 요청, 이미 처리된 요청, 반영하지 못한 승인")
+    void noNotifyWhenNothingHappened() {
+        Long canceled = request102();
+        notifications.sent.clear();
+        service.cancel(EMP_102, canceled);
+        assertEquals(409, status(() -> service.request(EMP_102, "2026-10-28", null, "19:00", "퇴근 있음")));
+        assertEquals(409, status(() -> service.approve(HEAD_103, canceled)));
+        assertTrue(notifications.sent.isEmpty());
+
+        Long failing = request102();
+        notifications.sent.clear();
+        mapper.att.get("102/2026-10-29").setCheckOut("18:00:00");
+        assertEquals(409, status(() -> service.approve(HEAD_103, failing)));
+        assertTrue(notifications.sent.isEmpty());
+    }
+
+    /** 알림을 저장하지 않고 부른 순서대로 적어 두는 가짜 */
+    static class RecordingNotifications extends NotificationService {
+        final List<String> sent = new ArrayList<>();
+
+        RecordingNotifications() {
+            super(null);
+        }
+
+        @Override
+        public void notifyAttendanceCorrectionRequest(Long companyId, Long receiverEmployeeId, Long attendanceCorrectionId,
+                                                      String requesterName, String workDate) {
+            sent.add("REQUEST " + receiverEmployeeId + " " + attendanceCorrectionId + " " + requesterName + " " + workDate);
+        }
+
+        @Override
+        public void notifyAttendanceCorrectionDone(Long companyId, Long receiverEmployeeId, Long attendanceCorrectionId,
+                                                   String workDate, boolean approved) {
+            sent.add("DONE " + receiverEmployeeId + " " + attendanceCorrectionId + " " + workDate + " " + (approved ? "승인" : "반려"));
+        }
+    }
+
     /** 근태·정정 표 메모리판. UX_82_01(같은 직원·같은 날 대기 하나)을 흉내 낸다 */
     static class FakeCorrectionMapper implements AttendanceCorrectionMapper {
         final Map<String, AttendanceDTO> att = new HashMap<>();   // "직원/날짜" → 근태
@@ -353,8 +430,17 @@ class AttendanceCorrectionServiceTest {
 
         @Override public AttendanceCorrectionDTO selectCorrectionForUpdate(Long companyId, Long id) {
             AttendanceCorrectionDTO r = byId(id);
-            if (r != null) r.setHeadEmployeeId(activeHead(r.getEmployeeId()));
+            if (r != null) {
+                r.setHeadEmployeeId(activeHead(r.getEmployeeId()));
+                r.setEmployeeName("직원" + r.getEmployeeId());
+            }
             return r;
+        }
+
+        final List<Long> admins = new ArrayList<>(List.of(900L, 901L)); // 사용 중인 업체 관리자
+
+        @Override public List<Long> selectAdminEmployeeIds(Long companyId, Long exceptEmployeeId) {
+            return admins.stream().filter(a -> !a.equals(exceptEmployeeId)).collect(Collectors.toList());
         }
 
         @Override public List<AttendanceCorrectionDTO> selectInbox(Long companyId, Long approverId, boolean admin) {

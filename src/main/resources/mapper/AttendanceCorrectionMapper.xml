@@ -114,6 +114,18 @@
 		ORDER BY c.created_at, c.attendance_correction_id
 	</select>
 
+	<!-- 정정 요청 알림을 받을 업체 관리자: 사용 중인 관리자 계정 + 재직 중인 사원. 요청자 본인은 빠진다(본인 요청은 처리할 수 없다) -->
+	<select id="selectAdminEmployeeIds" resultType="long">
+		SELECT a.employee_id
+		FROM user_account a
+		JOIN employee e ON e.employee_id = a.employee_id AND e.company_id = a.company_id
+		WHERE a.company_id = #{companyId}
+		  AND a.role_code = 'ROLE_ADMIN' AND a.status_code = 'ACTIVE'
+		  AND e.employment_status = 'ST_SERVING'
+		  AND a.employee_id &lt;&gt; #{exceptEmployeeId}
+		ORDER BY a.employee_id
+	</select>
+
 	<update id="cancelCorrection">
 		UPDATE attendance_correction
 		SET status_code = 'ACR_CANCELED', updated_at = <include refid="now"/>

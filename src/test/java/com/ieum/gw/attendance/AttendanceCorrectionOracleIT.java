@@ -31,12 +31,15 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 
 import com.ieum.gw.dao.AttendanceCorrectionDAO;
 import com.ieum.gw.dao.AttendanceDAO;
+import com.ieum.gw.dao.NotificationDAO;
 import com.ieum.gw.dto.AuthEmpDTO;
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.mapper.AttendanceCorrectionMapper;
 import com.ieum.gw.mapper.AttendanceMapper;
+import com.ieum.gw.mapper.NotificationMapper;
 import com.ieum.gw.service.AttendanceCorrectionService;
 import com.ieum.gw.service.AttendanceException;
+import com.ieum.gw.service.NotificationService;
 
 /**
  * 근태 정정 SQL을 실제 Oracle에서 돌린다. 팀 DB가 아니라 이 PC에 임시로 띄운 빈 DB(db/ 스크립트로 만든 것)에만 붙는다:
@@ -67,7 +70,8 @@ class AttendanceCorrectionOracleIT {
         SqlSessionTemplate session = new SqlSessionTemplate(factory.getObject());
         AttendanceDAO attendanceDao = new AttendanceDAO(session.getMapper(AttendanceMapper.class));
         ProxyFactory proxy = new ProxyFactory(new AttendanceCorrectionService(
-                new AttendanceCorrectionDAO(session.getMapper(AttendanceCorrectionMapper.class)), attendanceDao));
+                new AttendanceCorrectionDAO(session.getMapper(AttendanceCorrectionMapper.class)), attendanceDao,
+                new NotificationService(new NotificationDAO(session.getMapper(NotificationMapper.class)))));
         proxy.addAdvice(new TransactionInterceptor(new DataSourceTransactionManager(ds), new AnnotationTransactionAttributeSource()));
         service = (AttendanceCorrectionService) proxy.getProxy();
         today = LocalDate.parse(attendanceDao.selectToday());
@@ -121,6 +125,13 @@ class AttendanceCorrectionOracleIT {
                 .map(m -> ((Number) m.get("id")).longValue()).collect(Collectors.toList());
     }
 
+    /** 이 정정 요청으로 남은 알림: "종류:받는 사원 번호" (남은 순서) */
+    private List<String> notis(Long id) {
+        return jdbc.queryForList("SELECT n.notification_type || ':' || a.employee_id FROM notification n "
+                + "JOIN user_account a ON a.company_id = n.company_id AND a.user_account_id = n.receiver_account_id "
+                + "WHERE n.attendance_correction_id = ? ORDER BY n.notification_id", String.class, id);
+    }
+
     /** 거절된 요청의 상태 코드 */
     private static int status(Runnable r) {
         return assertThrows(AttendanceException.class, r::run).getStatus();
@@ -144,6 +155,8 @@ class AttendanceCorrectionOracleIT {
         assertEquals("ACR_APPROVED", col(id, "status_code"));
         assertEquals(String.valueOf(head.getEmployeeId()), col(id, "approver_employee_id"));
         assertNotNull(col(id, "decided_at"));
+        // 알림(FK_69_07·CK_69_01): 요청은 부서장에게, 승인은 요청한 직원에게
+        assertEquals(List.of("NT_ATT_CORRECTION_REQUEST:" + head.getEmployeeId(), "NT_ATT_CORRECTION_DONE:" + member.getEmployeeId()), notis(id));
         assertEquals(409, status(() -> service.reject(head, id, "늦은 반려")));
         assertEquals(409, status(() -> service.request(member, d, null, "19:00", "이미 퇴근이 있는 날")));
     }
@@ -162,6 +175,8 @@ class AttendanceCorrectionOracleIT {
         assertEquals(400, status(() -> service.reject(head, second, " ")));
         service.reject(head, second, "그날 일찍 나간 것으로 압니다");
         assertEquals("ACR_REJECTED", col(second, "status_code"));
+        assertEquals(List.of("NT_ATT_CORRECTION_REQUEST:" + head.getEmployeeId()), notis(first)); // 취소는 알림 없음
+        assertEquals(List.of("NT_ATT_CORRECTION_REQUEST:" + head.getEmployeeId(), "NT_ATT_CORRECTION_DONE:" + member.getEmployeeId()), notis(second));
         assertEquals("그날 일찍 나간 것으로 압니다", col(second, "reject_reason"));
         assertNull(checkOut(member, d));
 
@@ -177,6 +192,8 @@ class AttendanceCorrectionOracleIT {
         Long own = ((Number) service.request(head, hd, null, "18:00", "부서장 본인").get("id")).longValue();
         assertTrue(inboxIds(admin).contains(own));
         assertEquals(403, status(() -> service.approve(head, own)));
+        assertTrue(notis(own).contains("NT_ATT_CORRECTION_REQUEST:" + admin.getEmployeeId())); // 부서장 본인 요청은 업체 관리자에게
+        assertTrue(!notis(own).contains("NT_ATT_CORRECTION_REQUEST:" + head.getEmployeeId()));
         service.approve(admin, own);
         assertEquals("18:00", checkOut(head, hd));
 
