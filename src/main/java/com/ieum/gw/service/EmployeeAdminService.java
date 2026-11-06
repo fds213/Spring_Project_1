@@ -74,6 +74,7 @@ public class EmployeeAdminService {
             if (active && !protectedOne && (admin || !readOnly)) actions.add("off");
             if (!readOnly && "RETIRED".equals(r.getStatusCode())) actions.add("on");
             if (!readOnly && admin && active && r.getDepartmentName() != null) actions.add("head");
+            if (!readOnly && admin && active && !protectedOne) actions.add("role"); // 역할 바꾸기 (setRole과 같은 조건)
             
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("name", r.getEmployeeName());
@@ -166,6 +167,10 @@ public class EmployeeAdminService {
         // ④ 업체 관리자·본인 계정은 바꾸지 않는다
         if ("ROLE_ADMIN".equals(t.getRoleCode()) || t.getEmployeeId().equals(user.getEmployeeId())) {
             throw new IllegalStateException("업체 관리자와 본인 계정의 역할은 바꿀 수 없습니다");
+        }
+        // ④-2 사용 중 계정만 (비활성 계정의 역할을 바꾸면 다시 사용할 때 바뀐 역할로 돌아와 헷갈린다)
+        if (!"ACTIVE".equals(t.getStatusCode())) {
+            throw new IllegalStateException("사용 중인 계정만 역할을 바꿀 수 있습니다");
         }
         // ⑤ 조건부 UPDATE: 그사이 관리자가 됐으면 0행
         if (dao.updateRole(companyId, t.getEmployeeId(), role) == 0) {

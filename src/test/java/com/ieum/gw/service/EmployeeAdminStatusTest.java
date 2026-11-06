@@ -1,10 +1,14 @@
 package com.ieum.gw.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +19,7 @@ import org.springframework.security.access.AccessDeniedException;
 import com.ieum.gw.dao.EmployeeDAO;
 import com.ieum.gw.dto.AuthEmpDTO;
 import com.ieum.gw.dto.CompanyUsageDTO;
+import com.ieum.gw.dto.EmployeeAdminRowDTO;
 import com.ieum.gw.dto.EmployeeHeadTargetDTO;
 import com.ieum.gw.dto.LoginUser;
 
@@ -76,6 +81,22 @@ class EmployeeAdminStatusTest {
 		public Integer lockLastSerial(Long companyId) {
 			lockCalls++;
 			return 5;
+		}
+
+		/** 사원 목록: 들고 있는 사람들을 목록 줄로 */
+		@Override
+		public List<EmployeeAdminRowDTO> listAdminRows(Long companyId) {
+			List<EmployeeAdminRowDTO> rows = new ArrayList<>();
+			people.forEach((no, t) -> {
+				EmployeeAdminRowDTO r = new EmployeeAdminRowDTO();
+				r.setEmployeeId(t.getEmployeeId());
+				r.setEmployeeNo(no);
+				r.setEmployeeName(t.getEmployeeName());
+				r.setRoleCode(t.getRoleCode());
+				r.setStatusCode(status.get(t.getEmployeeId()));
+				rows.add(r);
+			});
+			return rows;
 		}
 	}
 
@@ -313,5 +334,32 @@ class EmployeeAdminStatusTest {
 
 		assertThrows(IllegalStateException.class, () -> service.setStatus(admin, "20260003", "on"));
 		assertEquals("RETIRED", dao.status.get(503L));
+	}
+
+	@Test
+	@DisplayName("사원 목록의 역할 바꾸기(role)는 업체 관리자에게만, 관리자·본인이 아닌 사용 중 계정에만, 만료 중이 아닐 때만 보인다")
+	void roleAction() {
+		Map<String, List<String>> a = actions(service.getList(admin));
+		assertTrue(a.get("20260002").contains("role"));   // 사용 중 직원
+		assertTrue(a.get("20260005").contains("role"));   // 사용 중 인사 담당
+		assertFalse(a.get("20260001").contains("role"));  // 관리자(본인)
+		assertFalse(a.get("20260003").contains("role"));  // 비활성
+
+		assertFalse(actions(service.getList(hr)).get("20260002").contains("role")); // 인사 담당에게는 없음
+
+		CompanyUsageDTO usage = new CompanyUsageDTO();
+		usage.setExpired(true);
+		subscription.usage = usage;
+		assertFalse(actions(service.getList(admin)).get("20260002").contains("role")); // 만료 중
+	}
+
+	/** 사원 목록 응답에서 사번 → actions */
+	@SuppressWarnings("unchecked")
+	private static Map<String, List<String>> actions(Map<String, Object> list) {
+		Map<String, List<String>> m = new HashMap<>();
+		for (Map<String, Object> item : (List<Map<String, Object>>) list.get("items")) {
+			m.put((String) item.get("empNo"), (List<String>) item.get("actions"));
+		}
+		return m;
 	}
 }

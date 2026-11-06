@@ -60,6 +60,14 @@ public class EmployeeService {
         return dao.countActiveEmployee(companyId, employeeId) > 0;
     }
 
+    /** 사용 중인 재직자면 지금 DB의 역할, 아니면 null (계정 상태 검사가 요청마다 세션 역할과 비교한다) */
+    public String getActiveRole(Long companyId, Long employeeId) {
+        if (companyId == null || employeeId == null) {
+            return null;
+        }
+        return dao.getActiveRole(companyId, employeeId);
+    }
+
     /**
      * 같은 업체 사원의 역할이 roleCodes 중 하나인지 본다. 다른 사람의 역할을 볼 때 쓴다
      * (예: 티켓을 배정받을 사람이 ROLE_IT·ROLE_ADMIN인지). 로그인한 본인의 역할은 LoginUser에서 꺼낸다.
