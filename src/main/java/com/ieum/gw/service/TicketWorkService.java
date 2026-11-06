@@ -139,8 +139,7 @@ public class TicketWorkService {
             // 본인이 접수한 장애·문의 중 접수 상태인 건만 취소할 수 있다.
             item.put("canCancel", user.getEmployeeId().equals(row.getRequesterId())
             						&& RECEIVED.name().equals(row.getStatus())
-            						&& (TicketType.TK_INCIDENT.name().equals(row.getType())
-            							|| TicketType.TK_QUESTION.name().equals(row.getType())));
+            						&& isCancellableType(row.getType()));
             item.put("version", row.getVersion());
             return item;
     }
@@ -326,15 +325,18 @@ public class TicketWorkService {
     @Transactional
     public void cancel(LoginUser user, Long id, TicketRequestDTO form) {
     	requireLogin(user);
+    	requireForm(form);
+
+    	if (form.getVersion() == null || form.getVersion() < 0) {
+			throw bad("변경 버전이 필요합니다.");
+		}
     	
     	TicketWorkDTO row = locked(user, id);
     	requireOwner(user, row);
     	requireVersion(row, form);
     	requireState(row, RECEIVED);
     	
-    	boolean cancellableType = TicketType.TK_INCIDENT.name().equals(row.getType()) || TicketType.TK_QUESTION.name().equals(row.getType());
-    	
-    	if (!cancellableType) {
+    	if (!isCancellableType(row.getType())) {
 			throw conflict("직접 접수한 장애·문의 티켓만 취소할 수 있습니다.");
 		}
     	
@@ -459,6 +461,12 @@ public class TicketWorkService {
     }
     private static boolean admin(LoginUser user) { return "ROLE_ADMIN".equals(user.getRole()); }
     private static boolean terminal(TicketWorkDTO row) { return List.of(CLOSED.name(), CANCELED.name(), REJECTED.name()).contains(row.getStatus()); }
+    
+    /** 요청자가 직접 취소할 수 있는 장애·문의 종류인지 확인한다. */
+    private static boolean isCancellableType(String type) {
+    	return TicketType.TK_INCIDENT.name().equals(type) || TicketType.TK_QUESTION.name().equals(type);
+    }
+    
     private static void requireState(TicketWorkDTO row, TicketStatus expected) {
         if (!expected.name().equals(row.getStatus())) { throw conflict("현재 상태에서는 처리할 수 없습니다. 새로 불러와 주세요."); }
     }

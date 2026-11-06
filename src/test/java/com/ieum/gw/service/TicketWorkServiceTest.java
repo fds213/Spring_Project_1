@@ -38,7 +38,7 @@ import com.ieum.gw.dto.TicketWorkDTO;
 class TicketWorkServiceTest {
     static class Rows extends TicketWorkDAO {
         TicketWorkDTO row;
-        int updates, histories, comments, affected = 1;
+        int locks, updates, histories, comments, affected = 1;
         boolean failHistory;
         Map<String, Object> lastChange;
         String commentBody;
@@ -46,6 +46,7 @@ class TicketWorkServiceTest {
         List<TicketHistoryDTO> historyRows = new ArrayList<>();
         Rows() { super(null); }
         @Override public TicketWorkDTO lock(Long companyId, Long id) {
+            locks++;
             return row != null && companyId.equals(row.getCompanyId()) && id.equals(row.getId()) ? row : null;
         }
         @Override public List<TicketWorkDTO> selectMine(Long companyId, Long employeeId) {
@@ -475,7 +476,7 @@ class TicketWorkServiceTest {
     }
 
     @Test
-    @DisplayName("취소의 비로그인·잘못된 번호·누락 요청·누락 또는 음수 버전은 변경 전에 거절한다")
+    @DisplayName("취소의 비로그인·잘못된 번호·누락 요청·누락 또는 음수 버전은 DB 잠금 전에 거절한다")
     void cancelRejectsMalformedInput() {
         status(HttpStatus.UNAUTHORIZED, () -> service.cancel(null, 10L, form()));
         for (Long id : new Long[] {null, 0L, -1L}) {
@@ -487,6 +488,7 @@ class TicketWorkServiceTest {
             request.setVersion(version);
             status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, request));
         }
+        assertEquals(0, rows.locks);
         assertEquals(0, rows.updates);
         assertEquals(0, rows.histories);
     }
@@ -496,6 +498,7 @@ class TicketWorkServiceTest {
     void cancelRejectsVersionConflicts() {
         rows.row.setVersion(1L);
         status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(1, rows.locks, "유효한 입력의 현재 버전 비교는 잠금 이후에 수행한다.");
         assertEquals(0, rows.updates);
         rows.row.setVersion(0L);
         rows.affected = 0;
