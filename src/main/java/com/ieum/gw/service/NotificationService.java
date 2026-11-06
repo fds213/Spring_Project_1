@@ -21,7 +21,10 @@ import lombok.RequiredArgsConstructor;
  * 받는 사람은 사원 ID로 받고 계정 ID로 바꿔 저장하는 일은 알림이 한다. 그 사원의 계정이 없으면 받을 곳이 없으니 로그만 남기고 업무는 이어 간다.
  * 결재 알림은 같은 사람에게 같은 문서·같은 종류로 두 번 들어와도 하나만 저장한다. 티켓 알림은 재배정·재요청으로
  * 같은 인자가 다시 올 수 있어 부를 때마다 저장한다(같은 처리가 두 번 되는 것은 티켓의 version 검사가 막는다).
- * 그 밖의 저장 오류(없는 문서·티켓 번호 등)는 그대로 던져 업무 트랜잭션을 취소한다(계획서 5장).
+ * 근태 정정 알림은 결재처럼 같은 사람에게 같은 요청·같은 종류로 하나만 저장한다(요청은 한 번만 대기에 들어가고, 처리는 한 번뿐이다).
+ * 그 밖의 저장 오류(없는 문서·티켓·정정 요청 번호 등)는 그대로 던져 업무 트랜잭션을 취소한다(계획서 5장).
+ * 근태 정정 알림은 DB 패치(NOTIFICATION.ATTENDANCE_CORRECTION_ID 칸과 CK_69_01 교체, 코드 2개)를 돌린 DB에서만 저장된다.
+ * 패치 전에 부르면 오류가 나 정정 요청·처리까지 취소되니, 부르는 코드는 패치가 들어간 뒤에 붙인다.
  */
 @Service
 @RequiredArgsConstructor
@@ -58,6 +61,29 @@ public class NotificationService {
         saveTicket(NotificationType.NT_TICKET_RESOLVED, companyId, receiverEmployeeId, itTicketId, ticketTitle);
     }
 
+    /**
+     * 근태 정정 요청(NT_ATT_CORRECTION_REQUEST). 정정 요청을 받을 때 처리자(요청자 부서장, 없거나 본인이면 업체 관리자)에게 부른다.
+     * 처리자가 여럿이면 사람마다 부른다. workDate는 YYYY-MM-DD.
+     */
+    public void notifyAttendanceCorrectionRequest(Long companyId, Long receiverEmployeeId, Long attendanceCorrectionId,
+                                                  String requesterName, String workDate) {
+        NotificationType type = NotificationType.NT_ATT_CORRECTION_REQUEST;
+        saveAttendanceCorrection(type, companyId, receiverEmployeeId, attendanceCorrectionId,
+                type.messageFor(requesterName, workDate));
+    }
+
+    /**
+     * 근태 정정 처리(NT_ATT_CORRECTION_DONE). 승인하거나 반려할 때 요청한 직원에게 부른다. 취소는 본인이 하니 부르지 않는다.
+     * approved가 true면 승인, false면 반려 문구로 저장한다. workDate는 YYYY-MM-DD.
+     */
+    public void notifyAttendanceCorrectionDone(Long companyId, Long receiverEmployeeId, Long attendanceCorrectionId,
+                                               String workDate, boolean approved) {
+        NotificationType type = NotificationType.NT_ATT_CORRECTION_DONE;
+        String result = approved ? "승인되었습니다." : "반려되었습니다. 근태 화면에서 반려 사유를 확인해 주세요.";
+        saveAttendanceCorrection(type, companyId, receiverEmployeeId, attendanceCorrectionId,
+                type.messageFor(workDate, result));
+    }
+
     /** 안 읽은 알림 수(헤더 배지 'notification'). */
     public int countUnread(Long companyId, Long userAccountId) {
         return notificationDAO.countUnread(companyId, userAccountId);
@@ -90,7 +116,7 @@ public class NotificationService {
 
     private void saveApproval(NotificationType type, Long companyId, Long receiverEmployeeId,
                               Long approvalDocumentId, String documentTitle) {
-        NotificationSaveDTO dto = newRow(type, companyId, documentTitle);
+        NotificationSaveDTO dto = newRow(type, companyId, type.messageFor(documentTitle));
         dto.setApprovalDocumentId(approvalDocumentId);
         dto.setDedupeKey(type.name() + ":" + approvalDocumentId);
         save(dto, receiverEmployeeId);
@@ -98,18 +124,28 @@ public class NotificationService {
 
     private void saveTicket(NotificationType type, Long companyId, Long receiverEmployeeId,
                             Long itTicketId, String ticketTitle) {
-        NotificationSaveDTO dto = newRow(type, companyId, ticketTitle);
+        NotificationSaveDTO dto = newRow(type, companyId, type.messageFor(ticketTitle));
         dto.setItTicketId(itTicketId);
         dto.setDedupeKey(type.name() + ":" + itTicketId + ":" + UUID.randomUUID()); // 부를 때마다 새 행
         save(dto, receiverEmployeeId);
     }
 
-    private NotificationSaveDTO newRow(NotificationType type, Long companyId, String targetTitle) {
+    /** 근태 정정 알림 1행을 정정 요청 번호와 함께 저장한다. 같은 사람·요청·종류는 하나만 */
+    private void saveAttendanceCorrection(NotificationType type, Long companyId, Long receiverEmployeeId,
+                                          Long attendanceCorrectionId, String message) {
+        NotificationSaveDTO dto = newRow(type, companyId, message);
+        dto.setAttendanceCorrectionId(attendanceCorrectionId);
+        dto.setDedupeKey(type.name() + ":" + attendanceCorrectionId);
+        save(dto, receiverEmployeeId);
+    }
+
+    /** 종류·제목·문구를 채운 저장용 행을 만든다 */
+    private NotificationSaveDTO newRow(NotificationType type, Long companyId, String message) {
         NotificationSaveDTO dto = new NotificationSaveDTO();
         dto.setCompanyId(companyId);
         dto.setNotificationType(type.name());
         dto.setTitle(type.getTitle());
-        dto.setMessage(type.messageFor(targetTitle));
+        dto.setMessage(message);
         return dto;
     }
 

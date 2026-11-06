@@ -38,6 +38,7 @@ class NotificationServiceTest {
     private static final Long ACCOUNT_LEE = 20L;
     private static final Long DOC = 7000L;
     private static final Long TICKET = 8000L;
+    private static final Long CORRECTION = 9000L;
 
     /** 저장한 행을 기억하고, 받는 계정·중복 방지 키가 겹치면 고유 제약처럼 예외를 던지는 가짜 DAO */
     static class FakeDAO extends NotificationDAO {
@@ -146,6 +147,7 @@ class NotificationServiceTest {
         assertTrue(row.getMessage().contains("휴가 신청서"));
         assertEquals(DOC, row.getApprovalDocumentId());
         assertNull(row.getItTicketId());
+        assertNull(row.getAttendanceCorrectionId());
     }
 
     @Test
@@ -189,6 +191,7 @@ class NotificationServiceTest {
         assertEquals("NT_TICKET_ASSIGNED", dao.rows.get(0).getNotificationType());
         assertEquals(TICKET, dao.rows.get(0).getItTicketId());
         assertNull(dao.rows.get(0).getApprovalDocumentId());
+        assertNull(dao.rows.get(0).getAttendanceCorrectionId());
     }
 
     @Test
@@ -200,6 +203,70 @@ class NotificationServiceTest {
         assertEquals("NT_TICKET_RESOLVED", row.getNotificationType());
         assertEquals(ACCOUNT_LEE, row.getReceiverAccountId());
         assertTrue(row.getDedupeKey().length() <= 100);
+    }
+
+    @Test
+    @DisplayName("근태 정정 요청 알림은 처리자 계정으로 정정 요청 번호와 함께 저장하고 요청자 이름·근무일을 문구에 넣는다")
+    void attendanceCorrectionRequestSaved() {
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION, "고양이", "2026-11-04");
+
+        assertEquals(1, dao.rows.size());
+        NotificationSaveDTO row = dao.rows.get(0);
+        assertEquals(ACCOUNT_KIM, row.getReceiverAccountId());
+        assertEquals("NT_ATT_CORRECTION_REQUEST", row.getNotificationType());
+        assertEquals("근태 정정 요청", row.getTitle());
+        assertEquals("고양이님이 2026-11-04 근태 정정을 요청했습니다.", row.getMessage());
+        assertEquals(CORRECTION, row.getAttendanceCorrectionId());
+        assertNull(row.getApprovalDocumentId());
+        assertNull(row.getItTicketId());
+    }
+
+    @Test
+    @DisplayName("근태 정정 요청 알림은 같은 처리자에게 두 번 와도 하나만, 처리자가 여럿이면 사람마다 저장한다")
+    void attendanceCorrectionRequestDeduped() {
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION, "고양이", "2026-11-04");
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION, "고양이", "2026-11-04");
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_LEE, CORRECTION, "고양이", "2026-11-04");
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION + 1, "고양이", "2026-11-05");
+
+        assertEquals(3, dao.rows.size());
+    }
+
+    @Test
+    @DisplayName("근태 정정 처리 알림은 승인과 반려 문구가 다르고, 같은 요청의 처리 알림은 하나만 저장한다")
+    void attendanceCorrectionDoneSaved() {
+        service.notifyAttendanceCorrectionDone(COMPANY, EMP_KIM, CORRECTION, "2026-11-04", true);
+        service.notifyAttendanceCorrectionDone(COMPANY, EMP_KIM, CORRECTION, "2026-11-04", false);
+        service.notifyAttendanceCorrectionDone(COMPANY, EMP_KIM, CORRECTION + 1, "2026-11-05", false);
+
+        assertEquals(2, dao.rows.size());
+        NotificationSaveDTO approved = dao.rows.get(0);
+        assertEquals("NT_ATT_CORRECTION_DONE", approved.getNotificationType());
+        assertEquals("근태 정정 처리", approved.getTitle());
+        assertEquals("2026-11-04 근태 정정 요청이 승인되었습니다.", approved.getMessage());
+        assertEquals(CORRECTION, approved.getAttendanceCorrectionId());
+        assertNull(approved.getApprovalDocumentId());
+        assertNull(approved.getItTicketId());
+        assertEquals("2026-11-05 근태 정정 요청이 반려되었습니다. 근태 화면에서 반려 사유를 확인해 주세요.",
+                dao.rows.get(1).getMessage());
+    }
+
+    @Test
+    @DisplayName("근태 정정 알림의 중복 방지 키는 칸 길이(100자)를 넘지 않는다")
+    void attendanceCorrectionKeyLength() {
+        service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, Long.MAX_VALUE, "고양이", "2026-11-04");
+        service.notifyAttendanceCorrectionDone(COMPANY, EMP_KIM, Long.MAX_VALUE, "2026-11-04", true);
+
+        dao.rows.forEach(r -> assertTrue(r.getDedupeKey().length() <= 100));
+    }
+
+    @Test
+    @DisplayName("근태 정정 알림도 중복이 아닌 저장 오류(패치 전 DB의 CK_69_01 등)는 그대로 던진다")
+    void attendanceCorrectionErrorPropagates() {
+        dao.insertError = new DataIntegrityViolationException("ORA-02290");
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION, "고양이", "2026-11-04"));
     }
 
     @Test
