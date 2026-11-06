@@ -19,7 +19,7 @@
         <h1>근태 단말기</h1>
         <div class="page-actions"><a class="btn" href="${ctx}/attendance/simulator" target="_blank" rel="noopener">지문 시뮬레이터 열기 ↗</a></div>
       </div>
-      <p class="muted join-scope">지문 단말기(시연용 시뮬레이터)가 업체를 알아보는 키와, 단말기에 등록된 사용자 번호와 직원의 연결을 관리합니다.</p>
+      <p class="muted join-scope">지문 단말기(시연용)의 업체 키와, 단말기 사용자 번호와 직원의 연결을 관리합니다.</p>
 
       <div class="info-grid info-grid-2 table-gap">
         <%-- 두 카드 모두 평소에는 머리줄만 보이고, 버튼을 누르면 아래로 펼쳐진다(.dev-fold, device-admin.js 의 devFold).
