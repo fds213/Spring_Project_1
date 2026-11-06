@@ -89,8 +89,8 @@ public class PasswordResetRecordService {
         }
         PasswordResetTargetDTO target = findTarget(companyCode, employeeNo);
         if (target == null) {
-            // 계정이 없어도 '틀림'과 같은 답 (계정이 있는지 드러나지 않게)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 코드가 맞지 않습니다");
+            // 계정이 없어도 '코드 없음'과 같은 답 (verify만 불러 계정이 있는지 알아내지 못하게)
+            throw new ResponseStatusException(HttpStatus.GONE, "쓸 수 있는 인증 코드가 없습니다. 다시 보내기를 눌러 주세요");
         }
         dao.lockAccount(target.getCompanyId(), target.getUserAccountId());
 
