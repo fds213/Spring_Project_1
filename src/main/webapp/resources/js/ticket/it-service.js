@@ -1,5 +1,5 @@
 // IT 서비스(사원): 장애·문의 접수(ticket-new), 내 티켓(ticket-mine), 내 장비(asset-mine) (요구분석서 3.4 IT 티켓·자산, 지점).
-// 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
+// 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 아직 접수 상태인 장애·문의는 본인이 취소할 수 있다(#177). 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
 // 장비 지급 신청서(전자결재)가 최종 승인되면 TK_EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
 
@@ -247,6 +247,8 @@ function ticketDetail(t) {
       itNode('p', 'muted inq-body', '처리 이력의 해결 결과를 확인해 주세요. 확인하면 종료됩니다.'),
       itNode('div', 'inq-body', itNode('div', 'inq-actions', ok)));
   }
+  // 아직 접수 상태인 장애·문의는 요청자가 취소할 수 있다(#177). 서버가 canCancel 을 준 티켓에만 보인다(장비 지급 티켓은 없음)
+  if (t.canCancel) parts[1].prepend(...cancelBox(t));
   if (t.canComment) {
     // 완료되면 더 쓰지 않는다. 처리 중에도 사원이 추가로 알릴 것이 있으면 댓글로 남긴다
     const box = itNode('textarea', 'inq-text');
@@ -275,6 +277,48 @@ function closeTicket(t, btn) {
   api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/close`, { version: t.version })
     .done(() => { showToast(`${t.id}번 티켓을 종료했습니다`); loadTicketMine(); })
     .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
+}
+
+// 접수 취소 칸: 되돌릴 수 없어서 한 번 더 묻는다. [접수 취소] → [취소하기]·[그대로 두기]
+// 버튼이 바뀔 때 포커스를 새 버튼으로 옮기고, 안내 문장이 바뀐 것은 화면 낭독기에도 읽힌다(aria-live)
+const TICKET_CANCEL_NOTE = '아직 담당자가 맡기 전입니다. 잘못 접수했거나 문제가 해결됐으면 취소할 수 있습니다.';
+function cancelBox(t) {
+  const note = itNode('p', 'muted inq-body', TICKET_CANCEL_NOTE);
+  note.setAttribute('aria-live', 'polite');
+  const actions = itNode('div', 'inq-actions');
+  const ask = focus => {
+    const btn = itButton('접수 취소', 'btn btn-danger-line');
+    btn.addEventListener('click', () => {
+      note.textContent = `${t.id}번 티켓을 취소할까요? 취소하면 되돌릴 수 없습니다.`;
+      const yes = itButton('취소하기', 'btn btn-danger-line');
+      const no = itButton('그대로 두기', 'btn');
+      yes.addEventListener('click', () => cancelTicket(t, yes, no));
+      no.addEventListener('click', () => {
+        note.textContent = TICKET_CANCEL_NOTE;
+        ask(true);
+      });
+      actions.replaceChildren(yes, no);
+      yes.focus();
+    });
+    actions.replaceChildren(btn);
+    if (focus) btn.focus();
+  };
+  ask(false);
+  return [itNode('header', 'info-card-head', itNode('h2', '', '접수 취소')), note, itNode('div', 'inq-body', actions)];
+}
+
+// 접수 취소: ticket 모듈 담당이 정한 규격(#177). POST /ticket/api/tickets/{id}/cancel { version } — version 은 늘 보낸다.
+// 오류는 상태 코드로만 나눈다(문구는 보여 주기만): 409 는 그새 담당자가 맡았거나 바뀐 것이라 목록을 다시 받는다
+function cancelTicket(t, yes, no) {
+  yes.disabled = true;
+  no.disabled = true;
+  api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/cancel`, { version: t.version })
+    .done(() => { showToast(`${t.id}번 티켓을 취소했습니다`); loadTicketMine(); })
+    .fail(xhr => {
+      showToast(apiMessage(xhr));
+      if (xhr.status === 409 || xhr.status === 404) loadTicketMine();
+      else { yes.disabled = false; no.disabled = false; }
+    });
 }
 
 function addComment(id, bodyRaw, btn) {
