@@ -22,7 +22,10 @@ pageEncoding="UTF-8"%>
             var pendingSend = null;
             var pendingImage = null;
             var imageInput = $("#chatImage");
-            var imageButton = $("#sendImage");
+            // 고른 이미지(보내기 전 미리보기). 보내기에 성공하거나 ✕를 누를 때까지 남는다
+            var attachFile = null;
+            var attachUrl = null;
+            var uploading = false;
             var lastMessageId = "0";
             var displayedMessageIds = new Set();
             var area = $(".message-area");
@@ -205,7 +208,7 @@ pageEncoding="UTF-8"%>
                 $(".input-area").attr("contenteditable", ready ? "true" : "false");
                 $("#retrySend").prop("disabled", !ready);
                 $("#sendText").prop("disabled", !ready);
-                imageButton.prop("disabled", !ready || imageInput.prop("disabled"));
+                imageInput.prop("disabled", !ready || uploading);
             }
 
             function confirmSend(key, senderId) {
@@ -233,26 +236,61 @@ pageEncoding="UTF-8"%>
 
             $("#retrySend").on("click", sendPending);
 
-            imageInput.on("change", function() {
+            /** 파일 크기를 "1.2MB"·"340KB"처럼 보인다 */
+            function fileSize(bytes) {
+                return bytes >= 1024 * 1024 ? (bytes / 1024 / 1024).toFixed(1) + "MB" : Math.max(1, Math.round(bytes / 1024)) + "KB";
+            }
+
+            /** 고른 이미지와 미리보기를 지운다 */
+            function clearAttachment() {
+                if (attachUrl) URL.revokeObjectURL(attachUrl);
+                attachUrl = null;
+                attachFile = null;
                 pendingImage = null;
+                imageInput.val("");
+                $("#chatAttach").prop("hidden", true);
+                $("#chatAttachThumb").removeAttr("src");
+                $("#chatAttachName").text("").removeAttr("title");
+                $("#chatAttachSize").text("");
+            }
+
+            // 이미지를 고르면 형식·크기를 바로 보고, 맞으면 입력 칸 위에 미리보기를 띄운다(보내기는 보내기 버튼·Enter)
+            imageInput.on("change", function() {
                 var file = this.files[0];
-                $("#chatImageName").text(file ? file.name : "").attr("title", file ? file.name : null);
-            });
-            imageButton.on("click", function() {
-                if (leaving || recovering || !ws || ws.readyState !== WebSocket.OPEN
-                    || imageInput.prop("disabled")) return;
-                var file = imageInput[0].files[0];
-                if (!file || file.size === 0 || file.size > 10 * 1024 * 1024
-                    || !/\.(jpe?g|png)$/i.test(file.name)) {
-                    $("#imageStatus").text("10MB 이하의 JPG·PNG 이미지 한 장을 선택해 주세요.");
+                if (!file) return; // 고르기 창을 그냥 닫으면 이미 고른 이미지를 그대로 둔다
+                $("#imageStatus").text("");
+                if (file.size === 0 || file.size > 10 * 1024 * 1024 || !/\.(jpe?g|png)$/i.test(file.name)) {
+                    this.value = "";
+                    $("#imageStatus").text("10MB 이하의 JPG·PNG 이미지 한 장을 골라 주세요.");
                     return;
                 }
+                clearAttachment();
+                attachFile = file;
+                attachUrl = URL.createObjectURL(file);
+                $("#chatAttachThumb").attr("src", attachUrl);
+                $("#chatAttachName").text(file.name).attr("title", file.name);
+                $("#chatAttachSize").text(fileSize(file.size));
+                $("#chatAttach").prop("hidden", false);
+                $(".input-area").trigger("focus");
+            });
+            $("#chatAttachRemove").on("click", function() {
+                if (uploading) return;
+                clearAttachment();
+                $("#imageStatus").text("");
+                $(".input-area").trigger("focus");
+            });
+
+            /** 고른 이미지를 올린다. 성공하면 미리보기를 지우고 done 을 부른다(같이 쓴 글을 이미지 다음에 보내려고) */
+            function sendImage(done) {
+                if (!attachFile || uploading || leaving || recovering
+                    || !ws || ws.readyState !== WebSocket.OPEN) return;
                 if (!pendingImage) pendingImage = crypto.randomUUID();
                 var data = new FormData();
                 data.append("clientMessageKey", pendingImage);
-                data.append("image", file);
+                data.append("image", attachFile);
+                uploading = true;
                 imageInput.prop("disabled", true);
-                imageButton.prop("disabled", true);
+                $("#chatAttach").addClass("is-sending");
                 $("#imageStatus").text("이미지를 보내고 있습니다.");
                 // CSRF 헤더는 공통 스크립트(common.js)가 붙인다
                 $.ajax({
@@ -265,12 +303,12 @@ pageEncoding="UTF-8"%>
                 }).done(function(message) {
                     appendMessage(message.chatMessageId, message.senderEmployeeId,
                         message.senderName, message.messageText, message.attachmentId, message.createdAt);
-                    pendingImage = null;
-                    imageInput.val("");
-                    $("#chatImageName").text("").removeAttr("title");
+                    clearAttachment();
                     $("#imageStatus").text("");
                     markRead();
+                    if (done) done();
                 }).fail(function(xhr) {
+                    // 실패하면 미리보기와 같이 쓴 글을 남겨 두어 보내기를 다시 누를 수 있게 한다(같은 키라 두 번 올라가지 않는다)
                     if (xhr.status === 401) {
                         location.href = "${ctx}/login";
                     } else if (xhr.status === 403 || xhr.status === 409) {
@@ -278,13 +316,14 @@ pageEncoding="UTF-8"%>
                     } else if (xhr.status === 400 || xhr.status === 413) {
                         $("#imageStatus").text("이미지 형식과 크기를 확인해 주세요. JPG·PNG 한 장, 최대 10MB입니다.");
                     } else {
-                        $("#imageStatus").text("전송을 확인하지 못했습니다. 같은 파일을 다시 보내 확인할 수 있습니다.");
+                        $("#imageStatus").text("전송을 확인하지 못했습니다. 보내기를 다시 누르면 같은 이미지로 확인합니다.");
                     }
                 }).always(function() {
-                    imageInput.prop("disabled", false);
-                    imageButton.prop("disabled", leaving || recovering || !ws || ws.readyState !== WebSocket.OPEN);
+                    uploading = false;
+                    $("#chatAttach").removeClass("is-sending");
+                    imageInput.prop("disabled", leaving || recovering || !ws || ws.readyState !== WebSocket.OPEN);
                 });
-            });
+            }
 
             function appendMessage(id, senderId, sender, content, attachmentId, createdAt) {
                 if (displayedMessageIds.has(id)) return;
@@ -541,15 +580,21 @@ pageEncoding="UTF-8"%>
                 sendPending();
             }
 
+            /** 보내기: 고른 이미지가 있으면 먼저 올리고, 성공한 뒤 같이 쓴 글을 보낸다 */
+            function sendCompose() {
+                if (attachFile) sendImage(sendText);
+                else sendText();
+            }
+
             $(".input-area").on("keydown", function(e) {
                 if (e.keyCode == 13) {
                     e.preventDefault();
-                    sendText();
+                    sendCompose();
                     return false;
                 }
             });
             $("#sendText").on("click", function() {
-                sendText();
+                sendCompose();
                 $(".input-area").trigger("focus");
             });
         });
@@ -590,19 +635,26 @@ pageEncoding="UTF-8"%>
         </div>
 
         <div class="chat-compose">
+          <%-- 고른 이미지 미리보기: 보내기 전에 확인하고 ✕로 뺄 수 있다 --%>
+          <div class="chat-attach" id="chatAttach" hidden>
+            <img class="chat-attach-thumb" id="chatAttachThumb" alt="보낼 이미지 미리보기">
+            <div class="chat-attach-info">
+              <span class="chat-attach-name" id="chatAttachName"></span>
+              <span class="chat-attach-size" id="chatAttachSize"></span>
+            </div>
+            <button type="button" class="btn btn-ghost chat-attach-remove" id="chatAttachRemove" aria-label="고른 이미지 빼기">✕</button>
+          </div>
+          <p class="chat-compose-status" id="imageStatus" role="status" aria-live="polite"></p>
           <div class="chat-compose-row">
+            <%-- 파일 칸은 눈에서 숨기고 그 label 을 그림 버튼으로 보인다. 키보드로는 숨긴 파일 칸에 그대로 닿는다 --%>
+            <input class="chat-sr" id="chatImage" type="file" accept="image/jpeg,image/png" disabled>
+            <label class="btn chat-attach-btn" for="chatImage" title="이미지 첨부 (JPG·PNG, 최대 10MB)" data-write>
+              <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/></svg>
+              <span class="chat-sr">이미지 첨부 (JPG·PNG, 최대 10MB)</span>
+            </label>
             <div class="input-area" contenteditable="false" role="textbox" aria-label="메시지 입력"
                  data-placeholder="메시지 입력 (Enter로 보내기)"></div>
             <button type="button" class="btn btn-primary" id="sendText" data-write disabled>보내기</button>
-          </div>
-          <%-- 파일 칸은 눈에서 숨기고 '이미지 고르기' 글자(label)를 버튼처럼 보인다. 키보드로는 숨긴 파일 칸에 그대로 닿는다 --%>
-          <div class="chat-image-picker">
-            <input class="chat-sr" id="chatImage" type="file" accept="image/jpeg,image/png" aria-describedby="chatImageHint">
-            <label class="btn" for="chatImage">이미지 고르기</label>
-            <span class="chat-image-name" id="chatImageName"></span>
-            <button id="sendImage" type="button" class="btn" data-write disabled>이미지 보내기</button>
-            <span class="chat-image-hint" id="chatImageHint">JPG·PNG, 최대 10MB</span>
-            <p id="imageStatus" role="status" aria-live="polite"></p>
           </div>
         </div>
       </section>

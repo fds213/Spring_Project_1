@@ -17,8 +17,25 @@
 .chat-room-list a {
   display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; color: inherit;
 }
+.chat-room-list a { position: relative; transition: background-color 0.18s ease; }
 .chat-room-list a:hover { background: var(--bg-sub); }
+.chat-room-list a:active { background: var(--line); }
 .chat-room-list a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* 마우스를 올리면 왼쪽에 파란 막대가 자라고 이름이 살짝 밀리며 배지가 커진다(모양만 바뀌고 자리는 그대로) */
+.chat-room-list a::before {
+  content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--accent); transform: scaleY(0); transition: transform 0.18s ease;
+}
+.chat-room-name, .chat-room-list .badge { transition: transform 0.18s ease; }
+@media (hover: hover) {
+  .chat-room-list a:hover::before { transform: scaleY(1); }
+  .chat-room-list a:hover .chat-room-name { transform: translateX(4px); }
+  .chat-room-list a:hover .badge { transform: scale(1.1); }
+}
+.chat-room-list a:focus-visible::before { transform: scaleY(1); }
+@media (prefers-reduced-motion: reduce) {
+  .chat-room-list a, .chat-room-list a::before, .chat-room-name, .chat-room-list .badge { transition: none; }
+}
 /* 이름은 줄어들 수 있게 두고 두 줄까지만 보인다. 전체 이름은 title(마우스를 올리면 보임)과 대화 화면 위쪽에 있다 */
 .chat-room-name {
   flex: 1; min-width: 0; line-height: 1.5;
@@ -132,7 +149,7 @@
 
 /* 입력 칸 */
 .chat-compose { border-top: 1px solid var(--line); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
-.chat-compose-row { display: flex; align-items: flex-end; gap: 8px; }
+.chat-compose-row { position: relative; display: flex; align-items: flex-end; gap: 8px; }
 .input-area {
   flex: 1; min-width: 0; max-height: 120px; min-height: 40px; overflow-y: auto; padding: 9px 12px;
   border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); line-height: 1.5;
@@ -142,15 +159,25 @@
 .input-area[contenteditable="false"] { background: var(--bg-sub); color: var(--text-muted); }
 .input-area:empty::before { content: attr(data-placeholder); color: var(--text-muted); pointer-events: none; }
 .chat-compose .btn { flex-shrink: 0; height: 40px; }
-.chat-image-picker { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12px; color: var(--text-sub); }
-.chat-image-picker .btn { height: 28px; font-size: 12px; }
-.chat-image-picker label.btn { cursor: pointer; }
-.chat-image-picker:has(input:focus-visible) label.btn { outline: 2px solid var(--accent); outline-offset: 2px; }
-.chat-image-name { min-width: 0; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
-.chat-image-name:empty { display: none; }
-.chat-image-hint { color: var(--text-muted); }
-.chat-image-picker p { margin: 0; color: var(--danger); }
-.chat-image-picker p:empty { display: none; }
+/* 입력 칸 왼쪽의 이미지 첨부 버튼 (숨긴 파일 칸의 label) */
+.chat-attach-btn { width: 40px; padding: 0; justify-content: center; color: var(--text-sub); cursor: pointer; }
+.chat-attach-btn:hover { color: var(--accent); }
+.chat-compose-row:has(#chatImage:focus-visible) .chat-attach-btn { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chat-compose-row:has(#chatImage:disabled) .chat-attach-btn { opacity: 0.5; cursor: default; }
+
+/* 보낼 이미지 미리보기 */
+.chat-attach {
+  display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%;
+  padding: 6px 6px 6px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sub);
+}
+.chat-attach.is-sending { opacity: 0.6; }
+.chat-attach-thumb { flex-shrink: 0; width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: var(--bg); }
+.chat-attach-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.chat-attach-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.chat-attach-size { font-size: 11px; color: var(--text-muted); }
+.chat-compose .chat-attach-remove { width: 32px; height: 32px; padding: 0; justify-content: center; color: var(--text-sub); }
+.chat-compose-status { margin: 0; font-size: 12px; color: var(--text-sub); }
+.chat-compose-status:empty { display: none; }
 
 /* 참여자 */
 .chat-members { padding: 12px 14px; overflow-y: auto; font-size: 13px; }
