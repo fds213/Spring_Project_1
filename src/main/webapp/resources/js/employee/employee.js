@@ -4,8 +4,9 @@
 // 승인되면 바로 사용, 구매 인원(체험은 관리자 포함 10명)이 차면 다음 승인을 거절한다. 1시간 기한·자리 대기·직원 이메일 인증은 없다.
 // 이 화면은 서버가 준 값으로 그리고, 누를 수 있는 버튼도 서버가 준 값(actions, perms)으로 정한다. 안내 문구만 먼저 보여 준다.
 //
-// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성뿐이다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
-// 승인 뒤 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(ieum-joined-id, 한 번 읽고 지움).
+// 이 파일이 브라우저 저장소를 쓰는 곳은 계정 생성과 비밀번호 찾기다: 자기 요청(업체 코드·요청 번호)을 기억해 화면을 다시 열어도 이어 보는 MY_JOIN_KEY,
+// 로그인 화면에 넘기는 업체 코드(ieum-last-company, login.jsp 와 같이 씀)와 사번(승인 뒤 ieum-joined-id, 비밀번호를 바꾼 뒤 ieum-pw-reset-id,
+// 둘 다 login.jsp 가 한 번 읽고 지움).
 
 // ---------- 공통 코드 표시 글자 (팀 시트 "쌍용_이음_공통 코드 테이블" 기준) ----------
 // 서버는 공통 코드 테이블에서 읽는다.
@@ -589,7 +590,6 @@ document.addEventListener('visibilitychange', tickJoin);
 // 한 양식, 세 상태: 요청(가입이 열린 동안 업체 확인, 입력, 비밀번호, 승인 요청) → 대기("승인 요청을 하였습니다") →
 // 승인(계정이 만들어짐: 사번과 로그인으로 가는 버튼). 이번 범위(단순화 ①)는 직원 이메일 인증 코드 없이 요청한다.
 // 이 기기는 자기 요청을 기억한다(MY_JOIN_KEY).
-const loginForm = $j('loginForm');
 const joinForm = $j('joinForm');
 const JOIN_FIELDS = ['joinCompany', 'joinDept', 'joinRank', 'joinName', 'joinEmail', 'joinPw', 'joinPw2'];
 let checkedCompany = ''; // 확인으로 맞춘 업체 코드 ('' = 아직)
@@ -853,7 +853,7 @@ joinForm?.addEventListener('submit', ev => {
 joinForm?.addEventListener('input', () => { if (joinNotice && !loadMyJoin()) { joinNotice = ''; setJoinStatus('', ''); } });
 if (joinForm) setInterval(() => { if (!document.hidden && loadMyJoin()) loadJoinForm(); }, 5000);
 
-// ---------- 로그인 화면: 비밀번호 찾기 ----------
+// ---------- 비밀번호 찾기 화면 (/join/password, common/join-password.jsp) ----------
 // 업체 코드 + 사번 → 계정을 만들 때의 이메일로 6자리 코드 → 맞으면 새 비밀번호(8자 이상, 두 번)로 바꾼다. 지금 비밀번호는 보여 주지 않는다
 // (서버는 BCrypt 해시만 둔다). 운영자(ieum0000)는 대상이 아니다.
 // 계정이 있든 없든 화면은 똑같이 답한다(ACC-07): 코드는 쓰는 계정에만 가고, 그 밖에는 맞는 코드가 없다.
@@ -884,19 +884,11 @@ function syncPwReset() {
   $j('btnPwReset').disabled = !(pwVerified && pw.length >= 8 && pw === $j('pwNew2').value);
 }
 
-function showPwFind(open) {
-  loginForm.hidden = open;
-  joinForm.hidden = true;
-  pwForm.hidden = !open;
-  if (open) {
-    resetPwForm();
-    $j('pwCompany').value = $j('loginCompany').value;
-    $j('pwId').value = $j('loginId').value;
-    ($j('pwCompany').value ? $j('pwId') : $j('pwCompany')).focus();
-  }
+// 화면을 열면 로그인 화면에서 마지막에 쓴 업체 코드를 채워 둔다(login.jsp 의 ieum-last-company)
+if (pwForm) {
+  try { $j('pwCompany').value = localStorage.getItem('ieum-last-company') || ''; } catch { /* 저장소가 막혔다 */ }
+  ($j('pwCompany').value ? $j('pwId') : $j('pwCompany')).focus();
 }
-$j('btnPwFind')?.addEventListener('click', () => showPwFind(true));
-$j('btnPwBack')?.addEventListener('click', () => showPwFind(false));
 
 $j('btnPwSend')?.addEventListener('click', () => {
   const company = $j('pwCompany').value.trim().toLowerCase();
@@ -960,15 +952,14 @@ pwForm?.addEventListener('submit', ev => {
   error.textContent = pw.length < 8 ? '비밀번호는 8자 이상으로 정해 주세요' : pw !== $j('pwNew2').value ? '비밀번호 확인이 맞지 않습니다' : '';
   if (error.textContent || !pwVerified || !resetToken) return;
   whileSending($j('btnPwReset'), api.post('/join/api/password/reset', { resetToken, password: pw }))
+    // 로그인 화면으로 가서 업체 코드와 사번을 채우고 안내한다. 계정 생성처럼 주소에 사번을 싣지 않고 브라우저 저장소로 넘긴다.
+    // 비밀번호는 넘기지 않는다
     .done(r => {
-      ['pwCompany', 'pwId'].forEach(x => { $j(x).disabled = false; });
-      showPwFind(false);
-      $j('loginCompany').value = r.companyCode;
-      $j('loginId').value = r.empNo;
-      $j('loginPw').value = '';
-      $j('loginError').textContent = '비밀번호를 바꿨습니다. 새 비밀번호로 로그인하세요.';
-      $j('loginError').classList.add('is-ok');
-      $j('loginPw').focus();
+      try {
+        localStorage.setItem('ieum-last-company', r.companyCode);
+        sessionStorage.setItem('ieum-pw-reset-id', r.empNo);
+      } catch { /* 저장소가 막혔다: 로그인 화면에서 직접 넣는다 */ }
+      location.href = pageHref('/login');
     })
     .fail(xhr => {
       const msg = apiMessage(xhr);

@@ -36,6 +36,7 @@ public class ReadOnlyInterceptor implements HandlerInterceptor {
     private final SubscriptionService subscriptionService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /** 만료 업체의 쓰기 요청(GET 외)을 409로 막는다. 비밀번호 변경·결제·비활성화 같은 예외는 통과 */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws IOException {

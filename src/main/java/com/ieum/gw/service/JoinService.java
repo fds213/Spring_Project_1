@@ -464,6 +464,7 @@ public class JoinService {
         return view;
     }
 
+    /** 가입을 받을 수 있는 업체면 그 업체, 아니면 null (없는 코드·이용 기간 끝·이메일 인증 전) */
     private JoinCompanyDTO acceptingCompany(String code) {
         JoinCompanyDTO company = dao.findCompanyByCode(code);
         if (company == null) {
@@ -486,6 +487,7 @@ public class JoinService {
 
     // ---------- 권한 ----------
 
+    /** 업체 관리자(ROLE_ADMIN)인가 */
     private boolean isAdmin(LoginUser user) {
         return "ROLE_ADMIN".equals(user.getRole());
     }
