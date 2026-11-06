@@ -37,9 +37,11 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 
 이미 11/02 패치가 적용된 기존 DB는 `patches/11-03_01_ANNUAL_RENEW_PATCH.sql` 실행 → `patches/11-03_02_ANNUAL_RENEW_CHECK.sql` PASS 확인 → 같은 연결에서 직접 `COMMIT;`한다. 신규 빈 DB는 `IEUM_COMMON_CODE_DML.sql`과 `IEUM_DEMO_SEED.sql`에 들어 있어 실행하지 않는다. 넣기 전에도 앱은 돈다: 이용 결제 화면에 월간만 나오고, 월간 연장은 된다.
 
-## 연차 추가 부여 (11/06, 팀 DB 미적용)
+## 연차 추가 부여 (11/06, 팀 DB 적용 완료)
 
-PR #164의 연차 추가 부여를 위한 DB 변경이다.
+2026-11-06 팀 DB 패치 적용·COMMIT 완료.
+점검 8개 항목 PASS와 CHECK·인덱스 정의 일치를 확인했다.
+이미 적용한 팀 DB에는 패치를 다시 실행하지 않는다.
 
 - LEAVE_LEDGER.NOTE: VARCHAR2(500 CHAR), 부여 사유.
 - LEAVE_REQUEST_DAY_ID: 추가 부여 기록을 위해 NULL 허용.
