@@ -136,6 +136,11 @@ public class TicketWorkService {
                     "text", historyText(h, employeeNames))).collect(Collectors.toList()));
             item.put("canComment", !terminal(row));
             item.put("canClose", RESOLVED.name().equals(row.getStatus()));
+            // 본인이 접수한 장애·문의 중 접수 상태인 건만 취소할 수 있다.
+            item.put("canCancel", user.getEmployeeId().equals(row.getRequesterId())
+            						&& RECEIVED.name().equals(row.getStatus())
+            						&& (TicketType.TK_INCIDENT.name().equals(row.getType())
+            							|| TicketType.TK_QUESTION.name().equals(row.getType())));
             item.put("version", row.getVersion());
             return item;
     }
@@ -316,7 +321,26 @@ public class TicketWorkService {
         requireState(row, RESOLVED);
         change(user, row, CLOSED, row.getAssigneeId(), "요청자 확인", false);
     }
-
+    
+    /** 요청자가 직접 접수한 장애·문의 티켓을 접수 상태에서 취소한다. */
+    @Transactional
+    public void cancel(LoginUser user, Long id, TicketRequestDTO form) {
+    	requireLogin(user);
+    	
+    	TicketWorkDTO row = locked(user, id);
+    	requireOwner(user, row);
+    	requireVersion(row, form);
+    	requireState(row, RECEIVED);
+    	
+    	boolean cancellableType = TicketType.TK_INCIDENT.name().equals(row.getType()) || TicketType.TK_QUESTION.name().equals(row.getType());
+    	
+    	if (!cancellableType) {
+			throw conflict("직접 접수한 장애·문의 티켓만 취소할 수 있습니다.");
+		}
+    	
+    	change(user, row, CANCELED, row.getAssigneeId(), "요청자 취소", false);
+    }
+    
     @Transactional
     public void assign(LoginUser user, Long id, TicketRequestDTO form) {
         requireOperator(user);
