@@ -288,9 +288,9 @@ class PasswordResetRecordServiceTest {
 	}
 
 	@Test
-	@DisplayName("없는 계정에 코드를 넣으면 틀렸을 때와 같은 400")
+	@DisplayName("없는 계정에 코드를 넣으면 코드가 없을 때와 같은 410 (계정이 있는지 드러나지 않게)")
 	void verifyUnknownAccount() {
-		assertEquals(HttpStatus.BAD_REQUEST, status(() -> service.verify(COMPANY, "29999999", "123456")));
+		assertEquals(HttpStatus.GONE, status(() -> service.verify(COMPANY, "29999999", "123456")));
 	}
 
 	// ---------- 새 비밀번호 ----------

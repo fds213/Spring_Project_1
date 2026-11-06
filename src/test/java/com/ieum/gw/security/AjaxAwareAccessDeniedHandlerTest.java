@@ -47,6 +47,7 @@ class AjaxAwareAccessDeniedHandlerTest {
 
 		assertEquals(403, res.getStatus());
 		assertTrue(res.getContentAsString().contains(AjaxAwareAccessDeniedHandler.MSG_EXPIRED));
+		assertTrue(res.getContentAsString().contains("\"expired\":true"));
 	}
 
 	@Test

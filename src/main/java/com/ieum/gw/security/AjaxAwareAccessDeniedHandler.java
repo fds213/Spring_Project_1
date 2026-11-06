@@ -22,18 +22,21 @@ public class AjaxAwareAccessDeniedHandler implements AccessDeniedHandler {
     /** AJAX면 403 JSON, 화면이면 안내 화면으로 이동 */
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
-            AccessDeniedException e) throws IOException {
-        boolean expired = e instanceof CsrfException;
+			AccessDeniedException e) throws IOException {
+		boolean expired = e instanceof CsrfException;
 
-        if (isAjax(request)) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            response.setContentType("application/json;charset=UTF-8");
-            // 문구는 위 상수 두 개뿐이라 JSON 이스케이프가 필요 없다
-            response.getWriter().write("{\"success\":false,\"message\":\"" + (expired ? MSG_EXPIRED : MSG_DENIED) + "\"}");
-        } else {
-            response.sendRedirect(request.getContextPath() + "/access-denied" + (expired ? "?expired" : ""));
-        }
-    }
+		if (isAjax(request)) {
+			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+			response.setContentType("application/json;charset=UTF-8");
+			// 문구는 위 상수 두 개뿐이라 JSON 이스케이프가 필요 없다. CSRF면 expired로 알려 준다(billing.js가 결제 값을 남기는
+			// 기준)
+			String body = expired ? "{\"success\":false,\"expired\":true,\"message\":\"" + MSG_EXPIRED + "\"}"
+					: "{\"success\":false,\"message\":\"" + MSG_DENIED + "\"}";
+			response.getWriter().write(body);
+		} else {
+			response.sendRedirect(request.getContextPath() + "/access-denied" + (expired ? "?expired" : ""));
+		}
+	}
 
     /** jQuery AJAX의 이름표, 또는 JSON을 받겠다는 요청 */
     private boolean isAjax(HttpServletRequest request) {
