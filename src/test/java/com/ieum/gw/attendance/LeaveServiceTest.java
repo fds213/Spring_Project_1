@@ -24,12 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ieum.gw.dao.AttendanceDAO;
 import com.ieum.gw.dao.LeaveDAO;
 import com.ieum.gw.dto.AttendanceApprovalStepDTO;
+import com.ieum.gw.dto.AuthEmpDTO;
 import com.ieum.gw.dto.EmployeeHireDTO;
 import com.ieum.gw.dto.LeaveCycleDTO;
 import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LeaveGrantDTO;
 import com.ieum.gw.dto.LeaveRequestDTO;
 import com.ieum.gw.dto.LeaveSlotDTO;
+import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.mapper.LeaveMapper;
+import com.ieum.gw.service.AttendanceException;
 import com.ieum.gw.service.HolidayService;
 import com.ieum.gw.service.LeaveService;
 
@@ -283,9 +287,131 @@ class LeaveServiceTest {
         assertEquals("NO_EMPLOYEE", leave.leaves(CO, 999L).get("reason"));
     }
 
+    // ===== 연차 추가 부여 (기능명세서 '연차 세부', 팀장 11/3 결정) =====
+
+    /** 같은 업체(CO)의 로그인 사용자. 계정 번호는 사원 번호 + 1000 */
+    private static LoginUser user(String role, long employeeId) {
+        AuthEmpDTO a = new AuthEmpDTO();
+        a.setCompanyId(CO);
+        a.setEmployeeId(employeeId);
+        a.setUserAccountId(employeeId + 1000);
+        a.setRole(role);
+        return new LoginUser(a);
+    }
+
+    private static final LoginUser HR = user("ROLE_HR", 500L);
+
+    /** 연차 화면의 요약 (보유·승인 완료·남은 일수) */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> summary(long employeeId) {
+        return (Map<String, Object>) leave.leaves(CO, employeeId).get("summary");
+    }
+
+    /** 거절된 요청의 상태 코드 */
+    private static int status(Runnable r) {
+        return assertThrows(AttendanceException.class, r::run).getStatus();
+    }
+
+    @Test
+    @DisplayName("추가 부여: 보유·승인 완료·남은 일수를 나눠 센다 (+5 → 20·0·20, 3일 사용 → 20·3·17, -2 되돌리기 → 18·3·15)")
+    void grantSplitsTotals() {
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("5"), "프로젝트 보상");
+        Map<String, Object> s = summary(EMP);
+        assertEquals(0, new BigDecimal("20").compareTo((BigDecimal) s.get("grant")));
+        assertEquals(0, BigDecimal.ZERO.compareTo((BigDecimal) s.get("usedDays")));
+        assertEquals(0, new BigDecimal("20").compareTo((BigDecimal) s.get("left")));
+        assertEquals(0, new BigDecimal("5").compareTo((BigDecimal) s.get("extraDays")));
+
+        leave.useLeave(CO, EMP, ACTOR, List.of(day("2026-11-02", "LV_FULL", 1), day("2026-11-03", "LV_FULL", 2), day("2026-11-04", "LV_FULL", 3)));
+        s = summary(EMP);
+        assertEquals(0, new BigDecimal("20").compareTo((BigDecimal) s.get("grant")));
+        assertEquals(0, new BigDecimal("3").compareTo((BigDecimal) s.get("usedDays")));
+        assertEquals(0, new BigDecimal("17").compareTo((BigDecimal) s.get("left")));
+
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("-2"), "잘못 준 2일 되돌림");
+        s = summary(EMP);
+        assertEquals(0, new BigDecimal("18").compareTo((BigDecimal) s.get("grant")));
+        assertEquals(0, new BigDecimal("3").compareTo((BigDecimal) s.get("usedDays")));
+        assertEquals(0, new BigDecimal("15").compareTo((BigDecimal) s.get("left")));
+        assertEquals(0, new BigDecimal("15").compareTo(leave.getRemainingLeaveDays(CO, EMP)));
+    }
+
+    @Test
+    @DisplayName("추가 부여: 부여 행이 없던 직원은 행을 만들어 잠근 뒤 쓰고, 휴가 승인과 같은 행을 잠근다")
+    void grantCreatesAndLocksRow() {
+        Map<String, Object> r = leave.grantExtraLeave(HR, EMP, new BigDecimal("1.5"), "포상");
+        assertEquals(1, leaveMapper.cycles.size());
+        assertEquals(List.of(leaveMapper.cycles.get(0).getLeaveCycleId()), leaveMapper.locked);
+        assertEquals(0, new BigDecimal("16.5").compareTo((BigDecimal) r.get("left")));
+        assertEquals("포상", leaveMapper.grants.get(0).getNote());
+        assertEquals(Long.valueOf(1500L), leaveMapper.grantActor.get(0)); // 처리한 사람의 계정 번호
+    }
+
+    @Test
+    @DisplayName("추가 부여 권한: 업체 관리자·인사 담당만, 본인은 안 된다 (403)")
+    void grantPermission() {
+        assertEquals(403, status(() -> leave.grantExtraLeave(user("ROLE_EMP", 501L), EMP, BigDecimal.ONE, "사유")));
+        assertEquals(403, status(() -> leave.grantExtraLeave(user("ROLE_IT", 502L), EMP, BigDecimal.ONE, "사유")));
+        assertEquals(403, status(() -> leave.grantExtraLeave(user("ROLE_ADMIN", EMP), EMP, BigDecimal.ONE, "본인")));
+        assertEquals(403, status(() -> leave.grantExtraLeave(user("ROLE_HR", EMP), EMP, new BigDecimal("-1"), "본인 되돌리기")));
+        leave.grantExtraLeave(user("ROLE_ADMIN", 503L), EMP, BigDecimal.ONE, "관리자");
+        leave.grantExtraLeave(HR, EMP, BigDecimal.ONE, "인사 담당");
+        assertEquals(2, leaveMapper.grants.size());
+    }
+
+    @Test
+    @DisplayName("추가 부여 값: 0일·0.5일 단위 밖·30일 넘음·사유 없음·500자 넘음은 400")
+    void grantValues() {
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, null, "사유")));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, BigDecimal.ZERO, "사유")));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, new BigDecimal("0.3"), "사유")));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, new BigDecimal("30.5"), "사유")));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, BigDecimal.ONE, "  ")));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, EMP, BigDecimal.ONE, "가".repeat(501))));
+        assertEquals(400, status(() -> leave.grantExtraLeave(HR, null, BigDecimal.ONE, "사유")));
+        assertTrue(leaveMapper.grants.isEmpty());
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("-0.5"), "가".repeat(500));
+        assertEquals(1, leaveMapper.grants.size());
+    }
+
+    @Test
+    @DisplayName("추가 부여 대상: 없는 직원 404, 퇴사자·입사일 없음 409, 되돌려 남은 연차가 0 아래로 가면 409")
+    void grantTarget() {
+        assertEquals(404, status(() -> leave.grantExtraLeave(HR, 999L, BigDecimal.ONE, "사유")));
+        EmployeeHireDTO retired = hire("2020-01-01");
+        retired.setEmploymentStatus("ST_RETIRED");
+        leaveMapper.hires.put(104L, retired);
+        assertEquals(409, status(() -> leave.grantExtraLeave(HR, 104L, BigDecimal.ONE, "사유")));
+        leaveMapper.hires.put(103L, hire(null));
+        assertEquals(409, status(() -> leave.grantExtraLeave(HR, 103L, BigDecimal.ONE, "사유")));
+
+        AttendanceException tooMuch = assertThrows(AttendanceException.class,
+                () -> leave.grantExtraLeave(HR, EMP, new BigDecimal("-15.5"), "사유"));
+        assertEquals(409, tooMuch.getStatus());
+        assertTrue(tooMuch.getMessage().contains("남은 15일"));
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("-15"), "모두 되돌림"); // 딱 0일까지는 된다
+        assertEquals(0, BigDecimal.ZERO.compareTo(leave.getRemainingLeaveDays(CO, EMP)));
+    }
+
+    @Test
+    @DisplayName("추가 부여 내역: 최근 순으로 일수·사유·처리자, 보유·남은 일수와 함께. 다른 업체·없는 직원은 404")
+    void grantHistory() {
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("2"), "첫 부여");
+        leave.grantExtraLeave(HR, EMP, new BigDecimal("-1"), "하루 되돌림");
+        Map<String, Object> h = leave.grantHistory(CO, EMP);
+        assertEquals(0, new BigDecimal("16").compareTo((BigDecimal) h.get("grant")));
+        assertEquals(0, new BigDecimal("16").compareTo((BigDecimal) h.get("left")));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> items = (List<Map<String, Object>>) h.get("items");
+        assertEquals(List.of("하루 되돌림", "첫 부여"), items.stream().map(m -> m.get("note")).collect(Collectors.toList()));
+        assertEquals(0, new BigDecimal("-1").compareTo((BigDecimal) items.get(0).get("days")));
+        assertEquals(404, status(() -> leave.grantHistory(CO, 999L)));
+    }
+
     private static EmployeeHireDTO hire(String date) {
         EmployeeHireDTO e = new EmployeeHireDTO();
         e.setHireDate(date);
+        e.setEmploymentStatus("ST_SERVING");
         return e;
     }
 
@@ -324,8 +450,47 @@ class LeaveServiceTest {
         }
 
         @Override public BigDecimal selectLedgerSum(Long companyId, Long leaveCycleId) {
-            return ledger.entrySet().stream().filter(e -> leaveCycleId.equals(ledgerCycle.get(e.getKey())))
+            BigDecimal used = ledger.entrySet().stream().filter(e -> leaveCycleId.equals(ledgerCycle.get(e.getKey())))
                     .map(Map.Entry::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
+            return used.add(selectGrantSum(companyId, leaveCycleId));
+        }
+
+        // 추가 부여(LC_GRANT): 날짜 행 없이 여러 줄. CK_33_01 처럼 0일·사유 없음은 거절
+        final List<LeaveGrantDTO> grants = new ArrayList<>();
+        final List<Long> grantCycle = new ArrayList<>();
+        final List<Long> grantActor = new ArrayList<>();
+
+        @Override public BigDecimal selectGrantSum(Long companyId, Long leaveCycleId) {
+            BigDecimal sum = BigDecimal.ZERO;
+            for (int i = 0; i < grants.size(); i++) {
+                if (leaveCycleId.equals(grantCycle.get(i))) sum = sum.add(grants.get(i).getDeltaDays());
+            }
+            return sum;
+        }
+
+        @Override public int insertLedgerGrant(Long companyId, Long leaveCycleId, BigDecimal deltaDays, Long actorAccountId, String note) {
+            if (deltaDays.signum() == 0 || note == null) throw new IllegalStateException("CK_33_01");
+            LeaveGrantDTO g = new LeaveGrantDTO();
+            g.setLeaveLedgerId(seq++);
+            g.setDeltaDays(deltaDays);
+            g.setNote(note);
+            g.setCreatedAt("2026-11-06T10:00:0" + grants.size());
+            g.setActorName("인사 담당");
+            grants.add(g);
+            grantCycle.add(leaveCycleId);
+            grantActor.add(actorAccountId);
+            return 1;
+        }
+
+        @Override public List<LeaveGrantDTO> selectGrantHistory(Long companyId, Long employeeId) {
+            List<LeaveGrantDTO> mine = new ArrayList<>();
+            for (int i = grants.size() - 1; i >= 0; i--) { // 최근 순
+                Long cycle = grantCycle.get(i);
+                if (cycles.stream().anyMatch(c -> c.getLeaveCycleId().equals(cycle) && c.getEmployeeId().equals(employeeId))) {
+                    mine.add(grants.get(i));
+                }
+            }
+            return mine;
         }
 
         @Override public List<LeaveCycleDTO> selectCompanyCyclesOn(Long companyId, String day) { return List.of(); }

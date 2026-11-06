@@ -878,6 +878,18 @@ body.is-readonly [data-write] { opacity: 0.45; cursor: not-allowed; }
 .hol-add .hol-date { flex: 0 0 170px; }
 /* 근태·연차 관리: 열이 많아 이름·부서가 한 글자씩 꺾이지 않게 (좁으면 표가 옆으로 밀린다) */
 .aa-table th, .aa-table td { white-space: nowrap; } /* 꾸민 드롭다운(select.js)이 감싼 직원 고르기 */
+/* 연차 추가 부여 창: 입력 칸 아래에 그 직원의 부여 내역 (길면 창 안에서 내린다) */
+.modal.aa-grant { width: min(440px, calc(100% - 32px)); }
+.aa-grant .aa-grant-who { margin: 0 0 4px; }
+.aa-grant .leave-form { padding: 8px 0 0; }
+.aa-grant .leave-row-top { align-items: start; }
+.aa-grant .leave-row-top label { padding-top: 10px; }
+.aa-grant .inq-text { min-height: 72px; }
+.aa-grant .form-error:empty { display: none; } /* 오류가 없을 때 버튼 위 빈 줄을 남기지 않는다 */
+.aa-grant-head { margin: 18px 0 6px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; font-weight: 600; }
+.aa-grant-list { max-height: 220px; overflow-y: auto; }
+.aa-grant-list .bill-history li { align-items: flex-start; }
+.aa-grant-note { min-width: 0; overflow-wrap: anywhere; }
 .dev-body .dev-no { flex: 0 0 120px; }
 
 /* ---------- 지문 단말기 시뮬레이터 (attendance/simulator.jsp) ---------- */

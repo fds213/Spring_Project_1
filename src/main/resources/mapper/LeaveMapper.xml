@@ -7,7 +7,7 @@
 
 	<!-- employee_id 도 읽는다. 입사일만 읽으면 입사일이 빈 직원은 모든 칸이 비어 MyBatis 가 결과 전체를 null 로 주고, '없는 직원'과 구분되지 않는다 -->
 	<select id="selectEmployeeHire" resultType="com.ieum.gw.dto.EmployeeHireDTO">
-		SELECT employee_id, TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date
+		SELECT employee_id, TO_CHAR(hire_date, 'YYYY-MM-DD') AS hire_date, employment_status
 		FROM employee
 		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
 	</select>
@@ -51,11 +51,39 @@
 		        0, #{grantedDays})
 	</insert>
 
-	<!-- 부여 행의 사용(-)·복원(+) 합. 남은 일수 = 부여 일수 + 이 값 -->
+	<!-- 부여 행의 사용(-)·복원(+)·추가 부여(±) 합. 남은 일수 = 부여 일수 + 이 값 -->
 	<select id="selectLedgerSum" resultType="java.math.BigDecimal">
 		SELECT NVL(SUM(delta_days), 0)
 		FROM leave_ledger
 		WHERE company_id = #{companyId} AND leave_cycle_id = #{leaveCycleId}
+	</select>
+
+	<!-- 그중 추가 부여(LC_GRANT)만의 합. 보유 = 부여 일수 + 이 값, 승인 완료 = -(전체 합 - 이 값) -->
+	<select id="selectGrantSum" resultType="java.math.BigDecimal">
+		SELECT NVL(SUM(delta_days), 0)
+		FROM leave_ledger
+		WHERE company_id = #{companyId} AND leave_cycle_id = #{leaveCycleId}
+		  AND change_type = 'LC_GRANT'
+	</select>
+
+	<!-- 추가 부여(+)·되돌리기(-) 한 줄. 휴가 날짜 행이 없고 사유(note)가 꼭 있다 (CK_33_01) -->
+	<insert id="insertLedgerGrant">
+		INSERT INTO leave_ledger (company_id, leave_cycle_id, leave_request_day_id, change_type, delta_days, actor_account_id, note)
+		VALUES (#{companyId}, #{leaveCycleId}, NULL, 'LC_GRANT', #{deltaDays}, #{actorAccountId}, #{note})
+	</insert>
+
+	<!-- 직원 한 명의 추가 부여 내역, 최근 순. 처리한 사람 이름은 계정에 사원이 있을 때만 -->
+	<select id="selectGrantHistory" resultType="com.ieum.gw.dto.LeaveGrantDTO">
+		SELECT l.leave_ledger_id, l.delta_days, l.note,
+		       TO_CHAR(l.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at,
+		       e.employee_name AS actor_name
+		FROM leave_ledger l
+		JOIN leave_cycle c       ON c.leave_cycle_id = l.leave_cycle_id AND c.company_id = l.company_id
+		LEFT JOIN user_account a ON a.user_account_id = l.actor_account_id AND a.company_id = l.company_id
+		LEFT JOIN employee e     ON e.employee_id = a.employee_id AND e.company_id = a.company_id
+		WHERE l.company_id = #{companyId} AND c.employee_id = #{employeeId}
+		  AND l.change_type = 'LC_GRANT'
+		ORDER BY l.created_at DESC, l.leave_ledger_id DESC
 	</select>
 
 	<!-- 근태·연차 관리: 업체 직원들의 부여 행과 사용 합을 한 번에 -->
@@ -87,7 +115,7 @@
 		VALUES (#{companyId}, #{employeeId}, #{leaveDate}, #{slotCode}, #{leaveRequestDayId})
 	</insert>
 
-	<!-- 사용 내역 (LC_USE, 음수). 같은 휴가 날짜 행은 UQ_33_01 로 한 번만 -->
+	<!-- 사용 내역 (LC_USE, 음수). 같은 휴가 날짜 행은 UX_33_01 로 한 번만 -->
 	<insert id="insertLedgerUse">
 		INSERT INTO leave_ledger (company_id, leave_cycle_id, leave_request_day_id, change_type, delta_days, actor_account_id)
 		VALUES (#{companyId}, #{leaveCycleId}, #{leaveRequestDayId}, 'LC_USE', #{deltaDays}, #{actorAccountId})
