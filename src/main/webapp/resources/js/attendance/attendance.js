@@ -1,9 +1,16 @@
 // 근무 > 근태 (views/attendance/my.jsp): 로그인한 본인의 출퇴근 기록만 보여 준다 (요구분석서 3.1, 3.10).
-// 다른 직원의 근태, 근태·연차 관리(인사)는 이 화면에 없다. 연차는 연차 화면(leave.js)에 있다.
+// 다른 직원의 근태 기록, 근태·연차 관리(인사)는 이 화면에 없다(다른 직원 것은 내가 처리할 정정 요청만). 연차는 연차 화면(leave.js)에 있다.
 //
 // 출퇴근 기록: 지문 단말기가 보낸 기록을 단말기 사용자 번호로 찾는다. 로그인한 사람과 단말기 사용자 번호의 연결은 요구분석서 3.10 의
 // "업체·단말기 사용자 번호·사번 계정의 연결"이다. 이 화면에서는 본인이 번호를 연결한다 (원래는 인사 담당자·서버가 관리할 일이다).
 // 승인된 연차가 있는 날은 기록의 비고에 연차 구분을 적는다.
+//
+// 근태 정정(퇴근 누락 1차): '퇴근 누락' 날의 비고에 [정정 요청]. 요청하면 '정정 대기'와 [취소], 반려되면 반려 사유와 [다시 요청],
+// 승인되면 그날 퇴근이 채워지고 '정정 반영'. 처리자(요청자 부서장, 없거나 본인이면 업체 관리자)에게는 '처리할 근태 정정' 목록이 보인다.
+//   GET  /attendance/api/corrections?month=YYYY-MM → { month, items: [{ id, date, in, outTime, reason, status, at, decidedBy, decidedAt, rejectReason }] } 최근 순
+//   POST /attendance/api/corrections { date, outTime(HH:mm), reason } · POST …/{id}/cancel
+//   GET  /attendance/api/corrections/inbox → { items: [{ id, name, employeeNo, dept, date, in, outTime, reason, at, … }] } 오래된 순
+//   POST …/{id}/approve · POST …/{id}/reject { reason }   거절은 { message } (400 값, 403 권한, 404 없음, 409 상태)
 
 const ATT_STATUS = { NORMAL: '정상', LATE: '지각', EARLY_LEAVE: '조퇴', NO_OUT: '퇴근 누락' }; // NO_OUT: 지난 날 출근만 있고 퇴근이 없음
 const ATT_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -25,17 +32,24 @@ function openAttendanceView() {
 function renderAttendanceView() {
   if (!attState.month) return openAttendanceView();
   loadAttRecords();
+  loadAttInbox();
 }
 
 const attMonthParam = () => `${attState.month.y}-${pad2(attState.month.m + 1)}`;
 
+// 그 달 기록과 내 정정 요청을 같이 받는다. 정정 목록을 못 받아도 기록은 그린다
 function loadAttRecords() {
-  api.get('/attendance/api/records', { month: attMonthParam() })
-    .done(r => { if (r.month === attMonthParam()) renderAttRecords(r); }) // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
+  const month = attMonthParam();
+  const corr = api.get('/attendance/api/corrections', { month }).then(c => c, () => $.Deferred().resolve({ items: [] }).promise());
+  $.when(api.get('/attendance/api/records', { month }), corr)
+    .done((r, c) => { if (r.month === attMonthParam()) renderAttRecords(r, c.items); }) // 달을 빨리 넘기면 늦게 온 앞 달 응답은 버린다
     .fail(xhr => showToast(apiMessage(xhr, '출퇴근 기록을 불러오지 못했습니다')));
 }
 
-function renderAttRecords(r) {
+function renderAttRecords(r, corrections = []) {
+  // 날짜마다 가장 최근 정정 요청 (목록이 최근 순이라 처음 나온 것)
+  const corrByDate = {};
+  corrections.forEach(c => { if (!corrByDate[c.date]) corrByDate[c.date] = c; });
   const dev = r.deviceId;
   // 카드: 오늘 / 이번 달 지각·조퇴 (카드의 "이번 달"은 오늘이 속한 달이다)
   const t = r.today.punch;
@@ -63,13 +77,141 @@ function renderAttRecords(r) {
       attNode('td', '', rec ? rec.in : '-'),
       attNode('td', '', rec && rec.out ? rec.out : '-'),
       attNode('td', '', status ? attNode('span', `status ${status === '정상' ? 'status-active' : 'status-waiting'}`, status) : '-'),
-      attNode('td', 'att-note', note));
+      attNode('td', 'att-note', attNode('div', 'att-note-box', ...(note ? [note] : []), ...corrParts(day, rec, corrByDate[day.date]))));
     tr.querySelectorAll('td').forEach((td, i) => { td.dataset.label = ['날짜', '출근', '퇴근', '상태', '비고'][i]; });
     return tr;
   });
   attEl('attList').replaceChildren(...rows);
   placeAttList();
 }
+
+// ---------- 근태 정정 (퇴근 누락) ----------
+
+const attCorr = { day: null, reject: null }; // 요청 창을 연 날 { date, in }, 반려 창을 연 요청
+const attDayLabel = date => `${Number(date.slice(5, 7))}월 ${Number(date.slice(8))}일`;
+
+/** 비고 칸의 정정 표시: 반영·대기(+취소)·반려(+다시 요청), 퇴근 누락이면 [정정 요청] */
+function corrParts(day, rec, c) {
+  if (c && c.status === 'APPROVED') return [span(`정정 반영 ${c.outTime}`, 'status status-active')];
+  if (c && c.status === 'REQUESTED') {
+    return [span(`정정 대기 ${c.outTime}`, 'status status-waiting'),
+      writeBtn('취소', 'btn', b => cancelCorrection(c, b))];
+  }
+  if (!rec || rec.outStatus !== 'NO_OUT') return [];
+  const parts = [];
+  if (c && c.status === 'REJECTED') parts.push(span('정정 반려', 'status status-rejected'), span(`사유: ${c.rejectReason}`, 'cell-sub'));
+  const again = c && c.status === 'REJECTED';
+  const go = writeBtn(again ? '다시 요청' : '정정 요청', 'btn', () => openCorrection(day, rec));
+  go.setAttribute('aria-label', `${attDayLabel(day.date)} 퇴근 누락 정정 ${again ? '다시 요청' : '요청'}`);
+  parts.push(go);
+  return parts;
+}
+
+/** 정정 요청 창을 연다 (그날 출근 시각을 보여 준다) */
+function openCorrection(day, rec) {
+  attCorr.day = { date: day.date, in: rec.in };
+  attEl('attCorrForm').reset();
+  attEl('attCorrError').textContent = '';
+  attEl('attCorrWho').textContent = `${attDayLabel(day.date)} (${ATT_WEEKDAYS[day.weekday]}) · 출근 ${rec.in} · 퇴근 기록 없음`;
+  attEl('attCorrDialog').showModal();
+  attEl('attCorrOut').focus();
+}
+
+attEl('attCorrForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const d = attCorr.day;
+  const out = attEl('attCorrOut').value;
+  const reason = attEl('attCorrReason').value.trim();
+  const error = attEl('attCorrError');
+  // 서버도 같은 검사를 다시 한다
+  error.textContent = !out ? '퇴근 시각을 넣어 주세요'
+    : out < d.in.slice(0, 5) ? `퇴근 시각은 출근 시각(${d.in.slice(0, 5)})보다 늦어야 합니다`
+    : !reason ? '사유를 넣어 주세요' : '';
+  if (error.textContent) return;
+  const btn = attEl('attCorrSubmit');
+  btn.disabled = true;
+  api.post('/attendance/api/corrections', { date: d.date, outTime: out, reason })
+    .done(() => {
+      attEl('attCorrDialog').close();
+      showToast(`${attDayLabel(d.date)} 퇴근을 ${out}으로 정정해 달라고 요청했습니다`);
+      loadAttRecords();
+    })
+    .fail(xhr => { error.textContent = apiMessage(xhr, '정정을 요청하지 못했습니다'); })
+    .always(() => { btn.disabled = false; });
+});
+attEl('attCorrCancel').addEventListener('click', () => attEl('attCorrDialog').close());
+
+/** 처리 전인 내 요청을 취소한다 */
+function cancelCorrection(c, btn) {
+  btn.disabled = true;
+  api.post(`/attendance/api/corrections/${c.id}/cancel`)
+    .done(() => showToast(`${attDayLabel(c.date)} 정정 요청을 취소했습니다`))
+    .fail(xhr => showToast(apiMessage(xhr, '취소하지 못했습니다')))
+    .always(() => loadAttRecords()); // 그새 처리됐을 수 있어 실패해도 다시 받는다
+}
+
+/** 처리할 근태 정정 (부서장·업체 관리자). 대기 요청이 없으면 칸을 숨긴다 */
+function loadAttInbox() {
+  api.get('/attendance/api/corrections/inbox')
+    .done(r => renderAttInbox(r.items))
+    .fail(() => { attEl('attInbox').hidden = true; });
+}
+
+/** 처리할 대기 요청 표: 요청자·날짜·출근·요청 퇴근·사유·요청일과 [승인]·[반려] */
+function renderAttInbox(items) {
+  attEl('attInbox').hidden = !items.length;
+  attEl('attInboxList').replaceChildren(...items.map(c => h('tr', '',
+    inqCell('요청자', c.name, ...(c.dept ? [small(c.dept)] : [])),
+    inqCell('날짜', attDayLabel(c.date)),
+    inqCell('출근', c.in),
+    inqCell('요청 퇴근', c.outTime),
+    inqCell('사유', h('span', 'att-corr-reason', c.reason)),
+    inqCell('요청일', whenFull(c.at)),
+    inqCell('관리', h('div', 'row-actions',
+      writeBtn('승인', 'btn btn-primary', b => approveCorrection(c, b)),
+      writeBtn('반려', 'btn', () => openReject(c)))))));
+}
+
+/** 승인: 요청한 퇴근 시각이 그날 근태에 들어간다 */
+function approveCorrection(c, btn) {
+  btn.disabled = true;
+  api.post(`/attendance/api/corrections/${c.id}/approve`)
+    .done(() => showToast(`${c.name}님 ${attDayLabel(c.date)} 퇴근을 ${c.outTime}으로 정정했습니다`))
+    .fail(xhr => showToast(apiMessage(xhr, '승인하지 못했습니다')))
+    .always(() => loadAttInbox());
+}
+
+/** 반려 창을 연다 */
+function openReject(c) {
+  attCorr.reject = c;
+  attEl('attRejectForm').reset();
+  attEl('attRejectError').textContent = '';
+  attEl('attRejectWho').textContent = `${c.name} · ${attDayLabel(c.date)} · 요청 퇴근 ${c.outTime}`;
+  attEl('attRejectDialog').showModal();
+  attEl('attRejectReason').focus();
+}
+
+attEl('attRejectForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const c = attCorr.reject;
+  const reason = attEl('attRejectReason').value.trim();
+  const error = attEl('attRejectError');
+  error.textContent = reason ? '' : '반려 사유를 넣어 주세요';
+  if (error.textContent) return;
+  const btn = attEl('attRejectSubmit');
+  btn.disabled = true;
+  api.post(`/attendance/api/corrections/${c.id}/reject`, { reason })
+    .done(() => {
+      attEl('attRejectDialog').close();
+      showToast(`${c.name}님 ${attDayLabel(c.date)} 정정 요청을 반려했습니다`);
+      loadAttInbox();
+    })
+    .fail(xhr => { error.textContent = apiMessage(xhr, '반려하지 못했습니다'); })
+    .always(() => { btn.disabled = false; });
+});
+attEl('attRejectCancel').addEventListener('click', () => attEl('attRejectDialog').close());
+['attCorrOut', 'attCorrReason', 'attRejectReason'].forEach(id =>
+  attEl(id).addEventListener('input', () => { attEl(id.startsWith('attReject') ? 'attRejectError' : 'attCorrError').textContent = ''; }));
 
 // 목록 위치: 달을 새로 열 때만 맞춘다(탭으로 돌아와 다시 받을 때는 보던 자리 그대로).
 // 오늘이 있는 달이면 오늘 줄이 표 머리줄 바로 아래에 오게, 다른 달이면 1일부터
@@ -137,4 +279,4 @@ const attMoveMonth = step => {
 attEl('attPrev').addEventListener('click', () => attMoveMonth(-1));
 attEl('attNext').addEventListener('click', () => attMoveMonth(1));
 // 다른 탭(지문 시뮬레이터)에서 찍고 이 탭으로 돌아오면 기록을 다시 받는다 (기능명세서 1.9: 변경 반영)
-document.addEventListener('visibilitychange', () => { if (!document.hidden && attState.month) loadAttRecords(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && attState.month) { loadAttRecords(); loadAttInbox(); } });

@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.AttendanceCorrectionMapper">
+
+	<!-- 근태 정정 요청 (attendance_correction, 11/2 패치). 승인은 전자결재가 아니라 근태 안에서: 요청자 부서장, 없거나 본인이면 업체 관리자.
+	     이번 1차는 퇴근 누락(출근만 있는 지난 날) 정정만 받는다. 단말기 원본(attendance_event)에는 쓰지 않는다 -->
+
+	<sql id="now">CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)</sql>
+
+	<!-- 처리하는 부서장: 부서장이 퇴사·휴직이면 없는 것으로 본다(그대로 두면 아무도 처리하지 못한다) → 업체 관리자가 처리 -->
+	<sql id="activeHead">CASE WHEN hd.employment_status = 'ST_SERVING' THEN dp.head_employee_id END</sql>
+
+	<sql id="correctionColumns">
+		c.attendance_correction_id, c.company_id, c.employee_id,
+		e.employee_name, e.employee_no, dp.department_name,
+		<include refid="activeHead"/> AS head_employee_id,
+		TO_CHAR(c.work_date, 'YYYY-MM-DD')            AS work_date,
+		c.attendance_id,
+		TO_CHAR(c.origin_check_in_at, 'HH24:MI:SS')   AS origin_check_in,
+		TO_CHAR(c.origin_check_out_at, 'HH24:MI:SS')  AS origin_check_out,
+		TO_CHAR(c.req_check_out_at, 'HH24:MI')        AS req_check_out,
+		c.reason, c.status_code,
+		ap.employee_name                              AS approver_name,
+		TO_CHAR(c.decided_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS decided_at,
+		c.reject_reason,
+		TO_CHAR(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS created_at
+	</sql>
+
+	<sql id="correctionFrom">
+		FROM attendance_correction c
+		JOIN employee e        ON e.employee_id = c.employee_id AND e.company_id = c.company_id
+		LEFT JOIN department dp ON dp.department_id = e.department_id AND dp.company_id = e.company_id
+		LEFT JOIN employee hd   ON hd.employee_id = dp.head_employee_id AND hd.company_id = dp.company_id
+		LEFT JOIN employee ap   ON ap.employee_id = c.approver_employee_id AND ap.company_id = c.company_id
+	</sql>
+
+	<!-- 그날 근태 1건. 요청과 승인이 같은 행을 보게 잠근다 -->
+	<select id="selectAttendanceOnForUpdate" resultType="com.ieum.gw.dto.AttendanceDTO">
+		SELECT attendance_id,
+		       TO_CHAR(work_date, 'YYYY-MM-DD')    AS work_date,
+		       TO_CHAR(check_in_at, 'HH24:MI:SS')  AS check_in,
+		       TO_CHAR(check_out_at, 'HH24:MI:SS') AS check_out
+		FROM attendance
+		WHERE company_id = #{companyId} AND employee_id = #{employeeId}
+		  AND work_date = TO_DATE(#{workDate}, 'YYYY-MM-DD')
+		FOR UPDATE
+	</select>
+
+	<!-- 원래 출퇴근은 근태 행에서 복사한다(PR #54 검토: 화면 값을 쓰면 CK_82_08 을 피해 승인 때 CK_36_02 오류).
+	     같은 직원·같은 날 대기 요청은 UX_82_01 로 하나만 -->
+	<insert id="insertCorrection" parameterType="com.ieum.gw.dto.AttendanceCorrectionDTO">
+		<selectKey keyProperty="attendanceCorrectionId" resultType="long" order="BEFORE">
+			SELECT sq_attendance_correction.NEXTVAL FROM dual
+		</selectKey>
+		INSERT INTO attendance_correction (attendance_correction_id, company_id, employee_id, work_date, attendance_id,
+		                                   origin_check_in_at, origin_check_out_at, req_check_out_at, reason)
+		SELECT #{attendanceCorrectionId}, a.company_id, a.employee_id, a.work_date, a.attendance_id,
+		       a.check_in_at, a.check_out_at,
+		       TO_TIMESTAMP(TO_CHAR(a.work_date, 'YYYY-MM-DD') || ' ' || #{reqCheckOut}, 'YYYY-MM-DD HH24:MI'),
+		       #{reason}
+		FROM attendance a
+		WHERE a.company_id = #{companyId} AND a.employee_id = #{employeeId} AND a.attendance_id = #{attendanceId}
+	</insert>
+
+	<select id="selectMyCorrections" resultType="com.ieum.gw.dto.AttendanceCorrectionDTO">
+		SELECT <include refid="correctionColumns"/>
+		<include refid="correctionFrom"/>
+		WHERE c.company_id = #{companyId} AND c.employee_id = #{employeeId}
+		  AND c.work_date &gt;= TO_DATE(#{month} || '-01', 'YYYY-MM-DD')
+		  AND c.work_date &lt; ADD_MONTHS(TO_DATE(#{month} || '-01', 'YYYY-MM-DD'), 1)
+		ORDER BY c.created_at DESC, c.attendance_correction_id DESC
+	</select>
+
+	<select id="selectCorrectionForUpdate" resultType="com.ieum.gw.dto.AttendanceCorrectionDTO">
+		SELECT <include refid="correctionColumns"/>
+		<include refid="correctionFrom"/>
+		WHERE c.company_id = #{companyId} AND c.attendance_correction_id = #{id}
+		FOR UPDATE OF c.status_code
+	</select>
+
+	<!-- 처리할 대기 요청, 오래된 순. 본인 요청은 빠진다 -->
+	<select id="selectInbox" resultType="com.ieum.gw.dto.AttendanceCorrectionDTO">
+		SELECT <include refid="correctionColumns"/>
+		<include refid="correctionFrom"/>
+		WHERE c.company_id = #{companyId}
+		  AND c.status_code = 'ACR_REQUESTED'
+		  AND c.employee_id &lt;&gt; #{approverId}
+		  AND ( (<include refid="activeHead"/> = #{approverId} AND <include refid="activeHead"/> &lt;&gt; c.employee_id)
+		<if test="admin">
+		     OR <include refid="activeHead"/> IS NULL OR <include refid="activeHead"/> = c.employee_id
+		</if>
+		      )
+		ORDER BY c.created_at, c.attendance_correction_id
+	</select>
+
+	<update id="cancelCorrection">
+		UPDATE attendance_correction
+		SET status_code = 'ACR_CANCELED', updated_at = <include refid="now"/>
+		WHERE company_id = #{companyId} AND attendance_correction_id = #{id}
+		  AND employee_id = #{employeeId} AND status_code = 'ACR_REQUESTED'
+	</update>
+
+	<!-- 승인·반려 (CK_82_05: 처리자·처리 일시 필수, CK_82_06: 반려는 사유 필수) -->
+	<update id="decideCorrection">
+		UPDATE attendance_correction
+		SET status_code = #{status}, approver_employee_id = #{approverId}, decided_at = <include refid="now"/>,
+		    reject_reason = #{rejectReason, jdbcType=VARCHAR}, updated_at = <include refid="now"/>
+		WHERE company_id = #{companyId} AND attendance_correction_id = #{id}
+		  AND status_code = 'ACR_REQUESTED'
+	</update>
+
+	<!-- 승인: 요청한 퇴근 시각을 그날 근태에. 그새 퇴근이 채워졌거나 다른 날 행이면 0줄 -->
+	<update id="applyCheckOut">
+		UPDATE attendance a
+		SET a.check_out_at = (SELECT c.req_check_out_at FROM attendance_correction c
+		                      WHERE c.company_id = #{companyId} AND c.attendance_correction_id = #{id}),
+		    a.updated_at = <include refid="now"/>
+		WHERE a.company_id = #{companyId}
+		  AND a.check_out_at IS NULL
+		  AND (a.attendance_id, a.work_date) IN (SELECT c.attendance_id, c.work_date FROM attendance_correction c
+		                                         WHERE c.company_id = #{companyId} AND c.attendance_correction_id = #{id})
+	</update>
+</mapper>
