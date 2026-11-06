@@ -16,7 +16,7 @@
   <jsp:body>
     <section class="view on" id="view-ticket-admin">
       <div class="page-head"><h1>티켓 처리</h1></div>
-      <p class="muted join-scope">IT 담당자는 미배정 티켓을 자신에게 배정해 처리하고, 업체 관리자는 담당자를 지정하거나 바꿉니다. 처리 완료한 티켓은 요청자가 내 티켓에서 확인하면 종료됩니다.</p>
+      <p class="muted join-scope">IT 담당자는 미배정 티켓을 맡아 처리하고, 관리자는 담당자를 정하거나 바꿉니다. 처리 완료 티켓은 요청자가 확인하면 종료됩니다.</p>
 
       <%-- 카드를 누르면 아래 목록이 그 조건으로 걸러진다 --%>
       <div class="cards" id="taFilters">

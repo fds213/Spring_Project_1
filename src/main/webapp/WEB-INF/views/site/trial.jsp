@@ -13,7 +13,7 @@
       <div class="wrap" style="max-width: 760px">
         <div class="section-head" style="margin-bottom: 28px">
           <h2>2주 무료 체험 신청</h2>
-          <p class="lead">결제 없이 바로 시작합니다. 신청하면 업체와 관리자 계정이 바로 만들어지고, <c:choose><c:when test="${verificationRequired}">메일로 받은 링크에서 이메일을 인증하면 IEUM 앱에서 로그인할 수 있습니다</c:when><c:otherwise>IEUM 앱을 설치해 곧바로 로그인할 수 있습니다</c:otherwise></c:choose>. 관리자를 포함해 10명까지 써 볼 수 있고, 결제는 체험 중 언제든 그룹웨어 안에서 합니다. 결제하지 않으면 체험이 끝난 뒤 읽기 전용으로 바뀌며, 그때 결제해도 계정과 데이터는 그대로 이어집니다.</p>
+          <p class="lead">결제 없이 업체와 관리자 계정이 바로 생기고, <c:choose><c:when test="${verificationRequired}">메일 링크로 이메일을 인증하면 로그인할 수 있습니다</c:when><c:otherwise>바로 로그인할 수 있습니다</c:otherwise></c:choose>. 관리자 포함 10명까지 쓰고, 체험이 끝나면 결제할 때까지 읽기 전용입니다.</p>
         </div>
 
         <ol class="stepper" id="stepper">
@@ -34,7 +34,7 @@
             <div class="form-row"><label for="pEmail">담당자 이메일</label><input class="input" id="pEmail" type="email" autocomplete="email" placeholder="name@company.com" aria-describedby="pEmailHint"><span class="field-hint" id="pEmailHint">업체 담당자 연락처이자 관리자 계정의 이메일입니다</span><span class="field-error"></span></div>
           </div>
           <h3 style="margin-top: 24px">최초 관리자 계정</h3>
-          <p class="note" style="margin-top: -8px">체험이 시작되면 이 계정으로 로그인하고, 직원들이 로그인 화면의 계정 생성으로 요청한 계정을 승인합니다(관리자 포함 10명까지).</p>
+          <p class="note" style="margin-top: -8px">이 계정으로 로그인해 직원 가입 요청을 승인합니다.</p>
           <div class="form-grid">
             <div class="form-row"><label for="pAdminName">관리자 이름</label><input class="input" id="pAdminName" autocomplete="name"><span class="field-error"></span></div>
             <%-- 사번은 입력받지 않는다: 가입 연도 + 0001로 서버가 정한다(ACC-03) --%>
@@ -57,7 +57,7 @@
             <tr><th>무료 체험 기간</th><td id="sTrial"></td></tr>
             <tr class="sum"><th>체험 중 요금</th><td>무료</td></tr>
           </table>
-          <p class="note">결제는 체험 중 그룹웨어의 업체 관리 &gt; 이용 결제에서 합니다. 그때 유료로 쓸 인원과 월간·연간을 고르고(1인 월 4,000원, 첫 연간 10% 할인), 결제한 날부터 바로 유료로 바뀌고 10명 제한이 풀립니다. 자동 결제는 없고 만료 전에 직접 연장합니다.</p>
+          <p class="note">결제는 그룹웨어의 업체 관리 &gt; 이용 결제에서 인원과 월간·연간을 골라 합니다(1인 월 4,000원, 첫 연간 10% 할인). 결제하면 10명 제한이 풀리고, 자동 결제는 없습니다.</p>
           <div class="form-row" style="margin-top: 16px"><label class="check"><input type="checkbox" id="pAgree"> 시연용 서비스 이용 조건에 동의합니다.</label><span class="field-error"></span></div>
           <div class="actions"><button class="btn btn-lg" type="button" data-go="1">이전</button><button class="btn btn-primary btn-lg" type="submit">무료 체험 시작</button></div>
           <%-- 칸과 상관없는 실패(업체 코드 소진·서버 오류)의 안내. 칸이 틀린 실패는 1단계 그 칸 아래에 보인다 --%>

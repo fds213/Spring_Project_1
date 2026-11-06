@@ -20,7 +20,7 @@
         <%-- 그 해 법정 공휴일 목록이 있을 때만 보인다 (이미 있는 날은 건너뛴다) --%>
         <div class="page-actions"><button type="button" class="btn btn-primary" id="btnHolPreset" data-write hidden>공휴일 한 번에 넣기</button></div>
       </div>
-      <p class="muted join-scope">휴가를 신청하면 주말과 여기 휴일을 빼고 날짜를 셉니다. 휴일이 하나도 없는 해에 걸친 휴가는 신청할 수 없으니, 해마다 먼저 넣어 주세요.</p>
+      <p class="muted join-scope">휴가 일수는 주말과 여기 휴일을 빼고 셉니다. 휴일이 없는 해의 휴가는 신청할 수 없으니 해마다 먼저 넣어 주세요.</p>
 
       <section class="info-card table-gap" aria-label="휴일 목록">
         <div class="att-month att-month-center">

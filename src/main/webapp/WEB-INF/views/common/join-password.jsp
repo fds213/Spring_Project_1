@@ -35,7 +35,7 @@
            서버는 비밀번호를 BCrypt로만 저장하므로 지금 비밀번호를 보여주지 않고 새로 정하게 한다 --%>
       <form id="pwForm" class="join-form" novalidate>
         <h2 class="login-title">비밀번호 찾기</h2>
-        <p class="login-lead">업체 코드와 사번을 넣으면 가입할 때 쓴 이메일로 인증 코드를 보냅니다. 인증하면 새 비밀번호를 정할 수 있습니다.</p>
+        <p class="login-lead">업체 코드와 사번을 넣으면 가입 이메일로 인증 코드를 보냅니다. 인증 뒤 새 비밀번호를 정합니다.</p>
         <div class="field">
           <label for="pwCompany">업체 코드</label>
           <input class="input" id="pwCompany" autocomplete="organization" placeholder="예: ieum7431">

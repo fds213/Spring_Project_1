@@ -13,13 +13,13 @@
       <div class="wrap inq-layout" id="inqLayout">
         <div class="inq-head">
           <h1>이음 도입 문의</h1>
-          <p class="inq-lead">이음 도입과 관련하여 궁금한 점을 남겨 주시면, 담당자가 확인 후 이메일로 답변 드립니다.</p>
+          <p class="inq-lead">궁금한 점을 남겨 주시면 담당자가 이메일로 답변 드립니다.</p>
         </div>
 
         <dl class="inq-strip">
-          <div><dt>답변 안내</dt><dd>영업일 기준 1~2일 이내에 입력하신 이메일로 회신합니다.</dd></div>
+          <div><dt>답변 안내</dt><dd>영업일 1~2일 안에 이메일로 회신합니다.</dd></div>
           <%-- 소개 페이지의 "무료 체험 시작" 버튼과 같은 주소 --%>
-          <div><dt>무료 체험</dt><dd>14일 동안 무료로 사용해 볼 수 있습니다. <a href="${ctx}/trial">무료 체험 신청 →</a></dd></div>
+          <div><dt>무료 체험</dt><dd>2주 동안 무료로 써 볼 수 있습니다. <a href="${ctx}/trial">무료 체험 신청 →</a></dd></div>
           <div><dt>이용 중인 고객</dt><dd>그룹웨어의 IT 서비스 메뉴나 회사 관리자에게 문의해 주세요.</dd></div>
         </dl>
 
