@@ -64,7 +64,8 @@
     select.setAttribute('aria-hidden', 'true');
 
     // 칸의 label이 이제 버튼을 가리키므로, label을 누르면 사용자가 보는 버튼에 초점이 간다
-    const label = select.id && document.querySelector(`label[for="${select.id}"]`);
+    // id에 따옴표·줄바꿈 같은 글자가 있어도 선택자가 깨지지 않게 CSS.escape 로 감싼다
+    const label = select.id && document.querySelector(`label[for="${CSS.escape(select.id)}"]`);
     if (label) {
       label.htmlFor = button.id;
       if (!label.id) label.id = `${id}Label`;
@@ -233,8 +234,11 @@
     if (opened && !opened.wrap.contains(e.target)) opened.close();
   });
 
-  // 지금 있는 select와, 화면 스크립트가 나중에 더하는 select(상세·창 안의 고르기 칸)를 모두 바꾼다
+  // 지금 있는 select와, 화면 스크립트가 나중에 더하는 select(상세·창 안의 고르기 칸)를 모두 바꾼다.
+  // 이미 문서에서 빠진 것은 건너뛴다: jQuery는 실릴 때 기능 검사용 select를 잠깐 넣었다 빼는데, 이 파일이 jQuery보다 먼저 실린
+  // 화면(계정 생성 join.jsp)에서는 그 select까지 꾸미려다 콘솔 오류가 났다
   const enhanceIn = root => {
+    if (!root.isConnected) return;
     if (root.tagName === 'SELECT') enhance(root);
     else if (root.querySelectorAll) root.querySelectorAll('select').forEach(enhance);
   };
