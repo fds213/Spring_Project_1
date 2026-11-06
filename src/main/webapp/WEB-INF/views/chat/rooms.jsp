@@ -2,6 +2,7 @@
          pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
+<c:set var="ctx" value="${pageContext.request.contextPath}" />
 <%-- 모델 속성: roomList (chatRoomId, displayName, unreadCount), empList (employeeId, employeeName) --%>
 <ui:layout title="채팅방 목록" crumb="채팅" menu="chat">
   <jsp:attribute name="scripts">
@@ -101,9 +102,22 @@
         var list = document.getElementById('chatRoomList');
         var unreadTotal = document.getElementById('chatUnreadTotal');
         var empty = document.getElementById('chatRoomEmpty');
+
+        /** 안 읽은 수를 배지에 넣는다. 눈에는 숫자(999 넘으면 999+), 화면 낭독기에는 "안 읽은 메시지 n개"로 보인다 */
+        function setBadge(badge, count) {
+          badge.textContent = count > 999 ? '999+' : String(count);
+          var spoken = document.createElement('span');
+          spoken.className = 'chat-sr';
+          spoken.textContent = '안 읽은 메시지 ' + count.toLocaleString('ko-KR') + '개';
+          badge.append(spoken);
+          badge.hidden = count === 0;
+          badge.closest('li').classList.toggle('is-unread', count > 0);
+        }
+
         window.addEventListener('ieum:chat-unread', function (event) {
           var snapshot = event.detail;
-          unreadTotal.textContent = '안 읽은 채팅 ' + snapshot.total + '개';
+          unreadTotal.textContent = snapshot.total > 0
+            ? '안 읽은 채팅 ' + snapshot.total.toLocaleString('ko-KR') + '개' : '';
           var current = new Map(Array.from(list.querySelectorAll('[data-room-id]'))
             .map(function (row) { return [row.dataset.roomId, row]; }));
           snapshot.rooms.forEach(function (room) {
@@ -116,101 +130,92 @@
               link.href = list.dataset.roomBase + encodeURIComponent(id);
               var name = document.createElement('span');
               name.dataset.roomName = '';
+              name.className = 'chat-room-name';
+              name.dir = 'auto';
               var badge = document.createElement('span');
               badge.dataset.roomUnread = '';
               badge.className = 'badge';
-              link.append(name, ' ', badge);
+              link.append(name, badge);
               row.append(link);
             }
             list.append(row);
-            row.querySelector('[data-room-name]').textContent = room.displayName || '';
-            var badge = row.querySelector('[data-room-unread]');
-            badge.textContent = '안 읽은 메시지 ' + room.unreadCount + '개';
-            badge.hidden = room.unreadCount === 0;
+            var name = row.querySelector('[data-room-name]');
+            name.textContent = room.displayName || '';
+            name.title = room.displayName || '';
+            setBadge(row.querySelector('[data-room-unread]'), room.unreadCount);
             current.delete(id);
           });
           current.forEach(function (row) { row.remove(); });
+          list.append(empty);
           empty.hidden = snapshot.rooms.length !== 0;
         });
       })();
     </script>
-    <script src="${pageContext.request.contextPath}/resources/js/chat/updates.js"
-            data-context-path="${pageContext.request.contextPath}"></script>
+    <script src="${ctx}/resources/js/chat/updates.js"
+            data-context-path="${ctx}"></script>
   </jsp:attribute>
   <jsp:body>
-    <style>
-      /* 공통 틀과 겹치지 않게 .chat-rooms 안으로 범위를 좁힌다 */
-      .chat-rooms ul { list-style: none; padding: 0; }
-      .chat-rooms li { padding: 12px; border-bottom: 1px solid #ddd; }
-      .chat-rooms li a { text-decoration: none; color: inherit; display: block; }
-      .chat-rooms .room-list li:hover { background: #f5f5f5; }
-      .chat-rooms .empty { color: #888; padding: 12px; }
-      .chat-rooms dialog { width: 360px; border: 1px solid #ccc; border-radius: 8px; }
-      .chat-rooms dialog input[type=text] { width: 100%; box-sizing: border-box; }
-      .chat-rooms .emp-list { max-height: 240px; overflow-y: auto; border: 1px solid #ddd; }
-      .chat-rooms .emp-list li { padding: 6px 10px; }
-    </style>
+    <%-- 채팅 전용 스타일 (공통 레이아웃에 화면별 CSS 칸이 없어서 본문 맨 앞에서 불러온다) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/chat/chat.css">
 
     <div class="chat-rooms">
       <div class="page-head">
         <h1>채팅방 목록</h1>
-        <button type="button" id="createBtn">채팅방 생성</button>
+        <button type="button" class="btn btn-primary" id="createBtn" data-write>채팅방 생성</button>
       </div>
 
-      <dialog id="createDialog" aria-labelledby="createRoomTitle">
-        <form id="createRoomForm" method="post" action="${pageContext.request.contextPath}/chat/createroom">
+      <dialog class="modal chat-create-dialog" id="createDialog" aria-labelledby="createRoomTitle">
+        <form id="createRoomForm" method="post" action="${ctx}/chat/createroom">
           <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
-          <h3 id="createRoomTitle">채팅방 만들기</h3>
-          <p>
+          <h2 id="createRoomTitle">채팅방 만들기</h2>
+          <div class="field">
             <label for="roomType">대화 종류</label>
-            <select name="roomType" id="roomType">
+            <select class="input" name="roomType" id="roomType">
               <option value="ROOM_DIRECT">1:1 대화</option>
               <option value="ROOM_GROUP">그룹 대화</option>
             </select>
-          </p>
-          <p id="roomNameField" hidden>
+          </div>
+          <div class="field" id="roomNameField" hidden>
             <label for="roomName">그룹방 이름 (최대 200자)</label>
-            <input type="text" name="roomName" id="roomName" placeholder="그룹방 이름" disabled>
-          </p>
-          <p id="memberHint"></p>
-          <p>참여자 선택 (본인 제외)</p>
-          <label for="chatEmployeeSearch">직원 검색</label>
-          <input type="search" id="chatEmployeeSearch" placeholder="이름 또는 부서">
+            <input class="input" type="text" name="roomName" id="roomName" placeholder="그룹방 이름" disabled>
+          </div>
+          <p class="chat-hint" id="memberHint"></p>
+          <div class="field">
+            <label for="chatEmployeeSearch">참여자 선택 (본인 제외)</label>
+            <input class="input" type="search" id="chatEmployeeSearch" placeholder="이름 또는 부서로 찾기">
+          </div>
           <ul class="emp-list">
             <c:forEach var="emp" items="${empList}">
               <li data-chat-employee><label>
                 <input type="checkbox" name="members" value="${emp.employeeId}">
-                <c:out value="${emp.employeeName}"/>
-                <c:if test="${not empty emp.departmentName}">
-                  (<c:out value="${emp.departmentName}"/>)
-                </c:if>
+                <span><c:out value="${emp.employeeName}"/><c:if test="${not empty emp.departmentName}">
+                  (<c:out value="${emp.departmentName}"/>)</c:if></span>
               </label></li>
             </c:forEach>
             <c:if test="${empty empList}">
               <li class="empty">선택할 사원이 없습니다.</li>
             </c:if>
           </ul>
-          <p id="chatEmployeeSearchEmpty" role="status" hidden>검색 결과가 없습니다.</p>
-          <p id="createRoomError" role="alert"></p>
-          <p>
-            <button type="submit" id="submitRoomBtn">대화 열기</button>
-            <button type="button" id="cancelBtn">취소</button>
-          </p>
+          <p class="chat-hint" id="chatEmployeeSearchEmpty" role="status" hidden>검색 결과가 없습니다.</p>
+          <p class="chat-form-error" id="createRoomError" role="alert"></p>
+          <div class="modal-actions">
+            <button type="button" class="btn" id="cancelBtn">취소</button>
+            <button type="submit" class="btn btn-primary" id="submitRoomBtn">대화 열기</button>
+          </div>
         </form>
       </dialog>
 
-      <p id="chatUnreadTotal" role="status" aria-live="polite"></p>
-      <ul id="chatRoomList" class="room-list" data-room-base="${pageContext.request.contextPath}/chat/room/">
+      <p class="chat-unread-total" id="chatUnreadTotal" role="status" aria-live="polite"></p>
+      <ul id="chatRoomList" class="chat-room-list" data-room-base="${ctx}/chat/room/">
         <c:forEach var="room" items="${roomList}">
-          <li data-room-id="${room.chatRoomId}">
-            <a href="${pageContext.request.contextPath}/chat/room/${room.chatRoomId}">
-              <span data-room-name><c:out value="${room.displayName}"/></span>
-              <span class="badge" data-room-unread
-                    <c:if test="${room.unreadCount eq 0}">hidden</c:if>>안 읽은 메시지 <c:out value="${room.unreadCount}"/>개</span>
+          <li data-room-id="${room.chatRoomId}"<c:if test="${room.unreadCount gt 0}"> class="is-unread"</c:if>>
+            <a href="${ctx}/chat/room/${room.chatRoomId}">
+              <span class="chat-room-name" data-room-name dir="auto" title="<c:out value='${room.displayName}'/>"><c:out value="${room.displayName}"/></span>
+              <span class="badge" data-room-unread<c:if test="${room.unreadCount eq 0}"> hidden</c:if>><c:choose><c:when test="${room.unreadCount gt 999}">999+</c:when><c:otherwise>${room.unreadCount}</c:otherwise></c:choose><span class="chat-sr">안 읽은 메시지 ${room.unreadCount}개</span></span>
             </a>
           </li>
         </c:forEach>
-        <li id="chatRoomEmpty" class="empty"
+        <li id="chatRoomEmpty" class="chat-room-empty"
             <c:if test="${not empty roomList}">hidden</c:if>>참여 중인 채팅방이 없습니다.</li>
       </ul>
     </div>
