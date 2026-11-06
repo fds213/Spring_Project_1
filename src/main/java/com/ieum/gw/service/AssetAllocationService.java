@@ -8,11 +8,13 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dao.AssetAllocationDAO;
 import com.ieum.gw.dto.AssetAdminAssignmentDTO;
+import com.ieum.gw.dto.AssetAdminIncidentDTO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
 import com.ieum.gw.dto.AssetListDTO;
 import com.ieum.gw.code.AssetStatus;
 import com.ieum.gw.code.AssetType;
+import com.ieum.gw.code.TicketType;
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.service.BranchService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,22 @@ public class AssetAllocationService {
     private final BranchService branchService;
     private final EmployeeService employeeService;
 
+    /** 같은 업체 자산의 모든 상태 장애 이력을 IT 담당자·관리자에게 제공한다. */
+    @Transactional(readOnly = true)
+    public List<AssetAdminIncidentDTO> getIncident(LoginUser user, Long assetId) {
+    	requireOperator(user);
+    	requireId(assetId);
+    	
+    	Long companyId = user.getCompanyId();
+    	AssetAllocationDTO asset = dao.detail(companyId, assetId);
+    	
+    	if (asset == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "자산을 찾을 수 없습니다.");
+		}
+    	
+    	return dao.selectIncidents(companyId, assetId, TicketType.TK_INCIDENT.name());
+    }
+    
     /** 같은 업체 자산의 지급·회수 이력을 관리자에게 제공한다. */
     @Transactional(readOnly = true)
     public List<AssetAdminAssignmentDTO> getAssignments(LoginUser user, Long assetId) {

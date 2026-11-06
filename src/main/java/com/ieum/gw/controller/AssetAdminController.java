@@ -20,6 +20,12 @@ import lombok.Setter;
 public class AssetAdminController {
     private final AssetAllocationService service;
 
+    /** 선택한 자산의 장애 티켓 이력을 JSON으로 반환한다. */
+    @GetMapping("/{id}/incidents")
+    public Map<String, Object> incident(@AuthenticationPrincipal LoginUser user, @PathVariable("id") Long assetId) {
+    	return Map.of("success", true, "data", service.getIncident(user, assetId));
+    }
+    
     /** 관리자가 선택한 자산의 지급·회수 이력을 JSON으로 반환한다. */
     @GetMapping("/{id}/assignments")
     public Map<String, Object> assignments(@AuthenticationPrincipal LoginUser user, 
