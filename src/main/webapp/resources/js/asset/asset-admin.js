@@ -13,14 +13,14 @@
 //   - status: ASSET_STATUS 코드 (AS_*)
 //   - 실패: { message }. 409 는 다른 사람이 먼저 바꾼 것이다
 //
-// 지급할 직원과 지점 이름: 자산 쪽에 목록 API가 없어 결재 작성의 선택 목록을 빌려 쓴다
-//   GET /approval/api/form-options
-//     approvers: 같은 업체의 재직 직원(나는 빠짐) [{ employeeId, employeeName, departmentName, gradeName }]
-//     branches:  사용 중 지점 [{ branchId, branchName }]
-//   - 그래서 나에게는 지급할 수 없고, 사용 중지한 지점에 놓인 자산은 지점이 '-'로 보인다
-//   - 자산 쪽에 목록이 생기면 그것으로 바꾼다
+// 지급할 직원과 지점 이름: 자산용 선택 목록 (IT 담당·업체 관리자, #157)
+//   GET /asset/admin/api/assets/form-options
+//     employees: 같은 업체의 재직·사용 중 직원(나도 포함) [{ employeeId, employeeName, departmentName, gradeName }]
+//     branches:  사용 중지한 지점도 포함 [{ branchId, branchName }] — 이미 놓인 자산의 지점 이름을 보이려고
+//   - 지점 목록은 이름 표시에만 쓴다(새 지점을 고르는 칸이 아니다)
 //
-// 서버에 아직 없어 화면에도 없는 것: 사용자·지급일·지급 이력, 자산 등록
+// 서버에는 있지만 화면에 아직 없는 것: 지급·회수 이력 (GET /asset/admin/api/assets/{id}/assignments, #151)
+// 서버에 없어 화면에도 없는 것: 목록의 현재 사용자·지급일, 자산 등록
 // 상태를 바꾸는 요청에는 받은 version 을 같이 보낸다.
 //   같은 장비를 두 사람에게 동시에 지급하려 하면 서버가 409 로 거절하고 화면은 새로 받는다.
 // 장비 지급 신청서로 생긴 지급은 티켓 처리 화면에서 한다(그 티켓과 함께 끝나야 해서).
@@ -62,9 +62,9 @@
   };
 
   function openAssetAdmin() {
-    api.get('/approval/api/form-options')
+    api.get('/asset/admin/api/assets/form-options')
       .done(o => {
-        state.people = (o && o.approvers) || [];
+        state.people = (o && o.employees) || [];
         state.branches = new Map(((o && o.branches) || []).map(b => [b.branchId, b.branchName]));
         if (state.items) render();
       })
