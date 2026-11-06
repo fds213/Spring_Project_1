@@ -28,8 +28,14 @@
 
   // ---------- 2) 로그인이 풀림 → 401, 권한 없음·CSRF 토큰 만료 → 403 (가이드 9장) ----------
   // 403 은 서버가 보낸 message("접근 권한이 없습니다", 토큰 만료면 "새로 고친 뒤 다시 시도")를 그대로 보여 준다. 없을 때만 아래 문구
+  // 401 은 로그인 화면으로. AccountStatusInterceptor(#178)가 끊은 경우는 reason(disabled 비활성, changed 역할 바뀜)을 실어 보내
+  // 로그인 화면이 그 안내를 보이고, 세션 만료(AjaxAwareEntryPoint)는 reason 이 없어 지금처럼 ?expired
+  const LOGIN_REASON = ['disabled', 'changed'];
   $(document).ajaxError((e, xhr) => {
-    if (xhr.status === 401) location.href = ctx + '/login?expired';
+    if (xhr.status === 401) {
+      const reason = xhr.responseJSON && xhr.responseJSON.reason;
+      location.href = ctx + '/login?' + (LOGIN_REASON.includes(reason) ? reason : 'expired');
+    }
     else if (xhr.status === 403) toast(apiMessage(xhr, '권한이 없거나 화면이 오래되었습니다. 새로고침한 뒤 다시 시도해 주세요.'));
   });
 
