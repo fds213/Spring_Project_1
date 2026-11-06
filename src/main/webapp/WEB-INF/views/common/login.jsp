@@ -74,6 +74,8 @@
           <c:when test="${param.locked ne null}">비밀번호를 5번 틀려 이 계정은 잠겼습니다. <c:choose><c:when test="${param.locked.matches('[0-9]{1,2}')}"><c:out value="${param.locked}" />분</c:when><c:otherwise>10분</c:otherwise></c:choose> 뒤에 다시 시도해 주세요</c:when>
           <c:when test="${param.disabled ne null}">사용이 중지된 계정입니다. 업체 관리자에게 문의해 주세요</c:when>
           <c:when test="${param.expired ne null}">로그인이 끝났습니다. 다시 로그인해 주세요</c:when>
+          <%-- 업체 관리자가 역할을 바꾸면 AccountStatusInterceptor 가 세션을 끊고 /login?changed 로 보낸다 (#178) --%>
+          <c:when test="${param.changed ne null}">역할이 바뀌어 다시 로그인해 주세요. 로그인하면 바뀐 메뉴가 보입니다</c:when>
           <%-- 체험 신청 이메일을 아직 인증하지 않은 업체 (ACC-06): 서버가 /login?unverified 로 보낸다 --%>
           <c:when test="${param.unverified ne null}">신청할 때 적은 이메일을 아직 인증하지 않았습니다. 인증 메일의 링크를 누른 뒤 로그인해 주세요</c:when>
         </c:choose></p>
