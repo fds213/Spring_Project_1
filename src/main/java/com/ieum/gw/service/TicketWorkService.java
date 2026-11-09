@@ -135,7 +135,7 @@ public class TicketWorkService {
                     "at", time(h.getCreatedAt()), "name", name(accountNames, h.getActorAccountId()),
                     "text", historyText(h, employeeNames))).collect(Collectors.toList()));
             item.put("canComment", !terminal(row));
-            item.put("canClose", RESOLVED.name().equals(row.getStatus()));
+            item.put("canClose", user.getEmployeeId().equals(row.getRequesterId()) && RESOLVED.name().equals(row.getStatus()));
             // 본인이 접수한 장애·문의 중 접수 상태인 건만 취소할 수 있다.
             item.put("canCancel", user.getEmployeeId().equals(row.getRequesterId())
             						&& RECEIVED.name().equals(row.getStatus())

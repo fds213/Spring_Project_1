@@ -401,6 +401,16 @@ class TicketWorkServiceTest {
     }
 
     @Test
+    @DisplayName("요청자가 아닌 관리자는 처리 완료 티켓의 상세에서도 종료할 수 없다")
+    void canCloseRequiresRequesterInAdminDetail() {
+        rows.row.setStatus(RESOLVED.name());
+
+        var result = service.detailAdmin(user(1L, 8L, "ROLE_ADMIN"), 10L);
+
+        assertEquals(false, result.get("canClose"));
+    }
+
+    @Test
     @DisplayName("내 티켓 취소 표시는 장애·문의이면서 접수 상태일 때만 참이다")
     void canCancelDependsOnTypeAndState() {
         for (var type : com.ieum.gw.code.TicketType.values()) {
