@@ -15,6 +15,8 @@ const EQUIP_QTY_MAX = 10;
 const EA_REASON_MAX = 200; // 장비 신청 사유, 장비 문서 결재 의견
 const EA_LEAVE_COMMENT_MAX = 100; // 휴가 문서 결재 의견
 const EA_ACTION = { APR_SUBMIT: '제출', APR_APPROVE: '승인', APR_REJECT: '반려' };
+const EA_ACTION_STATUS = { APR_SUBMIT: 'approved', APR_APPROVE: 'paid', APR_REJECT: 'failed' }; // 결재 이력 표시 색 (common.css 상태 색)
+const EA_ACTION_CLASS = { APR_SUBMIT: 'submit', APR_APPROVE: 'approve', APR_REJECT: 'reject' };
 
 const eaEl = id => document.getElementById(id);
 const eaNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
@@ -377,12 +379,22 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
 // ---------- 결재함 ----------
 function openApprovalBoxView() {
   eaState.open = null;
+  eaState.boxFirst = true; // 처음 열 때만 보여 줄 탭을 고른다
   loadApprovalBox();
 }
 
 function loadApprovalBox() {
   api.get('/approval/api/box')
-    .done(box => { eaState.box = box; renderApprovalBox(); })
+    .done(box => {
+      eaState.box = box;
+      // 처음 열 때 내 순번 대기가 0건이면 문서가 있는 첫 탭(진행 → 반려 → 완료)을 연다.
+      // 결재할 일이 거의 없는 직원이 빈 목록부터 보지 않게. 승인·반려 뒤 다시 받을 때는 보던 탭 그대로 둔다
+      if (eaState.boxFirst) {
+        eaState.boxFirst = false;
+        if (!(box.WAIT || []).length) eaState.tab = ['PROGRESS', 'REJECTED', 'DONE'].find(t => (box[t] || []).length) || 'WAIT';
+      }
+      renderApprovalBox();
+    })
     .fail(xhr => showToast(apiMessage(xhr, '결재함을 불러오지 못했습니다')));
 }
 
@@ -435,10 +447,14 @@ function eaDocDetail(d) {
   const info = eaNode('dl', 'detail');
   [['문서', d.title], ['기안자', `${d.employeeName}${d.departmentName ? ` (${d.departmentName})` : ''}`], ['기안일', whenFull(d.submittedAt)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', EA_STATUS[d.statusCode]]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
-  const log = eaNode('ul', 'bill-history', ...(d.history.length
-    ? d.history.map(h => eaNode('li', '', eaNode('span', '', `${whenFull(h.createdAt)} · ${h.employeeName} · ${EA_ACTION[h.actionCode] || h.actionCode}${h.opinion ? ` · ${h.opinion}` : ''}`)))
-    : [eaNode('li', '', eaNode('span', 'muted', '아직 처리된 단계가 없습니다'))]));
-  const side = eaNode('section', 'info-card', eaNode('header', 'info-card-head', eaNode('h2', '', '결재 이력')), log);
+  // 결재 이력: 누가 · [제출·승인·반려] 표시, 의견은 아랫줄, 시각은 흐리게 (오래된 것부터)
+  const log = eaNode('ol', 'ea-timeline', ...(d.history.length
+    ? d.history.map(h => eaNode('li', `ea-tl-${EA_ACTION_CLASS[h.actionCode] || 'submit'}`,
+        eaNode('div', 'ea-tl-head', eaNode('strong', '', h.employeeName), eaNode('span', `status status-${EA_ACTION_STATUS[h.actionCode] || 'waiting'}`, EA_ACTION[h.actionCode] || h.actionCode)),
+        ...(h.opinion ? [eaNode('p', 'ea-tl-opinion', h.opinion)] : []),
+        eaNode('time', 'ea-tl-time', whenFull(h.createdAt))))
+    : [eaNode('li', 'ea-tl-empty', '아직 처리된 단계가 없습니다')]));
+  const side = eaNode('section', 'info-card ea-history', eaNode('header', 'info-card-head', eaNode('h2', '', '결재 이력')), log);
 
   if (d.canDecide) {
     const box = eaNode('textarea', 'inq-text');
@@ -447,7 +463,16 @@ function eaDocDetail(d) {
     box.setAttribute('aria-label', '결재 의견');
     const ok = eaButton('승인', 'btn btn-primary', true);
     const no = eaButton('반려', 'btn', true);
-    ok.addEventListener('click', () => eaDecide(d, true, box.value.trim(), [ok, no]));
+    ok.addEventListener('click', async () => {
+      // 승인은 되돌릴 수 없어 한 번 묻는다. 마지막 결재자면 최종 승인 때 일어나는 일까지 알린다
+      const last = d.steps.filter(p => p.statusCode === 'WAITING').length <= 1;
+      const what = d.documentType === 'DOC_LEAVE'
+        ? `${d.employeeName}님의 연차가 ${d.requestedDays}일 차감되고 일정에 휴가가 들어갑니다.`
+        : '지급 티켓이 만들어져 IT 담당자에게 넘어갑니다.';
+      eaEl('eaDecideTitle').textContent = last ? '최종 승인할까요?' : '승인할까요?';
+      eaEl('eaDecideText').textContent = last ? `${what} 승인하면 되돌릴 수 없습니다.` : '다음 결재자에게 넘어갑니다. 승인하면 되돌릴 수 없습니다.';
+      if (await eaConfirm('eaDecideDialog')) eaDecide(d, true, box.value.trim(), [ok, no]);
+    });
     no.addEventListener('click', () => eaDecide(d, false, box.value.trim(), [ok, no]));
     side.append(eaNode('div', 'inq-body', box, eaNode('div', 'inq-actions', ok, no)));
   } else if (d.canRedraft) {
