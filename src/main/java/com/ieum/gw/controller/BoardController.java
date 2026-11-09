@@ -30,8 +30,10 @@ import com.ieum.gw.dto.NoticeDTO;
 import com.ieum.gw.dto.NoticeFileDTO;
 import com.ieum.gw.dto.NoticeCommentSaveDTO;
 import com.ieum.gw.dto.NoticeSaveDTO;
+import com.ieum.gw.service.BoardDeptService;
 import com.ieum.gw.service.NoticeService;
 import com.ieum.gw.dto.AttachmentDTO;
+import com.ieum.gw.dto.BoardDeptPostDTO;
 import com.ieum.gw.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +46,7 @@ import lombok.RequiredArgsConstructor;
 public class BoardController {
 
     private final NoticeService noticeService;
+    private final BoardDeptService boardDeptService;
 
     // ---------- 화면 ----------
 
@@ -134,22 +137,103 @@ public class BoardController {
         return noticeService.deleteComment(loginUser, id, commentId);
     }
 
-    // 첨부파일 올리기: POST /board/api/files  (multipart, 이름 "files"로 여러 개)
-    // 성공하면 [{ id, name, size, type }] → 화면이 번호를 들고 있다가 공지 저장 때 보낸다
+    // 첨부파일 올리기: POST /board/api/files  (multipart, 이름 "files"로 여러 개. 공지·부서 게시판이 같이 쓴다)
+    // 성공하면 [{ id, name, size, type }] → 화면이 번호를 들고 있다가 글 저장 때 보낸다
     @PostMapping("/api/files")
     @ResponseBody
     public List<NoticeFileDTO> fileUpload(@AuthenticationPrincipal LoginUser loginUser,
                                           @RequestPart("files") List<MultipartFile> files) throws IOException {
-        return noticeService.uploadFiles(loginUser, files);
+        return boardDeptService.uploadFiles(loginUser, files);
     }
 
     // 공지 첨부 내려받기: GET /board/api/notices/3/files/12
-    // 이미지는 화면에 바로 보이게(inline), 나머지는 내려받게(attachment)
     @GetMapping("/api/notices/{id}/files/{fileId}")
     public ResponseEntity<Resource> fileDownload(@AuthenticationPrincipal LoginUser loginUser,
                                                  @PathVariable Long id,
                                                  @PathVariable Long fileId) throws IOException {
-        AttachmentDTO file = noticeService.getFile(loginUser, id, fileId);
+        return fileResponse(noticeService.getFile(loginUser, id, fileId));
+    }
+
+    // ---------- 부서 게시판 데이터 (board.js가 부른다) ----------
+
+    // 글 목록: GET /board/api/dept/posts?q=검색어&page=1
+    @GetMapping("/api/dept/posts")
+    @ResponseBody
+    public Map<String, Object> deptPostList(@AuthenticationPrincipal LoginUser loginUser,
+                                            @RequestParam(defaultValue = "") String q,
+                                            @RequestParam(defaultValue = "1") int page) {
+        return boardDeptService.getPosts(loginUser, q, page);
+    }
+
+    // 글쓰기·수정 화면을 열 때: GET /board/api/dept/posts/form (수정이면 ?id=3)
+    @GetMapping("/api/dept/posts/form")
+    @ResponseBody
+    public Map<String, Object> deptPostForm(@AuthenticationPrincipal LoginUser loginUser,
+                                            @RequestParam(required = false) Long id) {
+        return boardDeptService.getForm(loginUser, id);
+    }
+
+    // 글 보기: GET /board/api/dept/posts/3  (다른 부서 글이면 404)
+    @GetMapping("/api/dept/posts/{id}")
+    @ResponseBody
+    public BoardDeptPostDTO deptPostDetail(@AuthenticationPrincipal LoginUser loginUser,
+                                           @PathVariable Long id) {
+        return boardDeptService.getPost(loginUser, id);
+    }
+
+    // 글 저장: POST /board/api/dept/posts  (본문 JSON: { title, content, files }. 부서는 서버가 정한다)
+    @PostMapping("/api/dept/posts")
+    @ResponseBody
+    public Map<String, Object> deptPostCreate(@AuthenticationPrincipal LoginUser loginUser,
+                                              @RequestBody NoticeSaveDTO form) {
+        return boardDeptService.createPost(loginUser, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 글 수정: POST /board/api/dept/posts/3  (본문은 저장과 같은 모양)
+    @PostMapping("/api/dept/posts/{id}")
+    @ResponseBody
+    public Map<String, Object> deptPostUpdate(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id,
+                                              @RequestBody NoticeSaveDTO form) {
+        return boardDeptService.updatePost(loginUser, id, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 글 삭제: POST /board/api/dept/posts/3/delete
+    @PostMapping("/api/dept/posts/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> deptPostDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id) {
+        return boardDeptService.deletePost(loginUser, id);
+    }
+
+    // 댓글 등록: POST /board/api/dept/posts/3/comments  (본문 JSON: { text }). 성공하면 댓글 목록 전체
+    @PostMapping("/api/dept/posts/{id}/comments")
+    @ResponseBody
+    public List<NoticeCommentDTO> deptCommentAdd(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @PathVariable Long id,
+                                                 @RequestBody NoticeCommentSaveDTO form) {
+        return boardDeptService.addComment(loginUser, id, form.getText());
+    }
+
+    // 댓글 삭제: POST /board/api/dept/posts/3/comments/7/delete. 성공하면 남은 댓글 목록 전체
+    @PostMapping("/api/dept/posts/{id}/comments/{commentId}/delete")
+    @ResponseBody
+    public List<NoticeCommentDTO> deptCommentDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                                    @PathVariable Long id,
+                                                    @PathVariable Long commentId) {
+        return boardDeptService.deleteComment(loginUser, id, commentId);
+    }
+
+    // 첨부 내려받기: GET /board/api/dept/posts/3/files/12
+    @GetMapping("/api/dept/posts/{id}/files/{fileId}")
+    public ResponseEntity<Resource> deptFileDownload(@AuthenticationPrincipal LoginUser loginUser,
+                                                     @PathVariable Long id,
+                                                     @PathVariable Long fileId) throws IOException {
+        return fileResponse(boardDeptService.getFile(loginUser, id, fileId));
+    }
+
+    // 파일 응답을 만든다. 이미지는 화면에 바로 보이게(inline), 나머지는 내려받게(attachment)
+    private ResponseEntity<Resource> fileResponse(AttachmentDTO file) throws IOException {
         Resource body = noticeService.loadFile(file);
 
         // 한글 파일 이름이 깨지지 않게 UTF-8로 적는다
