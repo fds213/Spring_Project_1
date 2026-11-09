@@ -3,12 +3,14 @@
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
 <%--
-  공통 지도 (/location/map). Controller: location/controller/WorkMapController, 데이터: /location/api/map/...
+  공통 지도 (/location/map)와 개인 지도 (/location/map/personal)가 같이 쓰는 화면. Controller: WorkMapController, 데이터: /location/api/map/...
   - 카카오 지도 JavaScript 키(kakaoKey)는 서버가 config/kakao.properties에서 읽어 넘긴다. 키가 없거나 지도를 못 불러오면
     지도 자리에 안내가 나오고 마커 목록은 그대로 보인다(계획서 6장: 지도 API가 실패해도 다른 기능은 쓴다).
-  - 마커 등록은 누구나, 수정·삭제는 업체 관리자·인사 담당(서버가 canEdit으로 알려 주고 저장할 때 다시 검사한다).
+  - 공통 지도: 마커 등록은 누구나, 수정·삭제는 업체 관리자·인사 담당(서버가 canEdit으로 알려 주고 저장할 때 다시 검사한다).
+  - 개인 지도: 본인만 보고 고친다. 어느 지도인지는 Controller가 넘긴 mapScope로 정하고, map.js는 data-scope를 보고 주소를 고른다.
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
+<c:set var="personal" value="${mapScope eq 'personal'}" />
 <ui:layout title="지도" crumb="소통" menu="location">
   <jsp:attribute name="scripts">
     <script src="${ctx}/resources/js/util.js"></script>
@@ -20,12 +22,18 @@
   <jsp:body>
     <link rel="stylesheet" href="${ctx}/resources/css/location/map.css">
     <%-- data-kakao-key: 카카오 지도 JavaScript 키 (비어 있으면 지도 대신 안내) --%>
-    <section class="view on" id="view-map" data-kakao-key="${fn:escapeXml(kakaoKey)}">
-      <div class="page-head"><h1>공통 지도</h1></div>
+    <section class="view on" id="view-map" data-kakao-key="${fn:escapeXml(kakaoKey)}" data-scope="${personal ? 'personal' : 'common'}">
+      <div class="page-head"><h1>${personal ? '개인 지도' : '공통 지도'}</h1></div>
+      <%-- 지도 종류: 주소가 다른 화면이라 링크로 옮겨 간다 (새로 고침·뒤로 가기를 해도 그 지도에 머문다) --%>
+      <nav class="type-tabs map-tabs" aria-label="지도 종류">
+        <a class="type-tab" href="${ctx}/location/map"<c:if test="${not personal}"> aria-current="page"</c:if>>공통 지도</a>
+        <a class="type-tab" href="${ctx}/location/map/personal"<c:if test="${personal}"> aria-current="page"</c:if>>개인 지도</a>
+      </nav>
 
       <div class="map-layout">
         <%-- 왼쪽: 검색 + 마커 목록 --%>
         <section class="info-card map-side">
+          <c:if test="${personal}"><p class="map-private">나만 보는 지도예요. 업체 관리자도 볼 수 없어요.</p></c:if>
           <form class="map-search" id="mapSearchForm" novalidate>
             <label class="sr-only" for="mapQuery">주소나 장소 검색</label>
             <input class="input" id="mapQuery" type="search" maxlength="100" autocomplete="off" placeholder="주소나 장소 이름 (예: 판교역로 235)">

@@ -2,8 +2,10 @@ package com.ieum.gw.mapper;
 
 import static org.junit.jupiter.api.Assertions.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
+import org.apache.ibatis.mapping.ParameterMapping;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -31,5 +33,29 @@ class TicketWorkMapperTest {
             String sql=config.getMappedStatement(ns+id).getBoundSql(p).getSql();
             assertTrue(sql.contains("company_id = ? AND it_ticket_id = ?"));
         }
+    }
+
+    @Test
+    @DisplayName("티켓 사진 SQL은 업체·티켓·첨부 ID를 바인딩하고 조회 행을 Long으로 매핑한다")
+    void photoBinding() throws Exception {
+        Configuration config = new Configuration();
+        String resource = "mapper/TicketWorkMapper.xml";
+        try (var input = getClass().getResourceAsStream("/" + resource)) {
+            new XMLMapperBuilder(input, config, resource, config.getSqlFragments()).parse();
+        }
+
+        String namespace = TicketWorkMapper.class.getName() + ".";
+        Map<String, Object> parameters = Map.of("companyId", 1L, "ticketId", 10L, "attachmentId", 200L);
+        var insert = config.getMappedStatement(namespace + "insertTicketFile").getBoundSql(parameters);
+        assertTrue(insert.getSql().contains("ticket_file (company_id, it_ticket_id, attachment_id)"));
+        assertEquals(List.of("companyId", "ticketId", "attachmentId"),
+                insert.getParameterMappings().stream().map(ParameterMapping::getProperty)
+                        .collect(java.util.stream.Collectors.toList()));
+
+        var select = config.getMappedStatement(namespace + "selectTicketFileIds");
+        String sql = select.getBoundSql(parameters).getSql();
+        assertTrue(sql.contains("company_id = ?"));
+        assertTrue(sql.contains("it_ticket_id = ?"));
+        assertEquals(Long.class, select.getResultMaps().get(0).getType());
     }
 }

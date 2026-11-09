@@ -13,14 +13,34 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TicketWorkDAO {
     private final TicketWorkMapper mapper;
+    
     public List<TicketWorkDTO> selectMine(Long companyId, Long employeeId) { return mapper.selectMine(companyId, employeeId); }
+    
     public List<TicketWorkDTO> selectCompany(Long companyId) { return mapper.selectCompany(companyId); }
+    
     public TicketWorkDTO selectOne(Long companyId, Long id) { return mapper.selectOne(companyId, id); }
+    
     public TicketWorkDTO lock(Long companyId, Long id) { return mapper.lock(companyId, id); }
+    
     public int insert(TicketWorkDTO row) { return mapper.insert(row); }
+    
     public int update(Map<String, Object> change) { return mapper.update(change); }
+    
     public int insertHistory(Map<String, Object> change) { return mapper.insertHistory(change); }
+    
     public int insertComment(Long companyId, Long id, Long employeeId, String body) { return mapper.insertComment(companyId, id, employeeId, body); }
+    
     public List<TicketCommentDTO> comments(Long companyId, Long id) { return mapper.comments(companyId, id); }
+    
     public List<TicketHistoryDTO> history(Long companyId, Long id) { return mapper.history(companyId, id); }
+    
+    /** 티켓과 첨부파일을 연결하고 저장된 행 수를 반환한다. */
+    public int insertTicketFile(Long companyId, Long ticketId, Long attachmentId) {
+    	return mapper.insertTicketFile(companyId, ticketId, attachmentId);
+    }
+    
+    /** 같은 업체의 티켓에 연결된 첨부파일 ID를 조회한다. */
+    public List<Long> selectTicketFileIds(Long companyId, Long ticketId) {
+    	return mapper.selectTicketFileIds(companyId, ticketId);
+    }
 }

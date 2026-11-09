@@ -40,4 +40,29 @@ public interface WorkMapMapper {
     // 마커 지우기: 우리 업체 공통 지도의 마커만 지워진다 (지운 줄 수를 돌려준다)
     int deleteMarker(@Param("companyId") Long companyId,
                      @Param("markerId") Long markerId);
+
+    // ---------- 개인 지도: 소유자 본인 것만 ----------
+
+    // 내 개인 지도 번호 (WORK_MAP에 내 개인 지도 줄이 없으면 null)
+    Long selectPersonalMapId(@Param("companyId") Long companyId,
+                             @Param("employeeId") Long employeeId);
+
+    // 내 개인 지도 줄 만들기 (내 첫 마커를 저장할 때)
+    int insertPersonalMap(@Param("companyId") Long companyId,
+                          @Param("employeeId") Long employeeId);
+
+    // 내 개인 지도의 마커 전체
+    List<MapMarkerDTO> selectPersonalMarkers(@Param("companyId") Long companyId,
+                                             @Param("employeeId") Long employeeId);
+
+    // 마커 고치기: 내 개인 지도의 마커만 고쳐진다 (고친 줄 수를 돌려준다)
+    int updatePersonalMarker(@Param("companyId") Long companyId,
+                             @Param("employeeId") Long employeeId,
+                             @Param("markerId") Long markerId,
+                             @Param("m") MapMarkerSaveDTO marker);
+
+    // 마커 지우기: 내 개인 지도의 마커만 지워진다 (지운 줄 수를 돌려준다)
+    int deletePersonalMarker(@Param("companyId") Long companyId,
+                             @Param("employeeId") Long employeeId,
+                             @Param("markerId") Long markerId);
 }

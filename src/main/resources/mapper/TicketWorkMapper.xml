@@ -6,25 +6,30 @@
         assignee_employee_id AS assignee_id, branch_id, asset_id, equipment_document_id,
         ticket_type AS type, status_code AS status, title, content AS body, version, created_at AS at
     </sql>
+    
     <select id="selectMine" resultType="com.ieum.gw.dto.TicketWorkDTO">
         SELECT <include refid="columns"/> FROM it_ticket
         WHERE company_id = #{companyId} AND requester_employee_id = #{employeeId}
         ORDER BY created_at DESC, it_ticket_id DESC
     </select>
+    
     <!-- 같은 티켓의 댓글·상태 변경도 직렬화한다. 업체가 다르면 행을 읽거나 잠그지 않는다. -->
     <select id="selectCompany" resultType="com.ieum.gw.dto.TicketWorkDTO">
         SELECT <include refid="columns"/> FROM it_ticket
         WHERE company_id = #{companyId}
         ORDER BY created_at DESC, it_ticket_id DESC
     </select>
+    
     <select id="selectOne" resultType="com.ieum.gw.dto.TicketWorkDTO">
         SELECT <include refid="columns"/> FROM it_ticket
         WHERE company_id = #{companyId} AND it_ticket_id = #{id}
     </select>
+    
     <select id="lock" resultType="com.ieum.gw.dto.TicketWorkDTO">
         SELECT <include refid="columns"/> FROM it_ticket
         WHERE company_id = #{companyId} AND it_ticket_id = #{id} FOR UPDATE
     </select>
+    
     <insert id="insert">
         <selectKey keyProperty="id" resultType="long" order="BEFORE">
             SELECT SQ_IT_TICKET.NEXTVAL FROM dual
@@ -34,6 +39,7 @@
         VALUES (#{id}, #{companyId}, #{requesterId}, #{branchId}, #{assetId,jdbcType=NUMERIC},
                 #{type}, #{status}, #{title}, #{body,jdbcType=CLOB})
     </insert>
+    
     <update id="update">
         UPDATE it_ticket
         SET status_code = #{afterStatus}, assignee_employee_id = #{afterAssigneeId,jdbcType=NUMERIC},
@@ -51,25 +57,44 @@
         WHERE company_id = #{companyId} AND it_ticket_id = #{id}
           AND version = #{version} AND status_code = #{beforeStatus}
     </update>
+    
     <insert id="insertHistory">
         INSERT INTO ticket_history (company_id, it_ticket_id, actor_account_id,
             before_status, after_status, before_assignee_id, after_assignee_id, reason)
         VALUES (#{companyId}, #{id}, #{actorAccountId}, #{beforeStatus}, #{afterStatus},
             #{beforeAssigneeId,jdbcType=NUMERIC}, #{afterAssigneeId,jdbcType=NUMERIC}, #{reason,jdbcType=VARCHAR})
     </insert>
+    
     <insert id="insertComment">
         INSERT INTO ticket_comment (company_id, it_ticket_id, author_employee_id, content)
         VALUES (#{companyId}, #{id}, #{employeeId}, #{body,jdbcType=CLOB})
     </insert>
+    
     <select id="comments" resultType="com.ieum.gw.dto.TicketCommentDTO">
         SELECT ticket_comment_id, author_employee_id, content, created_at FROM ticket_comment
         WHERE company_id = #{companyId} AND it_ticket_id = #{id}
         ORDER BY created_at, ticket_comment_id
     </select>
+    
     <select id="history" resultType="com.ieum.gw.dto.TicketHistoryDTO">
         SELECT ticket_history_id, actor_account_id, before_status, after_status,
                before_assignee_id, after_assignee_id, reason, created_at FROM ticket_history
         WHERE company_id = #{companyId} AND it_ticket_id = #{id}
         ORDER BY created_at, ticket_history_id
+    </select>
+    
+    <!-- 티켓과 첨부파일의 연결을 저장한다. -->
+    <insert id="insertTicketFile">
+        INSERT INTO ticket_file (company_id, it_ticket_id, attachment_id)
+        VALUES (#{companyId}, #{ticketId}, #{attachmentId})
+    </insert>
+
+	<!-- 같은 업체의 지정된 티켓에 연결된 첨부파일 ID를 조회한다. -->
+    <select id="selectTicketFileIds">
+        SELECT attachment_id
+        FROM ticket_file
+        WHERE company_id = #{companyId}
+          AND it_ticket_id = #{ticketId}
+        ORDER BY attachment_id
     </select>
 </mapper>

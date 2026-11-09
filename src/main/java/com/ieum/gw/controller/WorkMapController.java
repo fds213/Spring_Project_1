@@ -22,7 +22,7 @@ import com.ieum.gw.service.WorkMapService;
 
 import lombok.RequiredArgsConstructor;
 
-// 공통 지도 Controller. 화면은 /location/map, 데이터는 /location/api/map/... 를 쓴다.
+// 공통·개인 지도 Controller. 화면은 /location/map(공통)과 /location/map/personal(개인), 데이터는 /location/api/map/... 를 쓴다.
 // (지점 담당의 /location 화면과 겹치지 않게 지도 데이터는 /location/api/map 아래에 둔다)
 @Controller
 @RequestMapping("/location")
@@ -37,6 +37,14 @@ public class WorkMapController {
     @GetMapping("/map")
     public String map(Model model) {
         model.addAttribute("kakaoKey", workMapService.getKakaoKey());
+        return "location/map";
+    }
+
+    // 개인 지도: 공통 지도와 같은 화면을 mapScope만 바꿔 연다 (map.js가 이 값을 보고 개인 지도 주소를 부른다)
+    @GetMapping("/map/personal")
+    public String personalMap(Model model) {
+        model.addAttribute("kakaoKey", workMapService.getKakaoKey());
+        model.addAttribute("mapScope", "personal");
         return "location/map";
     }
 
@@ -72,6 +80,38 @@ public class WorkMapController {
     public Map<String, Object> delete(@AuthenticationPrincipal LoginUser loginUser,
                                       @PathVariable Long id) {
         return workMapService.deleteMarker(loginUser, id);
+    }
+
+    // 내 개인 지도의 마커 전체: GET /location/api/map/personal/markers → { markers, canEdit }
+    @GetMapping("/api/map/personal/markers")
+    @ResponseBody
+    public Map<String, Object> personalMarkers(@AuthenticationPrincipal LoginUser loginUser) {
+        return workMapService.getPersonalMap(loginUser);
+    }
+
+    // 개인 지도 마커 등록: POST /location/api/map/personal/markers (본문은 공통 지도와 같다)
+    @PostMapping("/api/map/personal/markers")
+    @ResponseBody
+    public Map<String, Object> addPersonal(@AuthenticationPrincipal LoginUser loginUser,
+                                           @RequestBody MapMarkerSaveDTO form) {
+        return workMapService.addPersonalMarker(loginUser, form);
+    }
+
+    // 개인 지도 마커 수정: POST /location/api/map/personal/markers/3
+    @PostMapping("/api/map/personal/markers/{id}")
+    @ResponseBody
+    public Map<String, Object> updatePersonal(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id,
+                                              @RequestBody MapMarkerSaveDTO form) {
+        return workMapService.updatePersonalMarker(loginUser, id, form);
+    }
+
+    // 개인 지도 마커 삭제: POST /location/api/map/personal/markers/3/delete
+    @PostMapping("/api/map/personal/markers/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> deletePersonal(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id) {
+        return workMapService.deletePersonalMarker(loginUser, id);
     }
 
     // ---------- 오류 응답 ----------
