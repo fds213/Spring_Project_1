@@ -113,7 +113,7 @@ class ChatAccessTest {
                 () -> assertThrows(AccessDeniedException.class,
                         () -> service.getMessagesAfter(otherCompany, ROOM, EMPLOYEE, 0L)),
                 () -> assertThrows(AccessDeniedException.class,
-                        () -> service.getRoomMemberNames(otherCompany, ROOM, EMPLOYEE)),
+                        () -> service.getRoomMembers(otherCompany, ROOM, EMPLOYEE)),
                 () -> assertThrows(AccessDeniedException.class,
                         () -> service.getImage(ROOM, MESSAGE, outsider)),
                 () -> assertThrows(AccessDeniedException.class,

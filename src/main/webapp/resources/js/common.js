@@ -56,14 +56,79 @@
 
   // 사이드바 왼쪽 아이콘 줄: 누르면 오른쪽 칸에 그 묶음의 메뉴만 보인다(페이지는 그대로).
   // 처음 열린 묶음은 지금 화면이 속한 것으로 서버가 정해 둔다(sidebar.jspf)
-  document.querySelectorAll('.rail-item').forEach(btn => btn.addEventListener('click', () => {
+  // 넓은 화면 + 마우스(common.css '넓은 화면 + 마우스')에서는 메뉴 칸을 접어 두고, 아이콘에 마우스를 올리거나
+  // 포커스·클릭하면 그 묶음의 메뉴 칸을 펼친다. 사이드바를 벗어나면 잠깐 뒤 접고 지금 화면의 묶음으로 되돌린다
+  const sidebar = document.getElementById('sidebar');
+  const flyout = matchMedia('(min-width: 901px) and (hover: hover) and (pointer: fine)');
+  const showCat = name => document.querySelectorAll('.nav-cat').forEach(cat => { cat.hidden = cat.dataset.cat !== name; });
+  const pageCat = (document.querySelector('.rail-item.on') || {}).dataset;
+  let flyoutTimer = null;
+  let suppressFocusOpen = false;
+  /** 펼침 모드에서는 화면 낭독기가 메뉴 칸이 열렸는지 알도록 aria-expanded 를 단다(펼친 아이콘만 true).
+   *  좁은 화면(서랍)에서는 아이콘이 펼침 버튼이 아니므로 뗀다. aria-pressed(지금 고른 묶음)는 따로 둔다 */
+  function markExpanded(btn) {
     document.querySelectorAll('.rail-item').forEach(b => {
-      const on = b === btn;
-      b.classList.toggle('on', on);
-      b.setAttribute('aria-pressed', on);
+      if (flyout.matches) b.setAttribute('aria-expanded', b === btn);
+      else b.removeAttribute('aria-expanded');
     });
-    document.querySelectorAll('.nav-cat').forEach(cat => { cat.hidden = cat.dataset.cat !== btn.dataset.cat; });
-  }));
+  }
+  function openFlyout(btn) {
+    clearTimeout(flyoutTimer);
+    showCat(btn.dataset.cat);
+    document.querySelectorAll('.rail-item').forEach(b => b.classList.toggle('is-peek', b === btn));
+    sidebar.classList.add('is-open');
+    markExpanded(btn);
+  }
+  function shutFlyout() {
+    clearTimeout(flyoutTimer);
+    sidebar.classList.remove('is-open');
+    document.querySelectorAll('.rail-item.is-peek').forEach(b => b.classList.remove('is-peek'));
+    if (pageCat) showCat(pageCat.cat);
+    markExpanded(null);
+  }
+  /** now: 바로 닫는다(Esc·창 크기 바뀜). 아니면 잠깐 뒤에, 마우스·포커스가 사이드바 밖일 때만 닫는다 */
+  function closeFlyout(now) {
+    if (now) { shutFlyout(); return; }
+    clearTimeout(flyoutTimer);
+    flyoutTimer = setTimeout(() => {
+      if (sidebar.matches(':hover') || sidebar.contains(document.activeElement)) return;
+      shutFlyout();
+    }, 200);
+  }
+  document.querySelectorAll('.rail-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (flyout.matches) { openFlyout(btn); return; }
+      document.querySelectorAll('.rail-item').forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('on', on);
+        b.setAttribute('aria-pressed', on);
+      });
+      showCat(btn.dataset.cat);
+    });
+    btn.addEventListener('pointerenter', e => { if (flyout.matches && e.pointerType === 'mouse') openFlyout(btn); });
+    btn.addEventListener('focus', () => {
+      if (suppressFocusOpen) { suppressFocusOpen = false; return; }
+      if (flyout.matches) openFlyout(btn);
+    });
+  });
+  if (sidebar) {
+    sidebar.addEventListener('pointerleave', () => { if (flyout.matches) closeFlyout(false); });
+    sidebar.addEventListener('focusout', () => { if (flyout.matches) closeFlyout(false); });
+    sidebar.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && sidebar.classList.contains('is-open')) {
+        const peek = sidebar.querySelector('.rail-item.is-peek');
+        closeFlyout(true);
+        // 메뉴 칸 안에 있던 포커스를 아이콘으로 돌려준다(이때는 다시 펼치지 않는다)
+        if (peek && document.activeElement !== peek) {
+          suppressFocusOpen = true;
+          peek.focus({ preventScroll: true });
+        }
+      }
+    });
+    // 창을 줄여 서랍 모드가 되면 펼침 상태를 푼다(넓히면 접힌 상태 aria-expanded="false"로 시작)
+    flyout.addEventListener('change', () => closeFlyout(true));
+    markExpanded(null);
+  }
 
   // ---------- 4) 배지: 15초마다 요청 한 번으로 모든 [data-badge="<name>"]를 채운다 (가이드 7장 알림과 배지) ----------
   // 업체 직원: { notification, approval, chat, join(가입 승인할 수 있는 사람만) }  /  이음 운영자: { application, inquiryGuest }

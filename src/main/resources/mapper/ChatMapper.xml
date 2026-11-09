@@ -30,7 +30,7 @@
         #{clientMessageKey}, default)
     </insert>
 
-    <!-- 본인이 참여중인 대화방 목록 -->
+    <!-- 본인이 참여중인 대화방 목록. 마지막 메시지(글은 앞 100자)를 같이 주고, 마지막 메시지가 최근인 방부터 -->
     <select id="getRoomList" resultType="com.ieum.gw.dto.ChatRoomDTO">
         SELECT r.chat_room_id,
                r.room_type,
@@ -43,7 +43,11 @@
                 WHERE msg.company_id = m.company_id
                   AND msg.chat_room_id = m.chat_room_id
                   AND msg.sender_employee_id != m.employee_id
-                  AND msg.chat_message_id > NVL(m.last_read_message_id, 0)) AS unread_count
+                  AND msg.chat_message_id > NVL(m.last_read_message_id, 0)) AS unread_count,
+               lm.message_type                                             AS last_message_type,
+               SUBSTR(lm.message_text, 1, 100)                             AS last_message_text,
+               lm.created_at                                               AS last_message_at,
+               CASE WHEN lm.sender_employee_id = m.employee_id THEN 1 ELSE 0 END AS last_message_mine
         FROM chat_room r
                  JOIN chat_member m ON m.company_id = r.company_id AND m.chat_room_id = r.chat_room_id
                  LEFT JOIN employee e
@@ -53,16 +57,18 @@
                                                            THEN r.direct_employee_high
                                                        ELSE r.direct_employee_low
                                    END
+                 OUTER APPLY (
+                     SELECT x.message_type, x.message_text, x.created_at, x.sender_employee_id
+                     FROM chat_message x
+                     WHERE x.company_id = r.company_id
+                       AND x.chat_room_id = r.chat_room_id
+                     ORDER BY x.chat_message_id DESC
+                     FETCH FIRST 1 ROW ONLY
+                 ) lm
         WHERE m.company_id = #{companyId}
           AND m.employee_id = #{employeeId}
           AND m.left_at IS NULL
-        ORDER BY COALESCE(
-            (SELECT MAX(msg.created_at)
-             FROM chat_message msg
-             WHERE msg.company_id = r.company_id
-               AND msg.chat_room_id = r.chat_room_id),
-            r.created_at
-        ) DESC, r.chat_room_id DESC
+        ORDER BY COALESCE(lm.created_at, r.created_at) DESC, r.chat_room_id DESC
     </select>
 
     <select id="getMessages"
