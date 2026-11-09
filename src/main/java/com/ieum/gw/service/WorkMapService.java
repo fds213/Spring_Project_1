@@ -19,11 +19,13 @@ import com.ieum.gw.dto.MapMarkerSaveDTO;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 공통 지도 규칙을 맡는 Service (요구분석서 3.4, 계획서 6장 '지도').
+ * 공통 지도와 개인 지도 규칙을 맡는 Service (요구분석서 3.4, 계획서 6장 '지도').
  * - 공통 지도는 업체마다 하나. 업체의 첫 마커를 저장할 때 지도 줄(WORK_MAP)을 같은 트랜잭션에서 만든다.
  * - 권한(계획서 6장 TODO를 지도 담당이 정함): 마커 등록은 우리 업체 직원 누구나, 수정·삭제는 업체 관리자·인사 담당.
- *   (MAP_MARKER에 작성자 칸이 없어 '쓴 사람'으로 나누지 않는다. 내 마커는 개인 지도가 생기면 거기서 다룬다)
- * - 업체는 로그인 정보에서만 꺼낸다. 화면이 보낸 값으로 업체·지도를 정하지 않는다 (AGENTS.md)
+ *   (MAP_MARKER에 작성자 칸이 없어 '쓴 사람'으로 나누지 않는다. 내 마커는 개인 지도에서 다룬다)
+ * - 개인 지도는 직원마다 하나이고 본인만 보고 고친다(범위 표 '개인 지도(본인만)'). 보호 자료라 업체 관리자·인사 담당도 남의 것을 못 본다.
+ *   본인 것이 아닌 마커는 있는지도 알 수 없게 '없는 마커'(404)로 답한다. 열람 요청·승인·묶음 공유는 이번 범위가 아니다.
+ * - 업체·소유자는 로그인 정보에서만 꺼낸다. 화면이 보낸 값으로 업체·지도를 정하지 않는다 (AGENTS.md)
  * - 카카오 지도 JavaScript 키는 저장소에 올리지 않는 config/kakao.properties에서 읽는다(kakao.properties.example 참고).
  *   파일이 없어도 서버는 뜨고, 화면은 지도 대신 안내와 마커 목록만 보여 준다.
  */
@@ -111,6 +113,52 @@ public class WorkMapService {
         Map<String, Object> result = new HashMap<>();
         result.put("id", id);
         return result;
+    }
+
+    // ---------- 개인 지도 (본인만) ----------
+
+    // 개인 지도: { markers, canEdit }. 로그인한 본인의 마커만 준다. 본인 지도라 수정·삭제 버튼은 늘 보인다
+    public Map<String, Object> getPersonalMap(LoginUser user) {
+        List<MapMarkerDTO> markers = dao.selectPersonalMarkers(user.getCompanyId(), user.getEmployeeId());
+        return Map.of("markers", markers, "canEdit", true);
+    }
+
+    // 개인 지도 마커 등록. 내 첫 마커면 내 개인 지도 줄을 같은 트랜잭션에서 만든다. 성공하면 { id }
+    @Transactional
+    public Map<String, Object> addPersonalMarker(LoginUser user, MapMarkerSaveDTO form) {
+        MapMarkerSaveDTO m = clean(form); // 틀리면 400
+
+        Long companyId = user.getCompanyId();
+        Long employeeId = user.getEmployeeId();
+        Long mapId = dao.selectPersonalMapId(companyId, employeeId);
+        if (mapId == null) {
+            dao.insertPersonalMap(companyId, employeeId);
+            mapId = dao.selectPersonalMapId(companyId, employeeId);
+        }
+
+        Long id = dao.selectNextMarkerId();
+        dao.insertMarker(id, companyId, mapId, m);
+        return Map.of("id", id);
+    }
+
+    // 개인 지도 마커 수정: 내 개인 지도의 마커가 아니면 역할과 상관없이 404
+    @Transactional
+    public Map<String, Object> updatePersonalMarker(LoginUser user, Long id, MapMarkerSaveDTO form) {
+        MapMarkerSaveDTO m = clean(form);
+
+        if (dao.updatePersonalMarker(user.getCompanyId(), user.getEmployeeId(), id, m) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        }
+        return Map.of("id", id);
+    }
+
+    // 개인 지도 마커 삭제: 내 개인 지도의 마커가 아니면 역할과 상관없이 404
+    @Transactional
+    public Map<String, Object> deletePersonalMarker(LoginUser user, Long id) {
+        if (dao.deletePersonalMarker(user.getCompanyId(), user.getEmployeeId(), id) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        }
+        return Map.of("id", id);
     }
 
     // ---------- 같이 쓰는 도구 ----------

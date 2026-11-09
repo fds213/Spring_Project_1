@@ -12,6 +12,35 @@
 		 WHERE company_id = #{companyId} AND map_type = 'MAP_COMMON'
 	</sql>
 
+	<!-- 내 개인 지도들. 공통 지도와 같은 이유로 '종류 + 소유자'로 찾는다. 이 조각을 안 거친 개인 지도 문장을 만들지 않는다 -->
+	<sql id="personalMaps">
+		SELECT work_map_id FROM work_map
+		 WHERE company_id = #{companyId} AND map_type = 'MAP_PERSONAL' AND owner_employee_id = #{employeeId}
+	</sql>
+
+	<!-- 화면이 읽는 마커 칸 (공통·개인 같이 쓴다) -->
+	<sql id="markerColumns">
+		m.map_marker_id  AS id,
+		m.title          AS title,
+		m.address        AS address,
+		m.detail_address AS detailAddress,
+		m.latitude       AS lat,
+		m.longitude      AS lng,
+		m.description    AS description,
+		TO_CHAR(m.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+	</sql>
+
+	<!-- 마커 고칠 칸 (공통·개인 같이 쓴다) -->
+	<sql id="markerSet">
+		SET title          = #{m.title},
+		    address        = #{m.address},
+		    detail_address = #{m.detailAddress, jdbcType=VARCHAR},
+		    latitude       = #{m.lat},
+		    longitude      = #{m.lng},
+		    description    = #{m.description, jdbcType=CLOB},
+		    updated_at     = <include refid="now"/>
+	</sql>
+
 	<!-- 공통 지도 번호: 여러 줄이면 가장 작은 번호 -->
 	<select id="selectCommonMapId" resultType="long">
 		SELECT MIN(work_map_id)
@@ -28,14 +57,7 @@
 
 	<!-- 공통 지도의 마커 전체: 최근에 고친 것부터 -->
 	<select id="selectCommonMarkers" resultType="com.ieum.gw.dto.MapMarkerDTO">
-		SELECT m.map_marker_id  AS id,
-		       m.title          AS title,
-		       m.address        AS address,
-		       m.detail_address AS detailAddress,
-		       m.latitude       AS lat,
-		       m.longitude      AS lng,
-		       m.description    AS description,
-		       TO_CHAR(m.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS updatedAt
+		SELECT <include refid="markerColumns"/>
 		  FROM map_marker m
 		 WHERE m.company_id = #{companyId}
 		   AND m.work_map_id IN (<include refid="commonMaps"/>)
@@ -59,13 +81,7 @@
 	<!-- 마커 고치기: 우리 업체 공통 지도의 마커만 -->
 	<update id="updateMarker">
 		UPDATE map_marker
-		   SET title          = #{m.title},
-		       address        = #{m.address},
-		       detail_address = #{m.detailAddress, jdbcType=VARCHAR},
-		       latitude       = #{m.lat},
-		       longitude      = #{m.lng},
-		       description    = #{m.description, jdbcType=CLOB},
-		       updated_at     = <include refid="now"/>
+		<include refid="markerSet"/>
 		 WHERE company_id = #{companyId}
 		   AND map_marker_id = #{markerId}
 		   AND work_map_id IN (<include refid="commonMaps"/>)
@@ -77,6 +93,49 @@
 		 WHERE company_id = #{companyId}
 		   AND map_marker_id = #{markerId}
 		   AND work_map_id IN (<include refid="commonMaps"/>)
+	</delete>
+
+	<!-- ========== 개인 지도: 업체 + 소유자가 로그인한 본인인 지도만 ========== -->
+
+	<!-- 내 개인 지도 번호: 여러 줄이면 가장 작은 번호 -->
+	<select id="selectPersonalMapId" resultType="long">
+		SELECT MIN(work_map_id)
+		  FROM work_map
+		 WHERE company_id = #{companyId}
+		   AND map_type = 'MAP_PERSONAL'
+		   AND owner_employee_id = #{employeeId}
+	</select>
+
+	<!-- 내 개인 지도 줄 만들기. 번호·등록일은 DB 기본값을 쓴다 -->
+	<insert id="insertPersonalMap">
+		INSERT INTO work_map (company_id, map_name, map_type, owner_employee_id)
+		VALUES (#{companyId}, '개인 지도', 'MAP_PERSONAL', #{employeeId})
+	</insert>
+
+	<!-- 내 개인 지도의 마커 전체: 최근에 고친 것부터 -->
+	<select id="selectPersonalMarkers" resultType="com.ieum.gw.dto.MapMarkerDTO">
+		SELECT <include refid="markerColumns"/>
+		  FROM map_marker m
+		 WHERE m.company_id = #{companyId}
+		   AND m.work_map_id IN (<include refid="personalMaps"/>)
+		 ORDER BY m.updated_at DESC, m.map_marker_id DESC
+	</select>
+
+	<!-- 마커 고치기: 내 개인 지도의 마커만 -->
+	<update id="updatePersonalMarker">
+		UPDATE map_marker
+		<include refid="markerSet"/>
+		 WHERE company_id = #{companyId}
+		   AND map_marker_id = #{markerId}
+		   AND work_map_id IN (<include refid="personalMaps"/>)
+	</update>
+
+	<!-- 마커 지우기: 내 개인 지도의 마커만. 지울 표시 칸이 없는 표라 실제로 지운다 -->
+	<delete id="deletePersonalMarker">
+		DELETE FROM map_marker
+		 WHERE company_id = #{companyId}
+		   AND map_marker_id = #{markerId}
+		   AND work_map_id IN (<include refid="personalMaps"/>)
 	</delete>
 
 </mapper>

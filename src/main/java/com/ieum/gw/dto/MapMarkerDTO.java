@@ -4,7 +4,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
 
-// 공통 지도의 마커 하나 (MAP_MARKER 한 줄). map.js가 읽는 모양: { id, title, address, detailAddress, lat, lng, description }
+// 공통·개인 지도의 마커 하나 (MAP_MARKER 한 줄). map.js가 읽는 모양: { id, title, address, detailAddress, lat, lng, description }
 @Getter
 @Setter
 @ToString
