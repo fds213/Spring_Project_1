@@ -121,4 +121,4 @@ public class NoticeDAO {
     public int insertNotice(Long postId, Long companyId, Long boardId, Long authorId, String title, String content) {
         return mapper.insertNotice(postId, companyId, boardId, authorId, title, content);
     }
-}
+}

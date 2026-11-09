@@ -107,4 +107,4 @@ public interface NoticeMapper {
                      @Param("authorId") Long authorId,
                      @Param("title") String title,
                      @Param("content") String content);
-}
+}

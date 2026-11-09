@@ -389,4 +389,4 @@ public class NoticeService {
         return user.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_HR"));
     }
-}
+}
