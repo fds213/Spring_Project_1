@@ -406,13 +406,16 @@ eaEl('eaDraftSave')?.addEventListener('click', () => {
     err.textContent = '재기안은 원래 문서와 같은 양식으로 저장해 주세요.';
     return;
   }
+  // 올리는 중인 파일은 번호가 없어 저장에서 빠진다. 내용 검사보다 먼저 봐야 파일만 올리는 중일 때 '저장할 내용이 없습니다'가 나오지 않는다
+  if (eaState.uploading) { err.textContent = '파일을 올리는 중입니다. 끝난 뒤 저장해 주세요.'; return; }
   if (eaIsBlank(c)) { err.textContent = '저장할 내용이 없습니다. 입력한 뒤 저장해 주세요'; return; }
   if (btn.disabled || eaEl('eaForm').querySelector('[type="submit"]').disabled) return;
   btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
+  const sent = eaSnapshot(); // 응답을 기다리는 사이 고친 내용은 저장되지 않으니 보낼 때의 값을 저장 기준으로 삼는다
   api.post('/approval/api/drafts', eaBody(c))
     .done(id => {
       eaState.draftId = id;
-      eaState.initial = eaSnapshot(); // 저장했으니 [취소]해도 묻지 않는다
+      eaState.initial = sent; // 보낸 내용까지는 저장했으니 [취소]해도 묻지 않는다
       err.textContent = '';
       showToast('임시저장했습니다. 결재함의 임시저장에서 이어 쓸 수 있습니다');
     })
