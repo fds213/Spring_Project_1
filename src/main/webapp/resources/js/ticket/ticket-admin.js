@@ -106,11 +106,25 @@
       .always(load);
   }
 
+  // 요청자가 장애 접수 때 붙인 사진(#197): 작게 보이고, 누르면 새 탭에서 원래 크기로 연다. 관리자용 주소라 서버가 IT·관리자인지 다시 본다
+  function photoLink(d) {
+    const img = h('img');
+    img.src = pageHref(`/ticket/admin/api/tickets/${encodeURIComponent(d.id)}/photos/${encodeURIComponent(d.photoId)}`);
+    img.alt = '요청자가 붙인 사진';
+    img.loading = 'lazy';
+    const a = h('a', 'tk-photo-link', img);
+    a.href = img.src;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    return a;
+  }
+
   function detailView(d) {
     const branch = d.branch ? [d.branch.name, d.branch.address, d.branch.detail].filter(Boolean).join(' · ') : '-';
     const left = cardOf('접수 내용', dlOf([['번호', d.id], ['구분', TICKET_TYPE[d.type] || '-'], ['요청자', person(d.requester)], ['접수 지점', branch],
       d.type === 'TK_EQUIPMENT' ? ['요청 장비', d.equipmentKind ? assetTypeName(d.equipmentKind) : '-'] : ['관련 자산', d.asset ? assetLabel(d.asset) : '-'],
-      ['담당자', d.assignee ? d.assignee.name : '미배정'], ['상태', TICKET_STATUS[d.status] || d.status], ['제목', d.title], ['내용', text(d.body || '-')]]));
+      ['담당자', d.assignee ? d.assignee.name : '미배정'], ['상태', TICKET_STATUS[d.status] || d.status], ['제목', d.title], ['내용', text(d.body || '-')],
+      ...(d.photoId ? [['사진', photoLink(d)]] : [])]));
 
     const right = h('section', 'info-card');
     const actions = actionBlocks(d);

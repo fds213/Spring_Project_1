@@ -16,6 +16,7 @@
   <jsp:body>
     <%-- 접수 화면만의 모양 (넓은 작성 칸 + 좁은 안내 칸, 구분 버튼, 두 묶음) --%>
     <link rel="stylesheet" href="${ctx}/resources/css/ticket/new.css">
+    <link rel="stylesheet" href="${ctx}/resources/css/ticket/photo.css">
     <section class="view on" id="view-ticket-new">
       <%-- 장애·문의 접수: 우리 회사 IT 담당자에게 간다 (ticket/it-service.js) --%>
       <div class="page-head"><h1>장애·문의 접수</h1></div>
@@ -51,6 +52,19 @@
               <div class="tk-row tk-row-top">
                 <label for="ticketBody">내용</label>
                 <div><textarea class="inq-text tk-body" id="ticketBody" maxlength="1000" placeholder="언제부터, 어떤 증상인지, 오류 메시지가 있으면 그대로 적어 주세요"></textarea><p class="tk-count" id="ticketBodyCount">0 / 1000</p></div>
+              </div>
+              <%-- 사진: 장애일 때만 보인다(서버도 장애에만 받는다). 1장, JPG·PNG, 10MB까지. 고르면 미리 보이고, [접수]할 때 올린다 --%>
+              <div class="tk-row tk-row-top" id="ticketPhotoRow">
+                <span class="tk-label">사진</span>
+                <div class="tk-photo">
+                  <input type="file" id="ticketPhoto" accept=".jpg,.jpeg,.png" hidden>
+                  <div class="tk-photo-pick">
+                    <button type="button" class="btn" id="ticketPhotoPick" aria-describedby="ticketPhotoInfo">사진 고르기</button>
+                    <button type="button" class="btn" id="ticketPhotoRemove" hidden>빼기</button>
+                    <p class="tk-hint" id="ticketPhotoInfo">선택 · JPG·PNG 1장, 10MB까지</p>
+                  </div>
+                  <img class="tk-photo-preview" id="ticketPhotoPreview" alt="고른 사진 미리보기" hidden>
+                </div>
               </div>
             </div>
 
