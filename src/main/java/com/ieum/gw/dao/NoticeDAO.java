@@ -56,6 +56,11 @@ public class NoticeDAO {
         return mapper.selectNotice(companyId, postId);
     }
 
+    // 공지 줄 잠그기 (지운 공지·다른 업체 공지면 null)
+    public Long lockNotice(Long companyId, Long postId) {
+        return mapper.lockNotice(companyId, postId);
+    }
+
     // ---------- 수정 · 삭제 ----------
 
     // 공지 고치기 (성공하면 1)
@@ -116,4 +121,4 @@ public class NoticeDAO {
     public int insertNotice(Long postId, Long companyId, Long boardId, Long authorId, String title, String content) {
         return mapper.insertNotice(postId, companyId, boardId, authorId, title, content);
     }
-}
+}
