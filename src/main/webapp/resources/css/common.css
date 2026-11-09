@@ -306,6 +306,24 @@ input::-ms-reveal { display: none; }
 .nav-item:focus-visible { outline: 2px solid #93b4f8; outline-offset: -2px; }
 /* 메뉴의 개수 표시: 포인트 색 바탕에 흰 글자라 남색 위에서도 잘 읽힌다 */
 .sidebar .badge { background: var(--accent); color: #fff; }
+/* 넓은 화면 + 마우스: 평소에는 아이콘 줄만 두어 본문을 넓히고, 아이콘에 마우스를 올리거나(키보드는 포커스)
+   누르면 그 묶음의 메뉴 칸이 본문 위로 펼쳐진다. 사이드바(아이콘 줄·메뉴 칸)를 벗어나면 접힌다(common.js 3).
+   좁은 화면(900px 아래)의 서랍과 마우스 없는 넓은 화면(터치 태블릿)은 두 단 그대로다 */
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) {
+  .sidebar { width: var(--rail-w); position: relative; z-index: 22; }
+  .nav-panel {
+    position: absolute; top: 0; bottom: 0; left: var(--rail-w); width: var(--sidebar-w);
+    background: var(--nav-bg); box-shadow: 10px 0 28px rgba(15, 23, 42, 0.22);
+    opacity: 0; visibility: hidden; transform: translateX(-8px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
+  }
+  .sidebar.is-open .nav-panel { opacity: 1; visibility: visible; transform: none; transition: opacity 0.15s ease, transform 0.15s ease; }
+  /* 펼친 메뉴 칸의 묶음 아이콘: 지금 화면의 묶음(on)과 구별되게 밝은 남색 */
+  .rail-item.is-peek:not(.on) { background: var(--nav-hover); color: #fff; }
+}
+@media (min-width: 901px) and (hover: hover) and (pointer: fine) and (prefers-reduced-motion: reduce) {
+  .nav-panel, .sidebar.is-open .nav-panel { transition: none; transform: none; }
+}
 
 /* 흰 카드·표·목록 아래의 회색 바탕 (2안) */
 .content { flex: 1; min-width: 0; overflow-y: auto; padding: 24px 28px; background: var(--page-bg); }
