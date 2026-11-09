@@ -8,7 +8,8 @@
 
 	<!-- 내가 볼 수 있는 일정 (달력과 메인 화면 건수가 같이 쓴다. 별칭 e = calendar_event):
 	     개인 일정은 본인 것만, 전사 일정은 업체 전체,
-	     부서 일정은 쓴 사람의 지금 부서가 내 지금 부서와 같을 때만 (부서가 없는 사람은 보지도 쓰지도 않는다).
+	     부서 일정은 쓴 사람의 지금 부서가 내 지금 부서와 같고 그 부서를 쓰고 있을 때만
+	     (부서가 없거나 '사용 안 함' 부서인 사람은 보지도 쓰지도 않는다. 부서 게시판과 같은 기준).
 	     일정 표에 부서 칸이 없어 쓴 사람의 부서로 판단한다. 쓴 사람이 부서를 옮기면 그 부서 일정도 새 부서로 따라간다 -->
 	<sql id="visible">
 		(   (e.scope_code = 'SCOPE_PERSONAL' AND e.owner_employee_id = #{employeeId})
@@ -17,10 +18,12 @@
 		        SELECT 1
 		          FROM employee o
 		          JOIN employee me ON me.company_id = o.company_id AND me.department_id = o.department_id
+		          JOIN department d ON d.company_id = me.company_id AND d.department_id = me.department_id
 		         WHERE o.company_id = e.company_id
 		           AND o.employee_id = e.owner_employee_id
 		           AND me.company_id = #{companyId}
-		           AND me.employee_id = #{employeeId})))
+		           AND me.employee_id = #{employeeId}
+		           AND d.use_yn = 'Y')))
 	</sql>
 
 	<!-- 기간 안의 일정: 내가 볼 수 있는 것(위 visible). 휴가 일정(EV_LEAVE)은 '내 연차'로 따로 읽는다.
@@ -108,14 +111,15 @@
 		   AND (event_type IS NULL OR event_type != 'EV_LEAVE')
 	</update>
 
-	<!-- 내 부서 이름 (부서 일정을 쓸 수 있는지, 일정 추가 창의 '부서 (개발팀)' 표시). 부서가 없으면 null.
-	     위 visible과 같은 기준(사원의 부서 ID)으로 본다. 그래서 부서 일정이 보이는 사람은 부서 일정을 쓸 수도 있다 -->
+	<!-- 내 부서 이름 (부서 일정을 쓸 수 있는지, 일정 추가 창의 '부서 (개발팀)' 표시). 부서가 없거나 '사용 안 함' 부서면 null.
+	     위 visible과 같은 기준(사원의 부서 ID, 사용 중인 부서)으로 본다. 그래서 부서 일정이 보이는 사람은 부서 일정을 쓸 수도 있다 -->
 	<select id="selectMyDeptName" resultType="string">
 		SELECT d.department_name
 		  FROM employee me
 		  JOIN department d ON d.company_id = me.company_id AND d.department_id = me.department_id
 		 WHERE me.company_id = #{companyId}
 		   AND me.employee_id = #{employeeId}
+		   AND d.use_yn = 'Y'
 	</select>
 
 	<!-- 일정 지우기: 결재에서 온 휴가 일정은 조건에서 빠져 지워지지 않는다 -->
