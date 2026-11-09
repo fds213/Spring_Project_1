@@ -60,7 +60,7 @@ function grantCell(p) {
   if (!p.serving || p.leaveLeft == null) return '-';
   const b = writeBtn('연차', 'btn', () => openGrant(p));
   b.setAttribute('aria-label', `${p.name} 연차 추가 부여`);
-  return b;
+  return h('div', 'row-actions', b); // 칸 안에서 버튼이 늘어나지 않게(다른 표의 관리 칸과 같게)
 }
 
 /** 부여 창을 열고 그 직원의 보유·남은 일수와 부여 내역을 읽는다 */
