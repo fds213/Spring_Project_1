@@ -203,6 +203,12 @@ public class NoticeService {
     public List<NoticeCommentDTO> addComment(LoginUser user, Long postId, String text) {
         findNotice(user, postId); // 없거나 볼 수 없는 공지면 404
 
+        dao.insertComment(user.getCompanyId(), postId, user.getEmployeeId(), checkComment(text));
+        return listComments(user, postId);
+    }
+
+    /** 댓글 글자 검사 (공지·부서 게시판 같이 씀). 앞뒤 공백을 뺀 글자를 돌려주고, 틀리면 400과 안내 문구 */
+    public String checkComment(String text) {
         text = (text == null) ? "" : text.trim();
         if (text.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글을 입력해 주세요");
@@ -210,9 +216,7 @@ public class NoticeService {
         if (text.length() > COMMENT_MAX) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "댓글은 " + COMMENT_MAX + "자까지 쓸 수 있습니다");
         }
-
-        dao.insertComment(user.getCompanyId(), postId, user.getEmployeeId(), text);
-        return listComments(user, postId);
+        return text;
     }
 
     // 댓글 삭제: 본인 댓글, 또는 업체 관리자·인사 담당은 모든 댓글.
@@ -246,9 +250,9 @@ public class NoticeService {
     // ---------- 첨부파일 ----------
 
     // 파일 올리기: 글을 저장하기 전에 파일부터 서버에 올리고 번호를 받는다.
-    // 저장·형식 검사·크기는 공통 파일 기능(AttachmentService)이 맡는다. 공지 첨부라 쓸 권한이 있는 사람만
-    public List<NoticeFileDTO> uploadFiles(LoginUser user, List<MultipartFile> files) throws IOException {
-        checkManager(user);
+    // 저장·형식 검사·크기는 공통 파일 기능(AttachmentService)이 맡는다.
+    // 공지·부서 게시판이 같이 쓰는 주소라 권한은 BoardDeptService.uploadFiles가 먼저 본다
+    public List<NoticeFileDTO> storeFiles(LoginUser user, List<MultipartFile> files) throws IOException {
         if (files == null || files.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올릴 파일을 골라 주세요");
         }
@@ -283,8 +287,8 @@ public class NoticeService {
         return attachmentService.load(file);
     }
 
-    // 공지의 첨부를 화면이 보낸 목록에 맞춘다 (새 글·수정 같이 씀)
-    private void syncFiles(LoginUser user, Long postId, List<NoticeFileDTO> files) {
+    // 글의 첨부를 화면이 보낸 목록에 맞춘다 (공지·부서 게시판의 새 글·수정이 같이 쓴다)
+    public void syncFiles(LoginUser user, Long postId, List<NoticeFileDTO> files) {
         Long companyId = user.getCompanyId();
 
         // 1. 화면이 남기겠다고 보낸 파일 번호들 (같은 번호가 두 번 와도 한 번만)
@@ -343,8 +347,8 @@ public class NoticeService {
         }
     }
 
-    // 제목·내용 검사. 틀리면 400과 안내 문구
-    private void validate(String title, String content) {
+    // 제목·내용 검사 (공지·부서 게시판 같이 씀). 틀리면 400과 안내 문구
+    public void validate(String title, String content) {
         String text = textOf(content);
         String message = null;
         if (title.isEmpty())                          message = "제목을 입력해 주세요";
@@ -370,14 +374,14 @@ public class NoticeService {
                 .trim();
     }
 
-    // 검색어를 띄어쓰기로 나눈다. 비어 있으면 null (= 검색 안 함)
-    private List<String> splitWords(String q) {
+    // 검색어를 띄어쓰기로 나눈다 (공지·부서 게시판 같이 씀). 비어 있으면 null (= 검색 안 함)
+    public List<String> splitWords(String q) {
         if (q == null || q.trim().isEmpty()) return null;
         return Arrays.asList(q.trim().split("\\s+"));
     }
 
     // 업체 관리자 또는 인사 담당인가
-    private boolean isManager(LoginUser user) {
+    public boolean isManager(LoginUser user) {
         return user.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ROLE_HR"));
     }
