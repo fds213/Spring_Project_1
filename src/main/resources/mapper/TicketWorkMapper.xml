@@ -138,4 +138,19 @@
         ORDER BY at DESC, id DESC
         OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
     </select>
+
+    <!-- 티켓과 첨부파일의 연결을 저장한다. -->
+    <insert id="insertTicketFile">
+        INSERT INTO ticket_file (company_id, it_ticket_id, attachment_id)
+        VALUES (#{companyId}, #{ticketId}, #{attachmentId})
+    </insert>
+
+	<!-- 같은 업체의 지정된 티켓에 연결된 첨부파일 ID를 조회한다. -->
+    <select id="selectTicketFileIds">
+        SELECT attachment_id
+        FROM ticket_file
+        WHERE company_id = #{companyId}
+          AND it_ticket_id = #{ticketId}
+        ORDER BY attachment_id
+    </select>
 </mapper>

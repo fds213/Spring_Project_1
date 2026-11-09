@@ -1,21 +1,29 @@
 package com.ieum.gw.service;
 
 import static com.ieum.gw.code.TicketStatus.*;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dto.AssetDTO;
+import com.ieum.gw.dto.AttachmentDTO;
 import com.ieum.gw.service.AssetService;
 import com.ieum.gw.service.AssetLookupService;
 import com.ieum.gw.code.TicketStatus;
@@ -40,8 +48,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TicketWorkService {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss");
+
     private static final int ADMIN_PAGE_SIZE = 20;
     private static final List<String> ADMIN_FILTERS = List.of("UNASSIGNED", "MINE", "IN_PROGRESS", "RESOLVED", "ALL");
+
+    private static final String PHOTO_MODULE = "ticket";
+    private static final long MAX_PHOTO_BYTES = 10L * 1024 * 1024;
+    private static final List<String> PHOTO_EXTENSIONS = List.of("jpg", "jpeg", "png");
+
     private final TicketWorkDAO dao;
     private final AssetService assetService;
     private final AssetLookupService assetLookupService;
@@ -50,6 +64,7 @@ public class TicketWorkService {
     private final NotificationService notificationService;
     private final ApprovalService approvalService;
     private final AssetAllocationService assetAllocationService;
+    private final AttachmentService attachmentService;
 
     @Transactional
     public Long create(LoginUser user, TicketRequestDTO form) {
@@ -74,6 +89,12 @@ public class TicketWorkService {
                 throw bad("본인에게 현재 지급된 자산만 선택할 수 있습니다.");
             }
         }
+        
+        Long attachmentId = form.getAttachmentId();
+        if (attachmentId != null && type != TicketType.TK_INCIDENT) {
+			throw bad("사진은 장애 티켓에만 첨부할 수 있습니다.");
+		}
+        
         TicketWorkDTO row = new TicketWorkDTO();
         row.setCompanyId(user.getCompanyId());
         row.setRequesterId(user.getEmployeeId());
@@ -84,7 +105,96 @@ public class TicketWorkService {
         row.setTitle(title);
         row.setBody(body);
         if (dao.insert(row) != 1 || row.getId() == null) { throw new IllegalStateException("티켓 저장 결과를 확인할 수 없습니다."); }
+        
+        if (attachmentId != null) {
+			attachPhoto(user, row.getId(), attachmentId);
+		}
+        
         return row.getId();
+    }
+    
+    /** 장애 접수에 사용할 사진 한 장을 저장하고 첨부 ID를 반환한다. */
+    public Long uploadPhoto(LoginUser user, MultipartFile photo) {
+        requireLogin(user);
+
+        if (photo.isEmpty() || photo.getSize() > MAX_PHOTO_BYTES) {
+            throw bad("사진은 비어 있지 않은 10MB 이하 파일이어야 합니다.");
+        }
+
+        String filename = photo.getOriginalFilename();
+        int dot = filename == null ? -1 : filename.lastIndexOf('.');
+        String extension = dot < 0 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+        if (!PHOTO_EXTENSIONS.contains(extension)) {
+            throw bad("JPG·JPEG·PNG 사진만 첨부할 수 있습니다.");
+        }
+
+        try {
+            return attachmentService.upload(photo, user, PHOTO_MODULE).getAttachmentId();
+        } catch (IllegalArgumentException e) {
+            throw bad(e.getMessage());
+        } catch (IOException e) {
+            throw new UncheckedIOException("티켓 사진을 저장하지 못했습니다.", e);
+        }
+    }
+
+    /** 본인이 업로드한 티켓 사진을 새 티켓에 연결한다. */
+    private void attachPhoto(LoginUser user, Long ticketId, Long attachmentId) {
+        requireId(attachmentId);
+        Long companyId = user.getCompanyId();
+
+        AttachmentDTO photo;
+        try {
+            photo = attachmentService.get(attachmentId, companyId);
+        } catch (IllegalArgumentException e) {
+            throw bad("첨부할 사진을 찾을 수 없습니다.");
+        }
+
+        if (!user.getUserAccountId().equals(photo.getUploaderAccountId())
+                || photo.getStorageKey() == null
+                || !photo.getStorageKey().startsWith(companyId + "/" + PHOTO_MODULE + "/")) {
+            throw bad("본인이 티켓 화면에서 올린 사진만 첨부할 수 있습니다.");
+        }
+
+        try {
+            attachmentService.markAttached(attachmentId, companyId);
+        } catch (IllegalStateException e) {
+            throw conflict("이미 연결됐거나 첨부할 수 없는 사진입니다.");
+        }
+
+        if (dao.insertTicketFile(companyId, ticketId, attachmentId) != 1) {
+            throw new IllegalStateException("티켓 사진 연결 결과를 확인할 수 없습니다.");
+        }
+    }
+
+    /** 티켓 조회 권한과 사진 연결을 확인한 뒤 사진 내용을 읽는다. */
+    public Resource loadPhoto(LoginUser user, Long ticketId, Long attachmentId, boolean adminView) {
+        if (adminView) {
+            requireOperator(user);
+        } else {
+            requireLogin(user);
+        }
+        requireId(ticketId);
+        requireId(attachmentId);
+
+        Long companyId = user.getCompanyId();
+        TicketWorkDTO ticket = dao.selectOne(companyId, ticketId);
+        if (ticket == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓을 찾을 수 없습니다.");
+        }
+        if (!adminView) {
+            requireOwner(user, ticket);
+        }
+        if (!dao.selectTicketFileIds(companyId, ticketId).contains(attachmentId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓 사진을 찾을 수 없습니다.");
+        }
+
+        try {
+            return attachmentService.load(attachmentService.get(attachmentId, companyId));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓 사진을 찾을 수 없습니다.");
+        } catch (IOException e) {
+            throw new UncheckedIOException("티켓 사진을 읽지 못했습니다.", e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -123,6 +233,13 @@ public class TicketWorkService {
                 label.put("serial", asset.getSerialNo());
             }
             item.put("asset", label);
+            
+            Long photoId = null;
+            if (TicketType.TK_INCIDENT.name().equals(row.getType())) {
+				photoId = dao.selectTicketFileIds(user.getCompanyId(), row.getId()).stream().findFirst().orElse(null);
+			}
+            item.put("photoId", photoId);
+            
             List<TicketCommentDTO> comments = dao.comments(user.getCompanyId(), row.getId());
             List<TicketHistoryDTO> history = dao.history(user.getCompanyId(), row.getId());
             List<Long> employeeIds = new ArrayList<>();

@@ -1,6 +1,8 @@
-// 공통 지도 (location/map.jsp). 카카오 지도 위에 우리 업체의 공통 마커를 보여 주고,
+// 공통·개인 지도 (location/map.jsp). 카카오 지도 위에 우리 업체의 공통 마커나 내 개인 마커를 보여 주고,
 // 주소·장소 검색이나 지도 누르기로 위치를 골라 마커를 추가한다.
-// - 마커 등록은 누구나, 수정·삭제 버튼은 서버가 canEdit으로 알려 준 사람(업체 관리자·인사 담당)에게만 보인다. 서버도 다시 검사한다.
+// - 어느 지도인지는 map.jsp의 data-scope로 정해지고, 다른 점은 부르는 서버 주소뿐이다. 화면 동작은 같다.
+// - 공통 지도: 마커 등록은 누구나, 수정·삭제 버튼은 서버가 canEdit으로 알려 준 사람(업체 관리자·인사 담당)에게만 보인다. 서버도 다시 검사한다.
+// - 개인 지도: 본인 마커만 오고 canEdit은 늘 true다. 서버가 소유자를 다시 검사한다.
 // - 지도를 못 불러와도 마커 목록은 보인다(계획서 6장). 그때는 검색·추가를 막고 안내만 한다.
 // - 카카오 스크립트는 목록을 먼저 읽은 뒤 여기서 넣는다. 카카오가 응답 없이 멈춰도 목록과 안내는 나오게 하려는 것.
 // - 위치 고르기: 지도 빈 곳을 누르거나 검색 결과를 고르면 바로 창을 열지 않고, 회색 핀과 '이 위치에 마커 추가' 말풍선을 먼저 띄운다.
@@ -9,9 +11,12 @@
 // - 쓰기 버튼(저장·수정·삭제)에는 data-write를 붙인다: 체험이 끝난 업체에서는 흐려지고 안내가 뜬다(common.js).
 // 서버 주소: GET /location/api/map/markers → { markers, canEdit }
 //            POST /location/api/map/markers, POST /location/api/map/markers/{id}, POST /location/api/map/markers/{id}/delete
+//            개인 지도는 markers 앞에 personal/ 이 붙는다 (GET /location/api/map/personal/markers ...)
 // 사용자가 쓴 글은 모두 textContent로 넣는다 (HTML로 해석되지 않게).
 
-const MAP_API = '/location/api/map/markers';
+const MAP_API = document.getElementById('view-map').dataset.scope === 'personal'
+  ? '/location/api/map/personal/markers'
+  : '/location/api/map/markers';
 const MAP_DESC_MAX = 1000;
 const MAP_CENTER = { lat: 37.5665, lng: 126.9780 }; // 마커가 없을 때 처음 보이는 곳 (서울시청)
 const MAP_LOAD_WAIT = 8000; // 카카오 지도가 이 시간 안에 안 열리면 실패로 본다 (응답 없이 멈추거나 키·도메인이 틀린 경우)
@@ -264,7 +269,7 @@ function mapRenderList() {
   }));
 }
 
-// 고른 마커의 자세한 내용: 상세주소·설명(이름표를 붙여서), 길찾기·카카오맵 링크, (관리자·인사 담당이면) 수정·삭제
+// 고른 마커의 자세한 내용: 상세주소·설명(이름표를 붙여서), 길찾기·카카오맵 링크, (canEdit이면) 수정·삭제
 function mapDetail(m) {
   const box = mapEl('div', 'map-detail');
   const dl = mapEl('dl', 'map-info');
@@ -652,7 +657,7 @@ function mapUpdateCount() {
   mapById('mfDescCount').textContent = `${mapById('mfDesc').value.length} / ${MAP_DESC_MAX}`;
 }
 
-// 저장: 새 마커는 누구나, 수정은 관리자·인사 담당 (화면 검사는 안내용, 서버가 다시 본다)
+// 저장: 공통 지도의 새 마커는 누구나, 수정은 관리자·인사 담당, 개인 지도는 본인 (화면 검사는 안내용, 서버가 다시 본다)
 function mapSave() {
   if (mapState.saving) return;
   const f = mapReadForm();

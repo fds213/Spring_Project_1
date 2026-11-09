@@ -253,6 +253,7 @@ const eaStartWrite = (form, pre) => startApprovalWrite(form, pre);
 // 화면을 열 때 (JSP 페이지가 열리면 부른다). 결재자·지점 목록을 받은 뒤 입력칸을 채운다
 function openApprovalWriteView() {
   const pre = takeApprovalPre();
+  eaState.pre = pre;
   eaEl('eaError').textContent = '';
   eaSyncForm();
   api.get('/approval/api/form-options')
@@ -356,6 +357,10 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
   e.preventDefault();
   const err = eaEl('eaError');
   const c = eaCollect();
+  if (eaState.pre?.originalDocumentId && c.form !== eaState.pre.form) {
+    err.textContent = '재기안은 원래 문서와 같은 양식으로 제출해 주세요.';
+    return;
+  }
   const msg = eaCheck(c);
   if (msg) { err.textContent = msg; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
@@ -366,7 +371,7 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
   eaEl('eaSubmitText').textContent = `${names.length > 1 ? `${names.join(' → ')} 순서로` : `${names[0]}님이`} 결재합니다. 제출하면 고치거나 회수할 수 없습니다.`;
   if (!(await eaConfirm('eaSubmitDialog'))) return;
   btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2] })
+  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], originalDocumentId: eaState.pre?.originalDocumentId || null })
     .done(() => {
       err.textContent = '';
       eaState.initial = eaSnapshot();
@@ -412,7 +417,7 @@ function renderApprovalBox() {
     const isOpen = eaState.open === key;
     const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''),
       eaCell('문서', eaNode('span', '', d.title)), eaCell('기안자', eaNode('span', '', d.employeeName), ...(d.departmentName ? [eaNode('small', 'cell-sub', d.departmentName)] : [])),
-      eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode])),
+      eaCell('결재선', eaNode('span', '', eaLineText(d))), eaCell('상태', eaNode('span', `status status-${EA_STATUS_CLASS[d.statusCode]}`, EA_STATUS[d.statusCode]), ...(d.redrafted ? [eaNode('small', 'cell-sub', '재기안 완료')] : [])),
       eaCell('기안일', eaNode('span', '', whenFull(d.submittedAt))));
     tr.addEventListener('click', () => { eaState.open = isOpen ? null : key; renderApprovalBox(); });
     rows.push(tr);
@@ -445,7 +450,7 @@ function eaDocRows(d) {
 
 function eaDocDetail(d) {
   const info = eaNode('dl', 'detail');
-  [['문서', d.title], ['기안자', `${d.employeeName}${d.departmentName ? ` (${d.departmentName})` : ''}`], ['기안일', whenFull(d.submittedAt)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', EA_STATUS[d.statusCode]]]
+  [['문서', d.title], ['기안자', `${d.employeeName}${d.departmentName ? ` (${d.departmentName})` : ''}`], ['기안일', whenFull(d.submittedAt)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', `${EA_STATUS[d.statusCode]}${d.redrafted ? ' · 재기안 완료' : ''}`]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
   // 결재 이력: 누가 · [제출·승인·반려] 표시, 의견은 아랫줄, 시각은 흐리게 (오래된 것부터)
   const log = eaNode('ol', 'ea-timeline', ...(d.history.length
@@ -477,7 +482,7 @@ function eaDocDetail(d) {
     side.append(eaNode('div', 'inq-body', box, eaNode('div', 'inq-actions', ok, no)));
   } else if (d.canRedraft) {
     const again = eaButton('재기안', 'btn btn-primary', true);
-    again.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.steps.map(p => p.approverEmployeeId) }));
+    again.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.steps.map(p => p.approverEmployeeId), originalDocumentId: d.approvalDocumentId }));
     side.append(eaNode('div', 'inq-body', ...(d.rejectOpinion ? [eaNode('p', 'notice-warn', `반려 사유: ${d.rejectOpinion}`)] : []),
       eaNode('p', 'inq-hint', '내용과 결재선을 채운 새 기안 화면이 열립니다. 고친 뒤 다시 제출하세요.'), eaNode('div', 'inq-actions', again)));
   }

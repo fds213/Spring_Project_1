@@ -36,4 +36,10 @@ public interface TicketWorkMapper {
     
     /** 검색어와 상태 탭에 맞는 관리자 티켓 목록을 한 페이지 조회한다. */
     List<TicketWorkDTO> selectAdminTicketPage(@Param("companyId") Long companyId, @Param("employeeId") Long employeeId, @Param("keyword") String keyword, @Param("filter") String filter, @Param("offset") long offset, @Param("size") int size);
+
+    /** 티켓과 첨부파일을 연결한다. */
+    int insertTicketFile(@Param("companyId") Long companyId, @Param("ticketId") Long ticketId, @Param("attachmentId") Long attachmentId);
+    
+    /** 같은 업체의 티켓에 연결된 첨부파일 ID를 조회한다. */
+    List<Long> selectTicketFileIds(@Param("companyId") Long companyId, @Param("ticketId") Long ticketId);
 }

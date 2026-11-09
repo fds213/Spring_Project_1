@@ -49,8 +49,10 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/ops/company` | `ops/company` |
 | `/ops/application-status` | `ops/application` |
 | `/ops/inquiry-guest` | `ops/inquiry-guest` |
+| `/ops/inquiry-member` | `ops/inquiry-member` |
+| `/support/inquiry` | `support/inquiry` |
 
-이번 범위에서 빠져 화면을 두지 않은 것: 운영자 증설 승인·인원 증설(CAP-01·02), 회원 접수·이음 장애 문의(OPS-04), 운영 데이터, 익명 게시판(요구사항에 없음), 근무 > 승인(휴가는 전자결재 휴가 신청서로), 가입 승인의 자리 대기, 직원 이메일 인증 코드.
+이번 범위에서 빠져 화면을 두지 않은 것: 운영자 증설 승인·인원 증설(CAP-01·02), 운영 데이터, 익명 게시판(요구사항에 없음), 근무 > 승인(휴가는 전자결재 휴가 신청서로), 가입 승인의 자리 대기, 직원 이메일 인증 코드.
 
 ## 2. 화면 JS가 서버를 부르는 방식
 

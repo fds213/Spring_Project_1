@@ -3,6 +3,7 @@ package com.ieum.gw.dto;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -26,6 +27,11 @@ public class ApprovalBoxDTO {
     private ApprovalFieldsDTO fields;
     private String assetTypeName;
     private boolean canDecide;
+    private boolean canRedraft;
+    private boolean redrafted;
+    private String rejectOpinion;
+    @JsonIgnore
+    private Long authorEmployeeId;
     private Long ticketId;           // 6단계 전까지 null
 
     // 탭 분류용: 내 결재 차례인가 (SQL이 채운다)

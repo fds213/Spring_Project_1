@@ -17,6 +17,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.dao.ApprovalDAO;
 import com.ieum.gw.dto.ApprovalBoxDTO;
@@ -122,6 +123,8 @@ class ApprovalServiceTest {
         String toDate;
 
         ApprovalDocumentDTO document;
+        ApprovalDocumentDTO originalDocument;
+        int redraftCount;
         final List<ApprovalStepDTO> steps = new ArrayList<>();
         ApprovalHistoryDTO history;
         ApprovalLeaveDTO leave;
@@ -155,6 +158,17 @@ class ApprovalServiceTest {
         boolean savedNothing() {
             return document == null && steps.isEmpty() && history == null && leave == null && leaveDays.isEmpty()
                     && equipment == null;
+        }
+
+        @Override
+        public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
+            return originalDocument != null && companyId.equals(originalDocument.getCompanyId())
+                    && Long.valueOf(documentId).equals(originalDocument.getApprovalDocumentId()) ? originalDocument : null;
+        }
+
+        @Override
+        public int countRedrafts(Long companyId, Long originalDocumentId) {
+            return redraftCount;
         }
 
         @Override
@@ -620,6 +634,69 @@ class ApprovalServiceTest {
     }
 
     @Test
+    @DisplayName("재기안: 본인이 반려된 문서를 같은 양식으로 제출하면 원본 번호를 저장한다")
+    void redraftSavesOriginalDocument() {
+        ApprovalDocumentDTO original = new ApprovalDocumentDTO();
+        original.setApprovalDocumentId(42L);
+        original.setCompanyId(COMPANY_ID);
+        original.setAuthorEmployeeId(MY_ID);
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_LEAVE");
+        dao.originalDocument = original;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setOriginalDocumentId(42L);
+
+        service.submit(user(), dto);
+
+        assertEquals(42L, dao.document.getOriginalDocumentId());
+        assertEquals("REJECTED", original.getStatusCode());
+    }
+
+    @Test
+    @DisplayName("재기안: 다른 기안자·다른 업체·반려 전 문서·다른 양식은 거절한다")
+    void redraftRejectsInvalidOriginal() {
+        ApprovalDocumentDTO original = new ApprovalDocumentDTO();
+        original.setApprovalDocumentId(42L);
+        original.setCompanyId(COMPANY_ID);
+        original.setAuthorEmployeeId(MY_ID + 1);
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_LEAVE");
+        dao.originalDocument = original;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setOriginalDocumentId(42L);
+
+        assertThrows(IllegalArgumentException.class, () -> service.submit(user(), dto));
+        original.setAuthorEmployeeId(MY_ID);
+        original.setCompanyId(COMPANY_ID + 1);
+        assertThrows(IllegalArgumentException.class, () -> service.submit(user(), dto));
+        original.setCompanyId(COMPANY_ID);
+        original.setStatusCode("IN_PROGRESS");
+        assertThrows(IllegalArgumentException.class, () -> service.submit(user(), dto));
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_EQUIPMENT");
+        assertThrows(IllegalArgumentException.class, () -> service.submit(user(), dto));
+        assertTrue(dao.savedNothing());
+    }
+
+    @Test
+    @DisplayName("재기안: 이미 재기안한 원본은 409로 거절한다")
+    void redraftRejectsAlreadyRedrafted() {
+        ApprovalDocumentDTO original = new ApprovalDocumentDTO();
+        original.setApprovalDocumentId(42L);
+        original.setCompanyId(COMPANY_ID);
+        original.setAuthorEmployeeId(MY_ID);
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_LEAVE");
+        dao.originalDocument = original;
+        dao.redraftCount = 1;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setOriginalDocumentId(42L);
+
+        assertThrows(ResponseStatusException.class, () -> service.submit(user(), dto));
+        assertTrue(dao.savedNothing());
+    }
+
+    @Test
     @DisplayName("저장: 문서는 로그인 업체·기안자로 결재 중 상태로 저장한다")
     void savesDocument() {
         service.submit(user(), validLeave());
@@ -943,6 +1020,44 @@ class ApprovalServiceTest {
 
         assertTrue(box.get("WAIT").get(0).isCanDecide());
         assertTrue(!box.get("PROGRESS").get(0).isCanDecide());
+    }
+
+    @Test
+    @DisplayName("결재함: 반려 문서는 기안자만 재기안할 수 있고 반려 사유를 받는다")
+    void boxRedraftOnlyForAuthor() {
+        ApprovalBoxDTO mine = boxDoc(1L, "REJECTED", false);
+        mine.setAuthorEmployeeId(MY_ID);
+        ApprovalBoxDTO other = boxDoc(2L, "REJECTED", false);
+        other.setAuthorEmployeeId(MY_ID + 1);
+        ApprovalBoxDTO progress = boxDoc(3L, "IN_PROGRESS", false);
+        progress.setAuthorEmployeeId(MY_ID);
+        ApprovalBoxHistoryDTO rejection = new ApprovalBoxHistoryDTO();
+        rejection.setApprovalDocumentId(1L);
+        rejection.setActionCode("APR_REJECT");
+        rejection.setOpinion("수정 필요");
+        dao.boxDocuments = List.of(mine, other, progress);
+        dao.boxHistory = List.of(rejection);
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertTrue(box.get("REJECTED").get(0).isCanRedraft());
+        assertEquals("수정 필요", box.get("REJECTED").get(0).getRejectOpinion());
+        assertTrue(!box.get("REJECTED").get(1).isCanRedraft());
+        assertTrue(!box.get("PROGRESS").get(0).isCanRedraft());
+    }
+
+    @Test
+    @DisplayName("결재함: 이미 재기안한 반려 문서는 버튼이 없다")
+    void boxRedraftHiddenWhenAlreadyRedrafted() {
+        ApprovalBoxDTO done = boxDoc(1L, "REJECTED", false);
+        done.setAuthorEmployeeId(MY_ID);
+        done.setRedrafted(true);
+        dao.boxDocuments = List.of(done);
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertTrue(box.get("REJECTED").get(0).isRedrafted());
+        assertTrue(!box.get("REJECTED").get(0).isCanRedraft());
     }
 
     @Test

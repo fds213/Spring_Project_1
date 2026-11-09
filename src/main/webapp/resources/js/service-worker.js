@@ -3,7 +3,7 @@
 // 사이트 맨 위 경로(/<컨텍스트>/service-worker.js)로 내려줘야 앱 전체를 맡는다.
 //   servlet-context.xml 참고: <resources mapping="/service-worker.js" location="/resources/js/" />
 // CSS·JS를 바꾸면 CACHE 이름을 올린다. 안 올리면 설치한 앱에 예전 파일이 남을 수 있다.
-const CACHE = 'ieum-shell-v47';
+const CACHE = 'ieum-shell-v48';
 
 // 이 파일 위치(/<컨텍스트>/) 기준 경로. JSP 화면은 로그인이 필요하고 내용이 바뀌므로 넣지 않는다.
 // 글꼴(resources/lib/ 의 woff)은 빠져 있어도 설치가 깨지지 않게 넣지 않는다.

@@ -12,6 +12,7 @@ import java.util.List;
 public class ApprovalSubmitDTO {
     private String documentType;
     private Long draftId; // 임시저장 번호
+    private Long originalDocumentId;
     private List<String> line;
     private ApprovalFieldsDTO fields;
 }

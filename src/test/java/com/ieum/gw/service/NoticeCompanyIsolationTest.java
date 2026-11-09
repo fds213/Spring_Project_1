@@ -53,6 +53,11 @@ class NoticeCompanyIsolationTest {
         }
 
         @Override
+        public Long lockNotice(Long companyId, Long postId) {
+            return mine(companyId, postId) ? postId : null;
+        }
+
+        @Override
         public int updateNotice(Long companyId, Long postId, String title, String content) {
             if (!mine(companyId, postId)) return 0;
             writes.add("update");

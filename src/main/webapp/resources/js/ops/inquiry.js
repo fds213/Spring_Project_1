@@ -1,5 +1,5 @@
-// 이음 운영자: 비회원 접수 (views/ops/inquiry-guest.jsp). 페이지가 열리면 openInquiryView('guest')를 부른다.
-// 소개 사이트 도입 문의(WEB-02)로 들어온 접수를 보고 메일로 답변한다(WEB-03). 회원 접수(장애 문의, OPS-04)는 이번 구현 범위에서 빠졌다.
+// 이음 운영자: 비회원 접수 (views/ops/inquiry-guest.jsp)와 회원 접수 (views/ops/inquiry-member.jsp). 페이지가 열리면 openInquiryView('guest' 또는 'member')를 부른다.
+// 비회원 접수는 소개 사이트 도입 문의(WEB-02)를 보고 메일로 답변한다(WEB-03). 회원 접수는 업체 직원의 이음 장애 문의(OPS-04 최소판)에 답변하고, 답변은 직원의 '내가 보낸 문의'에 보인다.
 // 작은 DOM 도구(h, span, small, dlOf, cardOf, inqCell, titleBtn, dataRow, detailTr, emptyTr)는 util.js에 있다.
 // 목록은 한 번에 받고, 카드·검색·기간·"답변 없음"으로 좁히는 것은 화면에서 한다. 메뉴 배지(inquiryGuest)는 common.js 의 /badges 가 채운다.
 // 접수 내용은 바깥 사람이 쓴 글이라 textContent로만 넣는다 (innerHTML을 쓰지 않는다).
@@ -19,7 +19,7 @@ const REPLY_STATE = {
 };
 const REPLY_STALE = { label: '결과 확인 불가', tone: 'failed' };
 const INQ_ANSWER_MAX = 4000; // 서버(OpsReplyService)와 같은 값
-const INQ_PATH = { guest: '/ops/api/guest-inquiries' };
+const INQ_PATH = { guest: '/ops/api/guest-inquiries', member: '/ops/api/member-inquiries' };
 
 const setCount = (id, n) => { document.getElementById(id).textContent = `${n}건`; };
 const markPressed = (boxId, filter) =>
@@ -31,11 +31,13 @@ const PERIOD_LABEL = { all: '전체 기간', 1: '오늘', 7: '최근 7일', 30: 
 
 // 켠 카드, 펼친 줄(한 번에 하나), 검색어, 기간, "답변 늦음" 스위치. 카드·검색·기간·스위치는 같은 목록을 함께 좁힌다
 const freshView = () => ({ filter: 'all', open: null, query: '', period: 'all', stale: false });
-const inq = { guest: freshView() };
+const inq = { guest: freshView(), member: freshView() };
 // 서버에서 받은 목록
-const inqItems = { guest: [] };
+const inqItems = { guest: [], member: [] };
 // 적던 답변 (접수번호별). 목록을 다시 그려도 적던 글이 지워지지 않게 둔다
-const inqDrafts = { guest: {} };
+const inqDrafts = { guest: {}, member: {} };
+// 종류별로 목록을 그리는 함수
+const inqRender = { guest: renderGuest, member: renderMember };
 
 // "최근 7일" = 오늘과 그 앞 6일, 0시부터
 function inPeriod(iso, period) {
@@ -79,14 +81,14 @@ function openInquiryView(kind) {
   document.getElementById(`${kind}Search`).value = '';
   document.getElementById(`${kind}Period`).value = 'all';
   document.getElementById(`${kind}Stale`).checked = false;
-  renderGuest(); // 전에 받은 목록으로 먼저 그리고, 새 목록이 오면 바꾼다
+  inqRender[kind](); // 전에 받은 목록으로 먼저 그리고, 새 목록이 오면 바꾼다
   loadInquiries(kind);
 }
 
 // 목록을 다시 받아 그린다. 필터·검색·펼친 줄은 그대로
 function loadInquiries(kind) {
   api.get(INQ_PATH[kind])
-    .done(items => { inqItems[kind] = items; renderGuest(); })
+    .done(items => { inqItems[kind] = items; inqRender[kind](); })
     .fail(xhr => showToast(apiMessage(xhr, '접수 목록을 불러오지 못했습니다')));
 }
 
@@ -230,8 +232,151 @@ function renderGuest() {
   document.getElementById('guestList').replaceChildren(...(rows.length ? rows : [emptyTr(4, narrowed('guest') ? '조건에 맞는 접수가 없습니다' : '해당하는 접수가 없습니다')]));
 }
 
-// 비회원 접수 화면이 있는 페이지에서만 연결한다
+// ---------- 회원 접수: 업체 직원이 보낸 이음 장애 문의(OPS-04 최소판). 메일을 보내지 않는다 ----------
+// 상태는 공통 코드 SUPPORT_STATUS다. 답변을 달면 SUP_PROCESSING이 된다
+const MEMBER_STATE = {
+  SUP_RECEIVED: { label: '답변 대기', tone: 'wait' },
+  SUP_PROCESSING: { label: '답변 완료', tone: 'done' },
+};
+// 이름표에 없는 상태가 와도 목록 전체가 멈추지 않게 받은 값을 그대로 보인다
+const memberState = q => MEMBER_STATE[q.state] || { label: q.state, tone: 'wait' };
+const memberNeedsReply = q => q.state === 'SUP_RECEIVED';
+
+// 저장하는 동안 버튼을 막아 두 번 눌러도 답변이 하나만 들어가게 한다
+let memberSendingNo = null;
+
+function sendMemberReply(q, body) {
+  if (memberSendingNo) return;
+  memberSendingNo = q.no;
+  renderMember();
+  api.post(`${INQ_PATH.member}/${encodeURIComponent(q.no)}/replies`, { body })
+    .done(updated => {
+      replaceInquiry('member', updated);
+      delete inqDrafts.member[q.no];
+      showToast('답변을 등록했습니다');
+    })
+    .fail(xhr => {
+      showToast(apiMessage(xhr, '답변을 등록하지 못했습니다'));
+      if (xhr.status === 404) loadInquiries('member'); // 적던 글은 그대로 둔다
+    })
+    .always(() => { memberSendingNo = null; renderMember(); });
+}
+
+// 고치는 중인 답변 번호(한 번에 하나)와 적던 글. 목록을 다시 그려도 적던 글이 지워지지 않게 둔다
+let memberEditingId = null;
+let memberEditDraft = '';
+
+function saveMemberEdit(q, r, body) {
+  if (memberSendingNo) return;
+  memberSendingNo = q.no;
+  renderMember();
+  api.post(`${INQ_PATH.member}/${encodeURIComponent(q.no)}/replies/${encodeURIComponent(r.id)}`, { body })
+    .done(updated => {
+      replaceInquiry('member', updated);
+      memberEditingId = null;
+      showToast('답변을 고쳤습니다');
+    })
+    .fail(xhr => {
+      showToast(apiMessage(xhr, '답변을 고치지 못했습니다'));
+      if (xhr.status === 404) loadInquiries('member'); // 적던 글은 그대로 둔다
+    })
+    .always(() => { memberSendingNo = null; renderMember(); });
+}
+
+function memberBtn(label, cls, onClick) {
+  const b = h('button', cls, label);
+  b.type = 'button';
+  b.disabled = !!memberSendingNo;
+  b.addEventListener('click', onClick);
+  return b;
+}
+
+// 답변 한 건: 평소에는 내용과 수정 버튼, 고치는 중이면 입력 칸과 저장·취소 버튼
+function memberReplyItem(q, r) {
+  const meta = h('div', 'reply-meta', span(whenFull(r.at)), r.editedAt ? span('수정됨') : null);
+  if (memberEditingId !== r.id) {
+    return h('li', '', meta, h('div', 'reply-text', r.body),
+      h('div', 'inq-actions', memberBtn('수정', 'btn', () => { memberEditingId = r.id; memberEditDraft = r.body; renderMember(); })));
+  }
+  const ta = h('textarea', 'inq-text');
+  ta.maxLength = INQ_ANSWER_MAX;
+  ta.value = memberEditDraft;
+  ta.disabled = !!memberSendingNo;
+  ta.setAttribute('aria-label', '답변 고치기');
+  ta.addEventListener('input', () => { memberEditDraft = ta.value; });
+  return h('li', '', meta, ta, h('div', 'inq-actions',
+    memberBtn(memberSendingNo === q.no ? '저장하는 중…' : '저장', 'btn btn-primary', () => {
+      const body = ta.value.trim();
+      // 서버도 같은 검사를 다시 한다
+      if (!body) { showToast('답변 내용을 입력하세요'); ta.focus(); return; }
+      saveMemberEdit(q, r, body);
+    }),
+    memberBtn('취소', 'btn', () => { memberEditingId = null; renderMember(); })));
+}
+
+function memberDetail(q) {
+  const left = cardOf('문의 내용',
+    dlOf([['접수번호', q.no], ['접수 시각', whenFull(q.at)], ['업체', `${q.company} (${q.companyCode})`], ['보낸 사람', q.name],
+      ['제목', q.title], ['내용', text(q.body)]]));
+
+  const log = q.replies.length
+    ? h('ul', 'reply-log', ...q.replies.map(r => memberReplyItem(q, r)))
+    : h('p', 'inq-hint', '아직 등록한 답변이 없습니다.');
+
+  const busy = !!memberSendingNo;
+  const ta = h('textarea', 'inq-text');
+  ta.maxLength = INQ_ANSWER_MAX;
+  ta.value = inqDrafts.member[q.no] ?? '';
+  ta.setAttribute('aria-label', q.replies.length ? '추가 답변' : '답변');
+  ta.placeholder = q.replies.length ? '추가로 남길 답변을 입력하세요' : '답변을 입력하세요';
+  ta.disabled = busy;
+  ta.addEventListener('input', () => { inqDrafts.member[q.no] = ta.value; });
+  const send = h('button', 'btn btn-primary', memberSendingNo === q.no ? '등록하는 중…' : q.replies.length ? '추가 답변 등록' : '답변 등록');
+  send.type = 'button';
+  send.disabled = busy;
+  send.addEventListener('click', () => {
+    const body = ta.value.trim();
+    // 서버도 같은 검사를 다시 한다
+    if (!body) { showToast('답변 내용을 입력하세요'); ta.focus(); return; }
+    sendMemberReply(q, body);
+  });
+  const compose = h('div', 'inq-body', ta,
+    h('p', 'inq-hint', '답변은 문의한 직원의 내가 보낸 문의 화면에 바로 보입니다. 고친 답변에는 수정됨이 함께 보입니다.'),
+    h('div', 'inq-actions', send));
+  return h('div', 'inq-grid', left, cardOf('답변', h('div', 'inq-body', log), compose));
+}
+
+function renderMember() {
+  const all = inqItems.member; // 서버가 최신순으로 준다
+  const n = s => all.filter(q => q.state === s).length;
+  setCount('mCntAll', all.length);
+  setCount('mCntWait', n('SUP_RECEIVED'));
+  setCount('mCntDone', n('SUP_PROCESSING'));
+  markPressed('memberFilters', inq.member.filter);
+
+  const f = inq.member.filter;
+  const shown = all.filter(q => (f === 'all' || q.state === f)
+    && passesControls('member', q, memberNeedsReply(q), q.name, q.company, q.companyCode, q.title, q.body, q.no));
+  showSearchInfo('member', shown.length);
+  const rows = shown.flatMap(q => {
+    const isOpen = inq.member.open === q.no;
+    const state = memberState(q);
+    const tr = dataRow(isOpen, () => { inq.member.open = isOpen ? null : q.no; memberEditingId = null; renderMember(); },
+      inqCell('접수 시각', span(when(q.at))),
+      inqCell('보낸 사람', span(q.name), small(q.company)),
+      inqCell('제목', titleBtn(q.title, isOpen), small(q.no)),
+      inqCell('상태', span(state.label, `status status-${state.tone}`)));
+    return isOpen ? [tr, detailTr(4, memberDetail(q))] : [tr];
+  });
+  document.getElementById('memberList').replaceChildren(...(rows.length ? rows : [emptyTr(4, narrowed('member') ? '조건에 맞는 접수가 없습니다' : '해당하는 접수가 없습니다')]));
+}
+
+// 접수 화면이 있는 페이지에서만 연결한다
 if (document.getElementById('guestList')) {
   wireFilters('guestFilters', 'guest', renderGuest);
   wireSearch('guest', renderGuest);
+}
+if (document.getElementById('memberList')) {
+  wireFilters('memberFilters', 'member', renderMember);
+  wireSearch('member', renderMember);
 }
