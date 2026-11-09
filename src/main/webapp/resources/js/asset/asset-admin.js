@@ -1,6 +1,7 @@
 // IT 서비스 > 자산 관리 (views/asset/admin/list.jsp)
 // 대상: IT 담당·업체 관리자 (요구분석서 3.4 IT 자산, 통합 계획서 4장 IT 자산)
-// 요청서 범위: 상태 카드로 거르는 목록, 지급·회수. 누를 수 있는 버튼은 서버가 준 actions 로 정한다.
+// 요청서 범위: 상태 카드로 거르는 목록(지금 쓰는 사람 포함), 지급·회수, 상세의 지급·회수 이력과 장애 이력.
+// 누를 수 있는 버튼은 서버가 준 actions 로 정한다.
 //
 // 서버(asset 모듈, AssetAdminController)에 맞춘 주소·값
 //   GET  /asset/admin/api/assets
@@ -8,14 +9,14 @@
 //          employeeName·issuedAt: 지금 쓰는 사람과 지급 시각(#181). 지급 중이 아니면 둘 다 null
 //   GET  /asset/admin/api/assets/{id}
 //        → { id, assetNo, name, serial, kind, status, branchId, version, actions: { assign, return } }
+//   GET  /asset/admin/api/assets/{id}/assignments  (지급·회수 이력, #151, 최신순)
+//        → [{ employeeName, issuedByName, issuedAt, returnedByName, returnedAt, itTicketId }]  (회수 전이면 returned* 는 null)
+//   GET  /asset/admin/api/assets/{id}/incidents    (이 자산으로 접수한 장애 티켓, #168, 최신순)
+//        → [{ id, title, status, requesterName, assigneeName, createdAt }]  (status: 티켓 상태, util.js TICKET_STATUS)
 //   POST /asset/admin/api/assets/{id}/assign  { employeeId, version }
 //   POST /asset/admin/api/assets/{id}/return  { version, reason (1~300자) }
 //   - kind: ASSET_TYPE 코드 (util.js assetTypeName 으로 이름을 붙인다)
 //   - status: ASSET_STATUS 코드 (AS_*)
-//   GET  /asset/admin/api/assets/{id}/assignments  (지급·회수 이력, #151, 최신순)
-//        → [{ employeeName, issuedByName, issuedAt, returnedByName, returnedAt, itTicketId }]  (회수 전이면 returned* 는 null)
-//   GET  /asset/admin/api/assets/{id}/incidents    (이 자산으로 접수한 장애 티켓, #168)
-//        → [{ id, title, status, requesterName, assigneeName, createdAt }]  (status: 티켓 상태, util.js TICKET_STATUS)
 //   - 실패: { message }. 409 는 다른 사람이 먼저 바꾼 것이다
 //
 // 지급할 직원과 지점 이름: 자산용 선택 목록 (IT 담당·업체 관리자, #157)
@@ -59,7 +60,7 @@
     filter: 'ALL',     // 고른 상태 카드
     open: null,        // 펼친 자산 id
     detail: null,      // 펼친 자산의 상세 응답
-    hist: null,        // 펼친 자산의 이력 { id, assignments, incidents } (null 은 받는 중, 'fail' 은 실패)
+    hist: null,        // 펼친 자산의 이력 { id, assignments, incidents }. 두 칸은 null 받는 중 / 배열 / 'fail' 실패
     seq: 0,            // 늦게 온 목록 응답을 버리기 위한 번호
     items: null,       // 받은 전체 목록
     people: [],        // 지급할 수 있는 직원
@@ -136,7 +137,7 @@
 
   // 카드를 누르면 그 상태만 보이고, 열린 상세는 닫는다(목록은 이미 받아 두었다)
   document.querySelectorAll('#aaFilters .card-filter').forEach(b => b.addEventListener('click', () => {
-    Object.assign(state, { filter: b.dataset.filter, open: null, detail: null });
+    Object.assign(state, { filter: b.dataset.filter, open: null, detail: null, hist: null });
     render();
   }));
 
@@ -158,19 +159,20 @@
       })
       .fail(xhr => {
         showToast(apiMessage(xhr, '자산을 불러오지 못했습니다'));
-        state.open = null;
+        Object.assign(state, { open: null, hist: null });
         render();
       });
   }
 
-  // 바꾼 뒤(또는 409 로 거절된 뒤) 상세를 먼저 새로 받고 목록을 받는다(카드에서 빠진 열린 자산을 위에 남기려고)
+  // 바꾼 뒤(또는 409 로 거절된 뒤) 이력을 다시 부르고, 상세를 먼저 새로 받은 다음 목록을 받는다
+  // (카드에서 빠진 열린 자산을 위에 남기려고)
   function refresh() {
     const id = state.open;
     if (!id) { load(); return; }
-    loadHistory(id); // 지급·회수하면 이력도 바뀐다
+    loadHistory(id);
     api.get(`/asset/admin/api/assets/${encodeURIComponent(id)}`)
       .done(d => { if (state.open === id) state.detail = d; })
-      .fail(() => { state.open = null; state.detail = null; })
+      .fail(() => { Object.assign(state, { open: null, detail: null, hist: null }); })
       .always(load);
   }
 
@@ -202,9 +204,10 @@
   }
 
   // ---------- 이력: 지급·회수(#151)와 장애(#168). 상세를 열 때와 지급·회수한 뒤에 같이 받는다 ----------
-  // 응답이 오면 이력 칸만 바꾼다: 표 전체를 다시 그리면 쓰던 회수 사유·고른 직원이 지워진다.
-  // 이번 요청의 이력 객체(mine)가 지금도 state.hist 일 때만 반영한다: 다른 자산을 열었거나, 같은 자산이라도
-  // 지급·회수 뒤 새로 부른 뒤에 늦게 온 앞 요청의 응답은 버린다(새 이력을 덮지 않게)
+  // - 응답은 이 요청의 이력 객체(mine)가 지금도 state.hist 일 때만 반영한다. 다른 자산을 열었거나 닫았을 때,
+  //   같은 자산이라도 지급·회수 뒤 다시 불렀을 때 늦게 온 앞 요청의 응답은 버린다(새 이력을 덮지 않게, #184 리뷰)
+  // - 반영할 때는 이력 칸만 바꾼다. 표 전체를 다시 그리면 쓰던 회수 사유·고른 직원이 지워진다.
+  //   상세가 아직 그려지기 전이면 상세를 그릴 때(detailView) 같이 그린다
   function loadHistory(id) {
     const mine = { id, assignments: null, incidents: null };
     state.hist = mine;
@@ -212,7 +215,7 @@
       if (state.hist !== mine) return;
       mine[key] = v;
       const box = $('aaHistory');
-      if (box && state.open === id) box.replaceWith(historyView(id)); // 상세가 아직 없으면 상세를 그릴 때 같이 그린다
+      if (box) box.replaceWith(historyView(id));
     };
     ['assignments', 'incidents'].forEach(key => {
       api.get(`/asset/admin/api/assets/${encodeURIComponent(id)}/${key}`)
