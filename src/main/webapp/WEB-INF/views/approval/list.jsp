@@ -14,6 +14,8 @@
     <script>openApprovalBoxView();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 결재함 화면만의 모양 (결재 이력 타임라인, 펼친 문서의 두 칸 높이) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/approval/box.css">
     <section class="view on" id="view-approval-box">
       <%-- 결재함: 내 순번에 온 문서, 내가 올린 문서를 상태별로 본다. 휴가와 장비 문서를 한 목록에서 다룬다 (approval/approval.js) --%>
       <div class="page-head"><h1>결재함</h1><a href="${ctx}/approval/write" class="btn btn-primary" data-write>기안 작성</a></div>
@@ -22,5 +24,15 @@
         <div class="table-wrap"><table class="table"><thead id="eaHead"></thead><tbody id="eaList"></tbody></table></div>
       </section>
     </section>
+
+    <%-- 승인 확인: 승인은 되돌릴 수 없어 한 번 묻는다 (마지막 결재자면 연차 차감·지급 티켓까지 알린다) --%>
+    <dialog class="modal" id="eaDecideDialog">
+      <h2 id="eaDecideTitle">승인할까요?</h2>
+      <p id="eaDecideText">승인하면 되돌릴 수 없습니다.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" value="cancel">취소</button>
+        <button type="button" class="btn btn-primary" value="ok">승인</button>
+      </div>
+    </dialog>
   </jsp:body>
 </ui:layout>
