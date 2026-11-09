@@ -26,17 +26,18 @@ import com.ieum.gw.dto.ApprovalBoxStepDTO;
 import com.ieum.gw.dto.ApprovalDocumentDTO;
 import com.ieum.gw.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.dto.ApprovalFieldsDTO;
+import com.ieum.gw.dto.ApprovalFileDTO;
 import com.ieum.gw.dto.ApprovalHistoryDTO;
 import com.ieum.gw.dto.ApprovalLeaveDTO;
 import com.ieum.gw.dto.ApprovalStepDTO;
 import com.ieum.gw.dto.ApprovalSubmitDTO;
 import com.ieum.gw.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.dto.ApproverDTO;
-import com.ieum.gw.dto.LeaveDayDTO;
 import com.ieum.gw.dto.AuthEmpDTO;
-import com.ieum.gw.dto.LoginUser;
-import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.dto.BranchDTO;
+import com.ieum.gw.dto.EmpSummaryDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LoginUser;
 
 class ApprovalServiceTest {
 
@@ -229,6 +230,11 @@ class ApprovalServiceTest {
         @Override
         public List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId) {
             return boxHistory;
+        }
+        
+        @Override
+        public List<ApprovalFileDTO> selectBoxFiles(Long companyId, Long employeeId) {
+            return List.of(); // 결재함 테스트는 첨부 없이 본다
         }
 
         @Override

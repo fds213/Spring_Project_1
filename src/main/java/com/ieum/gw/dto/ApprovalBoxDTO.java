@@ -33,7 +33,10 @@ public class ApprovalBoxDTO {
     @JsonIgnore
     private Long authorEmployeeId;
     private Long ticketId;           // 6단계 전까지 null
-
+    private List<ApprovalFileDTO> files; // 첨부 목록
+    
     // 탭 분류용: 내 결재 차례인가 (SQL이 채운다)
     private boolean myTurn;
+    
+    
 }

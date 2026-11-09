@@ -14,5 +14,5 @@ public class ApprovalFileDTO {	//첨부 하나를 담는 상자
 	private Long size; // 바이트 크기
 	private String type; // MIME 종류 (예: image/png) → 화면이 이미지면 미리보기를 보인다
 	private String url;  // 내려받기 주소 (컨텍스트 경로 뒤: /approval/api/documents/3/files/12)
-
+	private Long approvalDocumentId; // 어느 문서의 파일인지 (결재함에서 문서별로 나눌 때 씀)
 }

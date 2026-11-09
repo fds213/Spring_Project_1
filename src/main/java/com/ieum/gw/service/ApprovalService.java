@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import org.springframework.core.io.Resource;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
@@ -282,8 +283,10 @@ public class ApprovalService {
         }
 
         // 양식마다 검사와 상세 저장이 다르다
-        return isLeave ? submitLeave(user, approverIds, fields, dto.getOriginalDocumentId()) : submitEquipment(user, approverIds, fields, dto.getOriginalDocumentId());
-    }
+        Long documentId = isLeave ? submitLeave(user, approverIds, fields, dto.getOriginalDocumentId()) : submitEquipment(user, approverIds, fields, dto.getOriginalDocumentId());
+        linkFiles(user, documentId, dto.getFileIds());
+        return documentId;
+    }    
 
     // 휴가 신청서: 날짜 계산·연차·겹침을 검사하고 휴가 상세·날짜를 저장한다
     private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, Long originalDocumentId) {
@@ -514,7 +517,12 @@ public class ApprovalService {
                 .collect(Collectors.groupingBy(ApprovalBoxStepDTO::getApprovalDocumentId));
         Map<Long, List<ApprovalBoxHistoryDTO>> history = dao.selectBoxHistory(companyId, employeeId).stream()
                 .collect(Collectors.groupingBy(ApprovalBoxHistoryDTO::getApprovalDocumentId));
-
+        Map<Long, List<ApprovalFileDTO>> files = new HashMap<>();
+        for (ApprovalFileDTO f : dao.selectBoxFiles(companyId, employeeId)) {
+            f.setUrl("/approval/api/documents/" + f.getApprovalDocumentId() + "/files/" + f.getId());
+            files.computeIfAbsent(f.getApprovalDocumentId(), k -> new ArrayList<>()).add(f);
+        }
+        
         Map<String, List<ApprovalBoxDTO>> box = new LinkedHashMap<>();
         for (String tab : List.of("WAIT", "PROGRESS", "DONE", "REJECTED", "DRAFT")) {
             box.put(tab, new ArrayList<>());
@@ -524,6 +532,7 @@ public class ApprovalService {
             Long id = doc.getApprovalDocumentId();
             doc.setSteps(steps.getOrDefault(id, List.of()));
             doc.setHistory(history.getOrDefault(id, List.of()));
+            doc.setFiles(files.getOrDefault(id, List.of()));
             doc.setCanDecide(doc.isMyTurn());
             if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) {
                 doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()) && !doc.isRedrafted());
@@ -690,5 +699,39 @@ public class ApprovalService {
             result.add(f);
         }
         return result;
+    }
+    
+    /** 올려 둔 첨부를 결재 문서에 붙인다. 우리 업체 파일이고 본인이 올렸고 아직 안 붙은 것만 */
+    private void linkFiles(LoginUser user, Long documentId, List<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return; // 첨부 없이 상신
+        }
+        List<Long> ids = fileIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (ids.size() > FILE_MAX) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 " + FILE_MAX + "개까지입니다");
+        }
+
+        for (Long id : ids) {
+            AttachmentDTO file = attachService.get(id, user.getCompanyId()); // 다른 업체 파일이면 예외
+            if (!Objects.equals(file.getUploaderAccountId(), user.getUserAccountId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 올린 파일만 붙일 수 있습니다");
+            }
+            dao.insertFile(user.getCompanyId(), documentId, id);
+            attachService.markAttached(id, user.getCompanyId()); // 이미 다른 문서에 붙은 파일이면 예외
+        }
+    }
+    
+    /** 결재함에 보이는 문서의 첨부만 내준다. 아니면 404 (남의 문서 번호를 넣어도 존재 여부를 알 수 없게) */
+    @Transactional(readOnly = true)
+    public AttachmentDTO getFile(LoginUser user, long documentId, long fileId) {
+        if (dao.countBoxFile(user.getCompanyId(), user.getEmployeeId(), documentId, fileId) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다");
+        }
+        return attachService.get(fileId, user.getCompanyId());
+    }
+
+    /** 첨부 파일 내용 (내려받기용) */
+    public Resource loadFile(AttachmentDTO file) throws IOException {
+        return attachService.load(file);
     }
 }
