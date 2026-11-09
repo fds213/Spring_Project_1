@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ieum.gw.mapper.SupportMapper">
+
+    <sql id="inquiryColumns">
+        i.support_inquiry_id AS no, TO_CHAR(i.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at,
+        i.title, i.content AS body, i.status_code AS state
+    </sql>
+
+    <sql id="replyColumns">
+        r.support_reply_id AS id, r.support_inquiry_id AS inquiry_no,
+        TO_CHAR(r.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS at, r.content AS body,
+        CASE WHEN r.updated_at &gt; r.created_at + NUMTODSINTERVAL(1, 'SECOND')
+             THEN TO_CHAR(r.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') END AS edited_at
+    </sql>
+
+    <!-- 운영자 화면: 문의 표는 모든 업체 것을 읽는다(기능명세서 1.6 예외). 직원 표에서는 보낸 사람 이름만 가져온다 -->
+    <sql id="opsInquirySelect">
+        SELECT <include refid="inquiryColumns" />,
+               i.company_id, c.company_name AS company, c.company_code, e.employee_name AS name
+        FROM support_inquiry i
+        JOIN company c ON c.company_id = i.company_id
+        JOIN employee e ON e.company_id = i.company_id AND e.employee_id = i.requester_employee_id
+    </sql>
+
+    <!-- 상태는 DDL 기본값 SUP_RECEIVED로 들어간다 -->
+    <insert id="insertInquiry" parameterType="com.ieum.gw.dto.SupportInquirySaveDTO">
+        <selectKey keyProperty="no" resultType="long" order="BEFORE">
+            SELECT SQ_SUPPORT_INQUIRY.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO support_inquiry (support_inquiry_id, company_id, requester_employee_id, title, content)
+        VALUES (#{no}, #{companyId}, #{employeeId}, #{title}, #{body, jdbcType=CLOB})
+    </insert>
+
+    <select id="listMyInquiries" resultType="com.ieum.gw.dto.SupportInquiryDTO">
+        SELECT <include refid="inquiryColumns" />
+        FROM support_inquiry i
+        WHERE i.company_id = #{companyId} AND i.requester_employee_id = #{employeeId}
+        ORDER BY i.created_at DESC, i.support_inquiry_id DESC
+    </select>
+
+    <select id="listMyReplies" resultType="com.ieum.gw.dto.SupportReplyDTO">
+        SELECT <include refid="replyColumns" />
+        FROM support_reply r
+        JOIN support_inquiry i ON i.company_id = r.company_id AND i.support_inquiry_id = r.support_inquiry_id
+        WHERE r.company_id = #{companyId} AND i.requester_employee_id = #{employeeId}
+        ORDER BY r.support_reply_id
+    </select>
+
+    <!-- 업체 관리자 열람: 로그인 업체의 문의만. 직원 표에서는 보낸 사람 이름만 가져온다 -->
+    <select id="listCompanyInquiries" resultType="com.ieum.gw.dto.SupportInquiryDTO">
+        SELECT <include refid="inquiryColumns" />, e.employee_name AS name
+        FROM support_inquiry i
+        JOIN employee e ON e.company_id = i.company_id AND e.employee_id = i.requester_employee_id
+        WHERE i.company_id = #{companyId}
+        ORDER BY i.created_at DESC, i.support_inquiry_id DESC
+    </select>
+
+    <select id="listCompanyReplies" resultType="com.ieum.gw.dto.SupportReplyDTO">
+        SELECT <include refid="replyColumns" />
+        FROM support_reply r
+        WHERE r.company_id = #{companyId}
+        ORDER BY r.support_reply_id
+    </select>
+
+    <select id="listAllInquiries" resultType="com.ieum.gw.dto.SupportInquiryDTO">
+        <include refid="opsInquirySelect" />
+        ORDER BY i.created_at DESC, i.support_inquiry_id DESC
+    </select>
+
+    <select id="getInquiry" resultType="com.ieum.gw.dto.SupportInquiryDTO">
+        <include refid="opsInquirySelect" />
+        WHERE i.support_inquiry_id = #{no}
+    </select>
+
+    <select id="listReplies" resultType="com.ieum.gw.dto.SupportReplyDTO">
+        SELECT <include refid="replyColumns" />
+        FROM support_reply r
+        <where>
+            <if test="no != null">r.support_inquiry_id = #{no}</if>
+        </where>
+        ORDER BY r.support_reply_id
+    </select>
+
+    <insert id="insertReply" parameterType="com.ieum.gw.dto.SupportReplySaveDTO">
+        <selectKey keyProperty="replyId" resultType="long" order="BEFORE">
+            SELECT SQ_SUPPORT_REPLY.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO support_reply (support_reply_id, company_id, support_inquiry_id, author_account_id, content)
+        VALUES (#{replyId}, #{companyId}, #{no}, #{authorAccountId}, #{body, jdbcType=CLOB})
+    </insert>
+
+    <update id="updateReply">
+        UPDATE support_reply
+        SET content = #{body, jdbcType=CLOB}, updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE support_reply_id = #{replyId} AND support_inquiry_id = #{no}
+    </update>
+
+    <update id="changeInquiryStatus">
+        UPDATE support_inquiry
+        SET status_code = #{to}, operator_account_id = #{operatorAccountId},
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE support_inquiry_id = #{no} AND status_code = #{from}
+    </update>
+</mapper>
