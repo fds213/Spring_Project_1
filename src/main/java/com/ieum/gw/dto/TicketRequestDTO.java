@@ -16,4 +16,6 @@ public class TicketRequestDTO {
     private Long version;
     private String result;
     private String reason;
+    
+    private Long attachmentId;
 }

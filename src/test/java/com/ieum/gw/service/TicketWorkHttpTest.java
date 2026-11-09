@@ -7,6 +7,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
@@ -66,6 +67,55 @@ class TicketWorkHttpTest {
                 .path("data").get(0);
         assertTrue(item.path("canCancel").isBoolean());
         assertFalse(item.path("canCancel").asBoolean());
+    }
+
+    @Test
+    @DisplayName("티켓 사진 API는 업로드 ID와 PNG 응답 본문 및 캐시 금지 헤더를 제공한다")
+    void uploadAndReadPhoto() throws Exception {
+        login("ROLE_EMP", 2L);
+        var photo = TicketWorkServiceTest.samplePhoto();
+        var upload = mvc.perform(multipart("/ticket/api/photos").file(photo)).andReturn().getResponse();
+        assertEquals(200, upload.getStatus());
+        JsonNode json = new ObjectMapper().readTree(upload.getContentAsByteArray());
+        assertEquals(200L, json.path("data").path("attachmentId").asLong());
+
+        var create = mvc.perform(post("/ticket/api/tickets").contentType("application/json")
+                .content("{\"type\":\"TK_INCIDENT\",\"title\":\"장애\",\"body\":\"내용\",\"branchId\":8,\"attachmentId\":200}"))
+                .andReturn().getResponse();
+        assertEquals(200, create.getStatus());
+
+        var response = mvc.perform(get("/ticket/api/tickets/99/photos/200")).andReturn().getResponse();
+        assertEquals(200, response.getStatus());
+        assertEquals("image/png", response.getContentType());
+        assertEquals("no-store", response.getHeader("Cache-Control"));
+        assertArrayEquals(photo.getBytes(), response.getContentAsByteArray());
+
+        assertEquals(404, mvc.perform(get("/ticket/api/tickets/99/photos/201"))
+                .andReturn().getResponse().getStatus());
+        assertEquals(403, mvc.perform(get("/ticket/admin/api/tickets/99/photos/200"))
+                .andReturn().getResponse().getStatus());
+        login("ROLE_EMP", 3L);
+        assertEquals(404, mvc.perform(get("/ticket/api/tickets/99/photos/200"))
+                .andReturn().getResponse().getStatus());
+        login("ROLE_IT", 3L);
+        assertEquals(200, mvc.perform(get("/ticket/admin/api/tickets/99/photos/200"))
+                .andReturn().getResponse().getStatus());
+
+        LoginUser otherCompany = TicketWorkServiceTest.user(2L, 3L, "ROLE_IT");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(otherCompany, "", otherCompany.getAuthorities()));
+        assertEquals(404, mvc.perform(get("/ticket/admin/api/tickets/99/photos/200"))
+                .andReturn().getResponse().getStatus());
+    }
+
+    @Test
+    @DisplayName("확장자만 PNG인 파일을 올리면 400으로 거절하고 파일 정보를 저장하지 않는다")
+    void rejectDisguisedPhoto() throws Exception {
+        login("ROLE_EMP", 2L);
+        var file = new MockMultipartFile("photo", "fake.png", "image/png", new byte[]{1, 2, 3});
+        var response = mvc.perform(multipart("/ticket/api/photos").file(file)).andReturn().getResponse();
+        assertEquals(400, response.getStatus());
+        assertNull(fixture.photos.photo);
     }
     @Test @DisplayName("비로그인·잘못된 번호·깨진 JSON은 401·400으로 응답한다")
     void malformed() throws Exception {
