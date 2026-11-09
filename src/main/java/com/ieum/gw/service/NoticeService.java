@@ -201,7 +201,11 @@ public class NoticeService {
     // 등록 뒤 그 공지의 댓글 목록 전체를 돌려준다 (board.js가 목록을 다시 그린다)
     @Transactional
     public List<NoticeCommentDTO> addComment(LoginUser user, Long postId, String text) {
-        findNotice(user, postId); // 없거나 볼 수 없는 공지면 404
+        // 공지 줄을 잠근 뒤 저장한다. 공지 삭제와 겹치면 삭제가 먼저일 때는 여기서 404,
+        // 댓글이 먼저일 때는 삭제가 이 댓글까지 삭제 표시한다 (부서 게시판과 같은 방식)
+        if (postId == null || dao.lockNotice(user.getCompanyId(), postId) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        }
 
         dao.insertComment(user.getCompanyId(), postId, user.getEmployeeId(), checkComment(text));
         return listComments(user, postId);
