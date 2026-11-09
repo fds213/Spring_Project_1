@@ -229,6 +229,9 @@ public class ApprovalService {
                     || !dto.getDocumentType().equals(original.getDocumentType())) {
                 throw new IllegalArgumentException("재기안할 수 없는 문서입니다.");
             }
+            if (dao.countRedrafts(user.getCompanyId(), dto.getOriginalDocumentId()) > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 재기안한 문서입니다.");
+            }
         }
 
         // 결재자 검사
@@ -497,7 +500,7 @@ public class ApprovalService {
             doc.setHistory(history.getOrDefault(id, List.of()));
             doc.setCanDecide(doc.isMyTurn());
             if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) {
-                doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()));
+                doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()) && !doc.isRedrafted());
                 doc.getHistory().stream()
                         .filter(h -> ApprovalAction.APR_REJECT.name().equals(h.getActionCode()))
                         .reduce((first, last) -> last)

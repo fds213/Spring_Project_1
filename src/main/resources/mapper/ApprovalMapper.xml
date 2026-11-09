@@ -177,6 +177,11 @@
         FOR UPDATE OF approval_document_id WAIT 5
     </select>
 
+    <select id="countRedrafts" resultType="int">
+        SELECT COUNT(*) FROM approval_document
+        WHERE company_id = #{companyId} AND original_document_id = #{originalDocumentId}
+    </select>
+
     <select id="selectDocumentSteps" resultType="com.ieum.gw.dto.ApprovalStepDTO">
         SELECT * FROM approval_step
         WHERE company_id = #{companyId} AND approval_document_id = #{documentId} ORDER BY step_no ASC

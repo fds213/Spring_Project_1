@@ -17,6 +17,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.ieum.gw.dao.ApprovalDAO;
 import com.ieum.gw.dto.ApprovalBoxDTO;
@@ -123,6 +124,7 @@ class ApprovalServiceTest {
 
         ApprovalDocumentDTO document;
         ApprovalDocumentDTO originalDocument;
+        int redraftCount;
         final List<ApprovalStepDTO> steps = new ArrayList<>();
         ApprovalHistoryDTO history;
         ApprovalLeaveDTO leave;
@@ -162,6 +164,11 @@ class ApprovalServiceTest {
         public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
             return originalDocument != null && companyId.equals(originalDocument.getCompanyId())
                     && Long.valueOf(documentId).equals(originalDocument.getApprovalDocumentId()) ? originalDocument : null;
+        }
+
+        @Override
+        public int countRedrafts(Long companyId, Long originalDocumentId) {
+            return redraftCount;
         }
 
         @Override
@@ -672,6 +679,24 @@ class ApprovalServiceTest {
     }
 
     @Test
+    @DisplayName("재기안: 이미 재기안한 원본은 409로 거절한다")
+    void redraftRejectsAlreadyRedrafted() {
+        ApprovalDocumentDTO original = new ApprovalDocumentDTO();
+        original.setApprovalDocumentId(42L);
+        original.setCompanyId(COMPANY_ID);
+        original.setAuthorEmployeeId(MY_ID);
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_LEAVE");
+        dao.originalDocument = original;
+        dao.redraftCount = 1;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setOriginalDocumentId(42L);
+
+        assertThrows(ResponseStatusException.class, () -> service.submit(user(), dto));
+        assertTrue(dao.savedNothing());
+    }
+
+    @Test
     @DisplayName("저장: 문서는 로그인 업체·기안자로 결재 중 상태로 저장한다")
     void savesDocument() {
         service.submit(user(), validLeave());
@@ -1019,6 +1044,20 @@ class ApprovalServiceTest {
         assertEquals("수정 필요", box.get("REJECTED").get(0).getRejectOpinion());
         assertTrue(!box.get("REJECTED").get(1).isCanRedraft());
         assertTrue(!box.get("PROGRESS").get(0).isCanRedraft());
+    }
+
+    @Test
+    @DisplayName("결재함: 이미 재기안한 반려 문서는 버튼이 없다")
+    void boxRedraftHiddenWhenAlreadyRedrafted() {
+        ApprovalBoxDTO done = boxDoc(1L, "REJECTED", false);
+        done.setAuthorEmployeeId(MY_ID);
+        done.setRedrafted(true);
+        dao.boxDocuments = List.of(done);
+
+        Map<String, List<ApprovalBoxDTO>> box = service.box(user());
+
+        assertTrue(box.get("REJECTED").get(0).isRedrafted());
+        assertTrue(!box.get("REJECTED").get(0).isCanRedraft());
     }
 
     @Test

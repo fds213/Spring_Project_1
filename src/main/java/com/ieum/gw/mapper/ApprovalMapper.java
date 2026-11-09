@@ -46,6 +46,8 @@ public interface ApprovalMapper {
 
     ApprovalDocumentDTO lockDocument(Long companyId, long documentId);
 
+    int countRedrafts(Long companyId, Long originalDocumentId);
+
     List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId);
 
     int approveStep(Long companyId, Long employeeId, Integer stepNo, long documentId, String opinion);
