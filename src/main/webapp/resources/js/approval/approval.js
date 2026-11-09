@@ -2,12 +2,12 @@
 // 결재선은 최대 2단계로 순서대로 승인한다. 마지막 결재자가 승인해야 최종 승인이다.
 // - 휴가: 최종 승인 때 연차가 차감되고 일정에 나타난다 (연차 화면의 신청 내역과 같은 데이터다).
 // - 장비 지급: 최종 승인 때 IT 서비스에 지급 티켓이 만들어진다. 지급이 끝나면 내 장비에 나타난다.
-// 반려된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다. 임시저장은 핵심 뒤 추가(11/9까지, 요구분석서 3장 범위 표)라 아직 만들지 않았다.
+// 반려된 문서는 결재함에서 "재기안"으로 내용을 채워 새로 올린다. 작성 중인 문서는 임시저장해 두고 결재함의 임시저장 탭에서 이어 쓴다.
 // 결재자 목록, 내 순번인지, 재기안할 수 있는지는 서버가 정해 응답에 담는다. 화면은 받은 대로 그린다.
 // 읽기 전용 업체는 쓰는 요청이 409로 거절된다(공통 검사 ReadOnlyInterceptor). 버튼의 data-write로 화면도 먼저 막는다.
 
 const EA_FORMS = { DOC_LEAVE: '휴가 신청서', DOC_EQUIPMENT: '장비 지급 신청서' };
-const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려' };
+const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료', REJECTED: '반려', DRAFT: '임시저장' };
 const EA_STATUS = { IN_PROGRESS: '진행', APPROVED: '완료', REJECTED: '반려' };
 const EA_STATUS_CLASS = { IN_PROGRESS: 'waiting', APPROVED: 'paid', REJECTED: 'failed' };
 const EA_LEAVE_TYPE = { LV_FULL: '연차', LV_AM: '오전 반차', LV_PM: '오후 반차' };
@@ -255,6 +255,9 @@ function openApprovalWriteView() {
   eaInitFiles();
   const pre = takeApprovalPre();
   eaState.pre = pre;
+  eaState.draftId = pre?.draftId || null; // 임시저장을 이어 쓰면 그 문서 번호로 저장·제출한다
+  eaState.files = pre?.files || [];
+  eaRenderFiles();
   eaEl('eaError').textContent = '';
   eaSyncForm();
   api.get('/approval/api/form-options')
@@ -365,14 +368,14 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
   const msg = eaCheck(c);
   if (msg) { err.textContent = msg; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
-  if (btn.disabled) return;
+  if (btn.disabled || eaEl('eaDraftSave').disabled) return; // 임시저장이 끝나기 전에 제출하면 문서가 둘로 갈린다
   // 제출하면 회수할 수 없어 한 번 묻는다
   const names = [c.a1, c.a2].filter(Boolean).map(id => eaState.opts.approvers.find(a => String(a.employeeId) === id)).filter(Boolean).map(a => a.employeeName);
   eaEl('eaSubmitTitle').textContent = `${EA_FORMS[c.form]}를 제출할까요?`;
   eaEl('eaSubmitText').textContent = `${names.length > 1 ? `${names.join(' → ')} 순서로` : `${names[0]}님이`} 결재합니다. 제출하면 고치거나 회수할 수 없습니다.`;
   if (!(await eaConfirm('eaSubmitDialog'))) return;
   btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], originalDocumentId: eaState.pre?.originalDocumentId || null, fileIds: eaState.files.map(f => f.id) })
+  api.post('/approval/api/documents', eaBody(c))
     .done(() => {
       err.textContent = '';
       eaState.initial = eaSnapshot();
@@ -380,6 +383,41 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
     })
     // 성공하면 버튼을 풀지 않는다: 결재함으로 넘어가기 전에 한 번 더 눌러 같은 문서가 두 번 올라가지 않게. 실패했을 때만 다시 누를 수 있게 푼다
     .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
+});
+
+// 제출·임시저장이 같이 보내는 내용
+function eaBody(c) {
+  return { documentType: c.form, draftId: eaState.draftId, fields: c.fields, line: [c.a1, c.a2], originalDocumentId: eaState.pre?.originalDocumentId || null, fileIds: eaState.files.map(f => f.id) };
+}
+
+// 아직 아무것도 쓰지 않았는지 (장비 종류·수량은 처음부터 값이 들어 있어 치지 않는다)
+function eaIsBlank(c) {
+  const f = c.fields;
+  return !(c.a1 || c.a2 || eaState.files.length || (c.form === 'DOC_LEAVE' ? f.fromDate || f.toDate || f.reason : f.purpose));
+}
+
+// ---------- 임시저장 ----------
+// 필수 칸이 비어 있어도 저장한다(내용 검사는 제출할 때). 번호를 받아 두어 다시 누르면 같은 문서를 고친다
+eaEl('eaDraftSave')?.addEventListener('click', () => {
+  const err = eaEl('eaError');
+  const btn = eaEl('eaDraftSave');
+  const c = eaCollect();
+  if (eaState.pre?.originalDocumentId && c.form !== eaState.pre.form) {
+    err.textContent = '재기안은 원래 문서와 같은 양식으로 저장해 주세요.';
+    return;
+  }
+  if (eaIsBlank(c)) { err.textContent = '저장할 내용이 없습니다. 입력한 뒤 저장해 주세요'; return; }
+  if (btn.disabled || eaEl('eaForm').querySelector('[type="submit"]').disabled) return;
+  btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
+  api.post('/approval/api/drafts', eaBody(c))
+    .done(id => {
+      eaState.draftId = id;
+      eaState.initial = eaSnapshot(); // 저장했으니 [취소]해도 묻지 않는다
+      err.textContent = '';
+      showToast('임시저장했습니다. 결재함의 임시저장에서 이어 쓸 수 있습니다');
+    })
+    .fail(xhr => { err.textContent = apiMessage(xhr); })
+    .always(() => { btn.disabled = false; });
 });
 
 // ---------- 첨부 ----------
@@ -430,11 +468,11 @@ function loadApprovalBox() {
   api.get('/approval/api/box')
     .done(box => {
       eaState.box = box;
-      // 처음 열 때 내 순번 대기가 0건이면 문서가 있는 첫 탭(진행 → 반려 → 완료)을 연다.
+      // 처음 열 때 내 순번 대기가 0건이면 문서가 있는 첫 탭(진행 → 반려 → 완료 → 임시저장)을 연다.
       // 결재할 일이 거의 없는 직원이 빈 목록부터 보지 않게. 승인·반려 뒤 다시 받을 때는 보던 탭 그대로 둔다
       if (eaState.boxFirst) {
         eaState.boxFirst = false;
-        if (!(box.WAIT || []).length) eaState.tab = ['PROGRESS', 'REJECTED', 'DONE'].find(t => (box[t] || []).length) || 'WAIT';
+        if (!(box.WAIT || []).length) eaState.tab = ['PROGRESS', 'REJECTED', 'DONE', 'DRAFT'].find(t => (box[t] || []).length) || 'WAIT';
       }
       renderApprovalBox();
     })
@@ -447,10 +485,13 @@ function renderApprovalBox() {
   document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.setAttribute('aria-pressed', b.dataset.tab === eaState.tab));
   IEUM.refreshBadges(); // 메뉴의 결재함 숫자 (common.js /badges)
 
-  eaEl('eaHead').replaceChildren(eaNode('tr', '', ...['문서', '기안자', '결재선', '상태', '기안일'].map(t => eaNode('th', '', t))));
-  const cols = 5;
+  const isDraftTab = eaState.tab === 'DRAFT';
+  const heads = isDraftTab ? ['문서', '마지막 저장', '관리'] : ['문서', '기안자', '결재선', '상태', '기안일'];
+  eaEl('eaHead').replaceChildren(eaNode('tr', '', ...heads.map(t => eaNode('th', '', t))));
+  const cols = heads.length;
   const rows = [];
   (buckets[eaState.tab] || []).forEach(d => {
+    if (isDraftTab) { rows.push(eaDraftRow(d)); return; }
     const key = `${d.documentType}:${d.approvalDocumentId}`;
     const isOpen = eaState.open === key;
     const tr = eaNode('tr', 'row-link' + (isOpen ? ' is-open' : ''),
@@ -466,11 +507,33 @@ function renderApprovalBox() {
     }
   });
   if (!rows.length) {
-    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려된 문서가 없습니다' }[eaState.tab]);
+    const td = eaNode('td', '', { WAIT: '내 순번에 온 문서가 없습니다', PROGRESS: '진행 중인 문서가 없습니다', DONE: '완료된 문서가 없습니다', REJECTED: '반려된 문서가 없습니다', DRAFT: '임시저장한 문서가 없습니다' }[eaState.tab]);
     td.colSpan = cols;
     rows.push(eaNode('tr', 'row-empty', td));
   }
   eaEl('eaList').replaceChildren(...rows);
+}
+
+// 임시저장 한 줄: [이어 쓰기]는 저장해 둔 값을 채운 기안 화면을 연다. 본인에게만 보이는 제출 전 문서라 결재선·이력이 없다
+function eaDraftRow(d) {
+  const resume = eaButton('이어 쓰기', 'btn btn-primary', true);
+  resume.addEventListener('click', () => eaStartWrite(d.documentType, { fields: d.fields, line: d.line, draftId: d.approvalDocumentId, originalDocumentId: d.originalDocumentId, files: d.files }));
+  const del = eaButton('삭제', 'btn', true);
+  del.addEventListener('click', async () => {
+    if (!(await eaConfirm('eaDraftDeleteDialog'))) return;
+    del.disabled = true;
+    api.post(`/approval/api/drafts/${encodeURIComponent(d.approvalDocumentId)}/delete`)
+      .done(() => { showToast('임시저장 문서를 지웠습니다'); loadApprovalBox(); })
+      .fail(xhr => {
+        showToast(apiMessage(xhr));
+        del.disabled = false;
+        if (xhr.status === 404 || xhr.status === 409) loadApprovalBox(); // 다른 창에서 이미 제출·삭제한 문서: 새로 받아 그린다
+      });
+  });
+  return eaNode('tr', '',
+    eaCell('문서', eaNode('span', '', d.title), ...(d.originalDocumentId ? [eaNode('small', 'cell-sub', '재기안')] : [])),
+    eaCell('마지막 저장', eaNode('span', '', whenFull(d.savedAt))),
+    eaCell('관리', eaNode('div', 'row-actions', resume, del)));
 }
 document.querySelectorAll('#eaTabs .card-filter').forEach(b => b.addEventListener('click', () => {
   eaState.tab = b.dataset.tab;

@@ -63,6 +63,21 @@ public class ApprovalController {
         return Map.of("success", true, "data", service.submit(user,dto));
     }
 
+    // 임시저장: POST /approval/api/drafts (draftId가 없으면 새로, 있으면 고치기). 문서 번호를 돌려준다
+    @PostMapping(value = "/api/drafts")
+    @ResponseBody
+    public Map<String, Object> saveDraft(@AuthenticationPrincipal LoginUser user, @RequestBody ApprovalSubmitDTO dto) {
+        return Map.of("success", true, "data", service.saveDraft(user, dto));
+    }
+
+    // 임시저장 지우기: POST /approval/api/drafts/3/delete (제출하지 않은 내 문서만)
+    @PostMapping(value = "/api/drafts/{draftId}/delete")
+    @ResponseBody
+    public Map<String, Object> deleteDraft(@AuthenticationPrincipal LoginUser user, @PathVariable long draftId) {
+        service.deleteDraft(user, draftId);
+        return Map.of("success", true);
+    }
+
     @GetMapping(value = "/api/box")
     @ResponseBody
     public Map<String, Object> box(@AuthenticationPrincipal LoginUser user){

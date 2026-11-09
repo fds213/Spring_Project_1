@@ -37,6 +37,31 @@ public class ApprovalDAO {
         mapper.insertDocument(document);
     }
 
+    /** 임시저장 문서를 새로 만든다 */
+    public void insertDraft(ApprovalDocumentDTO document) {
+        mapper.insertDraft(document);
+    }
+
+    /** 임시저장 문서를 고친다. DRAFT가 아니면 0 */
+    public int updateDraft(ApprovalDocumentDTO document) {
+        return mapper.updateDraft(document);
+    }
+
+    /** 임시저장 문서를 제출 상태로 바꾼다. DRAFT가 아니면 0 */
+    public int submitDraft(ApprovalDocumentDTO document) {
+        return mapper.submitDraft(document);
+    }
+
+    /** 내 임시저장 문서를 지운다. 내 문서가 아니거나 DRAFT가 아니면 0 */
+    public int deleteDraft(Long companyId, Long employeeId, long documentId) {
+        return mapper.deleteDraft(companyId, employeeId, documentId);
+    }
+
+    /** 내 임시저장 문서 목록 (최근에 저장한 순) */
+    public List<ApprovalBoxDTO> selectDraftDocuments(Long companyId, Long employeeId) {
+        return mapper.selectDraftDocuments(companyId, employeeId);
+    }
+
     public void insertStep(ApprovalStepDTO stepDto) {
         mapper.insertStep(stepDto);
     }
