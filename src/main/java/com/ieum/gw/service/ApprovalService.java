@@ -217,6 +217,22 @@ public class ApprovalService {
         if(!isLeave && !ApprovalDocumentType.DOC_EQUIPMENT.name().equals(dto.getDocumentType())) {
             throw new IllegalArgumentException("지원하지 않는 양식");
         }
+        if (dto.getOriginalDocumentId() != null) {
+            ApprovalDocumentDTO original;
+            try {
+                original = dao.lockDocument(user.getCompanyId(), dto.getOriginalDocumentId());
+            } catch (CannotAcquireLockException e) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+            }
+            if (original == null || !Objects.equals(original.getAuthorEmployeeId(), user.getEmployeeId())
+                    || !ApprovalDocumentStatus.REJECTED.name().equals(original.getStatusCode())
+                    || !dto.getDocumentType().equals(original.getDocumentType())) {
+                throw new IllegalArgumentException("재기안할 수 없는 문서입니다.");
+            }
+            if (dao.countRedrafts(user.getCompanyId(), dto.getOriginalDocumentId()) > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 재기안한 문서입니다.");
+            }
+        }
 
         // 결재자 검사
         List<Long> approverIds = parseLine(dto.getLine());
@@ -240,11 +256,11 @@ public class ApprovalService {
         }
 
         // 양식마다 검사와 상세 저장이 다르다
-        return isLeave ? submitLeave(user, approverIds, fields) : submitEquipment(user, approverIds, fields);
+        return isLeave ? submitLeave(user, approverIds, fields, dto.getOriginalDocumentId()) : submitEquipment(user, approverIds, fields, dto.getOriginalDocumentId());
     }
 
     // 휴가 신청서: 날짜 계산·연차·겹침을 검사하고 휴가 상세·날짜를 저장한다
-    private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
+    private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, Long originalDocumentId) {
 
         // 휴가 입력값 검사
         if(!StringUtils.hasText(fields.getReason())) throw new IllegalArgumentException("사유를 입력하세요.");
@@ -291,7 +307,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_LEAVE.name(), "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_LEAVE.name(), "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds, originalDocumentId);
 
         ApprovalLeaveDTO leave = new ApprovalLeaveDTO();
         leave.setCompanyId(user.getCompanyId());
@@ -309,7 +325,7 @@ public class ApprovalService {
 
     // 장비 지급 신청서: 장비 종류·수량·수령 지점·사용 목적을 검사하고 장비 상세를 저장한다.
     // 지급 티켓은 최종 승인 때 만든다(계획서 3장 B)
-    private Long submitEquipment(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
+    private Long submitEquipment(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, Long originalDocumentId) {
 
         AssetType assetType = EQUIPMENT_KINDS.stream()
                 .filter(t -> t.name().equals(fields.getAssetType()))
@@ -327,7 +343,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_EQUIPMENT.name(), "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_EQUIPMENT.name(), "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds, originalDocumentId);
 
         ApprovalEquipmentDTO equipment = new ApprovalEquipmentDTO();
         equipment.setApprovalDocumentId(documentId);
@@ -357,10 +373,11 @@ public class ApprovalService {
     }
 
     // 두 양식이 같이 쓰는 저장: 문서(결재 중) → 결재선(고른 순서대로 1·2단계) → 제출 이력. 새 문서 번호를 돌려준다
-    private Long saveDocument(LoginUser user, String documentType, String title, String content, List<Long> approverIds) {
+    private Long saveDocument(LoginUser user, String documentType, String title, String content, List<Long> approverIds, Long originalDocumentId) {
         ApprovalDocumentDTO document = new ApprovalDocumentDTO();
         document.setCompanyId(user.getCompanyId());
         document.setAuthorEmployeeId(user.getEmployeeId());
+        document.setOriginalDocumentId(originalDocumentId);
         document.setStatusCode(ApprovalDocumentStatus.IN_PROGRESS.name());
         document.setDocumentType(documentType);
         document.setTitle(title);
@@ -482,6 +499,13 @@ public class ApprovalService {
             doc.setSteps(steps.getOrDefault(id, List.of()));
             doc.setHistory(history.getOrDefault(id, List.of()));
             doc.setCanDecide(doc.isMyTurn());
+            if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) {
+                doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()) && !doc.isRedrafted());
+                doc.getHistory().stream()
+                        .filter(h -> ApprovalAction.APR_REJECT.name().equals(h.getActionCode()))
+                        .reduce((first, last) -> last)
+                        .ifPresent(h -> doc.setRejectOpinion(h.getOpinion()));
+            }
             if (doc.getFields() != null && doc.getFields().getAssetType() != null) {
                 doc.setAssetTypeName(AssetType.from(doc.getFields().getAssetType()).getLabel());
             }

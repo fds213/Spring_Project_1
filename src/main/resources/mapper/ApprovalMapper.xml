@@ -32,9 +32,9 @@
         <selectKey keyProperty="approvalDocumentId" resultType="long" order="BEFORE">
             SELECT sq_approval_document.NEXTVAL FROM dual
         </selectKey>
-        INSERT INTO approval_document (approval_document_id, company_id, author_employee_id, document_type,
+        INSERT INTO approval_document (approval_document_id, company_id, author_employee_id, original_document_id, document_type,
                                        title, content, status_code, submitted_at)
-        VALUES (#{approvalDocumentId}, #{companyId}, #{authorEmployeeId}, #{documentType},
+        VALUES (#{approvalDocumentId}, #{companyId}, #{authorEmployeeId}, #{originalDocumentId,jdbcType=NUMERIC}, #{documentType},
                 #{title}, #{content}, #{statusCode}, CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP))
     </insert>
 
@@ -119,9 +119,12 @@
     </resultMap>
 
     <select id="selectBoxDocuments" resultMap="boxDocumentMap">
-        SELECT ad.approval_document_id, ad.document_type, ad.title, ad.status_code,
+        SELECT ad.approval_document_id, ad.author_employee_id, ad.document_type, ad.title, ad.status_code,
                TO_CHAR(ad.submitted_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS submitted_at,
                e.employee_name, d.department_name, lr.requested_days, b.branch_name,
+               CASE WHEN EXISTS (SELECT 1 FROM approval_document redraft
+                                  WHERE redraft.company_id = ad.company_id
+                                    AND redraft.original_document_id = ad.approval_document_id) THEN 1 ELSE 0 END AS redrafted,
                CASE WHEN <include refid="boxMyTurn"/> THEN 1 ELSE 0 END AS my_turn,
                (SELECT MIN(x.leave_type) FROM leave_request_day x
                  WHERE x.company_id = ad.company_id AND x.approval_document_id = ad.approval_document_id) AS f_leave_type,
@@ -172,6 +175,11 @@
         SELECT * FROM approval_document
         WHERE company_id = #{companyId} AND approval_document_id = #{documentId}
         FOR UPDATE OF approval_document_id WAIT 5
+    </select>
+
+    <select id="countRedrafts" resultType="int">
+        SELECT COUNT(*) FROM approval_document
+        WHERE company_id = #{companyId} AND original_document_id = #{originalDocumentId}
     </select>
 
     <select id="selectDocumentSteps" resultType="com.ieum.gw.dto.ApprovalStepDTO">

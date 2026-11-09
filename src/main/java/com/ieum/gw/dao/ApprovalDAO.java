@@ -78,6 +78,11 @@ public class ApprovalDAO {
         return mapper.lockDocument(companyId, documentId);
     }
 
+    /** 원본 문서로 이미 만든 재기안 문서 수를 센다 */
+    public int countRedrafts(Long companyId, Long originalDocumentId) {
+        return mapper.countRedrafts(companyId, originalDocumentId);
+    }
+
     public List<ApprovalStepDTO> selectDocumentSteps(Long companyId, long documentId) {
         return mapper.selectDocumentSteps(companyId, documentId);
     }
