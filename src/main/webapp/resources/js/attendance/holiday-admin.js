@@ -42,7 +42,7 @@ function renderHolidays(d) {
       inqCell('날짜', it.date.slice(5).replace('-', '.')),
       inqCell('요일', HOL_WEEKDAYS[it.weekday]),
       inqCell('이름', it.name),
-      inqCell('관리', del));
+      inqCell('관리', h('div', 'row-actions', del))); // 칸 안에서 버튼이 늘어나지 않게(다른 표의 관리 칸과 같게)
   });
   document.getElementById('holList').replaceChildren(...(rows.length ? rows
     : [emptyTr(4, `${d.year}년 휴일이 없습니다. 이 해에 걸친 휴가는 신청할 수 없습니다`)]));
