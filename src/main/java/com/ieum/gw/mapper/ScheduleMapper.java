@@ -13,7 +13,7 @@ import com.ieum.gw.dto.ScheduleLeaveDTO;
 @Mapper
 public interface ScheduleMapper {
 
-    // 기간 안의 일정: 내 개인 일정 + 우리 업체 전사 일정 (휴가 일정은 빼고)
+    // 기간 안의 일정: 내 개인 일정 + 우리 부서 일정 + 우리 업체 전사 일정 (휴가 일정은 빼고)
     List<ScheduleDTO> selectEvents(@Param("companyId") Long companyId,
                                    @Param("employeeId") Long employeeId,
                                    @Param("from") LocalDateTime from,
@@ -25,13 +25,13 @@ public interface ScheduleMapper {
                                              @Param("from") LocalDateTime from,
                                              @Param("to") LocalDateTime to);
 
-    // 기간 안의 일정 수: 달력에 보이는 것과 같은 조건 (내 개인 일정 + 전사 일정 + 내 휴가 일정)
+    // 기간 안의 일정 수: 달력에 보이는 것과 같은 조건 (내 개인 일정 + 우리 부서 일정 + 전사 일정 + 내 휴가 일정)
     int countEvents(@Param("companyId") Long companyId,
                     @Param("employeeId") Long employeeId,
                     @Param("from") LocalDateTime from,
                     @Param("to") LocalDateTime to);
 
-    // 일정 한 건 (삭제 권한 확인용. 다른 업체 일정이면 null)
+    // 일정 한 건 (수정·삭제 권한 확인용. 다른 업체 일정이면 null)
     ScheduleDTO selectEvent(@Param("companyId") Long companyId,
                             @Param("eventId") Long eventId);
 
@@ -43,6 +43,18 @@ public interface ScheduleMapper {
                     @Param("content") String content,
                     @Param("startsAt") LocalDateTime startsAt,
                     @Param("endsAt") LocalDateTime endsAt);
+
+    // 일정 고치기: 날짜·제목·메모 (휴가 일정은 바뀌지 않는다)
+    int updateEvent(@Param("companyId") Long companyId,
+                    @Param("eventId") Long eventId,
+                    @Param("title") String title,
+                    @Param("content") String content,
+                    @Param("startsAt") LocalDateTime startsAt,
+                    @Param("endsAt") LocalDateTime endsAt);
+
+    // 내 부서 이름 (부서가 없으면 null)
+    String selectMyDeptName(@Param("companyId") Long companyId,
+                            @Param("employeeId") Long employeeId);
 
     // 일정 지우기 (휴가 일정은 지워지지 않는다)
     int deleteEvent(@Param("companyId") Long companyId,
