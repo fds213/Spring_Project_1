@@ -26,17 +26,18 @@ import com.ieum.gw.dto.ApprovalBoxStepDTO;
 import com.ieum.gw.dto.ApprovalDocumentDTO;
 import com.ieum.gw.dto.ApprovalEquipmentDTO;
 import com.ieum.gw.dto.ApprovalFieldsDTO;
+import com.ieum.gw.dto.ApprovalFileDTO;
 import com.ieum.gw.dto.ApprovalHistoryDTO;
 import com.ieum.gw.dto.ApprovalLeaveDTO;
 import com.ieum.gw.dto.ApprovalStepDTO;
 import com.ieum.gw.dto.ApprovalSubmitDTO;
 import com.ieum.gw.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.dto.ApproverDTO;
-import com.ieum.gw.dto.LeaveDayDTO;
 import com.ieum.gw.dto.AuthEmpDTO;
-import com.ieum.gw.dto.LoginUser;
-import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.dto.BranchDTO;
+import com.ieum.gw.dto.EmpSummaryDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LoginUser;
 
 class ApprovalServiceTest {
 
@@ -230,6 +231,11 @@ class ApprovalServiceTest {
         public List<ApprovalBoxHistoryDTO> selectBoxHistory(Long companyId, Long employeeId) {
             return boxHistory;
         }
+        
+        @Override
+        public List<ApprovalFileDTO> selectBoxFiles(Long companyId, Long employeeId) {
+            return List.of(); // 결재함 테스트는 첨부 없이 본다
+        }
 
         @Override
         public int countWaitingForMe(Long companyId, Long employeeId) {
@@ -301,7 +307,7 @@ class ApprovalServiceTest {
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
     private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null), new TicketService(null));
+            new ScheduleService(null, null), new TicketService(null), null);
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();
@@ -1143,7 +1149,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null));
+                new ScheduleService(null, null), new TicketService(null), null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));
@@ -1162,7 +1168,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null));
+                new ScheduleService(null, null), new TicketService(null), null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));
