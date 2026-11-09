@@ -29,6 +29,7 @@ import com.ieum.gw.service.AssetLookupService;
 import com.ieum.gw.code.TicketStatus;
 import com.ieum.gw.code.TicketType;
 import com.ieum.gw.dto.LoginUser;
+import com.ieum.gw.dto.TicketAdminCountsDTO;
 import com.ieum.gw.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.service.EmployeeService;
@@ -47,9 +48,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TicketWorkService {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss");
+
+    private static final int ADMIN_PAGE_SIZE = 20;
+    private static final List<String> ADMIN_FILTERS = List.of("UNASSIGNED", "MINE", "IN_PROGRESS", "RESOLVED", "ALL");
+
     private static final String PHOTO_MODULE = "ticket";
     private static final long MAX_PHOTO_BYTES = 10L * 1024 * 1024;
     private static final List<String> PHOTO_EXTENSIONS = List.of("jpg", "jpeg", "png");
+
     private final TicketWorkDAO dao;
     private final AssetService assetService;
     private final AssetLookupService assetLookupService;
@@ -258,33 +264,95 @@ public class TicketWorkService {
             return item;
     }
 
-    /** IT·관리자는 같은 업체 목록을 읽되 변경은 각 처리 메서드에서 다시 제한한다. */
+    /** 기존 관리자 화면에 상태 탭별 건수와 선택한 탭의 전체 목록을 반환한다. */
     @Transactional(readOnly = true)
     public Map<String, Object> listAdmin(LoginUser user, String filter) {
-        requireOperator(user);
-        String wanted = filter == null || filter.isBlank() ? "UNASSIGNED" : filter;
-        List<String> filters = List.of("UNASSIGNED", "MINE", "IN_PROGRESS", "RESOLVED", "ALL");
-        if (!filters.contains(wanted)) { throw bad("목록 조건이 올바르지 않습니다."); }
+    	requireOperator(user);
+        String selectedFilter = adminFilter(filter);
         List<TicketWorkDTO> rows = dao.selectCompany(user.getCompanyId());
-        Map<Long, EmployeeOptionDTO> names = people(user.getCompanyId(), rows.stream()
-                .flatMap(r -> java.util.stream.Stream.of(r.getRequesterId(), r.getAssigneeId())).collect(Collectors.toList()));
-        Map<Long, BranchDetailDTO> branches = branchService.getBranchDetails(user.getCompanyId()).stream()
-                .collect(Collectors.toMap(BranchDetailDTO::getBranchId, Function.identity()));
+
         Map<String, Long> counts = new LinkedHashMap<>();
-        filters.forEach(f -> counts.put(f, rows.stream().filter(r -> matches(r, user, f)).count()));
+        ADMIN_FILTERS.forEach(tab ->
+                counts.put(tab, rows.stream().filter(row -> matches(row, user, tab)).count()));
+
+        List<TicketWorkDTO> filteredRows = rows.stream()
+                .filter(row -> matches(row, user, selectedFilter))
+                .collect(Collectors.toList());
+
+        return Map.of("counts", counts, "items", adminItems(user.getCompanyId(), filteredRows));
+    }
+    
+    /** 제목 검색 결과의 탭별 건수와 선택한 탭의 한 페이지를 반환한다. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> searchAdmin(LoginUser user, String filter, String keyword, Long requestedPage) {
+        requireOperator(user);
+        String selectedFilter = adminFilter(filter);
+        String searchKeyword = keyword == null ? "" : keyword.strip();
+        if (searchKeyword.codePointCount(0, searchKeyword.length()) > 200) {
+            throw bad("검색어는 200자 이하로 입력해 주세요.");
+        }
+
+        Long companyId = user.getCompanyId();
+        Long employeeId = user.getEmployeeId();
+        TicketAdminCountsDTO tabCounts = dao.countAdminTicketTabs(companyId, employeeId, searchKeyword);
+
+        Map<String, Long> counts = Map.of(
+                "UNASSIGNED", tabCounts.getUnassignedCount(),
+                "MINE", tabCounts.getMineCount(),
+                "IN_PROGRESS", tabCounts.getInProgressCount(),
+                "RESOLVED", tabCounts.getResolvedCount(),
+                "ALL", tabCounts.getAllCount());
+
+        long total = counts.get(selectedFilter);
+        long pages = total == 0 ? 1L : (total - 1) / ADMIN_PAGE_SIZE + 1;
+        long page = requestedPage == null ? 1L : Math.min(Math.max(1L, requestedPage), pages);
+        long offset = (page - 1) * ADMIN_PAGE_SIZE;
+
+        List<TicketWorkDTO> rows = total == 0 ? List.of()
+                : dao.selectAdminTicketPage(companyId, employeeId, searchKeyword,
+                        selectedFilter, offset, ADMIN_PAGE_SIZE);
+
+        return Map.of("counts", counts, "items", adminItems(companyId, rows),
+                "page", page, "pages", pages, "total", total);
+    }
+    
+    /** 관리자 목록의 상태 탭 값을 검증하고 기본 탭을 정한다. */
+    private static String adminFilter(String filter) {
+        String selectedFilter = filter == null || filter.isBlank() ? "UNASSIGNED" : filter;
+        if (!ADMIN_FILTERS.contains(selectedFilter)) {
+            throw bad("목록 조건이 올바르지 않습니다.");
+        }
+        return selectedFilter;
+    }
+    
+    /** 조회된 티켓에 요청자·담당자 이름과 지점명을 붙인다. */
+    private List<Map<String, Object>> adminItems(Long companyId, List<TicketWorkDTO> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, EmployeeOptionDTO> names = people(companyId, rows.stream()
+                .flatMap(row -> java.util.stream.Stream.of(row.getRequesterId(), row.getAssigneeId()))
+                .collect(Collectors.toList()));
+        Map<Long, BranchDetailDTO> branches = branchService.getBranchDetails(companyId).stream()
+                .collect(Collectors.toMap(BranchDetailDTO::getBranchId, Function.identity()));
+
         List<Map<String, Object>> items = new ArrayList<>();
         for (TicketWorkDTO row : rows) {
-            if (!matches(row, user, wanted)) { continue; }
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", row.getId()); item.put("type", row.getType()); item.put("title", row.getTitle());
-            item.put("status", row.getStatus()); item.put("at", time(row.getAt()));
+            item.put("id", row.getId());
+            item.put("type", row.getType());
+            item.put("title", row.getTitle());
+            item.put("status", row.getStatus());
+            item.put("at", time(row.getAt()));
             item.put("requester", person(row.getRequesterId(), names));
             item.put("assignee", row.getAssigneeId() == null ? null : person(row.getAssigneeId(), names));
+
             BranchDetailDTO branch = branches.get(row.getBranchId());
             item.put("branchName", branch == null ? null : branch.getBranchName());
             items.add(item);
         }
-        return Map.of("counts", counts, "items", items);
+        return items;
     }
 
     @Transactional(readOnly = true)
