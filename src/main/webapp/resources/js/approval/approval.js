@@ -362,10 +362,9 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
     err.textContent = '재기안은 원래 문서와 같은 양식으로 제출해 주세요.';
     return;
   }
-    const msg = eaCheck(c);
+  const msg = eaCheck(c);
   if (msg) { err.textContent = msg; return; }
   if (eaState.uploading) { err.textContent = '파일을 올리는 중입니다. 끝난 뒤 제출해 주세요.'; return; }
-  if (msg) { err.textContent = msg; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
   if (btn.disabled) return;
   // 제출하면 회수할 수 없어 한 번 묻는다
@@ -401,7 +400,6 @@ function eaRenderFiles() {
   }));
 }
 
-// 파일을 고르면 바로 서버에 올린다
 // 파일을 고르면 화면에서 먼저 검사하고, 통과한 것만 바로 서버에 올린다
 function eaInitFiles() {
   eaEl('eaFiles').addEventListener('change', e => {
