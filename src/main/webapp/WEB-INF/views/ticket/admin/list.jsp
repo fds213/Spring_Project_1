@@ -14,6 +14,8 @@
     <script>openTicketAdmin();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 장애 사진 보기 (#197) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/ticket/photo.css">
     <section class="view on" id="view-ticket-admin">
       <div class="page-head"><h1>티켓 처리</h1></div>
       <p class="muted join-scope">IT 담당자는 미배정 티켓을 맡아 처리하고, 관리자는 담당자를 정하거나 바꿉니다. 처리 완료 티켓은 요청자가 확인하면 종료됩니다.</p>
