@@ -274,6 +274,29 @@ class ScheduleServiceTest {
     }
 
     @Test
+    @DisplayName("부서 일정 수정·삭제: 쓴 본인이어도 지금 부서가 없거나 사용 안 함이면 403이고 바뀌지 않는다")
+    void deptEventChangeNeedsActiveDept() {
+        FakeDAO dao = new FakeDAO();
+        dao.event = event(8L, "DEPT", 10L);
+        dao.myDept = null; // 부서가 없거나 '사용 안 함' 부서
+        ScheduleService service = new ScheduleService(dao, null);
+
+        ResponseStatusException upd = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(user(10L, "ROLE_EMP"), 8L, "2026-11-20", "회식", ""));
+        assertEquals(HttpStatus.FORBIDDEN, upd.getStatus());
+        ResponseStatusException del = assertThrows(ResponseStatusException.class,
+                () -> service.deleteSchedule(user(10L, "ROLE_EMP"), 8L));
+        assertEquals(HttpStatus.FORBIDDEN, del.getStatus());
+        assertEquals(0, dao.updates.size());
+        assertEquals(0, dao.deleted.size());
+
+        // 개인 일정은 부서와 상관없이 그대로 고치고 지운다
+        dao.event = event(5L, "PERSONAL", 10L);
+        service.deleteSchedule(user(10L, "ROLE_EMP"), 5L);
+        assertEquals(List.of(5L), dao.deleted);
+    }
+
+    @Test
     @DisplayName("부서 일정 추가: 부서가 있는 직원은 누구나 쓰고, 부서가 없으면 403")
     void deptAddNeedsDept() {
         FakeDAO dao = new FakeDAO();
