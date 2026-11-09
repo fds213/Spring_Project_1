@@ -12,6 +12,7 @@ public class ApprovalDocumentDTO {
     private Long approvalDocumentId;
     private Long companyId;
     private Long authorEmployeeId;
+    private Long originalDocumentId;
     private String documentType;
     private String title;
     private String content;
