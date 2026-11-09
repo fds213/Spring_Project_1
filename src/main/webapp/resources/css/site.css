@@ -93,7 +93,7 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
   transform: perspective(1400px) rotateY(-5deg) rotateX(2deg);
   will-change: transform;
 }
-.device img { display: block; width: 100%; height: auto; }
+.device img, .device video { display: block; width: 100%; height: auto; aspect-ratio: 1600 / 1075; object-fit: cover; }
 /* 마우스 주변의 빛. 스크린샷 안에만 비치고(틀이 잘라 낸다) 서서히 나타났다 사라진다. 스크린샷이
    대부분 흰색이라 빛은 옅은 광채에 바깥쪽을 살짝 어둡게 한 것이고, 그래서 마우스 아래 글자는
    또렷하게 남는다 */
