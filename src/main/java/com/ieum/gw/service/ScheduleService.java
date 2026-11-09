@@ -195,6 +195,7 @@ public class ScheduleService {
         if (!canChange(user, s)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 일정만 고칠 수 있습니다");
         }
+        checkDeptActive(user, s);
 
         LocalDate day = checkDate(date);
         title = cleanTitle(title);
@@ -255,6 +256,7 @@ public class ScheduleService {
         if (!canChange(user, s)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인 일정만 삭제할 수 있습니다");
         }
+        checkDeptActive(user, s);
         dao.deleteEvent(user.getCompanyId(), id);
 
         Map<String, Object> result = new HashMap<>();
@@ -275,6 +277,14 @@ public class ScheduleService {
             scopes.add(COMPANY);
         }
         return scopes;
+    }
+
+    // 부서 일정을 고치거나 지울 때: 지금 내 부서가 있고 사용 중이어야 한다 (볼 수 없는 부서 일정을 번호로 바꾸지 못하게).
+    // 부서 일정을 보고 쓰는 기준(ScheduleMapper.xml의 visible·selectMyDeptName)과 같다
+    private void checkDeptActive(LoginUser user, ScheduleDTO s) {
+        if (DEPT.equals(s.getScope()) && dao.selectMyDeptName(user.getCompanyId(), user.getEmployeeId()) == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "소속 부서가 없어 부서 일정을 고치거나 지울 수 없습니다");
+        }
     }
 
     // 수정·삭제 버튼 (휴가 일정은 아니어야 함)
