@@ -56,6 +56,7 @@ class BoardDeptServiceTest {
         List<String> listWords;
         int listOffset = -1;
         int total;
+        boolean postJustRemoved; // 글을 조회한 뒤 잠그기 전에 다른 사람이 지운 상황
 
         FakeBoardDAO() {
             super(null);
@@ -89,6 +90,12 @@ class BoardDeptServiceTest {
             p.setTitle("개발팀 글");
             p.setAuthorId(WRITER);
             return p;
+        }
+
+        /** 실제 SQL처럼 업체·부서·글 번호가 맞고 지우지 않은 글만 잠근다 */
+        @Override
+        public Long lockPost(Long companyId, Long departmentId, Long postId) {
+            return mine(companyId, departmentId, postId) && !postJustRemoved ? postId : null;
         }
 
         @Override
@@ -360,6 +367,16 @@ class BoardDeptServiceTest {
         assertEquals(List.of("comment:확인했습니다"), posts.writes);
         assertFalse(comments.get(0).isCanDelete());
         assertTrue(service.getPost(emp(WRITER), POST_ID).getComments().get(0).isCanDelete());
+    }
+
+    @Test
+    @DisplayName("글이 막 지워져 글 줄을 잠그지 못하면 댓글을 저장하지 않고 404다")
+    void commentIsRejectedWhenPostWasJustRemoved() {
+        board.postJustRemoved = true;
+
+        assertStatus(HttpStatus.NOT_FOUND, () -> service.addComment(emp(TEAMMATE), POST_ID, "댓글"));
+
+        assertTrue(posts.writes.isEmpty());
     }
 
     @Test

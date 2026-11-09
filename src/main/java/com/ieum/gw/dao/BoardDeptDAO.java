@@ -37,6 +37,11 @@ public class BoardDeptDAO {
         return mapper.selectPost(companyId, departmentId, postId);
     }
 
+    /** 글 줄 잠그기 (지운 글·다른 부서 글이면 null) */
+    public Long lockPost(Long companyId, Long departmentId, Long postId) {
+        return mapper.lockPost(companyId, departmentId, postId);
+    }
+
     /** 우리 부서 게시판 번호 (없으면 null) */
     public Long selectBoardId(Long companyId, Long departmentId) {
         return mapper.selectBoardId(companyId, departmentId);

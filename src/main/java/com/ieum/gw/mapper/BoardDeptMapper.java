@@ -34,6 +34,11 @@ public interface BoardDeptMapper {
                                 @Param("departmentId") Long departmentId,
                                 @Param("postId") Long postId);
 
+    /** 댓글을 저장하기 전에 글 줄을 잠근다 (지운 글·다른 부서 글이면 null) */
+    Long lockPost(@Param("companyId") Long companyId,
+                  @Param("departmentId") Long departmentId,
+                  @Param("postId") Long postId);
+
     /** 우리 부서 게시판 번호 (BOARD 표에 줄이 없으면 null) */
     Long selectBoardId(@Param("companyId") Long companyId,
                        @Param("departmentId") Long departmentId);

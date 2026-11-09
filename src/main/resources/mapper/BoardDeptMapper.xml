@@ -75,6 +75,21 @@
 		   AND p.visible_yn = 'Y'
 	</select>
 
+	<!-- 댓글을 저장하기 전에 글 줄을 잠근다 (조건은 글 한 건과 같다). 글 지우기도 이 줄을 먼저 고치므로 둘이 순서대로 처리된다.
+	     다른 업체·다른 부서 글이나 지운 글이면 아무것도 안 나와서 Java에서는 null이 된다 -->
+	<select id="lockPost" resultType="long">
+		SELECT p.post_id
+		  FROM post p
+		  JOIN board b ON b.company_id = p.company_id AND b.board_id = p.board_id
+		 WHERE p.company_id = #{companyId}
+		   AND p.post_id = #{postId}
+		   AND b.board_type = 'BOARD_DEPT'
+		   AND b.department_id = #{departmentId}
+		   AND p.deleted_at IS NULL
+		   AND p.visible_yn = 'Y'
+		   FOR UPDATE OF p.post_id
+	</select>
+
 	<!-- 우리 부서 게시판 번호. 줄이 없으면 MIN이 NULL을 돌려줘서 Java에서는 null이 된다.
 	     첫 글을 동시에 써서 줄이 둘 생겨도 목록은 부서 번호로 찾으므로 글이 모두 보인다 -->
 	<select id="selectBoardId" resultType="long">

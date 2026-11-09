@@ -162,7 +162,10 @@ public class BoardDeptService {
     /** 댓글 등록: 같은 부서 사람 누구나. 그 글의 댓글 목록 전체를 돌려준다 */
     @Transactional
     public List<NoticeCommentDTO> addComment(LoginUser user, Long postId, String text) {
-        findPost(user, myDept(user), postId);
+        // 글 줄을 잠근 뒤 저장한다. 글 삭제와 겹치면 삭제가 먼저일 때는 여기서 404, 댓글이 먼저일 때는 삭제가 이 댓글까지 삭제 표시한다
+        if (dao.lockPost(user.getCompanyId(), myDept(user).getId(), postId) == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, NOT_FOUND);
+        }
 
         postDao.insertComment(user.getCompanyId(), postId, user.getEmployeeId(), noticeService.checkComment(text));
         return listComments(user, postId);
