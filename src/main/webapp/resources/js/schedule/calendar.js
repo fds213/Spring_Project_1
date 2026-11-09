@@ -1,8 +1,9 @@
 // 근무 > 일정 (views/schedule/calendar.jsp): 개인·부서·전사 일정을 달력으로 본다 (요구분석서 3.1 "일정·게시판").
 // 달력에는 일정 외에 휴일과 본인의 연차(승인된 것만)가 함께 나온다. 다른 직원의 연차·근태는 보이지 않는다.
 // 누가 무엇을 볼 수 있나: 개인 일정은 쓴 본인만, 부서 일정은 같은 부서 직원, 전사 일정은 업체 전체.
-// 누가 쓸 수 있나: 개인은 누구나, 부서는 부서장·업체 관리자(자기 부서), 전사는 인사 담당자·업체 관리자. 지우기는 쓴 본인·업체 관리자.
-// 이 규칙은 서버가 정하고 검사한다. 화면은 서버가 보내 준 구분(scopes)과 canDelete 로 선택지·버튼만 고른다.
+// 누가 쓸 수 있나: 개인은 누구나, 부서는 그 부서 직원 누구나(자기 부서), 전사는 인사 담당자·업체 관리자.
+// 고치기·지우기: 개인·부서 일정은 쓴 본인, 전사 일정은 쓴 본인·업체 관리자. 결재에서 온 연차는 고치거나 지울 수 없다.
+// 이 규칙은 서버가 정하고 검사한다. 화면은 서버가 보내 준 구분(scopes)과 canEdit·canDelete 로 선택지·버튼만 고른다.
 
 const SCOPE_LABEL = { PERSONAL: '개인', DEPT: '부서', COMPANY: '전사' };
 const SCH_LEAVE_LABEL = { FULL: '연차', AM: '오전 반차', PM: '오후 반차' };
@@ -25,6 +26,7 @@ const schState = {
   jumped: '',   // 앞뒤 달 칸을 눌러 달을 옮긴 직후(0.5초)의 그 날짜. 두 번 누르기를 바르게 처리하려고 둔다
   jumpTimer: null,
   reqSeq: 0,    // 달력 요청 번호. 가장 마지막에 보낸 요청의 응답만 쓴다
+  editing: null, // 팝업에서 고치는 중인 일정 (null이면 새 일정 추가)
 };
 const schMonthParam = mo => `${mo.y}-${pad2(mo.m + 1)}`;
 const schMonthOf = key => { const d = schFromKey(key); return { y: d.getFullYear(), m: d.getMonth() }; };
@@ -94,6 +96,7 @@ function drawSchedule() {
   if (!schState.data) return;
   const { y, m } = schState.month;
   schEl('schMonthLabel').textContent = `${y}년 ${m + 1}월`;
+  schEl('schFilterDept').hidden = !schState.data.dept; // 부서가 없는 사람은 부서 보기 칩을 숨긴다
 
   // 달력: 일요일부터 시작하는 7열
   const first = new Date(y, m, 1);
@@ -158,25 +161,56 @@ function renderDayPanel() {
     if (it.schedule && it.schedule.memo) body.append(schNode('small', 'sch-memo', it.schedule.memo));
     const li = schNode('li', '', schNode('span', `sch-chip chip-${it.type.toLowerCase()}`, it.type === 'HOLIDAY' ? '휴일' : it.type === 'LEAVE' ? '연차' : SCOPE_LABEL[it.type]),
       body);
+    // [수정] [삭제]: 읽기 전용 업체에서는 흐리게 두고 누르면 안내만 (data-write, common.js)
+    const acts = [];
+    if (it.schedule && it.schedule.canEdit) {
+      const edit = schNode('button', 'sch-del sch-edit', '수정');
+      edit.type = 'button';
+      edit.setAttribute('data-write', '');
+      edit.setAttribute('aria-label', `'${it.schedule.title}' 일정 수정`); // 화면 읽기 프로그램이 어느 일정인지 알게
+      edit.addEventListener('click', () => openEditDialog(it.schedule));
+      acts.push(edit);
+    }
     if (it.schedule && it.schedule.canDelete) {
       const del = schNode('button', 'sch-del', '삭제');
       del.type = 'button';
-      del.setAttribute('data-write', ''); // 읽기 전용 업체에서는 흐리게 두고 누르면 안내만 (common.js)
+      del.setAttribute('data-write', '');
+      del.setAttribute('aria-label', `'${it.schedule.title}' 일정 삭제`);
       del.addEventListener('click', () => deleteSchedule(it.schedule, del));
-      li.append(del);
+      acts.push(del);
     }
+    if (acts.length) li.append(schNode('span', 'sch-acts', ...acts));
     return li;
   }) : [schNode('li', 'empty-box', '이 날짜에는 일정이 없습니다')]));
 
-  // 구분 선택지는 쓸 수 있는 것만 (서버가 정해 보낸다). 부서 일정은 내 부서 이름을 함께 보여 준다
+  if (!schState.editing) schFillScopes(); // 고치는 중인 팝업의 구분(잠김)은 그대로 둔다
+}
+
+// 구분 선택지는 쓸 수 있는 것만 (서버가 정해 보낸다). 부서 일정은 내 부서 이름을 함께 보여 준다
+const schScopeText = s => s === 'DEPT' ? `부서 (${schState.data.dept || '-'})` : SCOPE_LABEL[s];
+function schFillScopes() {
   const scope = schEl('schScope');
   const keep = scope.value;
-  scope.replaceChildren(...r.scopes.map(s => {
-    const o = schNode('option', '', s === 'DEPT' ? `부서 (${r.dept || '-'})` : SCOPE_LABEL[s]);
+  scope.disabled = false;
+  scope.replaceChildren(...schState.data.scopes.map(s => {
+    const o = schNode('option', '', schScopeText(s));
     o.value = s;
     return o;
   }));
   if ([...scope.options].some(o => o.value === keep)) scope.value = keep;
+}
+
+// 팝업 모양: 추가(edit 없음)와 수정(고칠 일정)
+function schDialogMode(edit) {
+  schState.editing = edit || null;
+  schEl('schDialogTitle').textContent = edit ? '일정 수정' : '일정 추가';
+  schEl('schSubmit').textContent = edit ? '저장' : '추가';
+  if (!edit) return schFillScopes();
+  // 수정: 구분은 바꾸지 않는다 (서버도 받지 않는다). 지금 구분 하나만 보이고 잠근다
+  const o = schNode('option', '', schScopeText(edit.scope));
+  o.value = edit.scope;
+  schEl('schScope').replaceChildren(o);
+  schEl('schScope').disabled = true;
 }
 
 // 일정 추가 팝업 열기: 날짜를 채우고, 제목·메모·안내는 비운다
@@ -185,6 +219,7 @@ function openAddDialog(dateKey) {
   // 읽기 전용 업체(체험이 끝나 결제하지 않음): 날짜 칸을 두 번 눌러 열 때도 막는다.
   // [+ 일정 추가] 버튼(data-write)을 대신 눌러 공통 안내(common.js)를 띄운다. 창을 다 쓴 뒤에야 저장이 막히지 않게
   if (document.body.classList.contains('is-readonly')) { schEl('schAddDay').click(); return; }
+  schDialogMode(null);
   schEl('schDate').value = dateKey || schState.selected;
   schEl('schTitle').value = '';
   schEl('schMemo').value = '';
@@ -194,7 +229,28 @@ function openAddDialog(dateKey) {
   schEl('schTitle').focus();
 }
 schEl('schAddDay').addEventListener('click', () => openAddDialog(schState.selected));
-schEl('schCancel').addEventListener('click', () => { schSkipRepeat = true; schEl('schDialog').close(); });
+
+// 일정 수정 팝업 열기: 추가 팝업과 같은 창에 지금 값을 채운다 (구분은 잠김)
+function openEditDialog(s) {
+  if (!schState.data) return;
+  schDialogMode(s);
+  schEl('schDate').value = s.date;
+  schEl('schTitle').value = s.title;
+  schEl('schMemo').value = s.memo || '';
+  schEl('schError').textContent = '';
+  const dlg = schEl('schDialog');
+  if (!dlg.open) dlg.showModal();
+  schEl('schTitle').focus();
+}
+schEl('schCancel').addEventListener('click', () => {
+  if (schEl('schSubmit').disabled) return; // 저장 중에는 닫지 않는다 (응답이 오면 알아서 닫힌다)
+  schSkipRepeat = true;
+  schEl('schDialog').close();
+});
+// Esc도 저장 중에는 막는다. 저장 중에 닫고 다른 일정을 열면, 늦게 온 응답이 새로 연 창을 닫거나 안내가 엇갈린다
+schEl('schDialog').addEventListener('cancel', e => { if (schEl('schSubmit').disabled) e.preventDefault(); });
+// 팝업이 어떻게 닫히든(취소, Esc) 다음에 열 때는 추가 모양으로 시작한다 (수정 중이던 일정이 남지 않게)
+schEl('schDialog').addEventListener('close', () => { if (schState.editing) schDialogMode(null); });
 
 // 창(추가·삭제 확인)의 버튼을 빠르게 두 번 누르면, 첫 클릭에 창이 닫혀 두 번째 클릭이 창 아래의 달력 칸·목록에 떨어진다.
 // 그러면 엉뚱한 날짜로 추가 팝업이 열리거나 고른 날짜가 바뀐다. 창을 닫은 뒤, 새로 누른 클릭(detail 1)이 오기 전까지
@@ -261,8 +317,10 @@ document.querySelectorAll('#schFilters input').forEach(box => box.addEventListen
 }));
 
 // 서버도 같은 검사를 다시 한다. 화면은 먼저 알려 줄 뿐이다. 문제가 없으면 ''
+// 수정은 구분을 바꾸지 않아 구분 검사를 하지 않는다 (고칠 수 있는지는 서버가 canEdit과 같은 규칙으로 본다)
 function checkScheduleForm(scope, date, title, memo) {
-  if (!schState.data || !schState.data.scopes.includes(scope)) return '이 구분의 일정은 쓸 수 있는 권한이 없습니다';
+  if (!schState.data) return '일정을 불러오지 못했습니다';
+  if (!schState.editing && !schState.data.scopes.includes(scope)) return '이 구분의 일정은 쓸 수 있는 권한이 없습니다';
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '날짜를 입력해 주세요';
   if (!title) return '제목을 입력해 주세요';
   if (title.length > SCH_TITLE_MAX) return `제목은 ${SCH_TITLE_MAX}자까지입니다`;
@@ -280,19 +338,34 @@ schEl('schForm').addEventListener('submit', e => {
   const error = checkScheduleForm(scope, date, title, memo);
   err.textContent = error;
   if (error) return;
-  const btn = schEl('schForm').querySelector('[type="submit"]');
-  if (btn) btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/schedule/api/schedules', { scope, date, title, memo })
+  const btn = schEl('schSubmit');
+  btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
+  const edit = schState.editing;
+  const req = edit
+    ? api.post(`/schedule/api/schedules/${encodeURIComponent(edit.id)}`, { date, title, memo })
+    : api.post('/schedule/api/schedules', { scope, date, title, memo });
+  req
     .done(s => {
-      schSkipRepeat = true; // [추가]를 빠르게 두 번 눌렀을 때 두 번째 클릭이 닫힌 팝업 아래 달력에 떨어지지 않게
+      schSkipRepeat = true; // [추가]·[저장]을 빠르게 두 번 눌렀을 때 두 번째 클릭이 닫힌 팝업 아래 달력에 떨어지지 않게
       schEl('schDialog').close(); // 팝업 닫기
       schEl('schTitle').value = '';
       schEl('schMemo').value = '';
       err.textContent = '';
-      showToast('일정을 추가했습니다');
-      loadMonth(schMonthOf(s.date), s.date); // 다른 달 날짜로 추가해도 그 달로 옮겨 보여 준다
+      schDialogMode(null);
+      showToast(edit ? '일정을 수정했습니다' : '일정을 추가했습니다');
+      loadMonth(schMonthOf(s.date), s.date); // 다른 달 날짜로 옮겨도 그 달로 옮겨 보여 준다
     })
-    .fail(xhr => { err.textContent = apiMessage(xhr); })
-    .always(() => { if (btn) btn.disabled = false; });
+    .fail(xhr => {
+      err.textContent = apiMessage(xhr);
+      // 고치는 사이 다른 창·다른 사람이 지웠다(404): 창을 닫고 달력을 다시 받아 목록에서 없앤다
+      if (edit && xhr.status === 404) {
+        schSkipRepeat = true;
+        schEl('schDialog').close();
+        schDialogMode(null);
+        showToast(apiMessage(xhr));
+        renderSchedule();
+      }
+    })
+    .always(() => { btn.disabled = false; });
 });
 schEl('schTitle').addEventListener('input', () => { schEl('schError').textContent = ''; });

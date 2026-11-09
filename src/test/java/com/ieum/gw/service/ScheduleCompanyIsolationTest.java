@@ -37,6 +37,7 @@ class ScheduleCompanyIsolationTest {
         final List<Long> readCompanies = new ArrayList<>();
         final List<Long> insertCompanies = new ArrayList<>();
         final List<Long> deleted = new ArrayList<>();
+        final List<Long> updated = new ArrayList<>();
 
         FakeDAO() {
             super(null);
@@ -76,6 +77,19 @@ class ScheduleCompanyIsolationTest {
             deleted.add(eventId);
             return 1;
         }
+
+        @Override
+        public int updateEvent(Long companyId, Long eventId, String title, String content,
+                               LocalDateTime startsAt, LocalDateTime endsAt) {
+            updated.add(eventId);
+            return 1;
+        }
+
+        @Override
+        public String selectMyDeptName(Long companyId, Long employeeId) {
+            readCompanies.add(companyId);
+            return null;
+        }
     }
 
     /** 휴일 목록만 쓰는 가짜 근태 서비스 (휴일은 없음, 물어본 업체를 적어 둔다) */
@@ -114,6 +128,18 @@ class ScheduleCompanyIsolationTest {
     }
 
     @Test
+    @DisplayName("다른 업체 관리자가 일정 번호로 고치면 404이고 바뀌지 않는다")
+    void cannotUpdateOtherCompanyEvent() {
+        FakeDAO dao = new FakeDAO();
+        ScheduleService service = new ScheduleService(dao, null);
+
+        ResponseStatusException e = assertThrows(ResponseStatusException.class,
+                () -> service.updateSchedule(admin(OTHER_COMPANY), EVENT_ID, "2026-11-05", "바꿈", ""));
+        assertEquals(HttpStatus.NOT_FOUND, e.getStatus());
+        assertEquals(List.of(), dao.updated);
+    }
+
+    @Test
     @DisplayName("달력 조회는 로그인한 사람의 업체로만 일정·휴가·휴일을 읽는다")
     void monthReadsOnlyMyCompany() {
         FakeDAO dao = new FakeDAO();
@@ -122,7 +148,7 @@ class ScheduleCompanyIsolationTest {
         Map<String, Object> month = new ScheduleService(dao, attendance).getMonth(admin(OTHER_COMPANY), "2026-11");
 
         assertEquals("2026-11", month.get("month"));
-        assertEquals(List.of(OTHER_COMPANY, OTHER_COMPANY), dao.readCompanies);
+        assertEquals(List.of(OTHER_COMPANY, OTHER_COMPANY, OTHER_COMPANY), dao.readCompanies); // 일정·내 부서·휴가
         assertEquals(List.of(OTHER_COMPANY), attendance.holidayCompanies);
     }
 

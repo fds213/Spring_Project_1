@@ -19,7 +19,7 @@ public class ScheduleDAO {
 
     private final ScheduleMapper mapper;
 
-    // 기간 안의 일정 (내 개인 + 전사)
+    // 기간 안의 일정 (내 개인 + 우리 부서 + 전사)
     public List<ScheduleDTO> selectEvents(Long companyId, Long employeeId, LocalDateTime from, LocalDateTime to) {
         return mapper.selectEvents(companyId, employeeId, from, to);
     }
@@ -29,7 +29,7 @@ public class ScheduleDAO {
         return mapper.selectLeaveEvents(companyId, employeeId, from, to);
     }
 
-    // 기간 안의 일정 수 (내 개인 + 전사 + 내 휴가)
+    // 기간 안의 일정 수 (내 개인 + 우리 부서 + 전사 + 내 휴가)
     public int countEvents(Long companyId, Long employeeId, LocalDateTime from, LocalDateTime to) {
         return mapper.countEvents(companyId, employeeId, from, to);
     }
@@ -43,6 +43,17 @@ public class ScheduleDAO {
     public int insertEvent(Long companyId, Long ownerId, String scopeCode, String title, String content,
                            LocalDateTime startsAt, LocalDateTime endsAt) {
         return mapper.insertEvent(companyId, ownerId, scopeCode, title, content, startsAt, endsAt);
+    }
+
+    // 일정 고치기 (성공하면 1)
+    public int updateEvent(Long companyId, Long eventId, String title, String content,
+                           LocalDateTime startsAt, LocalDateTime endsAt) {
+        return mapper.updateEvent(companyId, eventId, title, content, startsAt, endsAt);
+    }
+
+    // 내 부서 이름 (부서가 없으면 null)
+    public String selectMyDeptName(Long companyId, Long employeeId) {
+        return mapper.selectMyDeptName(companyId, employeeId);
     }
 
     // 일정 지우기 (성공하면 1)

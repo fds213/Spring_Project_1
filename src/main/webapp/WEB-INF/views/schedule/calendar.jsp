@@ -30,8 +30,8 @@
             </div>
             <div class="sch-filters" id="schFilters">
               <label><input type="checkbox" data-scope="PERSONAL" checked> <span class="sch-chip chip-personal">개인</span></label>
-              <%-- 부서 일정은 이번 구현 범위 밖(요구분석서 3장 '핵심 뒤 추가')이라 숨겨 둔다 --%>
-              <label hidden><input type="checkbox" data-scope="DEPT" checked> <span class="sch-chip chip-dept">부서</span></label>
+              <%-- 부서 일정: 같은 부서 직원끼리 본다. 부서가 없는 사람은 calendar.js가 이 칩을 숨긴다 --%>
+              <label id="schFilterDept" hidden><input type="checkbox" data-scope="DEPT" checked> <span class="sch-chip chip-dept">부서</span></label>
               <label><input type="checkbox" data-scope="COMPANY" checked> <span class="sch-chip chip-company">전사</span></label>
               <label><input type="checkbox" data-scope="LEAVE" checked> <span class="sch-chip chip-leave">내 연차</span></label>
             </div>
@@ -52,7 +52,8 @@
       </div>
     </section>
 
-    <%-- 일정 추가 팝업: 오른쪽 날짜 칸 위 "+ 일정 추가"(고른 날짜로), 날짜 칸 두 번 누르기로 연다 --%>
+    <%-- 일정 추가·수정 팝업: 오른쪽 날짜 칸 위 "+ 일정 추가"(고른 날짜로), 날짜 칸 두 번 누르기로 연다.
+         목록의 [수정]으로 열면 제목이 '일정 수정'이 되고 구분은 바꿀 수 없다 (calendar.js) --%>
     <dialog class="modal" id="schDialog" aria-labelledby="schDialogTitle">
       <h2 id="schDialogTitle">일정 추가</h2>
       <form class="leave-form" id="schForm" novalidate style="padding: 8px 0 0;">
@@ -63,7 +64,7 @@
         <p class="form-error" id="schError" role="alert"></p>
         <div class="modal-actions">
           <button type="button" class="btn" id="schCancel">취소</button>
-          <button type="submit" class="btn btn-primary" data-write>추가</button>
+          <button type="submit" class="btn btn-primary" id="schSubmit" data-write>추가</button>
         </div>
       </form>
     </dialog>
