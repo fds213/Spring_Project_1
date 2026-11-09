@@ -202,12 +202,15 @@
   }
 
   // ---------- 이력: 지급·회수(#151)와 장애(#168). 상세를 열 때와 지급·회수한 뒤에 같이 받는다 ----------
-  // 응답이 오면 이력 칸만 바꾼다: 표 전체를 다시 그리면 쓰던 회수 사유·고른 직원이 지워진다
+  // 응답이 오면 이력 칸만 바꾼다: 표 전체를 다시 그리면 쓰던 회수 사유·고른 직원이 지워진다.
+  // 이번 요청의 이력 객체(mine)가 지금도 state.hist 일 때만 반영한다: 다른 자산을 열었거나, 같은 자산이라도
+  // 지급·회수 뒤 새로 부른 뒤에 늦게 온 앞 요청의 응답은 버린다(새 이력을 덮지 않게)
   function loadHistory(id) {
-    state.hist = { id, assignments: null, incidents: null };
+    const mine = { id, assignments: null, incidents: null };
+    state.hist = mine;
     const put = (key, v) => {
-      if (!state.hist || state.hist.id !== id) return; // 그사이 다른 자산을 열었다
-      state.hist[key] = v;
+      if (state.hist !== mine) return;
+      mine[key] = v;
       const box = $('aaHistory');
       if (box && state.open === id) box.replaceWith(historyView(id)); // 상세가 아직 없으면 상세를 그릴 때 같이 그린다
     };
