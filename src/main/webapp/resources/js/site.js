@@ -86,6 +86,17 @@ if (calcUsers) {
   fromBox();
 }
 
+// 히어로 영상: 동작 줄이기 설정이면 재생하지 않고 첫 화면(poster)에 둔다. 그래서 video 에 autoplay 를 쓰지 않는다
+const heroVideo = document.querySelector('.hero .device video');
+if (heroVideo) {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  // 재생한다. 브라우저가 자동 재생을 막으면 첫 화면이 그대로 남는다
+  const playHeroVideo = () => heroVideo.play().catch(() => {});
+  // load() 는 preload="none" 을 무시하고 영상을 받으므로 설정이 바뀌었을 때만 부른다
+  calm.addEventListener('change', () => { if (calm.matches) heroVideo.load(); else playHeroVideo(); });
+  if (!calm.matches) playHeroVideo();
+}
+
 // 히어로: 그림 둘레에 마우스가 오면 그룹웨어 화면이 마우스 쪽으로 기울고, 멈추면 결재 카드가 화면 앞으로 튀어나온다
 // (화면이 움직이는 동안에는 비켜 있다). 처음 볼 때는 화면이 평평한 데서 서서히 기운 뒤 카드가
 // 나온다. 넓은 화면의 마우스에서만 하고 동작 줄이기 설정이면 끈다: 그 밖에는 화면이 정해진 기울기로

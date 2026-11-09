@@ -27,7 +27,7 @@
           </div>
           <div class="device-wrap">
             <div class="device" aria-hidden="true">
-              <img src="${ctx}/resources/img/hero-app.png" alt="" width="1600" height="1075">
+              <video src="${ctx}/resources/img/hero-app.mp4" poster="${ctx}/resources/img/hero-app.png" width="1600" height="1075" muted loop playsinline preload="none"></video>
             </div>
             <div class="float-card" aria-hidden="true">
               <div class="ic"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg></div>
