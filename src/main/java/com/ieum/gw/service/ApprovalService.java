@@ -75,7 +75,7 @@ public class ApprovalService {
             List.of(AssetType.AT_LAPTOP, AssetType.AT_DESKTOP, AssetType.AT_MONITOR, AssetType.AT_OTHER);
     private static final int EQUIPMENT_QUANTITY = 1; // 계획서 3장 B: 수량 1개
     private static final int PURPOSE_MAX = 1000;     // EQUIPMENT_REQUEST.PURPOSE VARCHAR2(1000 CHAR)
-    private static final int FILE_MAX = 5;       // 공지 하나에 첨부 5개까지 (board.js와 같게)
+    private static final int FILE_MAX = 5;       // 결재 문서 하나에 첨부 5개까지 (approval.js와 같게)
     private static final String FILE_MODULE = "approval";	// 파일 저장 폴더 이름 ({업체}/approval/...)
     private final EmployeeService eService;
     private final AttendanceService aService;
@@ -678,6 +678,7 @@ public class ApprovalService {
         return createResponse(user, doc, history);
     }
     
+    /** 결재 첨부를 저장소에 올리고 번호·이름을 돌려준다(상신 전에 먼저 부른다) */
     public List<ApprovalFileDTO> storeFiles(LoginUser user, List<MultipartFile> files) throws IOException {
         
     	
