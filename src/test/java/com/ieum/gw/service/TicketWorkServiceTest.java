@@ -29,6 +29,7 @@ import com.ieum.gw.dto.BranchDetailDTO;
 import com.ieum.gw.service.BranchService;
 import com.ieum.gw.service.NotificationService;
 import com.ieum.gw.dao.TicketWorkDAO;
+import com.ieum.gw.dto.TicketAdminCountsDTO;
 import com.ieum.gw.dto.TicketCommentDTO;
 import com.ieum.gw.dto.TicketHistoryDTO;
 import com.ieum.gw.dto.TicketRequestDTO;
@@ -44,6 +45,9 @@ class TicketWorkServiceTest {
         String commentBody;
         List<TicketCommentDTO> commentRows = new ArrayList<>();
         List<TicketHistoryDTO> historyRows = new ArrayList<>();
+        TicketAdminCountsDTO adminCounts = new TicketAdminCountsDTO();
+        List<Object> countArguments;
+        List<Object> pageArguments;
         Rows() { super(null); }
         @Override public TicketWorkDTO lock(Long companyId, Long id) {
             locks++;
@@ -68,6 +72,19 @@ class TicketWorkServiceTest {
         }
         @Override public List<TicketCommentDTO> comments(Long companyId, Long id) { return commentRows; }
         @Override public List<TicketHistoryDTO> history(Long companyId, Long id) { return historyRows; }
+
+        @Override
+        public TicketAdminCountsDTO countAdminTicketTabs(Long companyId, Long employeeId, String keyword) {
+            countArguments = List.of(companyId, employeeId, keyword);
+            return adminCounts;
+        }
+
+        @Override
+        public List<TicketWorkDTO> selectAdminTicketPage(Long companyId, Long employeeId,
+                String keyword, String filter, long offset, int size) {
+            pageArguments = List.of(companyId, employeeId, keyword, filter, offset, size);
+            return List.of(row);
+        }
     }
     static class People extends EmployeeService {
         boolean active = true, role = true;
@@ -381,6 +398,44 @@ class TicketWorkServiceTest {
         status(HttpStatus.BAD_REQUEST,()->service.listAdmin(user(1L,3L,"ROLE_IT"),"UNKNOWN"));
         status(HttpStatus.FORBIDDEN,()->service.listAdmin(user(1L,2L,"ROLE_EMP"),"ALL"));
         assertTrue(((List<?>)service.listAdmin(user(9L,3L,"ROLE_IT"),"ALL").get("items")).isEmpty());
+    }
+
+    @Test
+    @DisplayName("검색 목록의 전체 페이지와 오프셋은 선택한 탭의 20건 경계에서 계산한다")
+    void adminSearchUsesSelectedTabCount() {
+        LoginUser operator = user(1L, 3L, "ROLE_IT");
+        rows.adminCounts.setAllCount(45L);
+        rows.adminCounts.setMineCount(20L);
+
+        var first = service.searchAdmin(operator, "MINE", " 노트북 ", 2L);
+        assertEquals(20L, first.get("total"));
+        assertEquals(1L, first.get("pages"));
+        assertEquals(1L, first.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북"), rows.countArguments);
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 0L, 20), rows.pageArguments);
+
+        rows.adminCounts.setMineCount(21L);
+        var second = service.searchAdmin(operator, "MINE", "노트북", 2L);
+        assertEquals(21L, second.get("total"));
+        assertEquals(2L, second.get("pages"));
+        assertEquals(2L, second.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 20L, 20), rows.pageArguments);
+        assertEquals(45L, ((Map<?, ?>) second.get("counts")).get("ALL"));
+    }
+
+    @Test
+    @DisplayName("선택한 탭에 검색 결과가 없으면 빈 첫 페이지를 반환한다")
+    void emptyAdminSearchSkipsPageQuery() {
+        rows.adminCounts.setAllCount(3L);
+
+        var result = service.searchAdmin(user(9L, 3L, "ROLE_ADMIN"), null, "   ", 8L);
+
+        assertEquals(List.of(9L, 3L, ""), rows.countArguments);
+        assertEquals(1L, result.get("page"));
+        assertEquals(1L, result.get("pages"));
+        assertEquals(0L, result.get("total"));
+        assertEquals(List.of(), result.get("items"));
+        assertNull(rows.pageArguments);
     }
     @Test @DisplayName("관리자 상세는 지점·권한 버튼과 이름·부서로 바꾼 담당자 후보를 반환한다")
     void adminDetail() {

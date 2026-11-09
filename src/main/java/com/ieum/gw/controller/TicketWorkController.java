@@ -38,10 +38,17 @@ public class TicketWorkController {
     @GetMapping("/ticket/admin/list")
     public String adminList() { return "ticket/admin/list"; }
 
+    /** 관리자 티켓 목록을 기존 방식 또는 검색·페이징 방식으로 조회한다. */
     @GetMapping("/ticket/admin/api/tickets")
     @ResponseBody
-    public Map<String, Object> adminList(@AuthenticationPrincipal LoginUser user, @RequestParam(required = false) String filter) {
-        return Map.of("success", true, "data", service.listAdmin(user, filter));
+    public Map<String, Object> adminList(@AuthenticationPrincipal LoginUser user, 
+    										@RequestParam(name = "filter", required = false) String filter,
+    										@RequestParam(name = "keyword", required = false) String keyword,
+    										@RequestParam(name = "page", required = false) Long page) {
+    	Map<String, Object> data = keyword == null && page == null 
+    										? service.listAdmin(user, filter) : service.searchAdmin(user, filter, keyword, page);
+    	
+        return Map.of("success", true, "data", data);
     }
 
     @GetMapping("/ticket/admin/api/tickets/{id}")
