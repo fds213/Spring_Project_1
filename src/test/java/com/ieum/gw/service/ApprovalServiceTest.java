@@ -187,6 +187,13 @@ class ApprovalServiceTest {
         public int insertFile(Long companyId, Long approvalDocumentId, Long attachmentId) {
             return 1;
         }
+        
+        int boxFileCount; // countBoxFile이 돌려줄 값 (결재함에 보이면 1, 아니면 0)
+
+        @Override
+        public int countBoxFile(Long companyId, Long employeeId, Long documentId, Long attachmentId) {
+            return boxFileCount;
+        }
 
         @Override
         public void insertDraft(ApprovalDocumentDTO document) {
@@ -1540,5 +1547,51 @@ class ApprovalServiceTest {
         draftRow(MY_ID, "DRAFT");
         draftService.deleteDraft(user(), DRAFT_ID);
         assertEquals(List.of(COMPANY_ID, MY_ID, DRAFT_ID), dao.deletedDraft);
+    }
+    
+
+    // ---------- 결재 첨부 (상신·내려받기) ----------
+
+    @Test
+    @DisplayName("결재 첨부: 상신할 때 내가 올린 파일을 문서에 붙이고, 같은 번호는 한 번만 붙인다")
+    void submitLinksMyFiles() {
+        addFile(9L, MY_ACCOUNT_ID);
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setFileIds(List.of(9L, 9L));
+
+        draftService.submit(user(), dto);
+
+        assertEquals(List.of(9L), attachments.attached);
+    }
+
+    @Test
+    @DisplayName("결재 첨부: 남이 올린 파일, 우리 업체에 없는 파일, 6개 첨부는 상신하지 않는다")
+    void submitRejectsBadFiles() {
+        addFile(9L, 999L); // 다른 사람이 올린 파일
+        ApprovalSubmitDTO othersFile = validLeave();
+        othersFile.setFileIds(List.of(9L));
+        assertStatus(HttpStatus.FORBIDDEN, () -> draftService.submit(user(), othersFile));
+
+        ApprovalSubmitDTO unknownFile = validLeave();
+        unknownFile.setFileIds(List.of(404L)); // 다른 업체 파일이거나 없는 번호
+        assertThrows(IllegalArgumentException.class, () -> draftService.submit(user(), unknownFile));
+
+        ApprovalSubmitDTO tooMany = validLeave();
+        tooMany.setFileIds(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+        assertStatus(HttpStatus.BAD_REQUEST, () -> draftService.submit(user(), tooMany));
+
+        assertTrue(attachments.attached.isEmpty());
+    }
+
+    @Test
+    @DisplayName("결재 첨부: 결재함에 보이지 않는 문서의 첨부는 404로 내려주지 않는다")
+    void downloadHiddenFileIsNotFound() {
+        addFile(9L, MY_ACCOUNT_ID);
+
+        dao.boxFileCount = 0;
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.getFile(user(), 5L, 9L));
+
+        dao.boxFileCount = 1;
+        assertEquals("증빙9.pdf", draftService.getFile(user(), 5L, 9L).getOriginalName());
     }
 }
