@@ -1,26 +1,35 @@
 package com.ieum.gw.service;
 
 import static com.ieum.gw.code.TicketStatus.*;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dto.AssetDTO;
+import com.ieum.gw.dto.AttachmentDTO;
 import com.ieum.gw.service.AssetService;
 import com.ieum.gw.service.AssetLookupService;
 import com.ieum.gw.code.TicketStatus;
 import com.ieum.gw.code.TicketType;
 import com.ieum.gw.dto.LoginUser;
+import com.ieum.gw.dto.TicketAdminCountsDTO;
 import com.ieum.gw.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.service.EmployeeService;
@@ -39,6 +48,14 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class TicketWorkService {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("uuuu-MM-dd'T'HH:mm:ss");
+
+    private static final int ADMIN_PAGE_SIZE = 20;
+    private static final List<String> ADMIN_FILTERS = List.of("UNASSIGNED", "MINE", "IN_PROGRESS", "RESOLVED", "ALL");
+
+    private static final String PHOTO_MODULE = "ticket";
+    private static final long MAX_PHOTO_BYTES = 10L * 1024 * 1024;
+    private static final List<String> PHOTO_EXTENSIONS = List.of("jpg", "jpeg", "png");
+
     private final TicketWorkDAO dao;
     private final AssetService assetService;
     private final AssetLookupService assetLookupService;
@@ -47,6 +64,7 @@ public class TicketWorkService {
     private final NotificationService notificationService;
     private final ApprovalService approvalService;
     private final AssetAllocationService assetAllocationService;
+    private final AttachmentService attachmentService;
 
     @Transactional
     public Long create(LoginUser user, TicketRequestDTO form) {
@@ -71,6 +89,12 @@ public class TicketWorkService {
                 throw bad("본인에게 현재 지급된 자산만 선택할 수 있습니다.");
             }
         }
+        
+        Long attachmentId = form.getAttachmentId();
+        if (attachmentId != null && type != TicketType.TK_INCIDENT) {
+			throw bad("사진은 장애 티켓에만 첨부할 수 있습니다.");
+		}
+        
         TicketWorkDTO row = new TicketWorkDTO();
         row.setCompanyId(user.getCompanyId());
         row.setRequesterId(user.getEmployeeId());
@@ -81,7 +105,96 @@ public class TicketWorkService {
         row.setTitle(title);
         row.setBody(body);
         if (dao.insert(row) != 1 || row.getId() == null) { throw new IllegalStateException("티켓 저장 결과를 확인할 수 없습니다."); }
+        
+        if (attachmentId != null) {
+			attachPhoto(user, row.getId(), attachmentId);
+		}
+        
         return row.getId();
+    }
+    
+    /** 장애 접수에 사용할 사진 한 장을 저장하고 첨부 ID를 반환한다. */
+    public Long uploadPhoto(LoginUser user, MultipartFile photo) {
+        requireLogin(user);
+
+        if (photo.isEmpty() || photo.getSize() > MAX_PHOTO_BYTES) {
+            throw bad("사진은 비어 있지 않은 10MB 이하 파일이어야 합니다.");
+        }
+
+        String filename = photo.getOriginalFilename();
+        int dot = filename == null ? -1 : filename.lastIndexOf('.');
+        String extension = dot < 0 ? "" : filename.substring(dot + 1).toLowerCase(Locale.ROOT);
+        if (!PHOTO_EXTENSIONS.contains(extension)) {
+            throw bad("JPG·JPEG·PNG 사진만 첨부할 수 있습니다.");
+        }
+
+        try {
+            return attachmentService.upload(photo, user, PHOTO_MODULE).getAttachmentId();
+        } catch (IllegalArgumentException e) {
+            throw bad(e.getMessage());
+        } catch (IOException e) {
+            throw new UncheckedIOException("티켓 사진을 저장하지 못했습니다.", e);
+        }
+    }
+
+    /** 본인이 업로드한 티켓 사진을 새 티켓에 연결한다. */
+    private void attachPhoto(LoginUser user, Long ticketId, Long attachmentId) {
+        requireId(attachmentId);
+        Long companyId = user.getCompanyId();
+
+        AttachmentDTO photo;
+        try {
+            photo = attachmentService.get(attachmentId, companyId);
+        } catch (IllegalArgumentException e) {
+            throw bad("첨부할 사진을 찾을 수 없습니다.");
+        }
+
+        if (!user.getUserAccountId().equals(photo.getUploaderAccountId())
+                || photo.getStorageKey() == null
+                || !photo.getStorageKey().startsWith(companyId + "/" + PHOTO_MODULE + "/")) {
+            throw bad("본인이 티켓 화면에서 올린 사진만 첨부할 수 있습니다.");
+        }
+
+        try {
+            attachmentService.markAttached(attachmentId, companyId);
+        } catch (IllegalStateException e) {
+            throw conflict("이미 연결됐거나 첨부할 수 없는 사진입니다.");
+        }
+
+        if (dao.insertTicketFile(companyId, ticketId, attachmentId) != 1) {
+            throw new IllegalStateException("티켓 사진 연결 결과를 확인할 수 없습니다.");
+        }
+    }
+
+    /** 티켓 조회 권한과 사진 연결을 확인한 뒤 사진 내용을 읽는다. */
+    public Resource loadPhoto(LoginUser user, Long ticketId, Long attachmentId, boolean adminView) {
+        if (adminView) {
+            requireOperator(user);
+        } else {
+            requireLogin(user);
+        }
+        requireId(ticketId);
+        requireId(attachmentId);
+
+        Long companyId = user.getCompanyId();
+        TicketWorkDTO ticket = dao.selectOne(companyId, ticketId);
+        if (ticket == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓을 찾을 수 없습니다.");
+        }
+        if (!adminView) {
+            requireOwner(user, ticket);
+        }
+        if (!dao.selectTicketFileIds(companyId, ticketId).contains(attachmentId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓 사진을 찾을 수 없습니다.");
+        }
+
+        try {
+            return attachmentService.load(attachmentService.get(attachmentId, companyId));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "티켓 사진을 찾을 수 없습니다.");
+        } catch (IOException e) {
+            throw new UncheckedIOException("티켓 사진을 읽지 못했습니다.", e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -120,6 +233,13 @@ public class TicketWorkService {
                 label.put("serial", asset.getSerialNo());
             }
             item.put("asset", label);
+            
+            Long photoId = null;
+            if (TicketType.TK_INCIDENT.name().equals(row.getType())) {
+				photoId = dao.selectTicketFileIds(user.getCompanyId(), row.getId()).stream().findFirst().orElse(null);
+			}
+            item.put("photoId", photoId);
+            
             List<TicketCommentDTO> comments = dao.comments(user.getCompanyId(), row.getId());
             List<TicketHistoryDTO> history = dao.history(user.getCompanyId(), row.getId());
             List<Long> employeeIds = new ArrayList<>();
@@ -135,38 +255,104 @@ public class TicketWorkService {
                     "at", time(h.getCreatedAt()), "name", name(accountNames, h.getActorAccountId()),
                     "text", historyText(h, employeeNames))).collect(Collectors.toList()));
             item.put("canComment", !terminal(row));
-            item.put("canClose", RESOLVED.name().equals(row.getStatus()));
+            item.put("canClose", user.getEmployeeId().equals(row.getRequesterId()) && RESOLVED.name().equals(row.getStatus()));
+            // 본인이 접수한 장애·문의 중 접수 상태인 건만 취소할 수 있다.
+            item.put("canCancel", user.getEmployeeId().equals(row.getRequesterId())
+            						&& RECEIVED.name().equals(row.getStatus())
+            						&& isCancellableType(row.getType()));
             item.put("version", row.getVersion());
             return item;
     }
 
-    /** IT·관리자는 같은 업체 목록을 읽되 변경은 각 처리 메서드에서 다시 제한한다. */
+    /** 기존 관리자 화면에 상태 탭별 건수와 선택한 탭의 전체 목록을 반환한다. */
     @Transactional(readOnly = true)
     public Map<String, Object> listAdmin(LoginUser user, String filter) {
-        requireOperator(user);
-        String wanted = filter == null || filter.isBlank() ? "UNASSIGNED" : filter;
-        List<String> filters = List.of("UNASSIGNED", "MINE", "IN_PROGRESS", "RESOLVED", "ALL");
-        if (!filters.contains(wanted)) { throw bad("목록 조건이 올바르지 않습니다."); }
+    	requireOperator(user);
+        String selectedFilter = adminFilter(filter);
         List<TicketWorkDTO> rows = dao.selectCompany(user.getCompanyId());
-        Map<Long, EmployeeOptionDTO> names = people(user.getCompanyId(), rows.stream()
-                .flatMap(r -> java.util.stream.Stream.of(r.getRequesterId(), r.getAssigneeId())).collect(Collectors.toList()));
-        Map<Long, BranchDetailDTO> branches = branchService.getBranchDetails(user.getCompanyId()).stream()
-                .collect(Collectors.toMap(BranchDetailDTO::getBranchId, Function.identity()));
+
         Map<String, Long> counts = new LinkedHashMap<>();
-        filters.forEach(f -> counts.put(f, rows.stream().filter(r -> matches(r, user, f)).count()));
+        ADMIN_FILTERS.forEach(tab ->
+                counts.put(tab, rows.stream().filter(row -> matches(row, user, tab)).count()));
+
+        List<TicketWorkDTO> filteredRows = rows.stream()
+                .filter(row -> matches(row, user, selectedFilter))
+                .collect(Collectors.toList());
+
+        return Map.of("counts", counts, "items", adminItems(user.getCompanyId(), filteredRows));
+    }
+    
+    /** 제목 검색 결과의 탭별 건수와 선택한 탭의 한 페이지를 반환한다. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> searchAdmin(LoginUser user, String filter, String keyword, Long requestedPage) {
+        requireOperator(user);
+        String selectedFilter = adminFilter(filter);
+        String searchKeyword = keyword == null ? "" : keyword.strip();
+        if (searchKeyword.codePointCount(0, searchKeyword.length()) > 200) {
+            throw bad("검색어는 200자 이하로 입력해 주세요.");
+        }
+
+        Long companyId = user.getCompanyId();
+        Long employeeId = user.getEmployeeId();
+        TicketAdminCountsDTO tabCounts = dao.countAdminTicketTabs(companyId, employeeId, searchKeyword);
+
+        Map<String, Long> counts = Map.of(
+                "UNASSIGNED", tabCounts.getUnassignedCount(),
+                "MINE", tabCounts.getMineCount(),
+                "IN_PROGRESS", tabCounts.getInProgressCount(),
+                "RESOLVED", tabCounts.getResolvedCount(),
+                "ALL", tabCounts.getAllCount());
+
+        long total = counts.get(selectedFilter);
+        long pages = total == 0 ? 1L : (total - 1) / ADMIN_PAGE_SIZE + 1;
+        long page = requestedPage == null ? 1L : Math.min(Math.max(1L, requestedPage), pages);
+        long offset = (page - 1) * ADMIN_PAGE_SIZE;
+
+        List<TicketWorkDTO> rows = total == 0 ? List.of()
+                : dao.selectAdminTicketPage(companyId, employeeId, searchKeyword,
+                        selectedFilter, offset, ADMIN_PAGE_SIZE);
+
+        return Map.of("counts", counts, "items", adminItems(companyId, rows),
+                "page", page, "pages", pages, "total", total);
+    }
+    
+    /** 관리자 목록의 상태 탭 값을 검증하고 기본 탭을 정한다. */
+    private static String adminFilter(String filter) {
+        String selectedFilter = filter == null || filter.isBlank() ? "UNASSIGNED" : filter;
+        if (!ADMIN_FILTERS.contains(selectedFilter)) {
+            throw bad("목록 조건이 올바르지 않습니다.");
+        }
+        return selectedFilter;
+    }
+    
+    /** 조회된 티켓에 요청자·담당자 이름과 지점명을 붙인다. */
+    private List<Map<String, Object>> adminItems(Long companyId, List<TicketWorkDTO> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, EmployeeOptionDTO> names = people(companyId, rows.stream()
+                .flatMap(row -> java.util.stream.Stream.of(row.getRequesterId(), row.getAssigneeId()))
+                .collect(Collectors.toList()));
+        Map<Long, BranchDetailDTO> branches = branchService.getBranchDetails(companyId).stream()
+                .collect(Collectors.toMap(BranchDetailDTO::getBranchId, Function.identity()));
+
         List<Map<String, Object>> items = new ArrayList<>();
         for (TicketWorkDTO row : rows) {
-            if (!matches(row, user, wanted)) { continue; }
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("id", row.getId()); item.put("type", row.getType()); item.put("title", row.getTitle());
-            item.put("status", row.getStatus()); item.put("at", time(row.getAt()));
+            item.put("id", row.getId());
+            item.put("type", row.getType());
+            item.put("title", row.getTitle());
+            item.put("status", row.getStatus());
+            item.put("at", time(row.getAt()));
             item.put("requester", person(row.getRequesterId(), names));
             item.put("assignee", row.getAssigneeId() == null ? null : person(row.getAssigneeId(), names));
+
             BranchDetailDTO branch = branches.get(row.getBranchId());
             item.put("branchName", branch == null ? null : branch.getBranchName());
             items.add(item);
         }
-        return Map.of("counts", counts, "items", items);
+        return items;
     }
 
     @Transactional(readOnly = true)
@@ -316,7 +502,29 @@ public class TicketWorkService {
         requireState(row, RESOLVED);
         change(user, row, CLOSED, row.getAssigneeId(), "요청자 확인", false);
     }
+    
+    /** 요청자가 직접 접수한 장애·문의 티켓을 접수 상태에서 취소한다. */
+    @Transactional
+    public void cancel(LoginUser user, Long id, TicketRequestDTO form) {
+    	requireLogin(user);
+    	requireForm(form);
 
+    	if (form.getVersion() == null || form.getVersion() < 0) {
+			throw bad("변경 버전이 필요합니다.");
+		}
+    	
+    	TicketWorkDTO row = locked(user, id);
+    	requireOwner(user, row);
+    	requireVersion(row, form);
+    	requireState(row, RECEIVED);
+    	
+    	if (!isCancellableType(row.getType())) {
+			throw conflict("직접 접수한 장애·문의 티켓만 취소할 수 있습니다.");
+		}
+    	
+    	change(user, row, CANCELED, row.getAssigneeId(), "요청자 취소", false);
+    }
+    
     @Transactional
     public void assign(LoginUser user, Long id, TicketRequestDTO form) {
         requireOperator(user);
@@ -435,6 +643,12 @@ public class TicketWorkService {
     }
     private static boolean admin(LoginUser user) { return "ROLE_ADMIN".equals(user.getRole()); }
     private static boolean terminal(TicketWorkDTO row) { return List.of(CLOSED.name(), CANCELED.name(), REJECTED.name()).contains(row.getStatus()); }
+    
+    /** 요청자가 직접 취소할 수 있는 장애·문의 종류인지 확인한다. */
+    private static boolean isCancellableType(String type) {
+    	return TicketType.TK_INCIDENT.name().equals(type) || TicketType.TK_QUESTION.name().equals(type);
+    }
+    
     private static void requireState(TicketWorkDTO row, TicketStatus expected) {
         if (!expected.name().equals(row.getStatus())) { throw conflict("현재 상태에서는 처리할 수 없습니다. 새로 불러와 주세요."); }
     }

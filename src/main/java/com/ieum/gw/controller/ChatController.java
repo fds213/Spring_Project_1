@@ -16,6 +16,7 @@ import com.ieum.gw.dto.ChatRoomDTO;
 import com.ieum.gw.service.ChatService;
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.EmpSummaryDTO;
+import com.ieum.gw.dto.EmployeeOptionDTO;
 import com.ieum.gw.service.EmployeeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -95,34 +96,32 @@ public class ChatController {
     // 채팅 메인
     @GetMapping(value = "/rooms")
     public String rooms(Model model, @AuthenticationPrincipal LoginUser user) {
-        // @RequestParam("roomName") String roomName
-
-        // 현재 세션 유저
-        // 의 참여 채팅방
-//        Long empNum = user.getEmployeeId();
-        List<ChatRoomDTO> roomlist = cService.getRoomList(user.getCompanyId(), user.getEmployeeId());
-        model.addAttribute("user", user); // empnum만 넘겨도 ㄱㅊ을듯 나중에 판단
-        model.addAttribute("roomList", roomlist);
-
-        List<EmpSummaryDTO> empList = eService.listActiveEmp(user.getCompanyId(), user.getEmployeeId());
-        model.addAttribute("empList", empList);
-
-
+        addRoomsPage(model, user);
         return "chat/rooms";
     }
 
-    // 채팅방
+    /** 채팅방: 방 목록 화면과 같은 두 칸 화면에서 오른쪽에 이 방을 연다. 대화는 화면 JS가 메시지 주소로 불러온다 */
     @GetMapping(value = "/room/{roomId}")
-    public String room(Model model,@PathVariable long roomId, @AuthenticationPrincipal LoginUser user) {
-        List<ChatMessageDTO> messages = cService.getMessages(user.getCompanyId(), roomId, user.getEmployeeId(), null);
-
+    public String room(Model model, @PathVariable long roomId, @AuthenticationPrincipal LoginUser user) {
+        // 참여하지 않은 방이면 여기서 403(AccessDeniedException)으로 끝난다
+        cService.getRoomMembers(user.getCompanyId(), roomId, user.getEmployeeId());
+        addRoomsPage(model, user);
         model.addAttribute("roomId", roomId);
-        model.addAttribute("messageList", messages);
-        model.addAttribute("employeeId", user.getEmployeeId());
-        model.addAttribute("roomMembers", cService.getRoomMemberNames(
-                user.getCompanyId(), roomId, user.getEmployeeId()));
+        return "chat/rooms";
+    }
 
-        return "chat/room";
+    /** 두 칸 채팅 화면의 공통 모델: 새 대화 창의 사원 목록, 내 직원 번호. 방 목록은 화면이 GET /chat/unread 로 받는다 */
+    private void addRoomsPage(Model model, LoginUser user) {
+        List<EmpSummaryDTO> empList = eService.listActiveEmp(user.getCompanyId(), user.getEmployeeId());
+        model.addAttribute("empList", empList);
+        model.addAttribute("employeeId", user.getEmployeeId());
+    }
+
+    /** 방 참여자(직원 번호·이름·부서, 본인 포함). 대화 칸의 참여자 목록과 1:1 대화 버튼이 쓴다 */
+    @GetMapping("/room/{roomId}/members")
+    @ResponseBody
+    public List<EmployeeOptionDTO> members(@PathVariable long roomId, @AuthenticationPrincipal LoginUser user) {
+        return cService.getRoomMembers(user.getCompanyId(), roomId, user.getEmployeeId());
     }
 
     // 이전 메시지 받기

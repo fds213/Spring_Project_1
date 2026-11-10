@@ -1,5 +1,6 @@
 package com.ieum.gw.controller;
 
+import java.math.BigDecimal;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -125,6 +126,22 @@ public class AttendanceController {
         return service.overview(user.getCompanyId(), month);
     }
 
+    /** 직원 한 명의 연차 보유·남은 일수와 추가 부여 내역 (최근 순) */
+    @GetMapping("/attendance/admin/api/leaves/{employeeId}/grants")
+    @ResponseBody
+    public Map<String, Object> leaveGrants(@AuthenticationPrincipal LoginUser user, @PathVariable Long employeeId) {
+        return leaveService.grantHistory(user.getCompanyId(), employeeId);
+    }
+
+    /** 연차 추가 부여(+)·되돌리기(-) { days, note }. 업체 관리자·인사 담당, 본인 연차는 안 된다 */
+    @PostMapping("/attendance/admin/api/leaves/{employeeId}/grants")
+    @ResponseBody
+    public Map<String, Object> grantLeave(@AuthenticationPrincipal LoginUser user, @PathVariable Long employeeId,
+                                          @RequestBody Map<String, Object> body) {
+        Object note = body.get("note");
+        return leaveService.grantExtraLeave(user, employeeId, toDays(body.get("days")), note == null ? null : String.valueOf(note));
+    }
+
     @GetMapping("/attendance/admin/holiday")
     public String holidayPage() {
         return "attendance/admin/holiday";
@@ -162,6 +179,16 @@ public class AttendanceController {
             return Long.valueOf(String.valueOf(v));
         } catch (NumberFormatException e) {
             throw new AttendanceException(400, "값이 올바르지 않습니다");
+        }
+    }
+
+    /** 일수 값 (숫자·문자 모두 받는다). 비었으면 null, 숫자가 아니면 400 */
+    private static BigDecimal toDays(Object v) {
+        if (v == null || String.valueOf(v).isBlank()) return null;
+        try {
+            return new BigDecimal(String.valueOf(v).trim());
+        } catch (NumberFormatException e) {
+            throw new AttendanceException(400, "일수는 숫자로 넣어 주세요");
         }
     }
 

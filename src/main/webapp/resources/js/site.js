@@ -86,6 +86,77 @@ if (calcUsers) {
   fromBox();
 }
 
+// 히어로 영상: 동작 줄이기 설정이면 재생하지 않고 첫 화면(poster)에 둔다. 그래서 video 에 autoplay 를 쓰지 않는다
+const heroVideo = document.querySelector('.hero .device video');
+if (heroVideo) {
+  const calm = matchMedia('(prefers-reduced-motion: reduce)');
+  // 재생한다. 브라우저가 자동 재생을 막으면 첫 화면이 그대로 남는다
+  const playHeroVideo = () => heroVideo.play().catch(() => {});
+  // load() 는 preload="none" 을 무시하고 영상을 받으므로 설정이 바뀌었을 때만 부른다
+  calm.addEventListener('change', () => { if (calm.matches) heroVideo.load(); else playHeroVideo(); });
+  if (!calm.matches) playHeroVideo();
+}
+
+// 히어로 카드: 영상이 도는 동안 지금 장면에 맞는 문구로 바꾼다. 영상이 안 돌면(동작 줄이기·자동 재생 막힘)
+// 아무것도 하지 않아 JSP에 적힌 문구(결재 승인)가 그대로 남는다.
+// hero-app.mp4의 화면 전환은 '앞 화면이 빠짐 → 새 화면이 들어옴' 두 단계라, 카드도 out(초)에 앞 화면과 함께 비키고
+// in(초)에 새 화면과 함께 새 문구로 나온다. 영상을 바꾸면 이 표도 같이 고친다(0.1초 단위로 잰 값).
+const HERO_SCENES = [
+  { out: 0,    in: 0,    title: '오늘 출근 08:52',      sub: '결재·일정·공지를 홈에서 한눈에' },
+  { out: 2.5,  in: 3.1,  title: '휴가 신청서 상신',      sub: '11월 12일 오전 반차 · 결재선 지정' },
+  { out: 5.8,  in: 6.7,  title: '휴가 신청서 최종 승인', sub: '연차 차감 · 일정 등록 완료' },
+  { out: 8.9,  in: 9.7,  title: '연차 0.5일 차감',       sub: '남은 연차 11.5일로 바로 반영' },
+  { out: 11.7, in: 12.7, title: '일정에 휴가 표시',      sub: '11월 12일 오전 반차' },
+  { out: 14.5, in: 14.8, title: '장애 티켓 접수',        sub: '사용 중인 노트북 고르고 증상 입력' },
+  { out: 16.8, in: 17.4, title: '장애 티켓 처리 완료',   sub: '교체 노트북 배정 · 처리 이력 기록' },
+  { out: 20.0, in: 20.9, title: '부서 채팅 새 메시지',   sub: '자료 공유와 답장을 바로' },
+  { out: 22.8, in: 23.0, title: '오늘 출근 08:52',      sub: '결재·일정·공지를 홈에서 한눈에' } // 첫 장면과 같은 홈이라 처음으로 그대로 이어진다
+];
+const heroCardText = document.querySelector('.hero .float-card b');
+const heroCardSub = document.querySelector('.hero .float-card small');
+if (heroVideo && heroCardText && heroCardSub) {
+  const card = heroCardText.closest('.float-card');
+  let shown = null;  // 지금 카드에 쓰인 장면
+  let swap = 0;      // 전환 밖에서 문구를 바꿀 때 잠깐 비켜 두는 타이머 (0이면 없음)
+  let ticking = false;
+  const write = s => { heroCardText.textContent = s.title; heroCardSub.textContent = s.sub; };
+
+  // t초에 맞는 카드: 전환 중(out~in)이면 비켜 두고 그 사이에 문구를 바꾼다(.is-swap, css/site.css).
+  // 마우스 기울기의 .is-away 와는 따로 둔다
+  function sync(t) {
+    const s = HERO_SCENES.reduce((cur, x) => (t >= x.out ? x : cur), HERO_SCENES[0]);
+    const between = t < s.in;
+    // 같은 문구면 바꾸지 않는다(영상 끝의 홈 → 처음의 홈으로 돌아갈 때 카드가 튀지 않게)
+    if (shown && s.title === shown.title && s.sub === shown.sub) { if (!swap) card.classList.toggle('is-swap', between); return; }
+    shown = s;
+    clearTimeout(swap);
+    card.classList.add('is-swap');
+    // 문구는 카드가 다 숨은 뒤(0.18초, .is-swap 전환 시간)에 바꾼다. 바로 쓰면 사라지는 동안 다음 장면 문구가 먼저 비친다.
+    // 그때 전환이 끝났으면(처음 재생·되감기, 짧은 전환) 바로 다시 꺼내고, 아직 전환 중이면 in 초에 다음 sync 가 꺼낸다
+    swap = setTimeout(() => {
+      swap = 0;
+      write(s);
+      if (heroVideo.currentTime >= s.in) card.classList.remove('is-swap');
+    }, 180);
+  }
+
+  // timeupdate 는 0.25초쯤마다라 늦다: 재생 중에는 영상 프레임(없으면 화면 그리기)마다 본다
+  const byFrame = 'requestVideoFrameCallback' in heroVideo;
+  function next() {
+    if (ticking) return; // 멈췄다 다시 재생해도 한 줄만 돈다
+    ticking = true;
+    const tick = (now, meta) => {
+      ticking = false;
+      sync(meta ? meta.mediaTime : heroVideo.currentTime);
+      if (!heroVideo.paused) next();
+    };
+    if (byFrame) heroVideo.requestVideoFrameCallback(tick); else requestAnimationFrame(() => tick());
+  }
+  heroVideo.addEventListener('play', next);
+  heroVideo.addEventListener('seeked', () => sync(heroVideo.currentTime));
+  if (!heroVideo.paused) next();
+}
+
 // 히어로: 그림 둘레에 마우스가 오면 그룹웨어 화면이 마우스 쪽으로 기울고, 멈추면 결재 카드가 화면 앞으로 튀어나온다
 // (화면이 움직이는 동안에는 비켜 있다). 처음 볼 때는 화면이 평평한 데서 서서히 기운 뒤 카드가
 // 나온다. 넓은 화면의 마우스에서만 하고 동작 줄이기 설정이면 끈다: 그 밖에는 화면이 정해진 기울기로

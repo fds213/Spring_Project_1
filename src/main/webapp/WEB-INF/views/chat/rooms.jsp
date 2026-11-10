@@ -2,11 +2,88 @@
          pageEncoding="UTF-8" %>
 <%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="ui" tagdir="/WEB-INF/tags" %>
-<%-- 모델 속성: roomList (chatRoomId, displayName, unreadCount), empList (employeeId, employeeName) --%>
-<ui:layout title="채팅방 목록" crumb="채팅" menu="chat">
+<c:set var="ctx" value="${pageContext.request.contextPath}" />
+<%--
+  채팅 두 칸 화면: GET /chat/rooms(방 안 고름), GET /chat/room/{roomId}(오른쪽에 그 방).
+  왼쪽 방 목록·검색(room-list.js), 오른쪽 대화(conversation.js). 방을 바꿀 때는 페이지를 다시 읽지 않고 주소만 바꾼다.
+  900px 아래는 한 칸씩: 방을 고르기 전에는 목록, 고른 뒤에는 대화(위쪽 ← 로 목록).
+  모델 속성: roomId(없을 수 있음), employeeId(나), empList(새 대화 창: employeeId, employeeName, departmentName)
+  chat.css 와 채팅 스크립트(updates·room-list·conversation)는 공통 레이아웃이 불러 둔다.
+--%>
+<ui:layout title="채팅" crumb="소통" menu="chat">
   <jsp:attribute name="scripts">
     <script>
       (function () {
+        var ctx = document.body.dataset.ctx || '';
+        var app = document.getElementById('chatApp');
+        var me = app.dataset.me;
+        var convPane = document.getElementById('chatConvPane');
+        var guide = document.getElementById('chatGuide');
+        var conv = null;
+        var pendingTitle = false;
+
+        ChatUpdates.start();
+
+        var rooms = ChatRoomList.create(document.getElementById('chatRoomsPane'), {
+          activeId: app.dataset.roomId || null,
+          onOpen: function (room) { openRoom(room.chatRoomId, room.displayName, room.roomType, true); },
+          onUpdate: function () {
+            // 주소로 바로 연 방은 목록이 온 뒤에야 이름을 안다
+            if (conv && pendingTitle) {
+              var room = rooms.get(conv.roomId);
+              if (room) {
+                conv.setTitle(room.displayName);
+                document.title = room.displayName || '채팅';
+                pendingTitle = false;
+              }
+            }
+          }
+        });
+
+        function closeRoom(push) {
+          if (conv) conv.destroy();
+          conv = null;
+          convPane.replaceChildren(guide);
+          app.classList.remove('has-room');
+          rooms.setActive(null);
+          document.title = '채팅';
+          if (push) history.pushState({ roomId: null }, '', '${ctx}/chat/rooms');
+        }
+
+        function openRoom(id, title, roomType, push) {
+          id = String(id);
+          if (conv && conv.roomId === id) {
+            app.classList.add('has-room');
+            conv.focus();
+            return;
+          }
+          if (conv) conv.destroy();
+          var known = rooms.get(id);
+          pendingTitle = !title && !known;
+          conv = ChatConversation.mount(convPane, {
+            roomId: id,
+            me: me,
+            title: title || (known && known.displayName),
+            roomType: roomType || (known && known.roomType),
+            onBack: function () { closeRoom(true); rooms.focusSearch(); },
+            onOpenRoom: function (otherId, otherTitle, otherType) { openRoom(otherId, otherTitle, otherType, true); }
+          });
+          app.classList.add('has-room');
+          rooms.setActive(id);
+          document.title = title || (known && known.displayName) || '채팅';
+          if (push) history.pushState({ roomId: id }, '', '${ctx}/chat/room/' + encodeURIComponent(id));
+        }
+
+        window.addEventListener('popstate', function () {
+          var match = /\/chat\/room\/(\d+)\/?$/.exec(location.pathname);
+          if (match) openRoom(match[1], null, null, false);
+          else closeRoom(false);
+        });
+
+        if (app.dataset.roomId) openRoom(app.dataset.roomId, null, null, false);
+        history.replaceState({ roomId: app.dataset.roomId || null }, '');
+
+        // ---------- 새 대화 창 (1:1 / 그룹) ----------
         var dialog = document.getElementById('createDialog');
         var form = document.getElementById('createRoomForm');
         var roomType = document.getElementById('roomType');
@@ -49,9 +126,13 @@
           error.textContent = '';
         }
 
-        document.getElementById('createBtn').addEventListener('click', function () {
+        function openCreate() {
           updateRoomType();
           dialog.showModal();
+          employeeSearch.focus();
+        }
+        document.querySelectorAll('[data-chat-create]').forEach(function (btn) {
+          btn.addEventListener('click', openCreate);
         });
         cancelBtn.addEventListener('click', function () { dialog.close(); });
         dialog.addEventListener('cancel', function (event) {
@@ -97,122 +178,71 @@
         });
         updateRoomType();
         filterEmployees();
-
-        var list = document.getElementById('chatRoomList');
-        var unreadTotal = document.getElementById('chatUnreadTotal');
-        var empty = document.getElementById('chatRoomEmpty');
-        window.addEventListener('ieum:chat-unread', function (event) {
-          var snapshot = event.detail;
-          unreadTotal.textContent = '안 읽은 채팅 ' + snapshot.total + '개';
-          var current = new Map(Array.from(list.querySelectorAll('[data-room-id]'))
-            .map(function (row) { return [row.dataset.roomId, row]; }));
-          snapshot.rooms.forEach(function (room) {
-            var id = String(room.chatRoomId);
-            var row = current.get(id);
-            if (!row) {
-              row = document.createElement('li');
-              row.dataset.roomId = id;
-              var link = document.createElement('a');
-              link.href = list.dataset.roomBase + encodeURIComponent(id);
-              var name = document.createElement('span');
-              name.dataset.roomName = '';
-              var badge = document.createElement('span');
-              badge.dataset.roomUnread = '';
-              badge.className = 'badge';
-              link.append(name, ' ', badge);
-              row.append(link);
-            }
-            list.append(row);
-            row.querySelector('[data-room-name]').textContent = room.displayName || '';
-            var badge = row.querySelector('[data-room-unread]');
-            badge.textContent = '안 읽은 메시지 ' + room.unreadCount + '개';
-            badge.hidden = room.unreadCount === 0;
-            current.delete(id);
-          });
-          current.forEach(function (row) { row.remove(); });
-          empty.hidden = snapshot.rooms.length !== 0;
-        });
+        // 채팅 패널의 '새 대화' 버튼은 /chat/rooms?new 로 온다
+        if (new URLSearchParams(location.search).has('new') && !document.body.classList.contains('is-readonly')) {
+          history.replaceState(history.state, '', '${ctx}/chat/rooms');
+          openCreate();
+        }
       })();
     </script>
-    <script src="${pageContext.request.contextPath}/resources/js/chat/updates.js"
-            data-context-path="${pageContext.request.contextPath}"></script>
   </jsp:attribute>
   <jsp:body>
-    <style>
-      /* 공통 틀과 겹치지 않게 .chat-rooms 안으로 범위를 좁힌다 */
-      .chat-rooms ul { list-style: none; padding: 0; }
-      .chat-rooms li { padding: 12px; border-bottom: 1px solid #ddd; }
-      .chat-rooms li a { text-decoration: none; color: inherit; display: block; }
-      .chat-rooms .room-list li:hover { background: #f5f5f5; }
-      .chat-rooms .empty { color: #888; padding: 12px; }
-      .chat-rooms dialog { width: 360px; border: 1px solid #ccc; border-radius: 8px; }
-      .chat-rooms dialog input[type=text] { width: 100%; box-sizing: border-box; }
-      .chat-rooms .emp-list { max-height: 240px; overflow-y: auto; border: 1px solid #ddd; }
-      .chat-rooms .emp-list li { padding: 6px 10px; }
-    </style>
-
-    <div class="chat-rooms">
-      <div class="page-head">
-        <h1>채팅방 목록</h1>
-        <button type="button" id="createBtn">채팅방 생성</button>
+    <div class="chat-app${not empty roomId ? ' has-room' : ''}" id="chatApp" data-me="${employeeId}" data-room-id="${roomId}">
+      <aside class="chat-app-side" aria-labelledby="chatAppTitle">
+        <div class="chat-app-head">
+          <h1 id="chatAppTitle">채팅</h1>
+          <button type="button" class="btn btn-primary" data-chat-create data-write>새 대화</button>
+        </div>
+        <div class="chat-app-rooms" id="chatRoomsPane"></div>
+      </aside>
+      <div class="chat-app-main" id="chatConvPane">
+        <div class="chat-guide" id="chatGuide">
+          <svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+          <p>왼쪽에서 대화할 방을 고르세요.</p>
+          <button type="button" class="btn" data-chat-create data-write>새 대화 시작</button>
+        </div>
       </div>
-
-      <dialog id="createDialog" aria-labelledby="createRoomTitle">
-        <form id="createRoomForm" method="post" action="${pageContext.request.contextPath}/chat/createroom">
-          <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
-          <h3 id="createRoomTitle">채팅방 만들기</h3>
-          <p>
-            <label for="roomType">대화 종류</label>
-            <select name="roomType" id="roomType">
-              <option value="ROOM_DIRECT">1:1 대화</option>
-              <option value="ROOM_GROUP">그룹 대화</option>
-            </select>
-          </p>
-          <p id="roomNameField" hidden>
-            <label for="roomName">그룹방 이름 (최대 200자)</label>
-            <input type="text" name="roomName" id="roomName" placeholder="그룹방 이름" disabled>
-          </p>
-          <p id="memberHint"></p>
-          <p>참여자 선택 (본인 제외)</p>
-          <label for="chatEmployeeSearch">직원 검색</label>
-          <input type="search" id="chatEmployeeSearch" placeholder="이름 또는 부서">
-          <ul class="emp-list">
-            <c:forEach var="emp" items="${empList}">
-              <li data-chat-employee><label>
-                <input type="checkbox" name="members" value="${emp.employeeId}">
-                <c:out value="${emp.employeeName}"/>
-                <c:if test="${not empty emp.departmentName}">
-                  (<c:out value="${emp.departmentName}"/>)
-                </c:if>
-              </label></li>
-            </c:forEach>
-            <c:if test="${empty empList}">
-              <li class="empty">선택할 사원이 없습니다.</li>
-            </c:if>
-          </ul>
-          <p id="chatEmployeeSearchEmpty" role="status" hidden>검색 결과가 없습니다.</p>
-          <p id="createRoomError" role="alert"></p>
-          <p>
-            <button type="submit" id="submitRoomBtn">대화 열기</button>
-            <button type="button" id="cancelBtn">취소</button>
-          </p>
-        </form>
-      </dialog>
-
-      <p id="chatUnreadTotal" role="status" aria-live="polite"></p>
-      <ul id="chatRoomList" class="room-list" data-room-base="${pageContext.request.contextPath}/chat/room/">
-        <c:forEach var="room" items="${roomList}">
-          <li data-room-id="${room.chatRoomId}">
-            <a href="${pageContext.request.contextPath}/chat/room/${room.chatRoomId}">
-              <span data-room-name><c:out value="${room.displayName}"/></span>
-              <span class="badge" data-room-unread
-                    <c:if test="${room.unreadCount eq 0}">hidden</c:if>>안 읽은 메시지 <c:out value="${room.unreadCount}"/>개</span>
-            </a>
-          </li>
-        </c:forEach>
-        <li id="chatRoomEmpty" class="empty"
-            <c:if test="${not empty roomList}">hidden</c:if>>참여 중인 채팅방이 없습니다.</li>
-      </ul>
     </div>
+
+    <dialog class="modal chat-create-dialog" id="createDialog" aria-labelledby="createRoomTitle">
+      <form id="createRoomForm" method="post" action="${ctx}/chat/createroom">
+        <input type="hidden" name="${_csrf.parameterName}" value="${_csrf.token}"/>
+        <h2 id="createRoomTitle">새 대화</h2>
+        <div class="field">
+          <label for="roomType">대화 종류</label>
+          <select class="input" name="roomType" id="roomType">
+            <option value="ROOM_DIRECT">1:1 대화</option>
+            <option value="ROOM_GROUP">그룹 대화</option>
+          </select>
+        </div>
+        <div class="field" id="roomNameField" hidden>
+          <label for="roomName">그룹방 이름 (최대 200자)</label>
+          <input class="input" type="text" name="roomName" id="roomName" placeholder="그룹방 이름" disabled>
+        </div>
+        <p class="chat-hint" id="memberHint"></p>
+        <div class="field">
+          <label for="chatEmployeeSearch">참여자 선택 (본인 제외)</label>
+          <input class="input" type="search" id="chatEmployeeSearch" placeholder="이름 또는 부서로 찾기">
+        </div>
+        <ul class="emp-list">
+          <c:forEach var="emp" items="${empList}">
+            <li data-chat-employee><label>
+              <input type="checkbox" name="members" value="${emp.employeeId}">
+              <span><c:out value="${emp.employeeName}"/><c:if test="${not empty emp.departmentName}">
+                (<c:out value="${emp.departmentName}"/>)</c:if></span>
+            </label></li>
+          </c:forEach>
+          <c:if test="${empty empList}">
+            <li class="empty">선택할 사원이 없습니다.</li>
+          </c:if>
+        </ul>
+        <p class="chat-hint" id="chatEmployeeSearchEmpty" role="status" hidden>검색 결과가 없습니다.</p>
+        <p class="chat-form-error" id="createRoomError" role="alert"></p>
+        <div class="modal-actions">
+          <button type="button" class="btn" id="cancelBtn">취소</button>
+          <button type="submit" class="btn btn-primary" id="submitRoomBtn">대화 열기</button>
+        </div>
+      </form>
+    </dialog>
   </jsp:body>
 </ui:layout>

@@ -1,32 +1,60 @@
 package com.ieum.gw.service;
 
-import com.ieum.gw.dao.ApprovalDAO;
-import com.ieum.gw.dto.*;
-import com.ieum.gw.dto.LeaveDayDTO;
-import com.ieum.gw.code.AssetType;
-import com.ieum.gw.code.ApprovalAction;
-import com.ieum.gw.code.ApprovalDocumentStatus;
-import com.ieum.gw.code.ApprovalDocumentType;
-import com.ieum.gw.code.ApprovalStepStatus;
-import com.ieum.gw.code.LeaveType;
-import com.ieum.gw.dto.LoginUser;
-import lombok.RequiredArgsConstructor;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.core.io.Resource;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Service;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ieum.gw.code.ApprovalAction;
+import com.ieum.gw.code.ApprovalDocumentStatus;
+import com.ieum.gw.code.ApprovalDocumentType;
+import com.ieum.gw.code.ApprovalStepStatus;
+import com.ieum.gw.code.AssetType;
+import com.ieum.gw.code.LeaveType;
+import com.ieum.gw.dao.ApprovalDAO;
+import com.ieum.gw.dto.ApprovalBoxDTO;
+import com.ieum.gw.dto.ApprovalBoxHistoryDTO;
+import com.ieum.gw.dto.ApprovalBoxStepDTO;
+import com.ieum.gw.dto.ApprovalDecisionDTO;
+import com.ieum.gw.dto.ApprovalDecisionResultDTO;
+import com.ieum.gw.dto.ApprovalDocumentDTO;
+import com.ieum.gw.dto.ApprovalEquipmentDTO;
+import com.ieum.gw.dto.ApprovalFieldsDTO;
+import com.ieum.gw.dto.ApprovalFileDTO;
+import com.ieum.gw.dto.ApprovalHistoryDTO;
+import com.ieum.gw.dto.ApprovalLeaveDTO;
+import com.ieum.gw.dto.ApprovalStepDTO;
+import com.ieum.gw.dto.ApprovalSubmitDTO;
+import com.ieum.gw.dto.ApprovedEquipmentDTO;
+import com.ieum.gw.dto.ApproverDTO;
+import com.ieum.gw.dto.AttachmentDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LoginUser;
+
+import lombok.RequiredArgsConstructor;
 
 // Dear programmer:
 // When I wrote this code, only god and I knew how it worked.
@@ -50,7 +78,11 @@ public class ApprovalService {
             List.of(AssetType.AT_LAPTOP, AssetType.AT_DESKTOP, AssetType.AT_MONITOR, AssetType.AT_OTHER);
     private static final int EQUIPMENT_QUANTITY = 1; // 계획서 3장 B: 수량 1개
     private static final int PURPOSE_MAX = 1000;     // EQUIPMENT_REQUEST.PURPOSE VARCHAR2(1000 CHAR)
-
+    private static final int FILE_MAX = 5;       // 결재 문서 하나에 첨부 5개까지 (approval.js와 같게)
+    private static final String FILE_MODULE = "approval";	// 파일 저장 폴더 이름 ({업체}/approval/...)
+    private static final int DRAFT_JSON_MAX = 8000;      // 임시저장 입력값(JSON) 글자 수 상한
+    private static final ObjectMapper DRAFT_JSON = new ObjectMapper()
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     private final EmployeeService eService;
     private final AttendanceService aService;
     private final ApprovalDAO dao;
@@ -58,6 +90,7 @@ public class ApprovalService {
     private final NotificationService nService;
     private final ScheduleService sService;
     private final TicketService tService;
+    private final AttachmentService attachService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -209,13 +242,39 @@ public class ApprovalService {
         return dao.selectApprovedEquipment(companyId, approvalDocumentId);
     }
 
+    // 양식 확인: 휴가면 true, 장비면 false. 그 밖의 양식은 거절한다
+    private boolean isLeaveForm(String documentType) {
+        boolean isLeave = ApprovalDocumentType.DOC_LEAVE.name().equals(documentType);
+        if(!isLeave && !ApprovalDocumentType.DOC_EQUIPMENT.name().equals(documentType)) {
+            throw new IllegalArgumentException("지원하지 않는 양식");
+        }
+        return isLeave;
+    }
+
     @Transactional
     public Long submit(LoginUser user, ApprovalSubmitDTO dto) {
 
         // 양식 확인
-        boolean isLeave = ApprovalDocumentType.DOC_LEAVE.name().equals(dto.getDocumentType());
-        if(!isLeave && !ApprovalDocumentType.DOC_EQUIPMENT.name().equals(dto.getDocumentType())) {
-            throw new IllegalArgumentException("지원하지 않는 양식");
+        boolean isLeave = isLeaveForm(dto.getDocumentType());
+        // 임시저장에서 제출할 때: 같은 문서가 두 번 제출되지 않게 먼저 잠근다
+        if (dto.getDraftId() != null) {
+            lockMyDraft(user, dto.getDraftId());
+        }
+        if (dto.getOriginalDocumentId() != null) {
+            ApprovalDocumentDTO original;
+            try {
+                original = dao.lockDocument(user.getCompanyId(), dto.getOriginalDocumentId());
+            } catch (CannotAcquireLockException e) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+            }
+            if (original == null || !Objects.equals(original.getAuthorEmployeeId(), user.getEmployeeId())
+                    || !ApprovalDocumentStatus.REJECTED.name().equals(original.getStatusCode())
+                    || !dto.getDocumentType().equals(original.getDocumentType())) {
+                throw new IllegalArgumentException("재기안할 수 없는 문서입니다.");
+            }
+            if (dao.countRedrafts(user.getCompanyId(), dto.getOriginalDocumentId()) > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 재기안한 문서입니다.");
+            }
         }
 
         // 결재자 검사
@@ -240,11 +299,13 @@ public class ApprovalService {
         }
 
         // 양식마다 검사와 상세 저장이 다르다
-        return isLeave ? submitLeave(user, approverIds, fields) : submitEquipment(user, approverIds, fields);
-    }
+        Long documentId = isLeave ? submitLeave(user, approverIds, fields, dto) : submitEquipment(user, approverIds, fields, dto);
+        linkFiles(user, documentId, dto.getFileIds());
+        return documentId;
+    }    
 
     // 휴가 신청서: 날짜 계산·연차·겹침을 검사하고 휴가 상세·날짜를 저장한다
-    private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
+    private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, ApprovalSubmitDTO dto) {
 
         // 휴가 입력값 검사
         if(!StringUtils.hasText(fields.getReason())) throw new IllegalArgumentException("사유를 입력하세요.");
@@ -291,7 +352,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_LEAVE.name(), "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_LEAVE.name(), "휴가 신청서 - " + from + " ~ " + to, fields.getReason(), approverIds, dto);
 
         ApprovalLeaveDTO leave = new ApprovalLeaveDTO();
         leave.setCompanyId(user.getCompanyId());
@@ -309,7 +370,7 @@ public class ApprovalService {
 
     // 장비 지급 신청서: 장비 종류·수량·수령 지점·사용 목적을 검사하고 장비 상세를 저장한다.
     // 지급 티켓은 최종 승인 때 만든다(계획서 3장 B)
-    private Long submitEquipment(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields) {
+    private Long submitEquipment(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, ApprovalSubmitDTO dto) {
 
         AssetType assetType = EQUIPMENT_KINDS.stream()
                 .filter(t -> t.name().equals(fields.getAssetType()))
@@ -327,7 +388,7 @@ public class ApprovalService {
 
 
         // DB 저장
-        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_EQUIPMENT.name(), "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds);
+        Long documentId = saveDocument(user, ApprovalDocumentType.DOC_EQUIPMENT.name(), "장비 지급 신청서 - " + assetType.getLabel(), purpose, approverIds, dto);
 
         ApprovalEquipmentDTO equipment = new ApprovalEquipmentDTO();
         equipment.setApprovalDocumentId(documentId);
@@ -356,17 +417,24 @@ public class ApprovalService {
         return branchId;
     }
 
-    // 두 양식이 같이 쓰는 저장: 문서(결재 중) → 결재선(고른 순서대로 1·2단계) → 제출 이력. 새 문서 번호를 돌려준다
-    private Long saveDocument(LoginUser user, String documentType, String title, String content, List<Long> approverIds) {
+    // 두 양식이 같이 쓰는 저장: 문서(결재 중) → 결재선(고른 순서대로 1·2단계) → 제출 이력. 문서 번호를 돌려준다.
+    // 임시저장에서 제출하면 새 문서를 만들지 않고 그 문서를 DRAFT에서 IN_PROGRESS로 바꾼다
+    private Long saveDocument(LoginUser user, String documentType, String title, String content, List<Long> approverIds, ApprovalSubmitDTO dto) {
         ApprovalDocumentDTO document = new ApprovalDocumentDTO();
         document.setCompanyId(user.getCompanyId());
         document.setAuthorEmployeeId(user.getEmployeeId());
+        document.setOriginalDocumentId(dto.getOriginalDocumentId());
         document.setStatusCode(ApprovalDocumentStatus.IN_PROGRESS.name());
         document.setDocumentType(documentType);
         document.setTitle(title);
         document.setContent(content);
 
-        dao.insertDocument(document);
+        if (dto.getDraftId() == null) {
+            dao.insertDocument(document);
+        } else {
+            document.setApprovalDocumentId(dto.getDraftId());
+            if (dao.submitDraft(document) != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 제출한 문서입니다.");
+        }
 
         Long documentId = document.getApprovalDocumentId();
 
@@ -382,6 +450,7 @@ public class ApprovalService {
 
         ApprovalHistoryDTO history = new ApprovalHistoryDTO();
         history.setActionCode(ApprovalAction.APR_SUBMIT.name());
+        history.setBeforeStatus(dto.getDraftId() == null ? null : ApprovalDocumentStatus.DRAFT.name());
         history.setAfterStatus(ApprovalDocumentStatus.IN_PROGRESS.name());
         history.setActorAccountId(user.getUserAccountId());
         history.setApprovalDocumentId(documentId);
@@ -392,6 +461,133 @@ public class ApprovalService {
 
 
         return documentId;
+    }
+
+    /**
+     * 임시저장: 필수 칸이 비어 있어도 저장한다. 번호가 없으면 새로 만들고, 있으면 내 임시저장 문서를 고친다.
+     * 입력값은 문서 한 줄의 내용 칸(CONTENT)에 JSON으로만 담고, 결재선·휴가·장비 상세·이력·알림은 제출할 때 만든다
+     * (제출 전 문서가 결재함·연차 집계·알림에 드러나지 않게). 내용 검사도 제출할 때 한다.
+     */
+    @Transactional
+    public Long saveDraft(LoginUser user, ApprovalSubmitDTO dto) {
+        if (dto.getFields() == null) dto.setFields(new ApprovalFieldsDTO());
+        String title = draftTitle(dto); // 지원하지 않는 양식이면 여기서 거절한다
+
+        dto.setFileIds(cleanFileIds(dto.getFileIds()));
+        dto.getFileIds().forEach(id -> requireMyFile(user, id));
+
+        Long draftId = dto.getDraftId();
+        if (draftId != null) lockMyDraft(user, draftId);
+
+        ApprovalDocumentDTO document = new ApprovalDocumentDTO();
+        document.setCompanyId(user.getCompanyId());
+        document.setAuthorEmployeeId(user.getEmployeeId());
+        document.setStatusCode(ApprovalDocumentStatus.DRAFT.name());
+        document.setDocumentType(dto.getDocumentType());
+        document.setTitle(title);
+        document.setContent(toDraftJson(dto));
+
+        if (draftId == null) {
+            dao.insertDraft(document);
+            return document.getApprovalDocumentId();
+        }
+        document.setApprovalDocumentId(draftId);
+        if (dao.updateDraft(document) != 1) throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 제출한 문서입니다.");
+        return draftId;
+    }
+
+    /** 임시저장 문서를 지운다. 제출 전이라 결재선·이력·첨부 연결이 없어 문서 한 줄만 지우면 된다 */
+    @Transactional
+    public void deleteDraft(LoginUser user, long draftId) {
+        lockMyDraft(user, draftId);
+        if (dao.deleteDraft(user.getCompanyId(), user.getEmployeeId(), draftId) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 제출한 문서입니다.");
+        }
+    }
+
+    /** 내 임시저장 문서를 잠근다. 없거나 남의 문서면 404(있는지 알 수 없게), 이미 제출했으면 409 */
+    private void lockMyDraft(LoginUser user, long draftId) {
+        ApprovalDocumentDTO doc;
+        try {
+            doc = dao.lockDocument(user.getCompanyId(), draftId);
+        } catch (CannotAcquireLockException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "다른 요청에서 이 문서를 처리 중입니다. 잠시 후 다시 시도해 주세요.", e);
+        }
+        if (doc == null || !Objects.equals(doc.getAuthorEmployeeId(), user.getEmployeeId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "임시저장 문서를 찾을 수 없습니다.");
+        }
+        if (!ApprovalDocumentStatus.DRAFT.name().equals(doc.getStatusCode())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "이미 제출한 문서입니다.");
+        }
+    }
+
+    /** 임시저장 문서 이름: 고른 기간·장비가 있으면 제출 문서와 같은 꼴로, 없으면 양식 이름만 */
+    private String draftTitle(ApprovalSubmitDTO dto) {
+        ApprovalFieldsDTO fields = dto.getFields();
+        if (isLeaveForm(dto.getDocumentType())) {
+            LocalDate from = parseDateOrNull(fields.getFromDate());
+            LocalDate to = parseDateOrNull(fields.getToDate());
+            if (from == null) return "휴가 신청서";
+            return to == null ? "휴가 신청서 - " + from : "휴가 신청서 - " + from + " ~ " + to;
+        }
+        return EQUIPMENT_KINDS.stream()
+                .filter(t -> t.name().equals(fields.getAssetType()))
+                .findFirst()
+                .map(t -> "장비 지급 신청서 - " + t.getLabel())
+                .orElse("장비 지급 신청서");
+    }
+
+    // 쓰다 만 날짜는 없는 것으로 본다
+    private LocalDate parseDateOrNull(String value) {
+        if (!StringUtils.hasText(value)) return null;
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException e) {
+            return null;
+        }
+    }
+
+    /** 임시저장 입력값을 JSON으로 만든다. 문서 번호는 문서에 따로 있어 담지 않는다 */
+    private String toDraftJson(ApprovalSubmitDTO dto) {
+        dto.setDraftId(null);
+        String json;
+        try {
+            json = DRAFT_JSON.writeValueAsString(dto);
+        } catch (JsonProcessingException e) {
+            throw new IllegalArgumentException("임시저장하지 못했습니다.", e);
+        }
+        if (json.length() > DRAFT_JSON_MAX) throw new IllegalArgumentException("임시저장 내용이 너무 깁니다.");
+        return json;
+    }
+
+    /** 임시저장 JSON을 화면이 이어 쓸 값(입력칸·결재선·첨부·재기안 원본)으로 푼다. 읽지 못하면 빈 칸으로 둔다 */
+    private void fillDraft(LoginUser user, ApprovalBoxDTO draft) {
+        ApprovalSubmitDTO saved;
+        try {
+            saved = DRAFT_JSON.readValue(draft.getContent(), ApprovalSubmitDTO.class);
+        } catch (JsonProcessingException | IllegalArgumentException e) {
+            saved = new ApprovalSubmitDTO();
+        }
+        draft.setFields(saved.getFields() != null ? saved.getFields() : new ApprovalFieldsDTO());
+        draft.setLine(saved.getLine() != null ? saved.getLine() : List.of());
+        draft.setOriginalDocumentId(saved.getOriginalDocumentId());
+        draft.setFiles(draftFiles(user, saved.getFileIds()));
+        draft.setSteps(List.of());
+        draft.setHistory(List.of());
+    }
+
+    // 임시저장에 적어 둔 첨부 번호로 파일 정보를 찾는다. 저장 뒤 지워진 파일은 빼고 보여 준다
+    private List<ApprovalFileDTO> draftFiles(LoginUser user, List<Long> fileIds) {
+        List<ApprovalFileDTO> result = new ArrayList<>();
+        if (fileIds == null) return result;
+        for (Long id : fileIds) {
+            try {
+                result.add(toFileDTO(attachService.get(id, user.getCompanyId())));
+            } catch (IllegalArgumentException e) {
+                // 지워진 파일: 목록에서 뺀다
+            }
+        }
+        return result;
     }
 
 
@@ -452,7 +648,7 @@ public class ApprovalService {
 
     /**
      * 결재함: 내가 기안했거나 결재선에 있는 문서를 탭(WAIT·PROGRESS·DONE·REJECTED·DRAFT)별로 나눠 돌려준다.
-     * 임시저장은 이번 범위가 아니라 DRAFT는 항상 빈 목록이다.
+     * DRAFT(임시저장)는 내가 저장한 제출 전 문서만 담는다. 다른 사람에게는 보이지 않는다.
      * <ul>
      *   <li>WAIT(내 순번 대기): 진행 중인 문서 중 지금 순번이 나인 문서
      *       (내 단계가 WAITING이고 내 앞 단계가 모두 APPROVED)</li>
@@ -471,7 +667,12 @@ public class ApprovalService {
                 .collect(Collectors.groupingBy(ApprovalBoxStepDTO::getApprovalDocumentId));
         Map<Long, List<ApprovalBoxHistoryDTO>> history = dao.selectBoxHistory(companyId, employeeId).stream()
                 .collect(Collectors.groupingBy(ApprovalBoxHistoryDTO::getApprovalDocumentId));
-
+        Map<Long, List<ApprovalFileDTO>> files = new HashMap<>();
+        for (ApprovalFileDTO f : dao.selectBoxFiles(companyId, employeeId)) {
+            f.setUrl("/approval/api/documents/" + f.getApprovalDocumentId() + "/files/" + f.getId());
+            files.computeIfAbsent(f.getApprovalDocumentId(), k -> new ArrayList<>()).add(f);
+        }
+        
         Map<String, List<ApprovalBoxDTO>> box = new LinkedHashMap<>();
         for (String tab : List.of("WAIT", "PROGRESS", "DONE", "REJECTED", "DRAFT")) {
             box.put(tab, new ArrayList<>());
@@ -481,7 +682,15 @@ public class ApprovalService {
             Long id = doc.getApprovalDocumentId();
             doc.setSteps(steps.getOrDefault(id, List.of()));
             doc.setHistory(history.getOrDefault(id, List.of()));
+            doc.setFiles(files.getOrDefault(id, List.of()));
             doc.setCanDecide(doc.isMyTurn());
+            if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) {
+                doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()) && !doc.isRedrafted());
+                doc.getHistory().stream()
+                        .filter(h -> ApprovalAction.APR_REJECT.name().equals(h.getActionCode()))
+                        .reduce((first, last) -> last)
+                        .ifPresent(h -> doc.setRejectOpinion(h.getOpinion()));
+            }
             if (doc.getFields() != null && doc.getFields().getAssetType() != null) {
                 doc.setAssetTypeName(AssetType.from(doc.getFields().getAssetType()).getLabel());
             }
@@ -490,6 +699,11 @@ public class ApprovalService {
             else if (ApprovalDocumentStatus.IN_PROGRESS.name().equals(doc.getStatusCode())) box.get("PROGRESS").add(doc);
             else if (ApprovalDocumentStatus.APPROVED.name().equals(doc.getStatusCode())) box.get("DONE").add(doc);
             else if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) box.get("REJECTED").add(doc);
+        }
+
+        for (ApprovalBoxDTO draft : dao.selectDraftDocuments(companyId, employeeId)) {
+            fillDraft(user, draft);
+            box.get("DRAFT").add(draft);
         }
         return box;
     }
@@ -617,5 +831,75 @@ public class ApprovalService {
         dao.insertHistory(history);
 
         return createResponse(user, doc, history);
+    }
+    
+    /** 결재 첨부를 저장소에 올리고 번호·이름을 돌려준다(상신 전에 먼저 부른다) */
+    public List<ApprovalFileDTO> storeFiles(LoginUser user, List<MultipartFile> files) throws IOException {
+        
+    	
+    	if (files == null || files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올릴 파일을 골라 주세요");
+        }
+        if (files.size() > FILE_MAX) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 " + FILE_MAX + "개까지입니다");
+        }
+
+        List<ApprovalFileDTO> result = new ArrayList<>();
+        for (MultipartFile file : files) {
+            AttachmentDTO saved = attachService.upload(file, user, FILE_MODULE); // 형식이 틀리면 여기서 예외
+            result.add(toFileDTO(saved));
+        }
+        return result;
+    }
+
+    // 화면에 보낼 첨부 한 건
+    private ApprovalFileDTO toFileDTO(AttachmentDTO saved) {
+        ApprovalFileDTO f = new ApprovalFileDTO();
+        f.setId(saved.getAttachmentId());
+        f.setName(saved.getOriginalName());
+        f.setSize(saved.getByteSize());
+        f.setType(saved.getMimeType());
+        return f;
+    }
+
+    // 첨부 번호를 중복 없이 정리한다. 없으면 빈 목록, 5개를 넘으면 거절
+    private List<Long> cleanFileIds(List<Long> fileIds) {
+        if (fileIds == null) return List.of();
+        List<Long> ids = fileIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (ids.size() > FILE_MAX) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 " + FILE_MAX + "개까지입니다");
+        }
+        return ids;
+    }
+
+    // 우리 업체 파일이고 본인이 올린 파일인지 확인한다
+    private void requireMyFile(LoginUser user, Long id) {
+        AttachmentDTO file = attachService.get(id, user.getCompanyId()); // 다른 업체 파일이면 예외
+        if (!Objects.equals(file.getUploaderAccountId(), user.getUserAccountId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 올린 파일만 붙일 수 있습니다");
+        }
+    }
+
+    /** 올려 둔 첨부를 결재 문서에 붙인다. 우리 업체 파일이고 본인이 올렸고 아직 안 붙은 것만 */
+    private void linkFiles(LoginUser user, Long documentId, List<Long> fileIds) {
+        for (Long id : cleanFileIds(fileIds)) {
+            requireMyFile(user, id);
+            dao.insertFile(user.getCompanyId(), documentId, id);
+            attachService.markAttached(id, user.getCompanyId()); // 이미 다른 문서에 붙은 파일이면 예외
+        }
+    }
+    
+    /** 결재함에 보이는 문서의 첨부만 내준다. 아니면 404 (남의 문서 번호를 넣어도 존재 여부를 알 수 없게) */
+    @Transactional(readOnly = true)
+    public AttachmentDTO getFile(LoginUser user, long documentId, long fileId) {
+        if (dao.countBoxFile(user.getCompanyId(), user.getEmployeeId(), documentId, fileId) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다");
+        }
+        return attachService.get(fileId, user.getCompanyId());
+    }
+
+    /** 첨부 파일 내용 (내려받기용) */
+    public Resource loadFile(AttachmentDTO file) throws IOException {
+        return attachService.load(file);
     }
 }

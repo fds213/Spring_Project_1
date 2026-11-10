@@ -17,7 +17,7 @@
   <jsp:body>
     <section class="view on" id="view-admin-rank">
       <div class="page-head"><h1>직급 관리</h1></div>
-      <p class="muted join-scope">위에서 아래로 낮은 직급부터 높은 직급 순서입니다. 여기 직급이 계정 생성에 그대로 나오고, 직원이 있는 직급은 지울 수 없습니다. 이름을 바꾸면 그 직급의 직원도 함께 따라갑니다.</p>
+      <p class="muted join-scope">위에서부터 낮은 직급 순입니다. 여기 직급이 계정 생성에 나오고, 직원이 있는 직급은 지울 수 없습니다.</p>
       <form class="org-add" id="rankAddForm" novalidate>
         <input class="input" id="rankNewName" maxlength="20" autocomplete="off" placeholder="새 직급 이름 (예: 책임)" aria-label="새 직급 이름" aria-describedby="rankError">
         <button type="submit" class="btn btn-primary" data-write>직급 추가</button>

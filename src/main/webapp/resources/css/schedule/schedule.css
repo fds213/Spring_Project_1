@@ -65,6 +65,9 @@
   color: var(--text-muted); cursor: pointer;
 }
 #view-schedule .sch-del:hover { color: var(--danger); text-decoration: underline; }
+/* [수정] [삭제]를 한 줄에 나란히. 수정은 지우기가 아니라 파란 글자로 */
+#view-schedule .sch-acts { flex-shrink: 0; display: flex; gap: 2px; }
+#view-schedule .sch-edit:hover { color: var(--accent); }
 #view-schedule .sch-del:disabled { opacity: .5; cursor: default; }
 /* 읽기 전용 업체: 흐린 [삭제] 위에서는 손가락 대신 금지 모양 (위 cursor: pointer가 공통 규칙보다 우선이라 따로 적는다) */
 body.is-readonly #view-schedule .sch-del { cursor: not-allowed; }
@@ -86,4 +89,7 @@ body.is-readonly #view-schedule .sch-del { cursor: not-allowed; }
   #view-schedule .sch-more { font-size: 10px; }
   /* 삭제 버튼: 손가락으로 누르기 쉽게 크게 (글자 크기는 그대로) */
   #view-schedule .sch-del { min-width: 44px; min-height: 36px; padding: 8px; margin: -8px -8px -8px 0; }
+  /* [수정] [삭제] 두 개가 나란히 있을 때 서로 겹치지 않게 (오른쪽 끝 버튼만 카드 끝으로 당긴다) */
+  #view-schedule .sch-acts { gap: 0; margin: -8px -8px -8px 0; }
+  #view-schedule .sch-acts .sch-del { margin: 0; }
 }

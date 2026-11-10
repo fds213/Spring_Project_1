@@ -14,6 +14,8 @@
     <script>openTicketMineView();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 장애 사진 보기 (#197) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/ticket/photo.css">
     <section class="view on" id="view-ticket-mine">
       <%-- 내 티켓: 내가 접수한 티켓의 처리 상태와 이력. 장비 지급 신청서가 승인되면 지급 티켓이 여기에 생긴다 (ticket/it-service.js) --%>
       <div class="page-head"><h1>내 티켓</h1><a href="${ctx}/ticket/new" class="btn btn-primary" data-write>접수</a></div>

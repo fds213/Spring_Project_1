@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 import com.ieum.gw.dto.AttendanceApprovalStepDTO;
 import com.ieum.gw.dto.EmployeeHireDTO;
 import com.ieum.gw.dto.LeaveCycleDTO;
+import com.ieum.gw.dto.LeaveGrantDTO;
 import com.ieum.gw.dto.LeaveRequestDTO;
 import com.ieum.gw.dto.LeaveSlotDTO;
 import com.ieum.gw.mapper.LeaveMapper;
@@ -32,8 +33,8 @@ public class LeaveDAO {
     /** 그 날이 들어 있는 연차 부여 행을 잠그며 읽는다(같은 직원 동시 차감 막기) */
     public LeaveCycleDTO selectCycleOnForUpdate(Long companyId, Long employeeId, String day) { return mapper.selectCycleOnForUpdate(companyId, employeeId, day); }
 
-    /** 업체 직원들의 연차 부여 행과 사용 합을 한 번에 읽는다 */
-    public List<LeaveCycleDTO> selectCompanyCyclesOn(Long companyId, String day) { return mapper.selectCompanyCyclesOn(companyId, day); }
+    /** 업체 직원들의 입사일이 들어 있는 연차 부여 행과 내역 합을 한 번에 읽는다 */
+    public List<LeaveCycleDTO> selectCompanyCyclesAtHire(Long companyId) { return mapper.selectCompanyCyclesAtHire(companyId); }
 
     /** 연차 부여 행(15일)을 만든다 */
     public int insertCycle(LeaveCycleDTO cycle) { return mapper.insertCycle(cycle); }
@@ -51,6 +52,20 @@ public class LeaveDAO {
         BigDecimal sum = mapper.selectLedgerSum(companyId, leaveCycleId);
         return sum == null ? BigDecimal.ZERO : sum;
     }
+
+    // 연차 추가 부여 (LC_GRANT)
+
+    /** 부여 행의 추가 부여(±) 합을 읽는다(없으면 null이 와서 0으로 바꾼다) */
+    public BigDecimal selectGrantSum(Long companyId, Long leaveCycleId) {
+        BigDecimal sum = mapper.selectGrantSum(companyId, leaveCycleId);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    /** 추가 부여(+)·되돌리기(-) 한 줄을 사유와 함께 남긴다 */
+    public int insertLedgerGrant(Long companyId, Long leaveCycleId, BigDecimal deltaDays, Long actorAccountId, String note) { return mapper.insertLedgerGrant(companyId, leaveCycleId, deltaDays, actorAccountId, note); }
+
+    /** 직원 한 명의 추가 부여 내역을 최근 순으로 읽는다 */
+    public List<LeaveGrantDTO> selectGrantHistory(Long companyId, Long employeeId) { return mapper.selectGrantHistory(companyId, employeeId); }
 
     /** 승인된 휴가가 그 날들에 이미 차지한 시간대를 읽는다(날짜가 없으면 IN () 이 되지 않게 묻지 않는다) */
     public List<LeaveSlotDTO> selectTakenSlots(Long companyId, Long employeeId, List<String> days) {

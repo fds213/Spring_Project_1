@@ -56,6 +56,15 @@ public class ScheduleController {
         return scheduleService.addSchedule(loginUser, form.getScope(), form.getDate(), form.getTitle(), form.getMemo());
     }
 
+    // 일정 수정: POST /schedule/api/schedules/3  (본문 JSON: { date, title, memo }. 구분은 바꾸지 않는다)
+    @PostMapping("/api/schedules/{id}")
+    @ResponseBody
+    public Map<String, Object> update(@AuthenticationPrincipal LoginUser loginUser,
+                                      @PathVariable Long id,
+                                      @RequestBody ScheduleSaveDTO form) {
+        return scheduleService.updateSchedule(loginUser, id, form.getDate(), form.getTitle(), form.getMemo());
+    }
+
     // 일정 삭제: POST /schedule/api/schedules/3/delete
     @PostMapping("/api/schedules/{id}/delete")
     @ResponseBody

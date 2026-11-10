@@ -26,8 +26,10 @@ import com.ieum.gw.dto.EmployeeHireDTO;
 import com.ieum.gw.dto.HolidayDTO;
 import com.ieum.gw.dto.LeaveCycleDTO;
 import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LeaveGrantDTO;
 import com.ieum.gw.dto.LeaveRequestDTO;
 import com.ieum.gw.dto.LeaveSlotDTO;
+import com.ieum.gw.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,7 +37,9 @@ import lombok.RequiredArgsConstructor;
  * 연차 (요구분석서 3.9). 연차 화면과, 결재가 부르는 연동 메서드(AttendanceService 맨 아래)가 같은 규칙을 쓴다.
  * - 모든 직원이 15일. 이전 경력으로 바꾸지 않고, 입사기념일 자동 부여도 하지 않는다(10/29 회의).
  * - 입사일에 한 번 부여한다: 부여 행(leave_cycle)은 입사일부터 끝없이(9999-12-31) 하나다.
- * - 남은 일수 = 부여 일수 + 사용(-)·복원(+) 내역(leave_ledger) 합. 진실은 이 내역 하나다.
+ * - 남은 일수 = 부여 일수 + 사용(-)·복원(+)·추가 부여(±) 내역(leave_ledger) 합. 진실은 이 내역 하나다.
+ * - 추가 부여(LC_GRANT)는 업체 관리자·인사 담당이 사유와 함께 준다. 잘못 준 것은 음수 한 줄로 되돌린다. 본인 연차는 본인이 바꿀 수 없다.
+ *   화면의 보유 = 부여 일수 + 추가 부여 합, 승인 완료 = -(사용 + 복원 합)으로 나눠 보여 준다(추가 부여가 승인 완료에 섞이지 않게).
  * - 부여 행이 아직 없으면(가입 승인 전 직원 등) 남은 일수는 15일로 보고, 차감하는 순간에 그 행을 만든다.
  * - 승인 대기 일수와 신청 내역은 전자결재의 휴가 신청서에서 읽는다.
  */
@@ -51,6 +55,13 @@ public class LeaveService {
     private static final Map<String, String> REQUEST_STATUS = Map.of("IN_PROGRESS", "REQUESTED", "APPROVED", "APPROVED", "REJECTED", "REJECTED");
     private static final BigDecimal HALF_DAY = new BigDecimal("0.5");
     private static final int MAX_SPAN_DAYS = 366; // 한 번에 신청하는 휴가 기간의 상한
+
+    /** 연차 추가 부여를 할 수 있는 역할 (기능명세서 '연차 세부') */
+    private static final Set<String> MANAGERS = Set.of("ROLE_ADMIN", "ROLE_HR");
+    /** 추가 부여 한 번에 바꿀 수 있는 일수(±). 잘못 넣은 큰 값을 막는다 */
+    private static final BigDecimal MAX_GRANT_DAYS = BigDecimal.valueOf(30);
+    /** 부여 사유 길이 (leave_ledger.note VARCHAR2(500 CHAR)) */
+    private static final int NOTE_MAX = 500;
 
     private final LeaveDAO dao;
     private final AttendanceDAO attendanceDao;
@@ -69,14 +80,14 @@ public class LeaveService {
         }
         Grant grant = grantOf(companyId, employeeId, LocalDate.parse(emp.getHireDate()));
 
-        BigDecimal used = grant.ledger.negate();
         BigDecimal pending = dao.selectPendingDays(companyId, employeeId, grant.start.toString(), OPEN_END.toString());
         BigDecimal left = grant.remaining();
 
         Map<String, Object> sum = new LinkedHashMap<>();
         sum.put("start", grant.start + "T00:00:00"); // 부여한 날(입사일)
-        sum.put("grant", grant.days);
-        sum.put("usedDays", used);
+        sum.put("grant", grant.held());               // 보유 = 기본 + 추가 부여
+        sum.put("extraDays", grant.extra);            // 그중 추가 부여(±) 합
+        sum.put("usedDays", grant.used());
         sum.put("pendingDays", pending);
         sum.put("left", left);
         sum.put("available", left.subtract(pending));
@@ -250,19 +261,98 @@ public class LeaveService {
         }
     }
 
-    // ===== 부여 행 =====
+    // ===== 근태·연차 관리: 연차 추가 부여 (기능명세서 '연차 세부') =====
 
-    /** 저장된 부여 행이 있으면 그 값과 사용 합, 없으면 15일(사용 합 0) */
-    private Grant grantOf(Long companyId, Long employeeId, LocalDate hire) {
-        LeaveCycleDTO row = dao.selectCycleOn(companyId, employeeId, hire.toString());
-        if (row == null) return new Grant(hire, GRANT_DAYS, BigDecimal.ZERO);
-        return new Grant(LocalDate.parse(row.getStartsOn()), row.getGrantedDays(), dao.selectLedgerSum(companyId, row.getLeaveCycleId()));
+    /**
+     * 연차를 더 주거나(+) 잘못 준 것을 되돌린다(-). 업체 관리자·인사 담당만, 본인은 안 된다.
+     * 부여 행을 잠그고(없으면 만들고) 되돌린 뒤 남은 일수가 0보다 적어지지 않는지 본 다음 LC_GRANT 한 줄을 남긴다.
+     * 거절은 AttendanceException(상태, 문구): 400 값, 403 권한·본인, 404 다른 업체·없는 직원, 409 재직·입사일·남은 일수.
+     */
+    @Transactional
+    public Map<String, Object> grantExtraLeave(LoginUser actor, Long employeeId, BigDecimal days, String note) {
+        if (actor == null || !MANAGERS.contains(actor.getRole())) {
+            throw new AttendanceException(403, "연차 추가 부여는 업체 관리자와 인사 담당만 할 수 있습니다");
+        }
+        if (employeeId == null) throw new AttendanceException(400, "직원을 골라 주세요");
+        if (employeeId.equals(actor.getEmployeeId())) {
+            throw new AttendanceException(403, "본인 연차는 직접 바꿀 수 없습니다. 다른 관리자에게 요청해 주세요");
+        }
+        if (days == null || days.signum() == 0) throw new AttendanceException(400, "일수를 넣어 주세요 (되돌릴 때는 음수)");
+        if (days.remainder(HALF_DAY).signum() != 0) throw new AttendanceException(400, "일수는 0.5일 단위로 넣어 주세요");
+        if (days.abs().compareTo(MAX_GRANT_DAYS) > 0) {
+            throw new AttendanceException(400, "한 번에 " + plain(MAX_GRANT_DAYS) + "일까지 바꿀 수 있습니다");
+        }
+        String reason = note == null ? "" : note.trim();
+        if (reason.isEmpty()) throw new AttendanceException(400, "사유를 넣어 주세요");
+        if (reason.length() > NOTE_MAX) throw new AttendanceException(400, "사유는 " + NOTE_MAX + "자까지 넣을 수 있습니다");
+
+        Long companyId = actor.getCompanyId();
+        EmployeeHireDTO emp = dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null) throw new AttendanceException(404, "같은 업체 직원이 아닙니다");
+        if (!"ST_SERVING".equals(emp.getEmploymentStatus())) {
+            throw new AttendanceException(409, "재직 중인 직원에게만 연차를 줄 수 있습니다");
+        }
+        if (emp.getHireDate() == null) throw new AttendanceException(409, "입사일이 없어 연차를 줄 수 없습니다");
+
+        // 휴가 승인(useLeave)과 같은 행을 잠근다: 되돌리기와 차감이 동시에 와도 하나씩 남은 일수를 본다
+        LeaveCycleDTO row = lockGrant(companyId, employeeId, LocalDate.parse(emp.getHireDate()));
+        BigDecimal left = row.getGrantedDays().add(dao.selectLedgerSum(companyId, row.getLeaveCycleId()));
+        BigDecimal after = left.add(days);
+        if (after.signum() < 0) {
+            throw new AttendanceException(409, "되돌리면 남은 연차가 0일보다 적어집니다 (남은 " + plain(left) + "일)");
+        }
+        dao.insertLedgerGrant(companyId, row.getLeaveCycleId(), days, actor.getUserAccountId(), reason);
+
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("employeeId", employeeId);
+        res.put("left", after);
+        return res;
     }
 
-    /** 업체 직원들의 부여 행(사용 합 포함)을 직원 번호로. 행이 없는 직원은 빠진다 */
-    public Map<Long, LeaveCycleDTO> grantsOn(Long companyId, LocalDate day) {
+    /** 근태·연차 관리: 직원 한 명의 보유·남은 일수와 추가 부여 내역(최근 순: 일시·일수·사유·처리자) */
+    public Map<String, Object> grantHistory(Long companyId, Long employeeId) {
+        EmployeeHireDTO emp = employeeId == null ? null : dao.selectEmployeeHire(companyId, employeeId);
+        if (emp == null) throw new AttendanceException(404, "같은 업체 직원이 아닙니다");
+        Map<String, Object> res = new LinkedHashMap<>();
+        if (emp.getHireDate() == null) {
+            res.put("grant", null);
+            res.put("left", null);
+        } else {
+            Grant grant = grantOf(companyId, employeeId, LocalDate.parse(emp.getHireDate()));
+            res.put("grant", grant.held());
+            res.put("left", grant.remaining());
+        }
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (LeaveGrantDTO g : dao.selectGrantHistory(companyId, employeeId)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", g.getLeaveLedgerId());
+            m.put("days", g.getDeltaDays());
+            m.put("note", g.getNote());
+            m.put("at", g.getCreatedAt());
+            m.put("by", g.getActorName() == null ? "" : g.getActorName());
+            items.add(m);
+        }
+        res.put("items", items);
+        return res;
+    }
+
+    // ===== 부여 행 =====
+
+    /** 저장된 부여 행이 있으면 그 값과 내역 합(그중 추가 부여 합), 없으면 15일(합 0) */
+    private Grant grantOf(Long companyId, Long employeeId, LocalDate hire) {
+        LeaveCycleDTO row = dao.selectCycleOn(companyId, employeeId, hire.toString());
+        if (row == null) return new Grant(hire, GRANT_DAYS, BigDecimal.ZERO, BigDecimal.ZERO);
+        return new Grant(LocalDate.parse(row.getStartsOn()), row.getGrantedDays(),
+                dao.selectLedgerSum(companyId, row.getLeaveCycleId()), dao.selectGrantSum(companyId, row.getLeaveCycleId()));
+    }
+
+    /**
+     * 업체 직원들의 부여 행(내역 합 포함)을 직원 번호로. 행이 없는 직원은 빠진다.
+     * 연차 화면·휴가 승인·추가 부여(grantOf·lockGrant)와 같게 입사일이 들어 있는 행이라, 관리 표의 남은 연차가 직원 화면과 같다
+     */
+    public Map<Long, LeaveCycleDTO> grantsAtHire(Long companyId) {
         Map<Long, LeaveCycleDTO> map = new HashMap<>();
-        for (LeaveCycleDTO c : dao.selectCompanyCyclesOn(companyId, day.toString())) map.put(c.getEmployeeId(), c);
+        for (LeaveCycleDTO c : dao.selectCompanyCyclesAtHire(companyId)) map.put(c.getEmployeeId(), c);
         return map;
     }
 
@@ -340,20 +430,33 @@ public class LeaveService {
         return v.stripTrailingZeros().toPlainString();
     }
 
-    /** 부여: 부여한 날, 부여 일수, 사용(-)·복원(+) 합 */
+    /** 부여: 부여한 날, 부여 일수, 내역 전체 합(사용·복원·추가 부여), 그중 추가 부여 합 */
     private static final class Grant {
         final LocalDate start;
         final BigDecimal days;
         final BigDecimal ledger;
+        final BigDecimal extra;
 
-        Grant(LocalDate start, BigDecimal days, BigDecimal ledger) {
+        Grant(LocalDate start, BigDecimal days, BigDecimal ledger, BigDecimal extra) {
             this.start = start;
             this.days = days;
             this.ledger = ledger;
+            this.extra = extra;
         }
 
+        /** 남은 일수 = 부여 일수 + 내역 전체 합 */
         BigDecimal remaining() {
             return days.add(ledger);
+        }
+
+        /** 보유 = 부여 일수 + 추가 부여 합 */
+        BigDecimal held() {
+            return days.add(extra);
+        }
+
+        /** 승인 완료 = -(사용 + 복원 합) = -(전체 합 - 추가 부여 합) */
+        BigDecimal used() {
+            return ledger.subtract(extra).negate();
         }
     }
 }

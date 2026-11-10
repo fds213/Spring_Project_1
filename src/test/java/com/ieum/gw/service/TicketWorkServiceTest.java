@@ -2,6 +2,7 @@ package com.ieum.gw.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static com.ieum.gw.code.TicketStatus.*;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,14 +12,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
+import com.ieum.gw.dao.AttachmentDAO;
 import com.ieum.gw.dto.AssetDTO;
+import com.ieum.gw.dto.AttachmentDTO;
 import com.ieum.gw.service.AssetService;
 import com.ieum.gw.service.AssetLookupService;
 import com.ieum.gw.dto.AuthEmpDTO;
@@ -29,6 +36,7 @@ import com.ieum.gw.dto.BranchDetailDTO;
 import com.ieum.gw.service.BranchService;
 import com.ieum.gw.service.NotificationService;
 import com.ieum.gw.dao.TicketWorkDAO;
+import com.ieum.gw.dto.TicketAdminCountsDTO;
 import com.ieum.gw.dto.TicketCommentDTO;
 import com.ieum.gw.dto.TicketHistoryDTO;
 import com.ieum.gw.dto.TicketRequestDTO;
@@ -38,14 +46,19 @@ import com.ieum.gw.dto.TicketWorkDTO;
 class TicketWorkServiceTest {
     static class Rows extends TicketWorkDAO {
         TicketWorkDTO row;
-        int updates, histories, comments, affected = 1;
+        int locks, updates, histories, comments, affected = 1;
         boolean failHistory;
         Map<String, Object> lastChange;
         String commentBody;
         List<TicketCommentDTO> commentRows = new ArrayList<>();
         List<TicketHistoryDTO> historyRows = new ArrayList<>();
+        TicketAdminCountsDTO adminCounts = new TicketAdminCountsDTO();
+        List<Object> countArguments;
+        List<Object> pageArguments;
+        final Map<Long, Long> photoLinks = new HashMap<>();
         Rows() { super(null); }
         @Override public TicketWorkDTO lock(Long companyId, Long id) {
+            locks++;
             return row != null && companyId.equals(row.getCompanyId()) && id.equals(row.getId()) ? row : null;
         }
         @Override public List<TicketWorkDTO> selectMine(Long companyId, Long employeeId) {
@@ -67,6 +80,83 @@ class TicketWorkServiceTest {
         }
         @Override public List<TicketCommentDTO> comments(Long companyId, Long id) { return commentRows; }
         @Override public List<TicketHistoryDTO> history(Long companyId, Long id) { return historyRows; }
+
+        @Override
+        public TicketAdminCountsDTO countAdminTicketTabs(Long companyId, Long employeeId, String keyword) {
+            countArguments = List.of(companyId, employeeId, keyword);
+            return adminCounts;
+        }
+
+        @Override
+        public List<TicketWorkDTO> selectAdminTicketPage(Long companyId, Long employeeId,
+                String keyword, String filter, long offset, int size) {
+            pageArguments = List.of(companyId, employeeId, keyword, filter, offset, size);
+            return List.of(row);
+        }
+
+        @Override
+        public int insertTicketFile(Long companyId, Long ticketId, Long attachmentId) {
+            assertEquals(1L, companyId);
+            assertEquals(row.getId(), ticketId);
+            photoLinks.put(ticketId, attachmentId);
+            return 1;
+        }
+
+        @Override
+        public List<Long> selectTicketFileIds(Long companyId, Long ticketId) {
+            assertEquals(1L, companyId);
+            Long attachmentId = photoLinks.get(ticketId);
+            return attachmentId == null ? List.of() : List.of(attachmentId);
+        }
+    }
+
+    static class Photos extends AttachmentDAO implements FileStorage {
+        AttachmentDTO photo;
+        byte[] bytes;
+        boolean attached;
+
+        Photos() { super(null); }
+
+        @Override
+        public int insert(AttachmentDTO value) {
+            value.setAttachmentId(200L);
+            photo = value;
+            return 1;
+        }
+
+        @Override
+        public AttachmentDTO getById(Long attachmentId, Long companyId) {
+            return photo != null && attachmentId.equals(photo.getAttachmentId())
+                    && companyId.equals(photo.getCompanyId()) ? photo : null;
+        }
+
+        @Override
+        public int markAttached(Long attachmentId, Long companyId) {
+            if (attached || getById(attachmentId, companyId) == null) {
+                return 0;
+            }
+            attached = true;
+            return 1;
+        }
+
+        @Override
+        public String save(MultipartFile file, Long companyId, String module) throws IOException {
+            String filename = file.getOriginalFilename();
+            String extension = filename.substring(filename.lastIndexOf('.') + 1);
+            FileTypeChecker.check(file, extension, module);
+            bytes = file.getBytes();
+            return companyId + "/" + module + "/sample." + extension;
+        }
+
+        @Override
+        public Resource load(String storageKey) {
+            assertEquals(photo.getStorageKey(), storageKey);
+            return new ByteArrayResource(bytes) {
+                @Override public String getFilename() { return "sample.png"; }
+            };
+        }
+
+        @Override public void delete(String storageKey) { bytes = null; }
     }
     static class People extends EmployeeService {
         boolean active = true, role = true;
@@ -115,6 +205,7 @@ class TicketWorkServiceTest {
     Rows rows;
     People people;
     Notices notices;
+    Photos photos;
     TicketWorkService service;
     AssetDTO asset;
     com.ieum.gw.dto.ApprovedEquipmentDTO approvedEquipment;
@@ -130,12 +221,20 @@ class TicketWorkServiceTest {
 
     @BeforeEach void setup() {
         rows = new Rows(); people = new People(); notices = new Notices();
+        photos = new Photos();
         asset = new AssetDTO(); asset.setAssetId(50L); asset.setAssetName("노트북"); asset.setBranchId(8L);
         AssetService assets = new AssetService(null) {
             @Override public List<AssetDTO> getMyAssets(LoginUser user) { return List.of(asset); }
         };
         AssetLookupService lookup = new AssetLookupService(null) {
-            @Override public Map<Long, AssetDTO> getSummaries(Long c, List<Long> ids) { return Map.of(50L, asset); }
+            @Override
+            public Map<Long, AssetDTO> getSummaries(Long c, List<Long> ids) {
+                Map<Long, AssetDTO> summaries = new HashMap<>();
+                if (ids.contains(50L)) {
+                    summaries.put(50L, asset);
+                }
+                return summaries;
+            }
         };
         BranchService branches = new BranchService(null) {
             @Override public List<BranchDTO> getBranches(Long c) {
@@ -146,7 +245,7 @@ class TicketWorkServiceTest {
             }
         };
         service = new TicketWorkService(rows, assets, lookup, branches, people, notices,
-                new ApprovalService(null, null, null, null, null, null, null) {
+                new ApprovalService(null, null, null, null, null, null, null, null) {
                     @Override public com.ieum.gw.dto.ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long documentId) {
                         if (approvedEquipment != null) {
                             assertEquals(1L, companyId);
@@ -169,8 +268,13 @@ class TicketWorkServiceTest {
                         equipmentIssues++;
                         return 100L;
                     }
-                });
+                }, new AttachmentService(photos, photos));
         rows.row = ticket(RECEIVED.name());
+    }
+
+    static MockMultipartFile samplePhoto() {
+        byte[] pngSignature = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        return new MockMultipartFile("photo", "sample.png", "image/png", pngSignature);
     }
     private TicketWorkDTO ticket(String status) {
         TicketWorkDTO t = new TicketWorkDTO();
@@ -233,6 +337,39 @@ class TicketWorkServiceTest {
         assertEquals(1L, rows.row.getCompanyId()); assertEquals(2L, rows.row.getRequesterId());
         assertEquals("장애", rows.row.getTitle()); assertEquals(RECEIVED.name(), rows.row.getStatus());
         assertEquals(0, rows.histories);
+        assertTrue(rows.photoLinks.isEmpty());
+    }
+
+    @Test
+    @DisplayName("사진을 첨부한 장애 티켓은 사진 ID를 돌려주고 같은 사진의 재사용은 롤백한다")
+    void createWithPhotoAndRejectReuse() {
+        LoginUser requester = user(1L, 2L, "ROLE_EMP");
+        TicketRequestDTO request = form();
+        request.setAttachmentId(service.uploadPhoto(requester, samplePhoto()));
+
+        assertEquals(99L, service.create(requester, request));
+        assertTrue(photos.attached);
+        assertEquals(200L, service.listMine(requester).get(0).get("photoId"));
+        assertEquals(200L, service.detailAdmin(user(1L, 3L, "ROLE_IT"), 99L).get("photoId"));
+
+        Transactions tx = new Transactions();
+        status(HttpStatus.CONFLICT, () -> proxy(tx).create(requester, request));
+        assertTrue(tx.rolledBack);
+        assertFalse(tx.committed);
+    }
+
+    @Test
+    @DisplayName("다른 직원이 올린 사진과 문의 티켓의 사진 연결을 거절한다")
+    void rejectInvalidPhotoLinks() {
+        TicketRequestDTO request = form();
+        LoginUser uploader = user(1L, 3L, "ROLE_EMP");
+        request.setAttachmentId(service.uploadPhoto(uploader, samplePhoto()));
+
+        status(HttpStatus.BAD_REQUEST, () -> service.create(user(1L, 2L, "ROLE_EMP"), request));
+        request.setType("TK_QUESTION");
+        status(HttpStatus.BAD_REQUEST, () -> service.create(uploader, request));
+        assertTrue(rows.photoLinks.isEmpty());
+        assertFalse(photos.attached);
     }
     @Test @DisplayName("장비 지급 직접 접수와 없는 지점·남의 자산·빈 본문은 거절한다")
     void invalidCreate() {
@@ -381,6 +518,44 @@ class TicketWorkServiceTest {
         status(HttpStatus.FORBIDDEN,()->service.listAdmin(user(1L,2L,"ROLE_EMP"),"ALL"));
         assertTrue(((List<?>)service.listAdmin(user(9L,3L,"ROLE_IT"),"ALL").get("items")).isEmpty());
     }
+
+    @Test
+    @DisplayName("검색 목록의 전체 페이지와 오프셋은 선택한 탭의 20건 경계에서 계산한다")
+    void adminSearchUsesSelectedTabCount() {
+        LoginUser operator = user(1L, 3L, "ROLE_IT");
+        rows.adminCounts.setAllCount(45L);
+        rows.adminCounts.setMineCount(20L);
+
+        var first = service.searchAdmin(operator, "MINE", " 노트북 ", 2L);
+        assertEquals(20L, first.get("total"));
+        assertEquals(1L, first.get("pages"));
+        assertEquals(1L, first.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북"), rows.countArguments);
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 0L, 20), rows.pageArguments);
+
+        rows.adminCounts.setMineCount(21L);
+        var second = service.searchAdmin(operator, "MINE", "노트북", 2L);
+        assertEquals(21L, second.get("total"));
+        assertEquals(2L, second.get("pages"));
+        assertEquals(2L, second.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 20L, 20), rows.pageArguments);
+        assertEquals(45L, ((Map<?, ?>) second.get("counts")).get("ALL"));
+    }
+
+    @Test
+    @DisplayName("선택한 탭에 검색 결과가 없으면 빈 첫 페이지를 반환한다")
+    void emptyAdminSearchSkipsPageQuery() {
+        rows.adminCounts.setAllCount(3L);
+
+        var result = service.searchAdmin(user(9L, 3L, "ROLE_ADMIN"), null, "   ", 8L);
+
+        assertEquals(List.of(9L, 3L, ""), rows.countArguments);
+        assertEquals(1L, result.get("page"));
+        assertEquals(1L, result.get("pages"));
+        assertEquals(0L, result.get("total"));
+        assertEquals(List.of(), result.get("items"));
+        assertNull(rows.pageArguments);
+    }
     @Test @DisplayName("관리자 상세는 지점·권한 버튼과 이름·부서로 바꾼 담당자 후보를 반환한다")
     void adminDetail() {
         var result=service.detailAdmin(user(1L,5L,"ROLE_ADMIN"),10L);
@@ -397,6 +572,144 @@ class TicketWorkServiceTest {
         status(HttpStatus.NOT_FOUND,()->service.detailAdmin(user(9L,3L,"ROLE_IT"),10L));
         rows.row.setType("TK_EQUIPMENT");
         status(HttpStatus.CONFLICT,()->service.detailAdmin(user(1L,3L,"ROLE_IT"),10L));
+    }
+
+    @Test
+    @DisplayName("요청자가 아닌 관리자는 처리 완료 티켓의 상세에서도 종료할 수 없다")
+    void canCloseRequiresRequesterInAdminDetail() {
+        rows.row.setStatus(RESOLVED.name());
+
+        var result = service.detailAdmin(user(1L, 8L, "ROLE_ADMIN"), 10L);
+
+        assertEquals(false, result.get("canClose"));
+    }
+
+    @Test
+    @DisplayName("내 티켓 취소 표시는 장애·문의이면서 접수 상태일 때만 참이다")
+    void canCancelDependsOnTypeAndState() {
+        for (var type : com.ieum.gw.code.TicketType.values()) {
+            rows.row.setType(type.name());
+            for (var state : com.ieum.gw.code.TicketStatus.values()) {
+                rows.row.setStatus(state.name());
+                boolean expected = state == RECEIVED && (type == com.ieum.gw.code.TicketType.TK_INCIDENT
+                        || type == com.ieum.gw.code.TicketType.TK_QUESTION);
+                assertEquals(expected, service.listMine(user(1L, 2L, "ROLE_EMP")).get(0).get("canCancel"),
+                        type.name() + " / " + state.name());
+            }
+        }
+    }
+
+    @Test
+    @DisplayName("관리자 상세의 타인 장애·문의 티켓은 접수 상태여도 취소 가능으로 표시하지 않는다")
+    void canCancelRequiresRequesterEvenInAdminDetail() {
+        for (String type : List.of("TK_INCIDENT", "TK_QUESTION")) {
+            rows.row.setType(type);
+            assertEquals(false, service.detailAdmin(user(1L, 3L, "ROLE_ADMIN"), 10L).get("canCancel"));
+        }
+    }
+
+    @Test
+    @DisplayName("본인의 접수 상태 장애·문의는 취소 상태와 실행자·이력을 한 번 기록한다")
+    void cancelOwnIncidentAndQuestion() {
+        for (String type : List.of("TK_INCIDENT", "TK_QUESTION")) {
+            rows.row.setType(type);
+            service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form());
+            assertEquals(1L, rows.lastChange.get("companyId"));
+            assertEquals(10L, rows.lastChange.get("id"));
+            assertEquals(0L, rows.lastChange.get("version"));
+            assertEquals(RECEIVED.name(), rows.lastChange.get("beforeStatus"));
+            assertEquals(CANCELED.name(), rows.lastChange.get("afterStatus"));
+            assertEquals(102L, rows.lastChange.get("actorAccountId"));
+            assertEquals("요청자 취소", rows.lastChange.get("reason"));
+            assertEquals(50L, rows.lastChange.get("assetId"));
+            assertNull(rows.lastChange.get("afterAssigneeId"));
+            assertEquals(false, rows.lastChange.get("assignment"));
+            assertEquals(false, rows.lastChange.get("resolved"));
+            assertEquals(false, rows.lastChange.get("closed"));
+        }
+        assertEquals(2, rows.updates);
+        assertEquals(2, rows.histories);
+        assertEquals(0, notices.assigned);
+        assertEquals(0, notices.resolved);
+    }
+
+    @Test
+    @DisplayName("타인·다른 업체·없는 티켓의 취소는 404이며 관리자도 타인 취소는 할 수 없다")
+    void cancelRejectsNonOwnerAndOtherCompany() {
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 3L, "ROLE_EMP"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 3L, "ROLE_ADMIN"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(9L, 2L, "ROLE_EMP"), 10L, form()));
+        status(HttpStatus.NOT_FOUND, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 999L, form()));
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("접수 이외 모든 상태와 장비 지급 티켓은 409로 취소를 거절한다")
+    void cancelRejectsStateAndEquipment() {
+        for (var state : com.ieum.gw.code.TicketStatus.values()) {
+            if (state == RECEIVED) { continue; }
+            rows.row.setStatus(state.name());
+            status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        }
+        rows.row.setStatus(RECEIVED.name());
+        rows.row.setType("TK_EQUIPMENT");
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("취소의 비로그인·잘못된 번호·누락 요청·누락 또는 음수 버전은 DB 잠금 전에 거절한다")
+    void cancelRejectsMalformedInput() {
+        status(HttpStatus.UNAUTHORIZED, () -> service.cancel(null, 10L, form()));
+        for (Long id : new Long[] {null, 0L, -1L}) {
+            status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), id, form()));
+        }
+        status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, null));
+        for (Long version : new Long[] {null, -1L}) {
+            TicketRequestDTO request = form();
+            request.setVersion(version);
+            status(HttpStatus.BAD_REQUEST, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, request));
+        }
+        assertEquals(0, rows.locks);
+        assertEquals(0, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("오래된 취소 버전과 조건부 갱신 충돌은 이력을 남기지 않는다")
+    void cancelRejectsVersionConflicts() {
+        rows.row.setVersion(1L);
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(1, rows.locks, "유효한 입력의 현재 버전 비교는 잠금 이후에 수행한다.");
+        assertEquals(0, rows.updates);
+        rows.row.setVersion(0L);
+        rows.affected = 0;
+        status(HttpStatus.CONFLICT, () -> service.cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertEquals(1, rows.updates);
+        assertEquals(0, rows.histories);
+    }
+
+    @Test
+    @DisplayName("취소 이력 저장 실패는 트랜잭션 프록시의 롤백으로 전달된다")
+    void cancelRollsBackOnHistoryFailure() {
+        rows.failHistory = true;
+        Transactions tx = new Transactions();
+        assertThrows(IllegalStateException.class,
+                () -> proxy(tx).cancel(user(1L, 2L, "ROLE_EMP"), 10L, form()));
+        assertTrue(tx.rolledBack);
+        assertFalse(tx.committed);
+    }
+
+    @Test
+    @DisplayName("취소 성공은 트랜잭션 프록시를 통해 커밋된다")
+    void cancelCommitsTransaction() {
+        Transactions tx = new Transactions();
+        proxy(tx).cancel(user(1L, 2L, "ROLE_EMP"), 10L, form());
+        assertTrue(tx.committed);
+        assertFalse(tx.rolledBack);
+        assertEquals(1, rows.histories);
     }
 
     static class Transactions extends AbstractPlatformTransactionManager {

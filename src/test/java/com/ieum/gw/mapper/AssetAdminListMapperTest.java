@@ -15,7 +15,7 @@ import com.ieum.gw.dto.AssetListDTO;
 /** 실제 Mapper XML의 바인딩·조회 범위를 확인한다. Oracle에서 SQL을 실행하지 않는다. */
 class AssetAdminListMapperTest {
     @Test
-    @DisplayName("자산 목록 SQL은 업체를 바인딩하고 상태 제한 없이 목록 DTO의 필드를 조회한다")
+    @DisplayName("자산 목록은 업체별 미회수 지급 건과 직원만 LEFT JOIN하고 전체 상태·정렬을 유지한다")
     void bindsCompanyAndSelectsAllStatuses() throws Exception {
         Configuration config = new Configuration();
         try (InputStream in = getClass().getResourceAsStream("/mapper/AssetAllocationMapper.xml")) {
@@ -32,8 +32,18 @@ class AssetAdminListMapperTest {
         assertEquals(1, bound.getParameterMappings().size());
         assertEquals("companyId", bound.getParameterMappings().get(0).getProperty());
         assertEquals(7L, config.newMetaObject(parameters).getValue("companyId"));
-        assertEquals("select asset_id as id, asset_no as assetno, asset_name as name, serial_no as serial, "
-                + "asset_type as kind, status_code as status, branch_id as branchid, version "
-                + "from asset where company_id = ? order by asset_no, asset_id", sql);
+        assertTrue(sql.contains("a.status_code as status"));
+        assertTrue(sql.contains("e.employee_name as employeename"));
+        assertTrue(sql.contains("aas.issued_at as issuedat"));
+        assertTrue(sql.contains("left join asset_assignment aas on aas.company_id = a.company_id "
+                + "and aas.asset_id = a.asset_id and aas.returned_at is null"));
+        assertTrue(sql.contains("left join employee e on e.company_id = aas.company_id "
+                + "and e.employee_id = aas.employee_id"));
+        String where = sql.substring(sql.indexOf(" where "));
+        assertTrue(where.startsWith(" where a.company_id = ?"));
+        assertTrue(where.endsWith("order by a.asset_no, a.asset_id"));
+        assertFalse(where.contains("returned_at"), "미지급 자산도 유지하도록 지급 필터는 JOIN에 둔다.");
+        assertFalse(where.contains("status_code"));
+        assertFalse(sql.contains("employment_status"));
     }
 }

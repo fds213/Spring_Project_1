@@ -105,6 +105,17 @@
           AND e.employment_status = 'ST_SERVING'
           AND a.status_code = 'ACTIVE'
     </select>
+	
+    <!-- 사용 중인 재직자의 지금 역할 (계정 상태 검사가 세션 역할과 비교). 사용 중이 아니면 행 없음(null) -->
+    <select id="getActiveRole" resultType="string">
+        SELECT a.role_code
+        FROM employee e
+        JOIN user_account a ON a.employee_id = e.employee_id AND a.company_id = e.company_id
+        WHERE e.company_id = #{companyId}
+          AND e.employee_id = #{employeeId}
+          AND e.employment_status = 'ST_SERVING'
+          AND a.status_code = 'ACTIVE'
+    </select>
 
     <!-- 그 사원의 역할이 목록 중 하나인가 -->
     <select id="countRole" resultType="int">
@@ -225,6 +236,17 @@
 		WHERE e.company_id = #{companyId}
 		AND e.employee_no = #{employeeNo}
     </select>
+    
+    <!-- 역할 바꾸기 (CFG-01). 사용 중 계정만, 업체 관리자는 바꾸지 않는다: 그사이 비활성·관리자가 됐으면 0행 -->
+    <update id="updateRole">
+        UPDATE user_account
+        SET role_code = #{roleCode},
+            updated_at = <include refid="now" />
+        WHERE company_id = #{companyId}
+        AND employee_id = #{employeeId}
+        AND status_code = 'ACTIVE'
+        AND role_code IN ('ROLE_EMP', 'ROLE_IT', 'ROLE_HR')
+    </update>
 
     <!-- 부서장 지정: 그 부서의 부서장 칸을 이 사람으로 (전 부서장은 덮어써져 빠진다) -->
     <update id="setDeptHead">

@@ -62,6 +62,14 @@ public class EmployeeAdminController {
 			@AuthenticationPrincipal LoginUser loginUser) {
 		return Map.of("success", true, "data", employeeAdminService.setHead(loginUser, empNo, body.get("head")));
 	}
+
+	/** 역할 바꾸기 (업체 관리자만, Service에서 확인). 바뀐 역할은 그 사람이 다시 로그인하면 반영 */
+	@PostMapping("/employee/admin/api/employees/{empNo}/role")
+	@ResponseBody
+	public Map<String, Object> role(@PathVariable String empNo, @RequestBody Map<String, String> body,
+			@AuthenticationPrincipal LoginUser loginUser) {
+		return Map.of("success", true, "data", employeeAdminService.setRole(loginUser, empNo, body.get("role")));
+	}
 	
 	/** 계정 비활성화·다시 사용 (업체 관리자·인사 담당, Service에서 확인) */
 	@PostMapping("/employee/admin/api/employees/{empNo}/status")
@@ -136,7 +144,7 @@ public class EmployeeAdminController {
 		return kind;
 	}
 
-	/** 관리자·인사 담당이 아님 → 403 */
+	/** 권한이 없음 → 403 (부서장 지정·부서·직급 관리·역할은 업체 관리자만이라 인사 담당도 받는다) */
 	@ExceptionHandler(AccessDeniedException.class)
 	@ResponseBody
 	public ResponseEntity<Map<String, Object>> denied(AccessDeniedException e) {

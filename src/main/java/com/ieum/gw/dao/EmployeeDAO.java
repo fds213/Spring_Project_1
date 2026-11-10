@@ -82,6 +82,11 @@ public class EmployeeDAO {
         return mapper.countActiveEmployee(companyId, employeeId);
     }
 
+    /** 사용 중인 재직자의 지금 역할. 사용 중이 아니면 null */
+    public String getActiveRole(Long companyId, Long employeeId) {
+        return mapper.getActiveRole(companyId, employeeId);
+    }
+
     /** 역할이 목록 중 하나면 1, 아니면 0 */
     public int countRole(Long companyId, Long employeeId, List<String> roleCodes) {
         return mapper.countRole(companyId, employeeId, roleCodes);
@@ -137,6 +142,11 @@ public class EmployeeDAO {
     /** 부서장 지정 대상. 같은 업체에 그 사번이 없으면 null */
     public EmployeeHeadTargetDTO getHeadTarget(Long companyId, String employeeNo) {
         return mapper.getHeadTarget(companyId, employeeNo);
+    }
+
+    /** 역할 바꾸기 (직원·IT 담당·인사 담당끼리만). 업체 관리자 계정이면 0 */
+    public int updateRole(Long companyId, Long employeeId, String roleCode) {
+        return mapper.updateRole(companyId, employeeId, roleCode);
     }
 
     /** 그 부서의 부서장을 이 사람으로 */

@@ -38,7 +38,8 @@
       </c:otherwise>
     </c:choose>
 
-    <div class="user">
+    <%-- 좁은 화면에서 이름·부서 글자를 숨겨도 마우스를 올리면 이름이 보이게 --%>
+    <div class="user" title="<c:out value='${loginUser.name}' />">
       <span class="avatar"><c:out value="${fn:substring(loginUser.name, 0, 1)}" /></span>
       <span class="user-text">
         <strong><c:out value="${loginUser.name}" /></strong>
@@ -46,7 +47,11 @@
       </span>
     </div>
     <%-- 본인 비밀번호 변경 (ACC-07, 로그인한 사람 누구나·읽기 전용 중에도 됨). 창은 layout.tag, 동작은 common.js --%>
-    <button class="btn btn-ghost" type="button" id="btnPwChange">비밀번호 변경</button>
+    <%-- 아주 좁은 화면(400px 아래)에서는 열쇠 아이콘만 보이고 글자는 화면 낭독기용으로 남는다 (common.css 헤더 좁은 화면) --%>
+    <button class="btn btn-ghost pw-btn" type="button" id="btnPwChange">
+      <svg class="pw-btn-ic" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="m10.8 12.2 9.2-9.2M17 6l3 3M14 9l2 2"/></svg>
+      <span class="pw-btn-text">비밀번호 변경</span>
+    </button>
     <%-- 로그아웃은 CSRF 토큰을 실은 POST (Spring Security 기본 /logout) --%>
     <form class="logout-form" action="${ctx}/logout" method="post">
       <sec:csrfInput />

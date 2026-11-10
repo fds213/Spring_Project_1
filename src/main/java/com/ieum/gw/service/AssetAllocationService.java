@@ -1,6 +1,10 @@
 package com.ieum.gw.service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -8,11 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dao.AssetAllocationDAO;
 import com.ieum.gw.dto.AssetAdminAssignmentDTO;
+import com.ieum.gw.dto.AssetAdminIncidentDTO;
 import com.ieum.gw.dto.AssetAllocationDTO;
 import com.ieum.gw.dto.AssetDTO;
 import com.ieum.gw.dto.AssetListDTO;
+import com.ieum.gw.dto.BranchDetailDTO;
+import com.ieum.gw.dto.EmpSummaryDTO;
 import com.ieum.gw.code.AssetStatus;
 import com.ieum.gw.code.AssetType;
+import com.ieum.gw.code.TicketType;
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.service.BranchService;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +32,55 @@ public class AssetAllocationService {
     private final AssetAllocationDAO dao;
     private final BranchService branchService;
     private final EmployeeService employeeService;
+    
+    /** 자산 관리에 필요한 직원·지점 정보만 골라 선택 목록으로 제공한다. */
+    @Transactional(readOnly = true)
+    public Map<String, Object> getFormOptions(LoginUser user) {
+        requireOperator(user);
 
+        Long companyId = user.getCompanyId();
+
+        List<Map<String, Object>> employees = new ArrayList<>();
+
+        for (EmpSummaryDTO employee : employeeService.listActiveEmp(companyId, null)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("employeeId", employee.getEmployeeId());
+            item.put("employeeName", employee.getEmployeeName());
+            item.put("departmentName", employee.getDepartmentName());
+            item.put("gradeName", employee.getGradeName());
+
+            employees.add(item);
+        }
+
+        List<Map<String, Object>> branches = new ArrayList<>();
+
+        for (BranchDetailDTO branch : branchService.getBranchDetails(companyId)) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("branchId", branch.getBranchId());
+            item.put("branchName", branch.getBranchName());
+
+            branches.add(item);
+        }
+
+        return Map.of("employees", employees, "branches", branches);
+    }
+
+    /** 같은 업체 자산의 모든 상태 장애 이력을 IT 담당자·관리자에게 제공한다. */
+    @Transactional(readOnly = true)
+    public List<AssetAdminIncidentDTO> getIncident(LoginUser user, Long assetId) {
+    	requireOperator(user);
+    	requireId(assetId);
+    	
+    	Long companyId = user.getCompanyId();
+    	AssetAllocationDTO asset = dao.detail(companyId, assetId);
+    	
+    	if (asset == null) {
+			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "자산을 찾을 수 없습니다.");
+		}
+    	
+    	return dao.selectIncidents(companyId, assetId, TicketType.TK_INCIDENT.name());
+    }
+    
     /** 같은 업체 자산의 지급·회수 이력을 관리자에게 제공한다. */
     @Transactional(readOnly = true)
     public List<AssetAdminAssignmentDTO> getAssignments(LoginUser user, Long assetId) {

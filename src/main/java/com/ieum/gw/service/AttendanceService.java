@@ -352,13 +352,13 @@ public class AttendanceService {
     }
 
     /**
-     * 근태·연차 관리: 업체 직원별 오늘 출퇴근, 그 달 출근일·지각·조퇴, 오늘 기준 남은 연차.
+     * 근태·연차 관리: 업체 직원별 오늘 출퇴근, 그 달 출근일·지각·조퇴, 남은 연차(연차 화면과 같은 부여 행).
      * 직원 수만큼 따로 묻지 않는다: 근태 요약 한 번, 연차 부여 행·사용 합 한 번.
      */
     public Map<String, Object> overview(Long companyId, String month) {
         requireMonth(month);
         LocalDate today = LocalDate.parse(dao.selectToday());
-        Map<Long, LeaveCycleDTO> grants = leaveService.grantsOn(companyId, today);
+        Map<Long, LeaveCycleDTO> grants = leaveService.grantsAtHire(companyId);
         List<Map<String, Object>> items = new ArrayList<>();
         int serving = 0;
         int punched = 0;

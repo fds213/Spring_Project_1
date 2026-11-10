@@ -29,6 +29,10 @@ public interface NoticeMapper {
     NoticeDTO selectNotice(@Param("companyId") Long companyId,
                            @Param("postId") Long postId);
 
+    // 댓글을 저장하기 전에 공지 줄을 잠근다 (지운 공지·다른 업체 공지면 null)
+    Long lockNotice(@Param("companyId") Long companyId,
+                    @Param("postId") Long postId);
+
     // ---------- 수정 · 삭제 ----------
 
     // 공지 제목·내용 고치기 (고친 줄 수: 1이면 성공, 0이면 없는 글·지운 글)

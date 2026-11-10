@@ -7,6 +7,7 @@ import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.ChatMessageDTO;
 import com.ieum.gw.dto.ChatRoomDTO;
 import com.ieum.gw.dto.CompanyUsageDTO;
+import com.ieum.gw.dto.EmployeeOptionDTO;
 import lombok.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -210,20 +211,21 @@ public class ChatService {
         return dao.getRoomMemberIds(companyId, roomId);
     }
 
-    /** 참여 권한을 확인하고 방 참여자의 이름을 반환한다 */
-    public List<String> getRoomMemberNames(Long companyId, long roomId, Long employeeId) {
+    /** 참여 권한을 확인하고 방 참여자(직원 번호·이름·부서)를 이름순으로 반환한다. 본인도 들어 있다 */
+    public List<EmployeeOptionDTO> getRoomMembers(Long companyId, long roomId, Long employeeId) {
         if (!canAccessRoom(companyId, roomId, employeeId)) {
             throw new AccessDeniedException("채팅방에 접근할 수 없습니다.");
         }
         List<Long> ids = getRoomMemberIds(companyId, roomId);
-        List<String> names = new ArrayList<>();
+        List<EmployeeOptionDTO> members = new ArrayList<>();
         for (int start = 0; start < ids.size(); start += 1000) {
             // 사원 이름 조회의 Oracle IN 제한에 맞춰 나눈다.
             List<Long> batch = ids.subList(start, Math.min(start + 1000, ids.size()));
-            names.addAll(eService.getEmployeeNames(companyId, batch).values());
+            members.addAll(eService.getEmployeeNamesWithDept(companyId, batch).values());
         }
-        names.sort(Comparator.naturalOrder());
-        return names;
+        members.sort(Comparator.comparing(EmployeeOptionDTO::getEmployeeName,
+                Comparator.nullsLast(Comparator.naturalOrder())));
+        return members;
     }
 
     /** 기준 메시지보다 이전 대화 한 페이지를 조회한다 */

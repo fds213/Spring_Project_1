@@ -1,5 +1,5 @@
 // IT 서비스(사원): 장애·문의 접수(ticket-new), 내 티켓(ticket-mine), 내 장비(asset-mine) (요구분석서 3.4 IT 티켓·자산, 지점).
-// 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
+// 사원은 본인이 접수한 티켓과 본인에게 지급된 장비만 본다. 아직 접수 상태인 장애·문의는 본인이 취소할 수 있다(#177). 티켓을 처리하는 IT 담당자 화면(티켓 처리)과 자산 관리는 이 파일에 없다.
 // 접수한 티켓의 지점은 접수 때 값으로 저장되므로, 나중에 자산이 다른 지점으로 옮겨져도 이미 접수한 티켓의 지점은 바뀌지 않는다.
 // 장비 지급 신청서(전자결재)가 최종 승인되면 TK_EQUIPMENT 티켓이 만들어진다 (approval/approval.js).
 
@@ -11,6 +11,10 @@ const TICKET_GROUP = {
 const TICKET_TITLE_MAX = 60;
 const TICKET_BODY_MAX = 1000;
 const TICKET_COMMENT_MAX = 300;
+// 장애 사진(#197): 1장, JPG·JPEG·PNG, 10MB까지. 서버(TicketWorkService.uploadPhoto)와 같은 기준이다.
+// 10MB가 넘으면 서버가 안내 문구 없이 끊으므로 화면에서 먼저 막는다
+const TICKET_PHOTO_MAX = 10 * 1024 * 1024;
+const TICKET_PHOTO_EXT = /\.(jpe?g|png)$/i;
 
 const itEl = id => document.getElementById(id);
 const itNode = (tag, cls, ...kids) => { const e = document.createElement(tag); if (cls) e.className = cls; e.append(...kids); return e; };
@@ -19,14 +23,16 @@ const itCell = (label, ...parts) => {
   td.dataset.label = label; // 폰에서 값 앞에 붙는 열 이름
   return td;
 };
-const itNew = { opts: null, initial: undefined };
+// photo: 고른 사진 파일, 미리보기 주소, 이미 올린 첨부 번호(접수가 실패해 다시 누를 때 또 올리지 않게)
+const itNew = { opts: null, initial: undefined, photo: { file: null, url: null, attachmentId: null } };
 const itMine = { filter: 'all', open: null, items: [] };
 const itAsset = { items: [], waiting: [] };
 
 // ---------- 장애·문의 접수 ----------
 // 구분(ticketType)의 값은 숨긴 select에 두고, 화면에는 설명이 붙은 버튼 두 개로 보인다
 const TICKET_INPUT_IDS = ['ticketType', 'ticketAsset', 'ticketBranch', 'ticketTitle', 'ticketBody'];
-const itSnapshot = () => JSON.stringify(TICKET_INPUT_IDS.map(id => itEl(id).value.trim())); // [취소] 때 쓰던 내용이 있는지 견줄 값
+// [취소] 때 쓰던 내용이 있는지 견줄 값 (고른 사진도 넣는다)
+const itSnapshot = () => JSON.stringify([...TICKET_INPUT_IDS.map(id => itEl(id).value.trim()), itNew.photo.file ? itNew.photo.file.name : '']);
 
 function openTicketNewView() {
   itEl('ticketError').textContent = '';
@@ -63,6 +69,8 @@ function syncTicketType() {
     b.tabIndex = b.dataset.type === type ? 0 : -1; // 라디오 묶음: Tab은 고른 버튼에만 멈추고, 묶음 안에서는 화살표로 옮긴다
   });
   const incident = type === 'TK_INCIDENT';
+  // 사진은 장애에만 붙는다. 문의로 바꾸면 칸을 숨기고 보내지 않는다(고른 사진은 장애로 돌아오면 그대로 있다)
+  itEl('ticketPhotoRow').hidden = !incident;
   itEl('ticketTitle').placeholder = incident ? '예: 노트북 화면이 켜지지 않아요' : '예: 공용 프린터 연결 방법이 궁금해요';
   itEl('ticketBody').placeholder = incident
     ? '언제부터, 어떤 증상인지, 오류 메시지가 있으면 그대로 적어 주세요'
@@ -132,6 +140,55 @@ itEl('ticketBranch')?.addEventListener('change', () => {
   syncTicketSummary();
 }));
 
+// 사진 고르기·빼기. 고른 파일은 바로 올리지 않고 [접수]할 때 올린다(접수하지 않고 나가면 서버에 남지 않게)
+function setTicketPhoto(file) {
+  const p = itNew.photo;
+  if (p.url) URL.revokeObjectURL(p.url);
+  p.file = file;
+  p.url = file ? URL.createObjectURL(file) : null;
+  p.attachmentId = null; // 다른 사진을 고르면 새로 올린다
+  const img = itEl('ticketPhotoPreview');
+  img.hidden = !file;
+  if (file) img.src = p.url; else img.removeAttribute('src');
+  itEl('ticketPhotoRemove').hidden = !file;
+  itEl('ticketPhotoPick').textContent = file ? '다른 사진' : '사진 고르기';
+  const info = itEl('ticketPhotoInfo');
+  info.classList.remove('is-warn');
+  const size = file && (file.size < 1024 * 1024 ? `${Math.max(1, Math.round(file.size / 1024))}KB` : `${(file.size / 1024 / 1024).toFixed(1)}MB`);
+  info.textContent = file ? `${file.name} · ${size}` : '선택 · JPG·PNG 1장, 10MB까지';
+}
+itEl('ticketPhotoPick')?.addEventListener('click', () => itEl('ticketPhoto').click());
+itEl('ticketPhotoRemove')?.addEventListener('click', () => { setTicketPhoto(null); itEl('ticketPhotoPick').focus(); });
+itEl('ticketPhoto')?.addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = ''; // 같은 파일을 다시 골라도 change가 오게
+  if (!file) return;
+  // 서버도 같은 검사를 다시 한다. 틀린 파일이면 고르기 전 상태를 그대로 둔다
+  const bad = !TICKET_PHOTO_EXT.test(file.name) ? 'JPG·JPEG·PNG 사진만 올릴 수 있습니다'
+    : !file.size ? '빈 파일은 올릴 수 없습니다'
+    : file.size > TICKET_PHOTO_MAX ? '사진은 10MB까지 올릴 수 있습니다' : '';
+  if (bad) {
+    const info = itEl('ticketPhotoInfo');
+    info.textContent = bad;
+    info.classList.add('is-warn');
+    return;
+  }
+  setTicketPhoto(file);
+});
+
+// 사진을 올리고 첨부 번호를 받는다: POST /ticket/api/photos (multipart, 이름 photo) → { success, data: { attachmentId } }.
+// api.post 는 JSON만 보내므로 FormData는 $.ajax로 보낸다(CSRF 머리글은 common.js가 붙인다). 이미 올렸으면 그 번호를 쓴다
+function uploadTicketPhoto() {
+  const p = itNew.photo;
+  if (p.attachmentId) return $.Deferred().resolve(p.attachmentId).promise();
+  const form = new FormData();
+  form.append('photo', p.file);
+  return $.ajax({ url: pageHref('/ticket/api/photos'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
+    .then(res => (res && res.success && res.data && res.data.attachmentId)
+      ? (p.attachmentId = res.data.attachmentId)
+      : $.Deferred().reject({ responseJSON: { message: (res && res.message) || '사진을 올리지 못했습니다' } }).promise());
+}
+
 // 확인 창(<dialog>)을 열고, 누른 버튼이 '확인'(value="ok")이면 true. Esc로 닫으면 false
 function itConfirm(id) {
   const dlg = itEl(id);
@@ -164,17 +221,32 @@ itEl('ticketForm')?.addEventListener('submit', e => {
   if (body.length > TICKET_BODY_MAX) { err.textContent = `내용은 ${TICKET_BODY_MAX}자까지 쓸 수 있습니다`; return; }
   const btn = itEl('ticketForm').querySelector('[type="submit"]');
   if (btn.disabled) return;
-  btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
   const assetId = itEl('ticketAsset').value;
-  api.post('/ticket/api/tickets', { type, title, body, branchId: Number(branchId), assetId: assetId ? Number(assetId) : null })
+  // 장애이고 사진을 골랐으면 먼저 올리고, 받은 첨부 번호를 접수 내용에 넣는다(#197)
+  const withPhoto = type === 'TK_INCIDENT' && itNew.photo.file;
+  ticketSending(true, withPhoto); // 두 번 눌러 두 건이 생기지 않게, 올리는 동안 사진을 바꾸지 않게
+  const photo = withPhoto ? uploadTicketPhoto() : $.Deferred().resolve(null).promise();
+  photo.then(attachmentId => api.post('/ticket/api/tickets',
+    { type, title, body, branchId: Number(branchId), assetId: assetId ? Number(assetId) : null, attachmentId })
+    // 409(이미 연결된 사진, 읽기 전용 업체 등)면 받아 둔 첨부 번호를 버린다: 다시 누르면 사진부터 새로 올린다
+    .fail(xhr => { if (xhr.status === 409) itNew.photo.attachmentId = null; }))
     .done(t => {
       err.textContent = '';
       itNew.initial = itSnapshot(); // 접수했으니 나갈 때 묻지 않는다
       toastAndGo(`${t.id}번 티켓을 접수했습니다. IT 담당자에게 전달됩니다`, pageHref('/ticket/mine'));
     })
     // 성공하면 버튼을 풀지 않는다: 내 티켓 화면으로 넘어가기 전에 한 번 더 눌러 같은 티켓이 두 건 생기지 않게. 실패했을 때만 다시 누를 수 있게 푼다
-    .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
+    .fail(xhr => { err.textContent = apiMessage(xhr); ticketSending(false); });
 });
+
+// 접수 보내는 중: [접수]·[사진 고르기]·[빼기]를 막고, 사진이 있으면 올리는 중이라고 보인다
+function ticketSending(on, withPhoto) {
+  const btn = itEl('ticketForm').querySelector('[type="submit"]');
+  btn.disabled = on;
+  btn.textContent = on ? (withPhoto ? '사진 올리는 중…' : '접수하는 중…') : '접수';
+  itEl('ticketPhotoPick').disabled = on;
+  itEl('ticketPhotoRemove').disabled = on;
+}
 
 // ---------- 내 티켓 ----------
 function openTicketMineView() { loadTicketMine(); }
@@ -226,7 +298,8 @@ document.querySelectorAll('#ticketFilters .card-filter').forEach(b => b.addEvent
 function ticketDetail(t) {
   const info = itNode('dl', 'detail');
   [['번호', t.id], ['구분', TICKET_TYPE[t.type] || '-'], ['접수 지점', t.branchName],
-    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', text(t.body)]]
+    ['관련 자산', t.asset ? assetLabel(t.asset) : '-'], ['제목', t.title], ['내용', text(t.body)],
+    ...(t.photoId ? [['사진', ticketPhotoLink(`/ticket/api/tickets/${encodeURIComponent(t.id)}/photos/${encodeURIComponent(t.photoId)}`)]] : [])]
     .forEach(([k, v]) => info.append(itNode('dt', '', k), itNode('dd', '', v)));
 
   // 접수 직후에는 이력이 없다: 티켓 처리 화면(ticket-admin.js)과 같은 안내를 보인다
@@ -247,6 +320,8 @@ function ticketDetail(t) {
       itNode('p', 'muted inq-body', '처리 이력의 해결 결과를 확인해 주세요. 확인하면 종료됩니다.'),
       itNode('div', 'inq-body', itNode('div', 'inq-actions', ok)));
   }
+  // 아직 접수 상태인 장애·문의는 요청자가 취소할 수 있다(#177). 서버가 canCancel 을 준 티켓에만 보인다(장비 지급 티켓은 없음)
+  if (t.canCancel) parts[1].prepend(...cancelBox(t));
   if (t.canComment) {
     // 완료되면 더 쓰지 않는다. 처리 중에도 사원이 추가로 알릴 것이 있으면 댓글로 남긴다
     const box = itNode('textarea', 'inq-text');
@@ -258,6 +333,19 @@ function ticketDetail(t) {
     parts[1].append(itNode('div', 'inq-body', box, itNode('div', 'inq-actions', send)));
   }
   return itNode('div', 'inq-grid', parts[0], itNode('div', '', parts[1]));
+}
+
+// 장애 사진(#197): 상세에 작게 보이고, 누르면 새 탭에서 원래 크기로 연다. 주소는 서버가 권한을 다시 본다
+function ticketPhotoLink(path) {
+  const img = itNode('img');
+  img.src = pageHref(path);
+  img.alt = '접수할 때 붙인 사진';
+  img.loading = 'lazy';
+  const a = itNode('a', 'tk-photo-link', img);
+  a.href = img.src;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  return a;
 }
 
 // 쓰는 버튼: 읽기 전용 업체에서는 누르지 못하게 data-write 를 단다
@@ -275,6 +363,48 @@ function closeTicket(t, btn) {
   api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/close`, { version: t.version })
     .done(() => { showToast(`${t.id}번 티켓을 종료했습니다`); loadTicketMine(); })
     .fail(xhr => { showToast(apiMessage(xhr)); if (xhr.status === 409) loadTicketMine(); else btn.disabled = false; });
+}
+
+// 접수 취소 칸: 되돌릴 수 없어서 한 번 더 묻는다. [접수 취소] → [취소하기]·[그대로 두기]
+// 버튼이 바뀔 때 포커스를 새 버튼으로 옮기고, 안내 문장이 바뀐 것은 화면 낭독기에도 읽힌다(aria-live)
+const TICKET_CANCEL_NOTE = '아직 담당자가 맡기 전입니다. 잘못 접수했거나 문제가 해결됐으면 취소할 수 있습니다.';
+function cancelBox(t) {
+  const note = itNode('p', 'muted inq-body', TICKET_CANCEL_NOTE);
+  note.setAttribute('aria-live', 'polite');
+  const actions = itNode('div', 'inq-actions');
+  const ask = focus => {
+    const btn = itButton('접수 취소', 'btn btn-danger-line');
+    btn.addEventListener('click', () => {
+      note.textContent = `${t.id}번 티켓을 취소할까요? 취소하면 되돌릴 수 없습니다.`;
+      const yes = itButton('취소하기', 'btn btn-danger-line');
+      const no = itButton('그대로 두기', 'btn');
+      yes.addEventListener('click', () => cancelTicket(t, yes, no));
+      no.addEventListener('click', () => {
+        note.textContent = TICKET_CANCEL_NOTE;
+        ask(true);
+      });
+      actions.replaceChildren(yes, no);
+      yes.focus();
+    });
+    actions.replaceChildren(btn);
+    if (focus) btn.focus();
+  };
+  ask(false);
+  return [itNode('header', 'info-card-head', itNode('h2', '', '접수 취소')), note, itNode('div', 'inq-body', actions)];
+}
+
+// 접수 취소: ticket 모듈 담당이 정한 규격(#177). POST /ticket/api/tickets/{id}/cancel { version } — version 은 늘 보낸다.
+// 오류는 상태 코드로만 나눈다(문구는 보여 주기만): 409 는 그새 담당자가 맡았거나 바뀐 것이라 목록을 다시 받는다
+function cancelTicket(t, yes, no) {
+  yes.disabled = true;
+  no.disabled = true;
+  api.post(`/ticket/api/tickets/${encodeURIComponent(t.id)}/cancel`, { version: t.version })
+    .done(() => { showToast(`${t.id}번 티켓을 취소했습니다`); loadTicketMine(); })
+    .fail(xhr => {
+      showToast(apiMessage(xhr));
+      if (xhr.status === 409 || xhr.status === 404) loadTicketMine();
+      else { yes.disabled = false; no.disabled = false; }
+    });
 }
 
 function addComment(id, bodyRaw, btn) {

@@ -17,7 +17,7 @@
     <%-- 기안 작성 화면만의 모양 (넓은 작성 칸 + 좁은 안내 칸, 양식 탭, 구분 버튼, 결재선 한 줄) --%>
     <link rel="stylesheet" href="${ctx}/resources/css/approval/write.css">
     <section class="view on" id="view-approval-write">
-      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 반려된 문서는 결재함에서 재기안한다(임시저장은 핵심 뒤 추가라 아직 만들지 않았다) (approval/approval.js) --%>
+      <%-- 기안 작성: 휴가 신청서·장비 지급 신청서. 결재선은 최대 2단계(순서대로). 반려된 문서는 결재함에서 재기안하고, 쓰다 만 문서는 임시저장해 결재함에서 이어 쓴다 (approval/approval.js) --%>
       <div class="page-head"><h1>기안 작성</h1></div>
       <div class="ea-write">
         <section class="info-card">
@@ -64,6 +64,13 @@
               </div>
             </div>
 
+            <div class="ea-group">
+              <p class="ea-group-title">첨부 <span>· 선택, 5개까지 (jpg·png·gif·pdf·docx·xlsx·pptx·hwp·hwpx, 파일당 10MB)</span></p>
+              <input type="file" id="eaFiles" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.docx,.xlsx,.pptx,.hwp,.hwpx" data-write>
+              <ul id="eaFileList"></ul>
+              <p class="form-error" id="eaFileError" role="alert"></p>
+            </div>
+            
             <div class="ea-group ea-line-group">
               <p class="ea-group-title">결재선 <span>· 순서대로 승인하고, 최대 2단계입니다</span></p>
               <div class="ea-line">
@@ -81,6 +88,7 @@
               <%-- 무엇을 제출하는지 한 줄 요약 (채울수록 문장이 완성된다) --%>
               <p class="ea-summary" id="eaSummary" aria-live="polite"></p>
               <button type="button" class="btn" id="eaCancel">취소</button>
+              <button type="button" class="btn" id="eaDraftSave" data-write>임시저장</button>
               <button type="submit" class="btn btn-primary" data-write>제출</button>
             </div>
           </form>

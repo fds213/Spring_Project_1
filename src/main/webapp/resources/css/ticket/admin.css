@@ -1,0 +1,14 @@
+/* 티켓 처리 화면 (ticket/admin/list.jsp + js/ticket/ticket-admin.js) 전용: 제목 검색 줄과 쪽 번호.
+   쪽 번호 모양은 게시판(css/board/board.css .pager)과 같다. 색·둥글기는 common.css 변수를 쓴다 */
+#view-ticket-admin .search-row { margin: 16px 0 0; }
+
+.pager { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: 16px; }
+.pager[hidden] { display: none; }
+.pager button {
+  min-width: 34px; height: 34px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--bg); font: inherit; font-size: 13px; color: var(--text-sub); cursor: pointer;
+}
+.pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.pager button[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pager button:disabled { opacity: 0.4; cursor: default; }
+.pager .pager-gap { align-self: center; padding: 0 2px; color: var(--text-muted); }
