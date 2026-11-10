@@ -1,4 +1,4 @@
--- 2026-11-06: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 233개 INSERT.
+-- 2026-11-06: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 235개 INSERT.
 -- 기존 DB에는 patches/11-02_02_DATA_PATCH.sql을 사용한다. 일부 적재된 DB에 이 파일 전체를 재실행하지 않는다.
 -- 대상: Oracle / COMMON_CODE
 -- 출처: https://docs.google.com/spreadsheets/d/1qBiMeyeUHtTa1W2TPY9VwphQEKBTNFclOThhCXRFbo0/edit
@@ -333,6 +333,11 @@ BEGIN
     -- 원본 시트 99행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('BOARD_DEPT', 'BOARD_TYPE', '부서 게시판', '지정 부서의 직원이 사용하는 게시판', 'N', 2);
+    -- 2026-11-10 추가: 익명 게시판·자료실
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('BOARD_ANON', 'BOARD_TYPE', '익명 게시판', '작성자 이름을 보이지 않는 업체 게시판', 'Y', 3);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('BOARD_LIBRARY', 'BOARD_TYPE', '자료실', '업체 직원이 문서 파일을 올리고 내려받는 게시판', 'Y', 4);
     -- ROOM_TYPE : 채팅방 종류
     -- 원본 시트 100행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
@@ -764,7 +769,7 @@ BEGIN
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('ACR_CANCELED', 'CORRECTION_STATUS', '취소', '처리 전에 직원이 직접 취소한 상태', 'Y', 4);
 
-    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 233행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
+    DBMS_OUTPUT.PUT_LINE('COMMON_CODE 235행 INSERT 완료. 확인 후 COMMIT 또는 ROLLBACK을 실행한다.');
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK TO SP_IEUM_COMMON_CODE;
@@ -772,7 +777,7 @@ EXCEPTION
 END;
 /
 
--- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 233)
+-- 입력 결과 확인 (신규 빈 테이블에 최초 실행했다면 TOTAL_COUNT = 235)
 SELECT COUNT(*) AS TOTAL_COUNT,
        SUM(CASE WHEN USE_YN = 'Y' THEN 1 ELSE 0 END) AS Y_COUNT,
        SUM(CASE WHEN USE_YN = 'N' THEN 1 ELSE 0 END) AS N_COUNT,
