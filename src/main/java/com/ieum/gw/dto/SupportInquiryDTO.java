@@ -3,6 +3,7 @@ package com.ieum.gw.dto;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -23,6 +24,12 @@ public class SupportInquiryDTO {
     private String state;       // 공통 코드 SUPPORT_STATUS(SUP_*)
     private List<SupportReplyDTO> replies; // 답변, 먼저 쓴 순
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Integer unread;     // 안 읽은 답변 알림 수. '내가 보낸 문의'에만 채운다
+
     @JsonIgnore
     private Long companyId;     // 답변을 문의와 같은 업체로 저장할 때 쓴다
+
+    @JsonIgnore
+    private Long requesterEmployeeId; // 문의한 직원. 답변 알림을 받을 사람이다. 운영자 쪽 조회에만 채운다
 }

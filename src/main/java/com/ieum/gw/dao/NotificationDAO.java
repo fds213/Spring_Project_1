@@ -6,6 +6,7 @@ import org.springframework.stereotype.Repository;
 
 import com.ieum.gw.dto.NotificationDTO;
 import com.ieum.gw.dto.NotificationSaveDTO;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 import com.ieum.gw.mapper.NotificationMapper;
 
 import lombok.RequiredArgsConstructor;
@@ -44,6 +45,16 @@ public class NotificationDAO {
     /** 안 읽은 본인 알림을 읽음으로 표시. 바뀐 행 수(이미 읽었거나 본인 것이 아니면 0) */
     public int markRead(Long companyId, Long userAccountId, Long notificationId) {
         return mapper.markRead(companyId, userAccountId, notificationId);
+    }
+
+    /** 본인의 안 읽은 이음 문의 답변 알림 수, 문의별 */
+    public List<NotificationUnreadCountDTO> countUnreadSupportReplies(Long companyId, Long userAccountId) {
+        return mapper.countUnreadSupportReplies(companyId, userAccountId);
+    }
+
+    /** 한 문의의 본인 답변 알림을 모두 읽음으로 표시. 바뀐 행 수 */
+    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId) {
+        return mapper.markSupportRepliesRead(companyId, userAccountId, supportInquiryId);
     }
 
     /** 이 번호가 본인 알림인지 */

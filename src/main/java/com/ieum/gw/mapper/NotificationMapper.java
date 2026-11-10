@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 
 import com.ieum.gw.dto.NotificationDTO;
 import com.ieum.gw.dto.NotificationSaveDTO;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 
 @Mapper
 public interface NotificationMapper {
@@ -27,6 +28,13 @@ public interface NotificationMapper {
     int markRead(@Param("companyId") Long companyId,
                  @Param("userAccountId") Long userAccountId,
                  @Param("notificationId") Long notificationId);
+
+    List<NotificationUnreadCountDTO> countUnreadSupportReplies(@Param("companyId") Long companyId,
+                                                                @Param("userAccountId") Long userAccountId);
+
+    int markSupportRepliesRead(@Param("companyId") Long companyId,
+                               @Param("userAccountId") Long userAccountId,
+                               @Param("supportInquiryId") Long supportInquiryId);
 
     int countOwned(@Param("companyId") Long companyId,
                    @Param("userAccountId") Long userAccountId,

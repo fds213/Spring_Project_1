@@ -1,5 +1,7 @@
 package com.ieum.gw.service;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -11,6 +13,7 @@ import com.ieum.gw.dao.NotificationDAO;
 import com.ieum.gw.dto.NotificationPageDTO;
 import com.ieum.gw.dto.NotificationSaveDTO;
 import com.ieum.gw.dto.NotificationType;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,6 +28,8 @@ import lombok.RequiredArgsConstructor;
  * 그 밖의 저장 오류(없는 문서·티켓·정정 요청 번호 등)는 그대로 던져 업무 트랜잭션을 취소한다(계획서 5장).
  * 근태 정정 알림은 DB 패치(NOTIFICATION.ATTENDANCE_CORRECTION_ID 칸과 CK_69_01 교체, 코드 2개)를 돌린 DB에서만 저장된다.
  * 패치 전에 부르면 오류가 나 정정 요청·처리까지 취소되니, 부르는 코드는 패치가 들어간 뒤에 붙인다.
+ * 이음 문의 답변 알림도 같다(11-09_01 패치: NOTIFICATION.SUPPORT_INQUIRY_ID 칸과 CK_69_01 교체, 코드 1개. 팀 DB는 11/10 적용).
+ * 답변 하나에 알림 하나를 저장한다(같은 답변으로 두 번 와도 하나). 답변을 고칠 때는 보내지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -82,6 +87,36 @@ public class NotificationService {
         String result = approved ? "승인되었습니다." : "반려되었습니다. 근태 화면에서 반려 사유를 확인해 주세요.";
         saveAttendanceCorrection(type, companyId, receiverEmployeeId, attendanceCorrectionId,
                 type.messageFor(workDate, result));
+    }
+
+    /**
+     * 이음 문의 답변(NT_SUPPORT_REPLY). 운영자가 답변을 달 때 문의한 직원에게 부른다.
+     * companyId는 문의한 업체다(운영자의 업체가 아니다). 같은 답변 번호로 두 번 불러도 하나만 저장한다.
+     */
+    public void notifySupportReply(Long companyId, Long receiverEmployeeId, Long supportInquiryId,
+                                   Long supportReplyId, String inquiryTitle) {
+        NotificationType type = NotificationType.NT_SUPPORT_REPLY;
+        NotificationSaveDTO dto = newRow(type, companyId, type.messageFor(inquiryTitle));
+        dto.setSupportInquiryId(supportInquiryId);
+        dto.setDedupeKey(type.name() + ":" + supportInquiryId + ":" + supportReplyId);
+        save(dto, receiverEmployeeId);
+    }
+
+    /** 본인의 안 읽은 이음 문의 답변 알림 수를 문의 번호별로. 안 읽은 것이 없는 문의는 빠진다 */
+    public Map<Long, Integer> countUnreadSupportReplies(Long companyId, Long userAccountId) {
+        Map<Long, Integer> counts = new HashMap<>();
+        for (NotificationUnreadCountDTO row : notificationDAO.countUnreadSupportReplies(companyId, userAccountId)) {
+            counts.put(row.getTargetId(), row.getUnread());
+        }
+        return counts;
+    }
+
+    /**
+     * 한 문의에 온 본인 답변 알림을 모두 읽음으로 표시한다('내가 보낸 문의'에서 그 문의를 펼쳤을 때).
+     * 남의 문의 번호나 이미 읽은 알림이면 아무것도 바꾸지 않는다(업체·받는 계정 조건). 바뀐 수를 돌려준다.
+     */
+    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId) {
+        return notificationDAO.markSupportRepliesRead(companyId, userAccountId, supportInquiryId);
     }
 
     /** 안 읽은 알림 수(헤더 배지 'notification'). */

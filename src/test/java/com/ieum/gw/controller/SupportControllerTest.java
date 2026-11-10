@@ -41,10 +41,12 @@ class SupportControllerTest {
         Long companyId;
         Long employeeId;
         Long operatorAccountId;
+        Long userAccountId;
         String editedTarget;
+        String readTarget;
 
         FakeService() {
-            super(null);
+            super(null, null);
         }
 
         private void check() {
@@ -62,11 +64,21 @@ class SupportControllerTest {
         }
 
         @Override
-        public List<SupportInquiryDTO> listMine(Long companyId, Long employeeId) {
+        public List<SupportInquiryDTO> listMine(Long companyId, Long employeeId, Long userAccountId) {
             check();
             this.companyId = companyId;
             this.employeeId = employeeId;
-            return List.of(inquiry());
+            this.userAccountId = userAccountId;
+            SupportInquiryDTO mine = inquiry();
+            mine.setUnread(1);
+            return List.of(mine);
+        }
+
+        @Override
+        public int markRepliesRead(Long companyId, Long userAccountId, Long no) {
+            check();
+            this.readTarget = companyId + ":" + userAccountId + ":" + no;
+            return 1;
         }
 
         @Override
@@ -105,6 +117,7 @@ class SupportControllerTest {
         SupportInquiryDTO inquiry = new SupportInquiryDTO();
         inquiry.setNo(100L);
         inquiry.setCompanyId(7L);
+        inquiry.setRequesterEmployeeId(55L);
         inquiry.setCompany("강아지상사");
         inquiry.setTitle("제목");
         inquiry.setState("SUP_RECEIVED");
@@ -166,10 +179,23 @@ class SupportControllerTest {
 
         assertEquals(3L, service.companyId);
         assertEquals(44L, service.employeeId);
+        assertEquals(9L, service.userAccountId);
         assertEquals(100L, data.get(0).get("no").asLong());
+        assertEquals(1, data.get(0).get("unread").asInt());
         assertEquals("확인했습니다", data.get(0).get("replies").get(0).get("body").asText());
         assertFalse(data.get(0).has("companyId"));
+        assertFalse(data.get(0).has("requesterEmployeeId"));
         assertFalse(data.get(0).get("replies").get(0).has("inquiryNo"));
+    }
+
+    @Test
+    @DisplayName("문의 읽음은 요청 값이 아니라 로그인 업체·계정과 주소의 접수번호로 처리한다")
+    void readRepliesUsesLoginUser() throws Exception {
+        JsonNode body = body(postJson("/support/api/inquiries/100/read", "{\"companyId\":999,\"userAccountId\":999}"));
+
+        assertTrue(body.get("success").asBoolean());
+        assertEquals(1, body.get("data").get("read").asInt());
+        assertEquals("3:9:100", service.readTarget);
     }
 
     @Test
@@ -179,6 +205,8 @@ class SupportControllerTest {
 
         assertEquals("강아지상사", first.get("company").asText());
         assertEquals("SUP_RECEIVED", first.get("state").asText());
+        assertFalse(first.has("unread"));
+        assertFalse(first.has("requesterEmployeeId"));
     }
 
     @Test

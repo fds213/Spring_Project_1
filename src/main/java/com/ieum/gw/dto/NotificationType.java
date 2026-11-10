@@ -10,7 +10,9 @@ public enum NotificationType {
     /** 요청자 이름, 근무일 */
     NT_ATT_CORRECTION_REQUEST("근태 정정 요청", "%s님이 %s 근태 정정을 요청했습니다."),
     /** 근무일, 결과 문구(승인·반려) */
-    NT_ATT_CORRECTION_DONE("근태 정정 처리", "%s 근태 정정 요청이 %s");
+    NT_ATT_CORRECTION_DONE("근태 정정 처리", "%s 근태 정정 요청이 %s"),
+    /** 문의 제목 */
+    NT_SUPPORT_REPLY("이음 문의 답변", "'%s' 문의에 이음 운영팀이 답변했습니다.");
 
     private final String title;
     private final String messageFormat;
