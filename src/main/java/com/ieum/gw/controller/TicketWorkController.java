@@ -4,7 +4,11 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.TicketRequestDTO;
@@ -38,10 +43,17 @@ public class TicketWorkController {
     @GetMapping("/ticket/admin/list")
     public String adminList() { return "ticket/admin/list"; }
 
+    /** 관리자 티켓 목록을 기존 방식 또는 검색·페이징 방식으로 조회한다. */
     @GetMapping("/ticket/admin/api/tickets")
     @ResponseBody
-    public Map<String, Object> adminList(@AuthenticationPrincipal LoginUser user, @RequestParam(required = false) String filter) {
-        return Map.of("success", true, "data", service.listAdmin(user, filter));
+    public Map<String, Object> adminList(@AuthenticationPrincipal LoginUser user, 
+    										@RequestParam(name = "filter", required = false) String filter,
+    										@RequestParam(name = "keyword", required = false) String keyword,
+    										@RequestParam(name = "page", required = false) Long page) {
+    	Map<String, Object> data = keyword == null && page == null 
+    										? service.listAdmin(user, filter) : service.searchAdmin(user, filter, keyword, page);
+    	
+        return Map.of("success", true, "data", data);
     }
 
     @GetMapping("/ticket/admin/api/tickets/{id}")
@@ -60,6 +72,34 @@ public class TicketWorkController {
     @ResponseBody
     public Map<String, Object> create(@AuthenticationPrincipal LoginUser user, @RequestBody TicketRequestDTO form) {
         return Map.of("success", true, "data", Map.of("id", service.create(user, form)));
+    }
+    
+    /** 장애 접수에 사용할 사진을 업로드한다. */
+    @PostMapping(value = "/ticket/api/photos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseBody
+    public Map<String, Object> uploadPhoto(@AuthenticationPrincipal LoginUser user, @RequestParam("photo") MultipartFile photo) {
+    	Long attachmentId = service.uploadPhoto(user, photo);
+    	
+    	return Map.of("success", true, "data", Map.of("attachmentId", attachmentId));
+    }
+    
+    /** 요청자가 본인 티켓에 연결된 사진을 연다. */
+    @GetMapping("/ticket/api/tickets/{id}/photos/{attachmentId}")
+    public ResponseEntity<Resource> photo(@AuthenticationPrincipal LoginUser user, @PathVariable Long id, @PathVariable Long attachmentId) {
+    	return photoResponse(service.loadPhoto(user, id, attachmentId, false));
+    }
+    
+    /** IT 담당자 또는 관리자가 같은 업체 티켓의 사진을 연다. */
+    @GetMapping("/ticket/admin/api/tickets/{id}/photos/{attachmentId}")
+    public ResponseEntity<Resource> adminPhoto(@AuthenticationPrincipal LoginUser user, @PathVariable Long id, @PathVariable Long attachmentId) {
+    	return photoResponse(service.loadPhoto(user, id, attachmentId, true));
+    }
+    
+    /** 사진을 브라우저가 표시할 수 있는 형식으로 응답한다. */
+    private ResponseEntity<Resource> photoResponse(Resource photo) {
+    	MediaType contentType = MediaTypeFactory.getMediaType(photo).orElse(MediaType.APPLICATION_OCTET_STREAM);
+
+        return ResponseEntity.ok().contentType(contentType).cacheControl(CacheControl.noStore()).body(photo);
     }
 
     @PostMapping("/ticket/api/tickets/{id}/comments")

@@ -252,6 +252,7 @@ const eaStartWrite = (form, pre) => startApprovalWrite(form, pre);
 
 // 화면을 열 때 (JSP 페이지가 열리면 부른다). 결재자·지점 목록을 받은 뒤 입력칸을 채운다
 function openApprovalWriteView() {
+  eaInitFiles();
   const pre = takeApprovalPre();
   eaState.pre = pre;
   eaEl('eaError').textContent = '';
@@ -371,7 +372,7 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
   eaEl('eaSubmitText').textContent = `${names.length > 1 ? `${names.join(' → ')} 순서로` : `${names[0]}님이`} 결재합니다. 제출하면 고치거나 회수할 수 없습니다.`;
   if (!(await eaConfirm('eaSubmitDialog'))) return;
   btn.disabled = true; // 두 번 눌러 두 건이 생기지 않게
-  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], originalDocumentId: eaState.pre?.originalDocumentId || null })
+  api.post('/approval/api/documents', { documentType: c.form, fields: c.fields, line: [c.a1, c.a2], originalDocumentId: eaState.pre?.originalDocumentId || null, fileIds: eaState.files.map(f => f.id) })
     .done(() => {
       err.textContent = '';
       eaState.initial = eaSnapshot();
@@ -380,6 +381,43 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
     // 성공하면 버튼을 풀지 않는다: 결재함으로 넘어가기 전에 한 번 더 눌러 같은 문서가 두 번 올라가지 않게. 실패했을 때만 다시 누를 수 있게 푼다
     .fail(xhr => { err.textContent = apiMessage(xhr); btn.disabled = false; });
 });
+
+// ---------- 첨부 ----------
+// 고르는 즉시 서버에 올려(POST /approval/api/files) 번호를 받아 두고, 제출할 때 번호(fileIds)만 보낸다
+const EA_FILE_MAX = 5; // 서버 ApprovalService.FILE_MAX와 같게
+eaState.files = [];
+
+// 올린 파일 목록을 그린다 (빼기 버튼 포함)
+function eaRenderFiles() {
+  eaEl('eaFiles').disabled = eaState.uploading || eaState.files.length >= EA_FILE_MAX;
+  eaEl('eaFileList').replaceChildren(...eaState.files.map(f => {
+    const del = eaButton('빼기', 'btn', false);
+    del.addEventListener('click', () => { eaState.files = eaState.files.filter(x => x.id !== f.id); eaRenderFiles(); });
+    return eaNode('li', '', `${f.name} (${Math.ceil(f.size / 1024)}KB) `, del);
+  }));
+}
+
+// 파일을 고르면 바로 서버에 올린다
+function eaInitFiles() {
+  eaEl('eaFiles').addEventListener('change', e => {
+    const picked = [...e.target.files];
+    e.target.value = ''; // 같은 파일을 다시 고를 수 있게
+    eaEl('eaFileError').textContent = '';
+    if (!picked.length) return;
+    if (eaState.files.length + picked.length > EA_FILE_MAX) {
+      eaEl('eaFileError').textContent = `첨부파일은 ${EA_FILE_MAX}개까지입니다`;
+      return;
+    }
+    const form = new FormData();
+    picked.forEach(file => form.append('files', file));
+    eaState.uploading = true;
+    eaRenderFiles();
+    $.ajax({ url: pageHref('/approval/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
+      .done(res => { eaState.files.push(...res.data); })
+      .fail(xhr => { eaEl('eaFileError').textContent = apiMessage(xhr, '파일을 올리지 못했습니다'); })
+      .always(() => { eaState.uploading = false; eaRenderFiles(); });
+  });
+}
 
 // ---------- 결재함 ----------
 function openApprovalBoxView() {
@@ -452,6 +490,14 @@ function eaDocDetail(d) {
   const info = eaNode('dl', 'detail');
   [['문서', d.title], ['기안자', `${d.employeeName}${d.departmentName ? ` (${d.departmentName})` : ''}`], ['기안일', whenFull(d.submittedAt)], ...eaDocRows(d), ['결재선', eaLineText(d)], ['상태', `${EA_STATUS[d.statusCode]}${d.redrafted ? ' · 재기안 완료' : ''}`]]
     .forEach(([k, v]) => info.append(eaNode('dt', '', k), eaNode('dd', '', v)));
+      // 첨부: 이름을 누르면 내려받는다 (결재함에 보이는 문서만 서버가 내준다)
+  if (d.files && d.files.length) {
+    info.append(eaNode('dt', '', '첨부'), eaNode('dd', '', ...d.files.map(f => {
+      const a = eaNode('a', '', f.name);
+      a.href = pageHref(f.url);
+      return eaNode('div', '', a);
+    })));
+  }
   // 결재 이력: 누가 · [제출·승인·반려] 표시, 의견은 아랫줄, 시각은 흐리게 (오래된 것부터)
   const log = eaNode('ol', 'ea-timeline', ...(d.history.length
     ? d.history.map(h => eaNode('li', `ea-tl-${EA_ACTION_CLASS[h.actionCode] || 'submit'}`,

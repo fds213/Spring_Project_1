@@ -64,6 +64,13 @@
               </div>
             </div>
 
+            <div class="ea-group">
+              <p class="ea-group-title">첨부 <span>· 선택, 5개까지 (jpg·png·gif·pdf·docx·xlsx·pptx·hwp·hwpx, 파일당 10MB)</span></p>
+              <input type="file" id="eaFiles" multiple accept=".jpg,.jpeg,.png,.gif,.pdf,.docx,.xlsx,.pptx,.hwp,.hwpx" data-write>
+              <ul id="eaFileList"></ul>
+              <p class="form-error" id="eaFileError" role="alert"></p>
+            </div>
+            
             <div class="ea-group ea-line-group">
               <p class="ea-group-title">결재선 <span>· 순서대로 승인하고, 최대 2단계입니다</span></p>
               <div class="ea-line">

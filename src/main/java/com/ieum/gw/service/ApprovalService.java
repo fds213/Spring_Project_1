@@ -1,32 +1,57 @@
 package com.ieum.gw.service;
 
-import com.ieum.gw.dao.ApprovalDAO;
-import com.ieum.gw.dto.*;
-import com.ieum.gw.dto.LeaveDayDTO;
-import com.ieum.gw.code.AssetType;
-import com.ieum.gw.code.ApprovalAction;
-import com.ieum.gw.code.ApprovalDocumentStatus;
-import com.ieum.gw.code.ApprovalDocumentType;
-import com.ieum.gw.code.ApprovalStepStatus;
-import com.ieum.gw.code.LeaveType;
-import com.ieum.gw.dto.LoginUser;
-import lombok.RequiredArgsConstructor;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+import org.springframework.core.io.Resource;
 import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.http.HttpStatus;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Service;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
-import java.util.*;
-import java.util.stream.Collectors;
+import com.ieum.gw.code.ApprovalAction;
+import com.ieum.gw.code.ApprovalDocumentStatus;
+import com.ieum.gw.code.ApprovalDocumentType;
+import com.ieum.gw.code.ApprovalStepStatus;
+import com.ieum.gw.code.AssetType;
+import com.ieum.gw.code.LeaveType;
+import com.ieum.gw.dao.ApprovalDAO;
+import com.ieum.gw.dto.ApprovalBoxDTO;
+import com.ieum.gw.dto.ApprovalBoxHistoryDTO;
+import com.ieum.gw.dto.ApprovalBoxStepDTO;
+import com.ieum.gw.dto.ApprovalDecisionDTO;
+import com.ieum.gw.dto.ApprovalDecisionResultDTO;
+import com.ieum.gw.dto.ApprovalDocumentDTO;
+import com.ieum.gw.dto.ApprovalEquipmentDTO;
+import com.ieum.gw.dto.ApprovalFieldsDTO;
+import com.ieum.gw.dto.ApprovalFileDTO;
+import com.ieum.gw.dto.ApprovalHistoryDTO;
+import com.ieum.gw.dto.ApprovalLeaveDTO;
+import com.ieum.gw.dto.ApprovalStepDTO;
+import com.ieum.gw.dto.ApprovalSubmitDTO;
+import com.ieum.gw.dto.ApprovedEquipmentDTO;
+import com.ieum.gw.dto.ApproverDTO;
+import com.ieum.gw.dto.AttachmentDTO;
+import com.ieum.gw.dto.LeaveDayDTO;
+import com.ieum.gw.dto.LoginUser;
+
+import lombok.RequiredArgsConstructor;
 
 // Dear programmer:
 // When I wrote this code, only god and I knew how it worked.
@@ -50,7 +75,8 @@ public class ApprovalService {
             List.of(AssetType.AT_LAPTOP, AssetType.AT_DESKTOP, AssetType.AT_MONITOR, AssetType.AT_OTHER);
     private static final int EQUIPMENT_QUANTITY = 1; // 계획서 3장 B: 수량 1개
     private static final int PURPOSE_MAX = 1000;     // EQUIPMENT_REQUEST.PURPOSE VARCHAR2(1000 CHAR)
-
+    private static final int FILE_MAX = 5;       // 결재 문서 하나에 첨부 5개까지 (approval.js와 같게)
+    private static final String FILE_MODULE = "approval";	// 파일 저장 폴더 이름 ({업체}/approval/...)
     private final EmployeeService eService;
     private final AttendanceService aService;
     private final ApprovalDAO dao;
@@ -58,6 +84,7 @@ public class ApprovalService {
     private final NotificationService nService;
     private final ScheduleService sService;
     private final TicketService tService;
+    private final AttachmentService attachService;
 
     private List<Long> parseLine(List<String> line) {
 
@@ -256,8 +283,10 @@ public class ApprovalService {
         }
 
         // 양식마다 검사와 상세 저장이 다르다
-        return isLeave ? submitLeave(user, approverIds, fields, dto.getOriginalDocumentId()) : submitEquipment(user, approverIds, fields, dto.getOriginalDocumentId());
-    }
+        Long documentId = isLeave ? submitLeave(user, approverIds, fields, dto.getOriginalDocumentId()) : submitEquipment(user, approverIds, fields, dto.getOriginalDocumentId());
+        linkFiles(user, documentId, dto.getFileIds());
+        return documentId;
+    }    
 
     // 휴가 신청서: 날짜 계산·연차·겹침을 검사하고 휴가 상세·날짜를 저장한다
     private Long submitLeave(LoginUser user, List<Long> approverIds, ApprovalFieldsDTO fields, Long originalDocumentId) {
@@ -488,7 +517,12 @@ public class ApprovalService {
                 .collect(Collectors.groupingBy(ApprovalBoxStepDTO::getApprovalDocumentId));
         Map<Long, List<ApprovalBoxHistoryDTO>> history = dao.selectBoxHistory(companyId, employeeId).stream()
                 .collect(Collectors.groupingBy(ApprovalBoxHistoryDTO::getApprovalDocumentId));
-
+        Map<Long, List<ApprovalFileDTO>> files = new HashMap<>();
+        for (ApprovalFileDTO f : dao.selectBoxFiles(companyId, employeeId)) {
+            f.setUrl("/approval/api/documents/" + f.getApprovalDocumentId() + "/files/" + f.getId());
+            files.computeIfAbsent(f.getApprovalDocumentId(), k -> new ArrayList<>()).add(f);
+        }
+        
         Map<String, List<ApprovalBoxDTO>> box = new LinkedHashMap<>();
         for (String tab : List.of("WAIT", "PROGRESS", "DONE", "REJECTED", "DRAFT")) {
             box.put(tab, new ArrayList<>());
@@ -498,6 +532,7 @@ public class ApprovalService {
             Long id = doc.getApprovalDocumentId();
             doc.setSteps(steps.getOrDefault(id, List.of()));
             doc.setHistory(history.getOrDefault(id, List.of()));
+            doc.setFiles(files.getOrDefault(id, List.of()));
             doc.setCanDecide(doc.isMyTurn());
             if (ApprovalDocumentStatus.REJECTED.name().equals(doc.getStatusCode())) {
                 doc.setCanRedraft(Objects.equals(employeeId, doc.getAuthorEmployeeId()) && !doc.isRedrafted());
@@ -641,5 +676,63 @@ public class ApprovalService {
         dao.insertHistory(history);
 
         return createResponse(user, doc, history);
+    }
+    
+    /** 결재 첨부를 저장소에 올리고 번호·이름을 돌려준다(상신 전에 먼저 부른다) */
+    public List<ApprovalFileDTO> storeFiles(LoginUser user, List<MultipartFile> files) throws IOException {
+        
+    	
+    	if (files == null || files.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "올릴 파일을 골라 주세요");
+        }
+        if (files.size() > FILE_MAX) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 " + FILE_MAX + "개까지입니다");
+        }
+
+        List<ApprovalFileDTO> result = new ArrayList<>();
+        for (MultipartFile file : files) {
+            AttachmentDTO saved = attachService.upload(file, user, FILE_MODULE); // 형식이 틀리면 여기서 예외
+            ApprovalFileDTO f = new ApprovalFileDTO();
+            f.setId(saved.getAttachmentId());
+            f.setName(saved.getOriginalName());
+            f.setSize(saved.getByteSize());
+            f.setType(saved.getMimeType());
+            result.add(f);
+        }
+        return result;
+    }
+    
+    /** 올려 둔 첨부를 결재 문서에 붙인다. 우리 업체 파일이고 본인이 올렸고 아직 안 붙은 것만 */
+    private void linkFiles(LoginUser user, Long documentId, List<Long> fileIds) {
+        if (fileIds == null || fileIds.isEmpty()) {
+            return; // 첨부 없이 상신
+        }
+        List<Long> ids = fileIds.stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        if (ids.size() > FILE_MAX) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "첨부파일은 " + FILE_MAX + "개까지입니다");
+        }
+
+        for (Long id : ids) {
+            AttachmentDTO file = attachService.get(id, user.getCompanyId()); // 다른 업체 파일이면 예외
+            if (!Objects.equals(file.getUploaderAccountId(), user.getUserAccountId())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 올린 파일만 붙일 수 있습니다");
+            }
+            dao.insertFile(user.getCompanyId(), documentId, id);
+            attachService.markAttached(id, user.getCompanyId()); // 이미 다른 문서에 붙은 파일이면 예외
+        }
+    }
+    
+    /** 결재함에 보이는 문서의 첨부만 내준다. 아니면 404 (남의 문서 번호를 넣어도 존재 여부를 알 수 없게) */
+    @Transactional(readOnly = true)
+    public AttachmentDTO getFile(LoginUser user, long documentId, long fileId) {
+        if (dao.countBoxFile(user.getCompanyId(), user.getEmployeeId(), documentId, fileId) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "파일을 찾을 수 없습니다");
+        }
+        return attachService.get(fileId, user.getCompanyId());
+    }
+
+    /** 첨부 파일 내용 (내려받기용) */
+    public Resource loadFile(AttachmentDTO file) throws IOException {
+        return attachService.load(file);
     }
 }

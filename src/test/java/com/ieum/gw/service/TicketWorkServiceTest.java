@@ -2,6 +2,7 @@ package com.ieum.gw.service;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static com.ieum.gw.code.TicketStatus.*;
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,14 +12,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
 import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.multipart.MultipartFile;
+import com.ieum.gw.dao.AttachmentDAO;
 import com.ieum.gw.dto.AssetDTO;
+import com.ieum.gw.dto.AttachmentDTO;
 import com.ieum.gw.service.AssetService;
 import com.ieum.gw.service.AssetLookupService;
 import com.ieum.gw.dto.AuthEmpDTO;
@@ -29,6 +36,7 @@ import com.ieum.gw.dto.BranchDetailDTO;
 import com.ieum.gw.service.BranchService;
 import com.ieum.gw.service.NotificationService;
 import com.ieum.gw.dao.TicketWorkDAO;
+import com.ieum.gw.dto.TicketAdminCountsDTO;
 import com.ieum.gw.dto.TicketCommentDTO;
 import com.ieum.gw.dto.TicketHistoryDTO;
 import com.ieum.gw.dto.TicketRequestDTO;
@@ -44,6 +52,10 @@ class TicketWorkServiceTest {
         String commentBody;
         List<TicketCommentDTO> commentRows = new ArrayList<>();
         List<TicketHistoryDTO> historyRows = new ArrayList<>();
+        TicketAdminCountsDTO adminCounts = new TicketAdminCountsDTO();
+        List<Object> countArguments;
+        List<Object> pageArguments;
+        final Map<Long, Long> photoLinks = new HashMap<>();
         Rows() { super(null); }
         @Override public TicketWorkDTO lock(Long companyId, Long id) {
             locks++;
@@ -68,6 +80,83 @@ class TicketWorkServiceTest {
         }
         @Override public List<TicketCommentDTO> comments(Long companyId, Long id) { return commentRows; }
         @Override public List<TicketHistoryDTO> history(Long companyId, Long id) { return historyRows; }
+
+        @Override
+        public TicketAdminCountsDTO countAdminTicketTabs(Long companyId, Long employeeId, String keyword) {
+            countArguments = List.of(companyId, employeeId, keyword);
+            return adminCounts;
+        }
+
+        @Override
+        public List<TicketWorkDTO> selectAdminTicketPage(Long companyId, Long employeeId,
+                String keyword, String filter, long offset, int size) {
+            pageArguments = List.of(companyId, employeeId, keyword, filter, offset, size);
+            return List.of(row);
+        }
+
+        @Override
+        public int insertTicketFile(Long companyId, Long ticketId, Long attachmentId) {
+            assertEquals(1L, companyId);
+            assertEquals(row.getId(), ticketId);
+            photoLinks.put(ticketId, attachmentId);
+            return 1;
+        }
+
+        @Override
+        public List<Long> selectTicketFileIds(Long companyId, Long ticketId) {
+            assertEquals(1L, companyId);
+            Long attachmentId = photoLinks.get(ticketId);
+            return attachmentId == null ? List.of() : List.of(attachmentId);
+        }
+    }
+
+    static class Photos extends AttachmentDAO implements FileStorage {
+        AttachmentDTO photo;
+        byte[] bytes;
+        boolean attached;
+
+        Photos() { super(null); }
+
+        @Override
+        public int insert(AttachmentDTO value) {
+            value.setAttachmentId(200L);
+            photo = value;
+            return 1;
+        }
+
+        @Override
+        public AttachmentDTO getById(Long attachmentId, Long companyId) {
+            return photo != null && attachmentId.equals(photo.getAttachmentId())
+                    && companyId.equals(photo.getCompanyId()) ? photo : null;
+        }
+
+        @Override
+        public int markAttached(Long attachmentId, Long companyId) {
+            if (attached || getById(attachmentId, companyId) == null) {
+                return 0;
+            }
+            attached = true;
+            return 1;
+        }
+
+        @Override
+        public String save(MultipartFile file, Long companyId, String module) throws IOException {
+            String filename = file.getOriginalFilename();
+            String extension = filename.substring(filename.lastIndexOf('.') + 1);
+            FileTypeChecker.check(file, extension, module);
+            bytes = file.getBytes();
+            return companyId + "/" + module + "/sample." + extension;
+        }
+
+        @Override
+        public Resource load(String storageKey) {
+            assertEquals(photo.getStorageKey(), storageKey);
+            return new ByteArrayResource(bytes) {
+                @Override public String getFilename() { return "sample.png"; }
+            };
+        }
+
+        @Override public void delete(String storageKey) { bytes = null; }
     }
     static class People extends EmployeeService {
         boolean active = true, role = true;
@@ -116,6 +205,7 @@ class TicketWorkServiceTest {
     Rows rows;
     People people;
     Notices notices;
+    Photos photos;
     TicketWorkService service;
     AssetDTO asset;
     com.ieum.gw.dto.ApprovedEquipmentDTO approvedEquipment;
@@ -131,12 +221,20 @@ class TicketWorkServiceTest {
 
     @BeforeEach void setup() {
         rows = new Rows(); people = new People(); notices = new Notices();
+        photos = new Photos();
         asset = new AssetDTO(); asset.setAssetId(50L); asset.setAssetName("노트북"); asset.setBranchId(8L);
         AssetService assets = new AssetService(null) {
             @Override public List<AssetDTO> getMyAssets(LoginUser user) { return List.of(asset); }
         };
         AssetLookupService lookup = new AssetLookupService(null) {
-            @Override public Map<Long, AssetDTO> getSummaries(Long c, List<Long> ids) { return Map.of(50L, asset); }
+            @Override
+            public Map<Long, AssetDTO> getSummaries(Long c, List<Long> ids) {
+                Map<Long, AssetDTO> summaries = new HashMap<>();
+                if (ids.contains(50L)) {
+                    summaries.put(50L, asset);
+                }
+                return summaries;
+            }
         };
         BranchService branches = new BranchService(null) {
             @Override public List<BranchDTO> getBranches(Long c) {
@@ -147,7 +245,7 @@ class TicketWorkServiceTest {
             }
         };
         service = new TicketWorkService(rows, assets, lookup, branches, people, notices,
-                new ApprovalService(null, null, null, null, null, null, null) {
+                new ApprovalService(null, null, null, null, null, null, null, null) {
                     @Override public com.ieum.gw.dto.ApprovedEquipmentDTO getApprovedEquipmentInfo(Long companyId, Long documentId) {
                         if (approvedEquipment != null) {
                             assertEquals(1L, companyId);
@@ -170,8 +268,13 @@ class TicketWorkServiceTest {
                         equipmentIssues++;
                         return 100L;
                     }
-                });
+                }, new AttachmentService(photos, photos));
         rows.row = ticket(RECEIVED.name());
+    }
+
+    static MockMultipartFile samplePhoto() {
+        byte[] pngSignature = {(byte) 0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+        return new MockMultipartFile("photo", "sample.png", "image/png", pngSignature);
     }
     private TicketWorkDTO ticket(String status) {
         TicketWorkDTO t = new TicketWorkDTO();
@@ -234,6 +337,39 @@ class TicketWorkServiceTest {
         assertEquals(1L, rows.row.getCompanyId()); assertEquals(2L, rows.row.getRequesterId());
         assertEquals("장애", rows.row.getTitle()); assertEquals(RECEIVED.name(), rows.row.getStatus());
         assertEquals(0, rows.histories);
+        assertTrue(rows.photoLinks.isEmpty());
+    }
+
+    @Test
+    @DisplayName("사진을 첨부한 장애 티켓은 사진 ID를 돌려주고 같은 사진의 재사용은 롤백한다")
+    void createWithPhotoAndRejectReuse() {
+        LoginUser requester = user(1L, 2L, "ROLE_EMP");
+        TicketRequestDTO request = form();
+        request.setAttachmentId(service.uploadPhoto(requester, samplePhoto()));
+
+        assertEquals(99L, service.create(requester, request));
+        assertTrue(photos.attached);
+        assertEquals(200L, service.listMine(requester).get(0).get("photoId"));
+        assertEquals(200L, service.detailAdmin(user(1L, 3L, "ROLE_IT"), 99L).get("photoId"));
+
+        Transactions tx = new Transactions();
+        status(HttpStatus.CONFLICT, () -> proxy(tx).create(requester, request));
+        assertTrue(tx.rolledBack);
+        assertFalse(tx.committed);
+    }
+
+    @Test
+    @DisplayName("다른 직원이 올린 사진과 문의 티켓의 사진 연결을 거절한다")
+    void rejectInvalidPhotoLinks() {
+        TicketRequestDTO request = form();
+        LoginUser uploader = user(1L, 3L, "ROLE_EMP");
+        request.setAttachmentId(service.uploadPhoto(uploader, samplePhoto()));
+
+        status(HttpStatus.BAD_REQUEST, () -> service.create(user(1L, 2L, "ROLE_EMP"), request));
+        request.setType("TK_QUESTION");
+        status(HttpStatus.BAD_REQUEST, () -> service.create(uploader, request));
+        assertTrue(rows.photoLinks.isEmpty());
+        assertFalse(photos.attached);
     }
     @Test @DisplayName("장비 지급 직접 접수와 없는 지점·남의 자산·빈 본문은 거절한다")
     void invalidCreate() {
@@ -381,6 +517,44 @@ class TicketWorkServiceTest {
         status(HttpStatus.BAD_REQUEST,()->service.listAdmin(user(1L,3L,"ROLE_IT"),"UNKNOWN"));
         status(HttpStatus.FORBIDDEN,()->service.listAdmin(user(1L,2L,"ROLE_EMP"),"ALL"));
         assertTrue(((List<?>)service.listAdmin(user(9L,3L,"ROLE_IT"),"ALL").get("items")).isEmpty());
+    }
+
+    @Test
+    @DisplayName("검색 목록의 전체 페이지와 오프셋은 선택한 탭의 20건 경계에서 계산한다")
+    void adminSearchUsesSelectedTabCount() {
+        LoginUser operator = user(1L, 3L, "ROLE_IT");
+        rows.adminCounts.setAllCount(45L);
+        rows.adminCounts.setMineCount(20L);
+
+        var first = service.searchAdmin(operator, "MINE", " 노트북 ", 2L);
+        assertEquals(20L, first.get("total"));
+        assertEquals(1L, first.get("pages"));
+        assertEquals(1L, first.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북"), rows.countArguments);
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 0L, 20), rows.pageArguments);
+
+        rows.adminCounts.setMineCount(21L);
+        var second = service.searchAdmin(operator, "MINE", "노트북", 2L);
+        assertEquals(21L, second.get("total"));
+        assertEquals(2L, second.get("pages"));
+        assertEquals(2L, second.get("page"));
+        assertEquals(List.of(1L, 3L, "노트북", "MINE", 20L, 20), rows.pageArguments);
+        assertEquals(45L, ((Map<?, ?>) second.get("counts")).get("ALL"));
+    }
+
+    @Test
+    @DisplayName("선택한 탭에 검색 결과가 없으면 빈 첫 페이지를 반환한다")
+    void emptyAdminSearchSkipsPageQuery() {
+        rows.adminCounts.setAllCount(3L);
+
+        var result = service.searchAdmin(user(9L, 3L, "ROLE_ADMIN"), null, "   ", 8L);
+
+        assertEquals(List.of(9L, 3L, ""), rows.countArguments);
+        assertEquals(1L, result.get("page"));
+        assertEquals(1L, result.get("pages"));
+        assertEquals(0L, result.get("total"));
+        assertEquals(List.of(), result.get("items"));
+        assertNull(rows.pageArguments);
     }
     @Test @DisplayName("관리자 상세는 지점·권한 버튼과 이름·부서로 바꾼 담당자 후보를 반환한다")
     void adminDetail() {

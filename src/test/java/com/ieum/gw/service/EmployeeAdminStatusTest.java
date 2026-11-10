@@ -136,7 +136,7 @@ class EmployeeAdminStatusTest {
 		int calls = 0;
 
 		FakeApprovalService() {
-			super(null, null, null, null, null, null, null);
+			super(null, null, null, null, null, null, null, null);
 		}
 
 		@Override

@@ -36,7 +36,7 @@
 **/subscription/                         @fds213
 **/notification/                         @fds213
 **/ops/                                  @fds213
-# support(이음 장애 문의 최소판)는 추가 구현 범위라 맡는 사람이 정해지면 더한다.
+**/support/                              @fds213
 
 # 화면을 프론트가 만드는 모듈: 화면 폴더(JSP·화면 JS)는 서버 담당과 프론트 리드가 함께 본다
 /src/main/webapp/**/employee/            @kddong991121 @hodogu-021025
@@ -47,6 +47,7 @@
 /src/main/webapp/**/subscription/        @fds213 @hodogu-021025
 /src/main/webapp/**/notification/        @fds213 @hodogu-021025
 /src/main/webapp/**/ops/                 @fds213 @hodogu-021025
+/src/main/webapp/**/support/             @fds213 @hodogu-021025
 
 # 공통 레이아웃 JSP: 프론트 리드, 로그인·계정 만들기 화면이 있어 담당 1도 함께
 /src/main/webapp/WEB-INF/views/common/   @hodogu-021025 @kddong991121
@@ -122,6 +123,8 @@
 /src/main/resources/config/mail.properties.example @fds213
 # ops
 /src/*/java/**/Ops*                      @fds213
+# support
+/src/*/java/**/Support*                  @fds213
 # common
 /src/*/java/**/TicketStatus*             @kddong991121
 /src/*/java/**/TicketType*               @kddong991121

@@ -298,4 +298,34 @@
         ORDER BY ad.approval_document_id ASC
     </select>
 
+    <!-- 결재 문서에 첨부 붙이기 (파일 정보는 ATTACHMENT에 이미 있다) -->
+    <insert id="insertFile">
+        INSERT INTO approval_file (company_id, approval_document_id, attachment_id)
+        VALUES (#{companyId}, #{approvalDocumentId}, #{attachmentId})
+    </insert>
+    
+        <!-- 결재함 첨부: 결재함에 보이는 문서(boxRelated)의 파일만 -->
+    <select id="selectBoxFiles" resultType="com.ieum.gw.dto.ApprovalFileDTO">
+        SELECT f.approval_document_id,
+               a.attachment_id AS id,
+               a.original_name AS name,
+               a.byte_size     AS "size",
+               a.mime_type     AS "type"   -- SIZE·TYPE는 Oracle 예약어라 따옴표로 감싼다
+        FROM approval_file f
+                 JOIN approval_document ad ON ad.company_id = f.company_id AND ad.approval_document_id = f.approval_document_id
+                 JOIN attachment a ON a.company_id = f.company_id AND a.attachment_id = f.attachment_id
+        WHERE <include refid="boxRelated"/>
+          AND a.status_code != 'FILE_REMOVED'
+        ORDER BY f.approval_document_id, f.created_at, a.attachment_id
+    </select>
+
+    <!-- 내려받기 권한: 결재함에 보이는 문서에 붙은 파일이면 1 -->
+    <select id="countBoxFile" resultType="int">
+        SELECT COUNT(*)
+        FROM approval_file f
+                 JOIN approval_document ad ON ad.company_id = f.company_id AND ad.approval_document_id = f.approval_document_id
+        WHERE <include refid="boxRelated"/>
+          AND f.approval_document_id = #{documentId}
+          AND f.attachment_id = #{attachmentId}
+    </select>
 </mapper>

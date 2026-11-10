@@ -52,4 +52,29 @@ public class WorkMapDAO {
     public int deleteMarker(Long companyId, Long markerId) {
         return mapper.deleteMarker(companyId, markerId);
     }
+
+    // 내 개인 지도 번호 (없으면 null)
+    public Long selectPersonalMapId(Long companyId, Long employeeId) {
+        return mapper.selectPersonalMapId(companyId, employeeId);
+    }
+
+    // 내 개인 지도 줄 만들기
+    public int insertPersonalMap(Long companyId, Long employeeId) {
+        return mapper.insertPersonalMap(companyId, employeeId);
+    }
+
+    // 내 개인 지도의 마커 전체
+    public List<MapMarkerDTO> selectPersonalMarkers(Long companyId, Long employeeId) {
+        return mapper.selectPersonalMarkers(companyId, employeeId);
+    }
+
+    // 내 개인 지도의 마커 고치기 (고친 줄 수: 내 마커가 아니면 0)
+    public int updatePersonalMarker(Long companyId, Long employeeId, Long markerId, MapMarkerSaveDTO marker) {
+        return mapper.updatePersonalMarker(companyId, employeeId, markerId, marker);
+    }
+
+    // 내 개인 지도의 마커 지우기 (지운 줄 수: 내 마커가 아니면 0)
+    public int deletePersonalMarker(Long companyId, Long employeeId, Long markerId) {
+        return mapper.deletePersonalMarker(companyId, employeeId, markerId);
+    }
 }
