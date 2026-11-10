@@ -130,11 +130,14 @@ if (heroVideo && heroCardText && heroCardSub) {
     if (shown && s.title === shown.title && s.sub === shown.sub) { if (!swap) card.classList.toggle('is-swap', between); return; }
     shown = s;
     clearTimeout(swap);
-    swap = 0;
     card.classList.add('is-swap');
-    if (between) { write(s); return; }
-    // 전환 밖에서 장면이 바뀜(처음 재생·되감기): 잠깐 비켰다가 새 문구로 나온다
-    swap = setTimeout(() => { swap = 0; write(s); card.classList.remove('is-swap'); }, 180);
+    // 문구는 카드가 다 숨은 뒤(0.18초, .is-swap 전환 시간)에 바꾼다. 바로 쓰면 사라지는 동안 다음 장면 문구가 먼저 비친다.
+    // 그때 전환이 끝났으면(처음 재생·되감기, 짧은 전환) 바로 다시 꺼내고, 아직 전환 중이면 in 초에 다음 sync 가 꺼낸다
+    swap = setTimeout(() => {
+      swap = 0;
+      write(s);
+      if (heroVideo.currentTime >= s.in) card.classList.remove('is-swap');
+    }, 180);
   }
 
   // timeupdate 는 0.25초쯤마다라 늦다: 재생 중에는 영상 프레임(없으면 화면 그리기)마다 본다
