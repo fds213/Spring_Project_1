@@ -11,7 +11,7 @@ const EA_TABS = { WAIT: '내 순번 대기', PROGRESS: '진행', DONE: '완료',
 const EA_STATUS = { IN_PROGRESS: '진행', APPROVED: '완료', REJECTED: '반려' };
 const EA_STATUS_CLASS = { IN_PROGRESS: 'waiting', APPROVED: 'paid', REJECTED: 'failed' };
 const EA_LEAVE_TYPE = { LV_FULL: '연차', LV_AM: '오전 반차', LV_PM: '오후 반차' };
-const EQUIP_QTY_MAX = 10;
+const EQUIP_QTY = 1; // 서버(ApprovalService.EQUIPMENT_QUANTITY)와 같다. 장비는 한 번에 1대만 신청한다
 const EA_REASON_MAX = 200; // 장비 신청 사유, 장비 문서 결재 의견
 const EA_LEAVE_COMMENT_MAX = 100; // 휴가 문서 결재 의견
 const EA_ACTION = { APR_SUBMIT: '제출', APR_APPROVE: '승인', APR_REJECT: '반려' };
@@ -231,7 +231,7 @@ function eaApplyForm(p) {
   eaEl('eaLeaveTo').value = (p.form === 'DOC_LEAVE' && f.toDate) || '';
   eaEl('eaLeaveReason').value = (p.form === 'DOC_LEAVE' && f.reason) || '';
   eaEl('eaEquipKind').value = p.form === 'DOC_EQUIPMENT' && kinds.some(k => k.code === f.assetType) ? f.assetType : ((kinds[0] && kinds[0].code) || '');
-  eaEl('eaEquipQty').value = (p.form === 'DOC_EQUIPMENT' && f.quantity) || 1;
+  eaEl('eaEquipQty').value = EQUIP_QTY; // 이어 쓰는 임시저장에 2 이상이 남아 있어도 1로 연다
   if (p.form === 'DOC_EQUIPMENT' && f.branchId) eaEl('eaEquipBranch').value = f.branchId;
   eaEl('eaEquipReason').value = (p.form === 'DOC_EQUIPMENT' && f.purpose) || '';
   eaEl('eaAppr1').value = (p.line && p.line[0]) || '';
@@ -292,7 +292,7 @@ function eaCheck(c) {
     if (!f.reason) return '사유를 입력해 주세요'; // 서버도 사유가 없으면 거절한다
   } else {
     if (!f.assetType) return '장비 종류를 골라 주세요';
-    if (!Number.isInteger(f.quantity) || f.quantity < 1 || f.quantity > EQUIP_QTY_MAX) return `수량은 1~${EQUIP_QTY_MAX}대로 입력해 주세요`;
+    if (f.quantity !== EQUIP_QTY) return `장비는 한 번에 ${EQUIP_QTY}대만 신청할 수 있습니다`;
     if (!f.branchId) return eaState.opts && !eaState.opts.branches.length ? '등록된 지점이 없어 신청할 수 없습니다. 업체 관리자에게 지점 등록을 요청해 주세요' : '수령 지점을 골라 주세요';
     if (!f.purpose) return '신청 사유를 입력해 주세요';
     if (f.purpose.length > EA_REASON_MAX) return `사유는 ${EA_REASON_MAX}자까지 쓸 수 있습니다`;
