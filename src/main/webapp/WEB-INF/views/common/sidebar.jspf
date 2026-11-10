@@ -166,11 +166,13 @@
       </div>
     </c:if>
     <sec:authorize access="hasRole('ADMIN')">
-      <%-- 업체 관리: 부서·직급은 employee 모듈의 관리 화면, 이용 결제는 subscription 모듈의 업무 화면 --%>
+      <%-- 업체 관리: 부서·직급은 employee 모듈의 관리 화면, 지점은 location 모듈의 관리 화면(/location/admin/**, Security·BranchService 모두 업체 관리자만),
+           이용 결제는 subscription 모듈의 업무 화면 --%>
       <div class="nav-cat" id="navCat-admin" data-cat="admin"${navCat eq 'admin' ? '' : ' hidden'}>
         <p class="nav-title">업체 관리</p>
         <ui:nav key="admin-dept" path="/employee/admin/dept" current="${menu}">부서 관리</ui:nav>
         <ui:nav key="admin-rank" path="/employee/admin/rank" current="${menu}">직급 관리</ui:nav>
+        <ui:nav key="admin-branch" path="/location/admin/branch" current="${menu}">지점 관리</ui:nav>
         <ui:nav key="admin-billing" path="/subscription/billing" current="${menu}">이용 결제</ui:nav>
       </div>
     </sec:authorize>

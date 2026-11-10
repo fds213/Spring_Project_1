@@ -22,7 +22,7 @@ import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.service.BranchService;
 import lombok.RequiredArgsConstructor;
 
-/** 지점 선택 목록만 제공한다. 등록·수정·사용 중지 화면은 필수 기능 뒤의 범위다. */
+/** 지점 선택 목록과 업체 관리자의 지점 관리(화면·목록·등록·수정·사용 중지)를 제공한다. */
 @Controller
 @RequiredArgsConstructor
 public class BranchController {
@@ -39,6 +39,12 @@ public class BranchController {
         return Map.of("success", true, "data", branchService.getBranches(user.getCompanyId()));
     }
     
+    /** 업체 관리자의 지점 관리 화면을 연다. 목록·등록·수정·사용 중지는 화면 JS가 아래 API로 한다. */
+    @GetMapping("/location/admin/branch")
+    public String adminPage() {
+        return "location/admin/branch";
+    }
+
     /** 업체 관리자에게 지점 관리 목록을 반환한다. */
     @GetMapping("/location/admin/api/branches")
     @ResponseBody

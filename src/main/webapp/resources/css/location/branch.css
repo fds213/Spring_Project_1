@@ -1,0 +1,20 @@
+/* 지점 관리 화면 (views/location/admin/branch.jsp). 공통 표·모달 모양은 common.css 를 그대로 쓰고, 이 화면에 필요한 것만 더한다 */
+
+/* 사용 중·사용 중지 개수 한 줄 */
+.br-count { margin: -6px 0 10px; font-size: 13px; }
+.br-count:empty { display: none; }
+
+/* 띄어쓰기 없는 긴 지점명·주소도 칸 안에서 줄을 바꾼다 (320px 폰에서 가로로 넘치지 않게) */
+.br-table .cell { min-width: 0; }
+.br-text { overflow-wrap: anywhere; }
+.br-table td[data-label="주소"] { min-width: 200px; }
+
+/* 추가·수정 창: 주소가 길어 기본 모달보다 조금 넓게 */
+.modal.br-dialog { width: min(440px, calc(100% - 32px)); }
+.br-dialog form { padding-top: 8px; }
+.br-dialog .field label .muted { font-weight: 400; }
+
+@media (max-width: 600px) {
+  .br-table td[data-label="주소"] { min-width: 0; }
+  .br-table .cell { text-align: right; }
+}
