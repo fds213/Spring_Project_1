@@ -21,6 +21,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.ieum.gw.dto.LoginUser;
 import com.ieum.gw.dto.SupportInquiryDTO;
 import com.ieum.gw.dto.SupportInquiryFormDTO;
+import com.ieum.gw.dto.SupportReadFormDTO;
 import com.ieum.gw.dto.SupportReplyFormDTO;
 import com.ieum.gw.service.SupportFormException;
 import com.ieum.gw.service.SupportNotFoundException;
@@ -53,12 +54,22 @@ public class SupportController {
         return "ops/inquiry-member";
     }
 
-    /** 직원: 내가 보낸 문의와 답변 */
+    /** 직원: 내가 보낸 문의와 답변. 문의마다 안 읽은 답변 수(unread)가 붙는다 */
     @GetMapping("/support/api/inquiries")
     @ResponseBody
     public Map<String, Object> myInquiries(@AuthenticationPrincipal LoginUser user) {
-        List<SupportInquiryDTO> inquiries = supportService.listMine(user.getCompanyId(), user.getEmployeeId());
+        List<SupportInquiryDTO> inquiries = supportService.listMine(user.getCompanyId(), user.getEmployeeId(),
+                user.getUserAccountId());
         return ok(inquiries);
+    }
+
+    /** 직원: 펼친 문의의 답변 알림을 {"upTo": 목록의 unreadUpTo} 번호까지 읽음으로 바꾼다. data는 {"read": 바뀐 알림 수} */
+    @PostMapping("/support/api/inquiries/{no}/read")
+    @ResponseBody
+    public Map<String, Object> readReplies(@AuthenticationPrincipal LoginUser user, @PathVariable Long no,
+                                           @RequestBody SupportReadFormDTO form) {
+        int read = supportService.markRepliesRead(user.getCompanyId(), user.getUserAccountId(), no, form.getUpTo());
+        return ok(Map.of("read", read));
     }
 
     /** 직원: 문의를 보낸다. data는 {"no": 접수번호} */
