@@ -111,7 +111,7 @@ body.site .btn-primary:hover { box-shadow: 0 8px 20px rgba(24, 95, 165, 0.32); }
   /* 화면이 멈추면 살짝 튕기듯 돌아오고, 움직이는 동안에는 빨리 사라진다 */
   transition: opacity 0.4s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.float-card.is-away { opacity: 0; transform: translateY(18px) scale(0.92); transition: opacity 0.18s ease, transform 0.18s ease; }
+.float-card.is-away, .float-card.is-swap { opacity: 0; transform: translateY(18px) scale(0.92); transition: opacity 0.18s ease, transform 0.18s ease; }
 .float-card .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #e5f6ee; color: #0f6e56; }
 .float-card b { display: block; font-weight: 600; }
 .float-card small { color: var(--text-muted); }
