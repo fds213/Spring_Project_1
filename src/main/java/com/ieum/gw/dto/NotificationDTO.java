@@ -15,6 +15,7 @@ public class NotificationDTO {
     private String message;            // 문서·티켓 제목이 든 문장. 사용자가 쓴 제목이 들어 있으니 화면에서 이스케이프한다
     private Long approvalDocumentId;   // 결재 알림만
     private Long itTicketId;           // 티켓 알림만
+    private Long supportInquiryId;     // 이음 문의 답변 알림만(누르면 그 문의를 펼친다)
     private String readAt;             // 안 읽었으면 null
     private String createdAt;
 }
