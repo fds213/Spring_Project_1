@@ -319,13 +319,15 @@
         ORDER BY f.approval_document_id, f.created_at, a.attachment_id
     </select>
 
-    <!-- 내려받기 권한: 결재함에 보이는 문서에 붙은 파일이면 1 -->
+    <!-- 내려받기 권한: 결재함에 보이는 문서에 붙은, 지워지지 않은 파일이면 1 (selectBoxFiles와 같은 조건) -->
     <select id="countBoxFile" resultType="int">
         SELECT COUNT(*)
         FROM approval_file f
                  JOIN approval_document ad ON ad.company_id = f.company_id AND ad.approval_document_id = f.approval_document_id
+                 JOIN attachment a ON a.company_id = f.company_id AND a.attachment_id = f.attachment_id
         WHERE <include refid="boxRelated"/>
           AND f.approval_document_id = #{documentId}
           AND f.attachment_id = #{attachmentId}
+          AND a.status_code != 'FILE_REMOVED'
     </select>
 </mapper>

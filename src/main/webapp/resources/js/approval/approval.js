@@ -364,6 +364,7 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
   }
   const msg = eaCheck(c);
   if (msg) { err.textContent = msg; return; }
+  if (eaState.uploading) { err.textContent = '파일을 올리는 중입니다. 끝난 뒤 제출해 주세요.'; return; }
   const btn = eaEl('eaForm').querySelector('[type="submit"]');
   if (btn.disabled) return;
   // 제출하면 회수할 수 없어 한 번 묻는다
@@ -385,6 +386,8 @@ eaEl('eaForm')?.addEventListener('submit', async e => {
 // ---------- 첨부 ----------
 // 고르는 즉시 서버에 올려(POST /approval/api/files) 번호를 받아 두고, 제출할 때 번호(fileIds)만 보낸다
 const EA_FILE_MAX = 5; // 서버 ApprovalService.FILE_MAX와 같게
+const EA_FILE_SIZE_MAX = 10 * 1024 * 1024; // 파일당 10MB, 한 번에 30MB (서버도 다시 검사한다)
+const EA_FILE_EXT = /\.(jpe?g|png|gif|pdf|docx|xlsx|pptx|hwpx?)$/i; // 서버와 같은 허용 목록
 eaState.files = [];
 
 // 올린 파일 목록을 그린다 (빼기 버튼 포함)
@@ -397,19 +400,29 @@ function eaRenderFiles() {
   }));
 }
 
-// 파일을 고르면 바로 서버에 올린다
+// 파일을 고르면 화면에서 먼저 검사하고, 통과한 것만 바로 서버에 올린다
 function eaInitFiles() {
   eaEl('eaFiles').addEventListener('change', e => {
     const picked = [...e.target.files];
     e.target.value = ''; // 같은 파일을 다시 고를 수 있게
     eaEl('eaFileError').textContent = '';
-    if (!picked.length) return;
-    if (eaState.files.length + picked.length > EA_FILE_MAX) {
-      eaEl('eaFileError').textContent = `첨부파일은 ${EA_FILE_MAX}개까지입니다`;
+    const errors = [];
+    const ok = [];
+    for (const file of picked) {
+      if (eaState.files.length + ok.length >= EA_FILE_MAX) { errors.push(`첨부파일은 ${EA_FILE_MAX}개까지입니다`); break; }
+      if (!EA_FILE_EXT.test(file.name)) { errors.push(`${file.name}: 이미지·문서 파일만 올릴 수 있습니다`); continue; }
+      if (file.size > EA_FILE_SIZE_MAX) { errors.push(`${file.name}: 파일당 10MB까지 올릴 수 있습니다`); continue; }
+      ok.push(file);
+    }
+    if (ok.reduce((sum, f) => sum + f.size, 0) > EA_FILE_SIZE_MAX * 3) {
+      eaEl('eaFileError').textContent = '한 번에 30MB까지 올릴 수 있습니다. 나눠서 골라 주세요';
       return;
     }
+    if (errors.length) eaEl('eaFileError').textContent = errors.join(' / ');
+    if (!ok.length) return;
+
     const form = new FormData();
-    picked.forEach(file => form.append('files', file));
+    ok.forEach(file => form.append('files', file));
     eaState.uploading = true;
     eaRenderFiles();
     $.ajax({ url: pageHref('/approval/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
@@ -495,6 +508,9 @@ function eaDocDetail(d) {
     info.append(eaNode('dt', '', '첨부'), eaNode('dd', '', ...d.files.map(f => {
       const a = eaNode('a', '', f.name);
       a.href = pageHref(f.url);
+      a.className = 'link-btn';   // 공통 CSS의 링크 모양 (색·밑줄)
+      a.target = '_blank';        // 결재함을 벗어나지 않게 새 탭
+      a.rel = 'noopener';
       return eaNode('div', '', a);
     })));
   }
