@@ -36,7 +36,8 @@
             <ul class="bill-history" id="billHistory"></ul>
           </div>
         </section>
-        <section class="info-card">
+        <%-- 결제 카드: 결제할 수 없으면 왜 그런지 안내만 남기고, 보여 줄 이용 정보가 없으면(권한 없음 등) 카드째 감춘다 --%>
+        <section class="info-card" id="billPayCard">
           <header class="info-card-head">
             <span class="ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
             <div><h2 id="billPayTitle">결제</h2><p id="billHint"></p></div>

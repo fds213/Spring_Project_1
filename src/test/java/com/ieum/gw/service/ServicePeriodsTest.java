@@ -148,6 +148,36 @@ class ServicePeriodsTest {
     }
 
     @Test
+    @DisplayName("SQL로 넣은 유료 기간이 체험보다 먼저 시작해도 둘 다 지금 기간이면 유료로 본다")
+    void paidStartedBeforeTrialWins() {
+        ServicePeriodDTO paid = period(false, "2026-10-20T00:00", "2026-12-20T00:00", 20);
+        ServicePeriodDTO trial = period(true, "2026-10-27T00:00", "2026-12-01T00:00", 10);
+
+        assertSame(paid, ServicePeriods.pick(List.of(paid, trial), at("2026-11-10T09:00")));
+        assertSame(paid, ServicePeriods.pick(List.of(trial, paid), at("2026-11-10T09:00")), "목록 순서와 관계없다");
+    }
+
+    @Test
+    @DisplayName("둘 다 끝났으면 유료가 체험보다 먼저 끝났어도 유료 만료로 본다")
+    void endedPaidBeforeEndedTrial() {
+        ServicePeriodDTO paid = period(false, "2026-10-01T00:00", "2026-11-01T00:00", 20);
+        ServicePeriodDTO trial = period(true, "2026-10-20T00:00", "2026-11-03T00:00", 10);
+        LocalDateTime now = at("2026-11-05T09:00");
+
+        assertSame(paid, ServicePeriods.pick(List.of(trial, paid), now));
+        assertEquals("EXPIRED", ServicePeriods.statusOf(ServicePeriods.pick(List.of(trial, paid), now), now));
+    }
+
+    @Test
+    @DisplayName("유료가 끝났어도 지금 체험 기간이 있으면 체험이다(시연 자료 SQL이 지금 기간이 없는 업체의 체험을 늘린다)")
+    void currentTrialBeatsEndedPaid() {
+        ServicePeriodDTO paid = period(false, "2026-10-01T00:00", "2026-11-01T00:00", 20);
+        ServicePeriodDTO trial = period(true, "2026-10-27T00:00", "2026-12-01T00:00", 10);
+
+        assertSame(trial, ServicePeriods.pick(List.of(paid, trial), at("2026-11-10T09:00")));
+    }
+
+    @Test
     @DisplayName("모든 기간이 끝났으면 가장 늦게 끝난 기간으로 만료 상태를 본다(유료 만료)")
     void allEndedPicksLatestEnd() {
         ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
@@ -301,6 +331,29 @@ class ServicePeriodsTest {
         assertEquals("ANNUAL", summary.getPlan());
         assertEquals(LocalDate.parse("2027-01-01"), summary.getLastDay());
         assertEquals(42, summary.getDaysLeft());
+    }
+
+    @Test
+    @DisplayName("운영자 요약: 연장분으로 넘어가도 이용 기간 첫날은 최초 기준일이다(업체 화면의 구독 시작일과 같다)")
+    void companyPeriodFirstDayKeepsAnchor() {
+        LocalDate anchor = LocalDate.parse("2026-11-02");
+        ServicePeriodDTO paid = period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5);
+        paid.setBillingAnchorDate(anchor);
+        ServicePeriodDTO renewed = period(false, "2026-12-02T00:00", "2027-01-02T00:00", 5);
+        renewed.setBillingAnchorDate(anchor);
+        List<ServicePeriodDTO> periods = List.of(period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5), paid, renewed);
+
+        assertEquals(anchor, ServicePeriods.toCompanyPeriod(periods, at("2026-11-20T10:00")).getFirstDay());
+        assertEquals(anchor, ServicePeriods.toCompanyPeriod(periods, at("2026-12-10T10:00")).getFirstDay(), "연장분 안에서도 같다");
+    }
+
+    @Test
+    @DisplayName("이용 기간 첫날: 기준일이 없는 유료 행과 체험은 그 기간의 시작일이다")
+    void firstDayWithoutAnchor() {
+        assertEquals(LocalDate.parse("2026-11-02"), ServicePeriods.firstDayOf(period(false, "2026-11-02T14:00", "2026-12-02T00:00", 5)));
+        ServicePeriodDTO trial = period(true, "2026-10-30T15:20", "2026-11-13T00:00", 5);
+        trial.setBillingAnchorDate(LocalDate.parse("2026-10-01")); // 체험은 기준일을 보지 않는다
+        assertEquals(LocalDate.parse("2026-10-30"), ServicePeriods.firstDayOf(trial));
     }
 
     @Test

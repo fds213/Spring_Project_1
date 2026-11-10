@@ -2,14 +2,14 @@
 
 Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저장소의 `db/` 아래에 같은 구조로 배치한다. SQL과 실행 안내는 Git 저장소의 `db/` 디렉터리에서 함께 관리한다.
 
-현재 생성 기준: **프로젝트 테이블 82개 / 시퀀스 66개 / 공통 코드 233개**. 별도 보존한 TEST_EMP는 프로젝트 테이블 수에 포함하지 않는다.
+현재 생성 기준: **프로젝트 테이블 82개 / 시퀀스 66개 / 공통 코드 235개**. 별도 보존한 TEST_EMP는 프로젝트 테이블 수에 포함하지 않는다.
 
 ## 파일 용도
 
 | 파일 | 용도 |
 |---|---|
 | [ddl/IEUM_DDL.sql](ddl/IEUM_DDL.sql) | **신규 빈 스키마**에 테이블·시퀀스·제약·인덱스 생성 |
-| [data/IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) | 신규 DB에 기본 공통 코드 233개 입력 |
+| [data/IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) | 신규 DB에 기본 공통 코드 235개 입력 |
 | [data/init_auth_data.sql](data/init_auth_data.sql) | 신규 DB에 시연 업체·직원·계정 입력. 시연 보완 파일도 자동 실행 |
 | [data/IEUM_DEMO_SEED.sql](data/IEUM_DEMO_SEED.sql) | 월간·연간 요금제, 시연 업체 기간·지점·자산·직원 지점 보완. init 또는 데이터 패치에서 호출 |
 | [patches/11-02_01_SCHEMA_PATCH.sql](patches/11-02_01_SCHEMA_PATCH.sql) | 기존 DB의 11/02 구조 변경. 기존 자료 보존, 같은 정의는 검증 후 유지 |
@@ -26,6 +26,8 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql](patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql) | 근태 정정 알림 구조·코드 읽기 전용 점검 |
 | [patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql](patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql) | 기존 DB에 이음 장애 문의 답변 알림 컬럼·FK·인덱스·CHECK·코드 추가. 승인 후 1회 실행 |
 | [patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql](patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql) | 이음 장애 문의 답변 알림 구조·코드 읽기 전용 점검 |
+| [patches/11-10_01_BOARD_EXTRA_PATCH.sql](patches/11-10_01_BOARD_EXTRA_PATCH.sql) | 기존 DB에 익명 게시판·자료실 게시판 종류 코드 추가, CK_52_01을 새 정의로 교체(임시 이름으로 먼저 추가). 승인 후 1회 실행 |
+| [patches/11-10_02_BOARD_EXTRA_CHECK.sql](patches/11-10_02_BOARD_EXTRA_CHECK.sql) | 익명 게시판·자료실 CHECK·코드 읽기 전용 점검 |
 
 ## 현재 팀 DB 상태
 
@@ -87,7 +89,8 @@ DB 변경이 포함된 커밋을 PR #164 브랜치에도 반영한 뒤 CI를 다
 5. `patches/11-06_02_LEAVE_GRANT_CHECK.sql`
 6. `patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql`
 7. `patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql`
-8. 오류와 결과를 확인한 뒤 같은 연결에서 직접 `COMMIT;`
+8. `patches/11-10_02_BOARD_EXTRA_CHECK.sql`
+9. 오류와 결과를 확인한 뒤 같은 연결에서 직접 `COMMIT;`
 
 신규 DDL에는 근태정정이 포함되어 있으므로
 `11-02_04_ATTENDANCE_CORRECTION_PATCH.sql`은 실행하지 않는다.
@@ -123,25 +126,74 @@ DB 변경을 develop과 팀 DB에 반영한 뒤 #174를 병합한다.
 11-09_02 점검 6개 항목 PASS를 확인했다.
 이미 적용한 팀 DB에는 패치를 다시 실행하지 않는다.
 
-운영자가 이음 장애 문의에 답변하면 문의한 직원에게 알림을 저장하기 위한 변경이다.
-읽음 표시는 이 알림의 READ_AT을 쓰므로 칸을 따로 늘리지 않는다.
+2026-11-10 팀 DB에서 `11-09_02_SUPPORT_NOTIFICATION_CHECK.sql`을 실행해 6개 항목 모두 PASS를 확인했다. `CK_69_01`의 네 분기와 `FK_69_08`·`IX_69_07`의 컬럼 순서도 패치 정의와 일치했다. 이 팀 DB에는 `11-09_01_SUPPORT_NOTIFICATION_PATCH.sql`을 다시 실행하지 않는다.
 
-- NOTIFICATION.SUPPORT_INQUIRY_ID 추가.
-- FK_69_08로 같은 업체의 장애 문의를 참조한다.
-- IX_69_07로 업체·장애 문의별 조회를 지원한다.
-- CK_69_01은 알림 종류에 맞는 대상 ID 하나만 허용한다.
-- NT_SUPPORT_REPLY 추가.
-- 신규 공통 코드 기준은 233개다.
+운영자가 이음 장애 문의에 답변하면 문의한 직원에게 알림을 저장하기 위한 변경이다. 읽음 표시는 기존 `READ_AT`을 사용한다.
 
-기존 DB는 별도 실행 승인 후 11-09_01 패치 → 11-09_02 점검과 정의 확인 →
-같은 연결에서 직접 COMMIT한다.
-DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행하지 않는다.
+- `NOTIFICATION.SUPPORT_INQUIRY_ID`를 추가한다.
+- `FK_69_08`로 같은 업체의 장애 문의를 참조한다.
+- `IX_69_07`로 업체·장애 문의별 조회를 지원한다.
+- `CK_69_01`은 알림 종류에 맞는 대상 ID 하나만 허용한다.
+- `NT_SUPPORT_REPLY`를 추가한다. 신규 공통 코드 기준은 233개다.
 
-신규 빈 DB는 수정된 전체 DDL·공통 코드 적재 파일을 사용한다.
-11-09_01 패치는 실행하지 않고 11-09_02 점검만 추가한다.
+아직 패치가 적용되지 않은 별도 기존 DB는 실행 승인 후 `11-09_01` 패치와 `11-09_02` 점검을 순서대로 실행한다. 결과와 정의를 확인한 뒤 같은 연결에서 `COMMIT`한다. DDL은 자동 확정되므로 오류가 나면 적용 상태부터 확인한다.
+
+신규 빈 DB는 수정된 전체 DDL과 공통 코드 적재 파일을 사용한다. `11-09_01` 패치를 건너뛰고 `11-09_02` 점검을 실행한다.
 
 DB 변경을 develop(#209)과 팀 DB에 반영한 뒤 알림 코드를 붙였다.
 패치를 돌리지 않은 DB에서는 알림 저장이 답변과 같은 트랜잭션이라 운영자 답변이 실패한다.
+
+## 익명 게시판·자료실 (11/10, 팀 DB 미적용)
+
+요구분석서 3장 '추가 구현 범위'의 익명 게시판·자료실을 게시판 표에 담기 위한 변경이다.
+두 게시판은 업체 전체 게시판이라 부서가 없다.
+글의 작성자 칸(POST.AUTHOR_EMPLOYEE_ID)은 NOT NULL 그대로라, 익명 게시판의 작성자는 보여 줄 때 감춘다.
+
+- BOARD_ANON(익명 게시판, 정렬 3)·BOARD_LIBRARY(자료실, 정렬 4) 추가.
+- CK_52_01은 공지·익명·자료실은 부서 없음, 부서 게시판만 부서 있음을 허용한다.
+- 패치는 새 CHECK를 CK_52_01_TMP로 먼저 추가·검증하고, 옛 CK_52_01을 지운 뒤 이름을 CK_52_01로 바꾼다.
+- 칸·FK·인덱스는 늘지 않는다.
+- 신규 공통 코드 기준은 235개다.
+
+기존 DB는 별도 실행 승인 후 11-10_01 패치 → 11-10_02 점검과 정의 확인 →
+같은 연결에서 직접 COMMIT한다.
+DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행하지 않는다.
+
+### 11-10_01 패치가 중간에 멈췄을 때
+
+CHECK 교체는 1단계 새 정의를 CK_52_01_TMP로 추가·검증, 2단계 옛 CK_52_01 삭제,
+3단계 CK_52_01_TMP를 CK_52_01로 이름 바꾸기 순서다. 어느 단계에서 멈춰도
+옛 규칙이나 새 규칙 중 하나는 걸려 있어 게시판 표가 CHECK 없이 남지 않는다.
+멈추면 패치를 다시 돌리지 말고(사전 점검에서 멈춘다) 같은 연결에서 상태부터 본다.
+
+```sql
+SELECT CONSTRAINT_NAME, STATUS, VALIDATED, SEARCH_CONDITION_VC
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'BOARD'
+   AND CONSTRAINT_NAME IN ('CK_52_01', 'CK_52_01_TMP');
+
+SELECT CODE FROM COMMON_CODE WHERE CODE IN ('BOARD_ANON', 'BOARD_LIBRARY');
+```
+
+| 보이는 상태 | 멈춘 곳 | 이어서 실행할 것 |
+|---|---|---|
+| 옛 CK_52_01(공지·부서)만 | 1단계. 아무것도 바뀌지 않음 | 원인(잠금 대기 초과 등)을 없앤 뒤 패치를 처음부터 다시 실행 |
+| 옛 CK_52_01 + CK_52_01_TMP | 2단계 | 아래 ① → ② → ③ |
+| CK_52_01_TMP만 | 3단계 | 아래 ② → ③ |
+| 새 CK_52_01(네 종류)만, 코드 없음 | COMMIT 전에 연결이 끊김 | 아래 ③ |
+
+1. `ALTER TABLE BOARD DROP CONSTRAINT CK_52_01;`
+2. `ALTER TABLE BOARD RENAME CONSTRAINT CK_52_01_TMP TO CK_52_01;`
+3. 패치 아래쪽의 공통 코드 INSERT 두 문장(이미 있는 코드는 건너뛴다)
+
+그다음 11-10_02 점검이 모두 PASS인지 보고 같은 연결에서 직접 COMMIT한다.
+2단계에서 멈췄는데 새 규칙을 넣지 않기로 하면 `ALTER TABLE BOARD DROP CONSTRAINT CK_52_01_TMP;`로 원래대로 돌아간다.
+
+신규 빈 DB는 수정된 전체 DDL·공통 코드 적재 파일을 사용한다.
+11-10_01 패치는 실행하지 않고 11-10_02 점검만 추가한다.
+
+DB 변경을 develop과 팀 DB에 반영한 뒤 익명 게시판·자료실 코드 PR을 병합한다.
+패치보다 코드가 먼저 들어가면 두 게시판의 줄을 만들 수 없어(FK_52_02·CK_52_01) 첫 글쓰기가 실패한다.
 
 ## 아직 11/02 변경이 적용되지 않은 기존 DB
 
