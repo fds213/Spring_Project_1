@@ -1272,7 +1272,7 @@ class ApprovalServiceTest {
 
     private final FakeAttachment attachments = new FakeAttachment();
     private final ApprovalService draftService = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null), new TicketService(null), attachments);
+            new ScheduleService(null, null), new TicketService(null, branch), attachments);
 
     private static final Long DRAFT_ID = 77L;
     private static final Long MY_ACCOUNT_ID = 200L;
