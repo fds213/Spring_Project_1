@@ -114,8 +114,9 @@
       .always(() => { sending = false; btn.disabled = false; btn.textContent = '무료 체험 시작'; });
   });
 
-  // 3. 신청 완료: 업체 코드와 관리자 사번이 가장 먼저 보이게. 그룹웨어는 설치한 앱으로 들어가므로 앱 설치 버튼을 둔다.
-  // 앱의 로그인 화면이 업체 코드를 채워 두게 이 브라우저에 저장한다
+  // 3. 신청 완료: 업체 코드와 관리자 사번이 가장 먼저 보이게. 그룹웨어는 설치한 앱으로 들어가므로 앱 설치 버튼을 두고,
+  // 설치가 막힌 PC(발표 PC 등)에서도 들어갈 수 있게 브라우저 로그인 링크를 함께 둔다.
+  // 로그인 화면이 업체 코드를 채워 두게 이 브라우저에 저장한다
   function showResult(r) {
     try { localStorage.setItem('ieum-last-company', r.companyCode); } catch (e) { /* 저장소 막힘: 직접 입력 */ }
     $('pPw').value = '';
@@ -133,6 +134,9 @@
     const install = node('button', 'btn btn-primary btn-lg', 'IEUM 앱 설치하기');
     install.type = 'button';
     install.addEventListener('click', () => { if (typeof startDownload === 'function') startDownload(); });
+    // 앱을 설치하지 않고 이 브라우저에서 바로 로그인한다. 같은 브라우저라 업체 코드가 채워져 있다
+    const login = node('a', 'btn btn-lg', '브라우저에서 로그인');
+    login.href = IEUM.url('/login');
 
     // 이메일 인증(ACC-06): 인증을 요구하면 메일 안내를 앞에, 다시 보내기를 버튼 줄에 둔다. 메일을 끈 환경(개발)에서는 지금처럼 바로 로그인한다
     const status = node('p', r.mailSent ? 'done' : 'done err',
@@ -152,7 +156,7 @@
     $('step3').replaceChildren(
       node('h3', '', r.verificationRequired ? '메일로 이메일을 인증해 주세요' : '무료 체험을 시작했습니다'),
       ...(r.verificationRequired ? [status] : []),
-      node('p', 'sub', `${r.companyName}의 관리자 계정이 만들어졌습니다. IEUM 앱을 설치한 뒤 아래 업체 코드와 관리자 사번, 신청할 때 정한 비밀번호로 로그인하세요.`),
+      node('p', 'sub', `${r.companyName}의 관리자 계정이 만들어졌습니다. 아래 업체 코드와 관리자 사번, 신청할 때 정한 비밀번호로 로그인하세요. IEUM 앱을 설치해도 되고, 이 브라우저에서 바로 로그인해도 됩니다.`),
       node('table', 'summary',
         row('업체 코드', r.companyCode, 'sum'),
         row('관리자 사번', r.employeeNo, 'sum'),
@@ -161,7 +165,7 @@
         row('이용 인원', `${r.seats}명 (관리자 포함, 체험 중 10명까지)`),
         row('무료 체험 기간', `${dot(r.trialStartDate)} ~ ${dot(r.trialLastDate)}`)),
       node('p', 'done', '업체 코드와 사번은 로그인할 때마다 씁니다. 꼭 적어 두세요. 결제는 체험 중 그룹웨어의 업체 관리 > 이용 결제에서 합니다.'),
-      node('div', 'actions', ...(r.verificationRequired ? [resend] : []), copy, install));
+      node('div', 'actions', ...(r.verificationRequired ? [resend] : []), copy, login, install));
     go(3);
     $('step3').focus({ preventScroll: true });
   }
