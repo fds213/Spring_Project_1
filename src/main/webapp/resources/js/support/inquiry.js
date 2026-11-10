@@ -65,9 +65,9 @@ function toggleSupport(kind, q, isOpen) {
 // 읽음 저장도 쓰기라 이용 기간이 끝난 업체(body.is-readonly)에서는 저장하지 않는다(알림 목록과 같다)
 function markSupportRead(q) {
   if (!q.unread || document.body.classList.contains('is-readonly')) return;
-  supportFresh[q.no] = q.unread;
   api.post(`${SUPPORT_PATH}/${encodeURIComponent(q.no)}/read`)
     .done(() => {
+      supportFresh[q.no] = q.unread; // 저장된 뒤에만 표시한다. 실패하면 행의 '새 답변 N'이 그대로 남는다
       q.unread = 0;
       renderSupportList('mine');
       if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
