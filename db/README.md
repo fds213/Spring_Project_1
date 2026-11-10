@@ -26,7 +26,7 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql](patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql) | 근태 정정 알림 구조·코드 읽기 전용 점검 |
 | [patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql](patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql) | 기존 DB에 이음 장애 문의 답변 알림 컬럼·FK·인덱스·CHECK·코드 추가. 승인 후 1회 실행 |
 | [patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql](patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql) | 이음 장애 문의 답변 알림 구조·코드 읽기 전용 점검 |
-| [patches/11-10_01_BOARD_EXTRA_PATCH.sql](patches/11-10_01_BOARD_EXTRA_PATCH.sql) | 기존 DB에 익명 게시판·자료실 게시판 종류 코드 추가, CK_52_01 교체. 승인 후 1회 실행 |
+| [patches/11-10_01_BOARD_EXTRA_PATCH.sql](patches/11-10_01_BOARD_EXTRA_PATCH.sql) | 기존 DB에 익명 게시판·자료실 게시판 종류 코드 추가, CK_52_01을 새 정의로 교체(임시 이름으로 먼저 추가). 승인 후 1회 실행 |
 | [patches/11-10_02_BOARD_EXTRA_CHECK.sql](patches/11-10_02_BOARD_EXTRA_CHECK.sql) | 익명 게시판·자료실 CHECK·코드 읽기 전용 점검 |
 
 ## 현재 팀 DB 상태
@@ -150,14 +150,43 @@ DB 변경을 develop과 팀 DB에 반영한 뒤 알림 코드 PR을 병합한다
 
 - BOARD_ANON(익명 게시판, 정렬 3)·BOARD_LIBRARY(자료실, 정렬 4) 추가.
 - CK_52_01은 공지·익명·자료실은 부서 없음, 부서 게시판만 부서 있음을 허용한다.
+- 패치는 새 CHECK를 CK_52_01_TMP로 먼저 추가·검증하고, 옛 CK_52_01을 지운 뒤 이름을 CK_52_01로 바꾼다.
 - 칸·FK·인덱스는 늘지 않는다.
 - 신규 공통 코드 기준은 235개다.
 
 기존 DB는 별도 실행 승인 후 11-10_01 패치 → 11-10_02 점검과 정의 확인 →
 같은 연결에서 직접 COMMIT한다.
 DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행하지 않는다.
-CHECK를 바꾼 뒤 COMMIT 전에 연결이 끊겨 코드 2개만 빠졌다면 패치를 다시 실행하지 않고
-(사전 점검에서 멈춘다) 패치 아래쪽 INSERT 두 문장만 실행한 뒤 11-10_02 점검을 다시 본다.
+
+### 11-10_01 패치가 중간에 멈췄을 때
+
+CHECK 교체는 1단계 새 정의를 CK_52_01_TMP로 추가·검증, 2단계 옛 CK_52_01 삭제,
+3단계 CK_52_01_TMP를 CK_52_01로 이름 바꾸기 순서다. 어느 단계에서 멈춰도
+옛 규칙이나 새 규칙 중 하나는 걸려 있어 게시판 표가 CHECK 없이 남지 않는다.
+멈추면 패치를 다시 돌리지 말고(사전 점검에서 멈춘다) 같은 연결에서 상태부터 본다.
+
+```sql
+SELECT CONSTRAINT_NAME, STATUS, VALIDATED, SEARCH_CONDITION_VC
+  FROM USER_CONSTRAINTS
+ WHERE TABLE_NAME = 'BOARD'
+   AND CONSTRAINT_NAME IN ('CK_52_01', 'CK_52_01_TMP');
+
+SELECT CODE FROM COMMON_CODE WHERE CODE IN ('BOARD_ANON', 'BOARD_LIBRARY');
+```
+
+| 보이는 상태 | 멈춘 곳 | 이어서 실행할 것 |
+|---|---|---|
+| 옛 CK_52_01(공지·부서)만 | 1단계. 아무것도 바뀌지 않음 | 원인(잠금 대기 초과 등)을 없앤 뒤 패치를 처음부터 다시 실행 |
+| 옛 CK_52_01 + CK_52_01_TMP | 2단계 | 아래 ① → ② → ③ |
+| CK_52_01_TMP만 | 3단계 | 아래 ② → ③ |
+| 새 CK_52_01(네 종류)만, 코드 없음 | COMMIT 전에 연결이 끊김 | 아래 ③ |
+
+1. `ALTER TABLE BOARD DROP CONSTRAINT CK_52_01;`
+2. `ALTER TABLE BOARD RENAME CONSTRAINT CK_52_01_TMP TO CK_52_01;`
+3. 패치 아래쪽의 공통 코드 INSERT 두 문장(이미 있는 코드는 건너뛴다)
+
+그다음 11-10_02 점검이 모두 PASS인지 보고 같은 연결에서 직접 COMMIT한다.
+2단계에서 멈췄는데 새 규칙을 넣지 않기로 하면 `ALTER TABLE BOARD DROP CONSTRAINT CK_52_01_TMP;`로 원래대로 돌아간다.
 
 신규 빈 DB는 수정된 전체 DDL·공통 코드 적재 파일을 사용한다.
 11-10_01 패치는 실행하지 않고 11-10_02 점검만 추가한다.

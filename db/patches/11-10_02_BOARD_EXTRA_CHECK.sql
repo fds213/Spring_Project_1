@@ -41,7 +41,12 @@ SELECT '4 전사 공지·부서 게시판 코드 유지',
 UNION ALL
 SELECT '5 공통 코드 235개 이상',
        CASE WHEN COUNT(*) >= 235 THEN 'PASS' ELSE 'FAIL' END
-  FROM COMMON_CODE;
+  FROM COMMON_CODE
+UNION ALL
+SELECT '6 임시 제약 CK_52_01_TMP가 남지 않음',
+       CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END
+  FROM USER_CONSTRAINTS
+ WHERE CONSTRAINT_NAME = 'CK_52_01_TMP';
 
 -- CHECK의 두 분기가 패치와 일치하는지 확인한다.
 -- 공지·익명·자료실은 DEPARTMENT_ID IS NULL, 부서 게시판만 IS NOT NULL이어야 한다.

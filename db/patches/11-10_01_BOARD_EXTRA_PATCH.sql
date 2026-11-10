@@ -24,6 +24,15 @@ BEGIN
         RAISE_APPLICATION_ERROR(-20001, 'CK_52_01에 익명 게시판·자료실이 이미 있습니다.');
     END IF;
 
+    -- 앞선 실행이 중간에 멈춰 임시 제약이 남았으면 db/README.md의 복구 순서를 따른다.
+    SELECT COUNT(*) INTO v_count
+      FROM USER_CONSTRAINTS
+     WHERE CONSTRAINT_NAME = 'CK_52_01_TMP';
+
+    IF v_count <> 0 THEN
+        RAISE_APPLICATION_ERROR(-20002, '임시 제약 CK_52_01_TMP가 남아 있습니다. db/README.md 복구 순서를 보세요.');
+    END IF;
+
     SELECT COUNT(*) INTO v_count
       FROM USER_CONSTRAINTS
      WHERE TABLE_NAME = 'BOARD'
@@ -35,7 +44,7 @@ BEGIN
        AND SEARCH_CONDITION_VC LIKE '%BOARD_DEPT%';
 
     IF v_count <> 1 THEN
-        RAISE_APPLICATION_ERROR(-20002, '기존 CK_52_01 상태가 예상과 다릅니다.');
+        RAISE_APPLICATION_ERROR(-20003, '기존 CK_52_01 상태가 예상과 다릅니다.');
     END IF;
 
     SELECT COUNT(*) INTO v_count
@@ -46,7 +55,7 @@ BEGIN
        AND STATUS = 'ENABLED';
 
     IF v_count <> 1 THEN
-        RAISE_APPLICATION_ERROR(-20003, '게시판 종류 FK_52_02를 확인하세요.');
+        RAISE_APPLICATION_ERROR(-20004, '게시판 종류 FK_52_02를 확인하세요.');
     END IF;
 
     SELECT COUNT(*) INTO v_count
@@ -54,7 +63,7 @@ BEGIN
      WHERE CODE = 'BOARD_TYPE';
 
     IF v_count <> 1 THEN
-        RAISE_APPLICATION_ERROR(-20004, '상위 코드 BOARD_TYPE이 없습니다.');
+        RAISE_APPLICATION_ERROR(-20005, '상위 코드 BOARD_TYPE이 없습니다.');
     END IF;
 
     SELECT COUNT(*) INTO v_count
@@ -63,20 +72,27 @@ BEGIN
         OR (PARENT_CODE = 'BOARD_TYPE' AND SORT_ORDER IN (3, 4));
 
     IF v_count <> 0 THEN
-        RAISE_APPLICATION_ERROR(-20005, '익명 게시판·자료실 코드나 정렬 순서 3·4번이 이미 있습니다.');
+        RAISE_APPLICATION_ERROR(-20006, '익명 게시판·자료실 코드나 정렬 순서 3·4번이 이미 있습니다.');
     END IF;
 END;
 /
 
-ALTER TABLE BOARD DROP CONSTRAINT CK_52_01;
+-- CHECK는 새 정의를 임시 이름으로 먼저 추가·검증한 뒤 옛 정의를 지우고 이름을 바꾼다.
+-- 어느 단계에서 멈춰도 옛 규칙이나 새 규칙 중 하나는 걸려 있다. 멈춘 뒤 이어 가는 법은 db/README.md.
 
--- 전사 공지·익명 게시판·자료실은 업체 전체 게시판이라 부서가 없고, 부서 게시판만 부서가 있다.
-ALTER TABLE BOARD ADD CONSTRAINT CK_52_01 CHECK (
+-- 1단계: 새 규칙 추가. 전사 공지·익명 게시판·자료실은 업체 전체 게시판이라 부서가 없고, 부서 게시판만 부서가 있다.
+ALTER TABLE BOARD ADD CONSTRAINT CK_52_01_TMP CHECK (
     (BOARD_TYPE IN ('BOARD_NOTICE', 'BOARD_ANON', 'BOARD_LIBRARY')
         AND DEPARTMENT_ID IS NULL)
  OR (BOARD_TYPE = 'BOARD_DEPT'
         AND DEPARTMENT_ID IS NOT NULL)
-);
+) ENABLE VALIDATE;
+
+-- 2단계: 옛 규칙 삭제.
+ALTER TABLE BOARD DROP CONSTRAINT CK_52_01;
+
+-- 3단계: 새 규칙을 원래 이름으로.
+ALTER TABLE BOARD RENAME CONSTRAINT CK_52_01_TMP TO CK_52_01;
 
 -- DML은 모든 DDL 뒤에 수행한다.
 INSERT INTO COMMON_CODE (
