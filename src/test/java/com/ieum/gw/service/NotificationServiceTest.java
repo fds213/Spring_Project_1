@@ -22,6 +22,7 @@ import com.ieum.gw.dao.NotificationDAO;
 import com.ieum.gw.dto.NotificationDTO;
 import com.ieum.gw.dto.NotificationPageDTO;
 import com.ieum.gw.dto.NotificationSaveDTO;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 
 /**
  * DB 없이 확인한다: DAO를 가짜로 바꿔 고유 제약(UQ_69_01)과 업체·계정 조건을 흉내 낸다.
@@ -39,6 +40,7 @@ class NotificationServiceTest {
     private static final Long DOC = 7000L;
     private static final Long TICKET = 8000L;
     private static final Long CORRECTION = 9000L;
+    private static final Long INQUIRY = 600L;
 
     /** 저장한 행을 기억하고, 받는 계정·중복 방지 키가 겹치면 고유 제약처럼 예외를 던지는 가짜 DAO */
     static class FakeDAO extends NotificationDAO {
@@ -127,6 +129,40 @@ class NotificationServiceTest {
         @Override
         public boolean isOwned(Long companyId, Long accountId, Long id) {
             return owned(companyId, accountId, id);
+        }
+
+        /** 이음 문의 답변 알림 중 안 읽은 것을 문의별로 센다(SQL의 GROUP BY 흉내) */
+        @Override
+        public List<NotificationUnreadCountDTO> countUnreadSupportReplies(Long companyId, Long accountId) {
+            Map<Long, NotificationUnreadCountDTO> counts = new HashMap<>();
+            for (long id = 0; id < rows.size(); id++) {
+                NotificationSaveDTO row = rows.get((int) id);
+                if (owned(companyId, accountId, id) && !readIds.contains(id) && "NT_SUPPORT_REPLY".equals(row.getNotificationType())) {
+                    NotificationUnreadCountDTO dto = counts.computeIfAbsent(row.getSupportInquiryId(), k -> {
+                        NotificationUnreadCountDTO d = new NotificationUnreadCountDTO();
+                        d.setTargetId(k);
+                        return d;
+                    });
+                    dto.setUnread(dto.getUnread() + 1);
+                    dto.setLastId(id); // 순번이 알림 번호다
+                }
+            }
+            return new ArrayList<>(counts.values());
+        }
+
+        @Override
+        public int markSupportRepliesRead(Long companyId, Long accountId, Long supportInquiryId, Long upToId) {
+            int changed = 0;
+            for (long id = 0; id <= upToId && id < rows.size(); id++) {
+                NotificationSaveDTO row = rows.get((int) id);
+                if (owned(companyId, accountId, id) && !readIds.contains(id)
+                        && "NT_SUPPORT_REPLY".equals(row.getNotificationType())
+                        && supportInquiryId.equals(row.getSupportInquiryId())) {
+                    readIds.add(id);
+                    changed++;
+                }
+            }
+            return changed;
         }
     }
 
@@ -267,6 +303,99 @@ class NotificationServiceTest {
 
         assertThrows(DataIntegrityViolationException.class,
                 () -> service.notifyAttendanceCorrectionRequest(COMPANY, EMP_KIM, CORRECTION, "고양이", "2026-11-04"));
+    }
+
+    @Test
+    @DisplayName("이음 문의 답변 알림은 문의한 직원의 계정으로 문의 번호와 함께 저장하고 문의 제목을 문구에 넣는다")
+    void supportReplySaved() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "결재함 오류");
+
+        assertEquals(1, dao.rows.size());
+        NotificationSaveDTO row = dao.rows.get(0);
+        assertEquals(COMPANY, row.getCompanyId());
+        assertEquals(ACCOUNT_KIM, row.getReceiverAccountId());
+        assertEquals("NT_SUPPORT_REPLY", row.getNotificationType());
+        assertEquals("이음 문의 답변", row.getTitle());
+        assertEquals("'결재함 오류' 문의에 이음 운영팀이 답변했습니다.", row.getMessage());
+        assertEquals(INQUIRY, row.getSupportInquiryId());
+        assertNull(row.getApprovalDocumentId());
+        assertNull(row.getItTicketId());
+        assertNull(row.getAttendanceCorrectionId());
+    }
+
+    @Test
+    @DisplayName("이음 문의 답변 알림은 답변마다 저장하고, 같은 답변으로 두 번 오면 하나만 저장한다")
+    void supportReplyPerReply() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "결재함 오류");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "결재함 오류");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 2L, "결재함 오류");
+
+        assertEquals(2, dao.rows.size());
+    }
+
+    @Test
+    @DisplayName("이음 문의 답변 알림의 중복 방지 키는 칸 길이(100자)를 넘지 않는다")
+    void supportReplyKeyLength() {
+        service.notifySupportReply(COMPANY, EMP_KIM, Long.MAX_VALUE, Long.MAX_VALUE, "결재함 오류");
+
+        assertTrue(dao.rows.get(0).getDedupeKey().length() <= 100);
+    }
+
+    @Test
+    @DisplayName("이음 문의 답변 알림도 중복이 아닌 저장 오류는 그대로 던진다")
+    void supportReplyErrorPropagates() {
+        dao.insertError = new DataIntegrityViolationException("ORA-02291");
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "결재함 오류"));
+    }
+
+    @Test
+    @DisplayName("안 읽은 답변 알림 수는 본인 것만 문의별로 세고, 다른 종류의 알림은 세지 않는다")
+    void countUnreadSupportRepliesOwnOnly() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "a");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 2L, "a");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY + 1, 3L, "b");
+        service.notifySupportReply(COMPANY, EMP_LEE, INQUIRY, 4L, "a");
+        service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "c");
+
+        Map<Long, NotificationUnreadCountDTO> counts = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM);
+
+        assertEquals(2, counts.size());
+        assertEquals(2, counts.get(INQUIRY).getUnread());
+        assertEquals(1L, counts.get(INQUIRY).getLastId()); // 0·1번이 김의 INQUIRY 알림
+        assertEquals(1, counts.get(INQUIRY + 1).getUnread());
+        assertTrue(service.countUnreadSupportReplies(OTHER_COMPANY, ACCOUNT_KIM).isEmpty());
+    }
+
+    @Test
+    @DisplayName("문의를 펼치면 그 문의의 본인 답변 알림만 읽음이 되고 헤더 배지 수도 줄어든다")
+    void markSupportRepliesReadOnlyThatInquiry() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "a");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 2L, "a");
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY + 1, 3L, "b");
+        service.notifySupportReply(COMPANY, EMP_LEE, INQUIRY, 4L, "a");
+
+        Long upTo = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getLastId();
+        assertEquals(2, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo));
+        assertEquals(0, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo)); // 두 번 눌러도 된다
+
+        assertEquals(Map.of(INQUIRY + 1, 1), service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUnread())));
+        assertEquals(1, service.countUnread(COMPANY, ACCOUNT_KIM));
+        assertEquals(1, service.countUnread(COMPANY, ACCOUNT_LEE));
+    }
+
+    @Test
+    @DisplayName("목록을 받은 뒤 온 답변의 알림은 그때 받은 번호까지만 읽음으로 바꿔서 안 읽은 채로 남는다")
+    void markSupportRepliesReadKeepsLaterReply() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "a");
+        Long upTo = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getLastId(); // 화면이 받은 목록
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 2L, "a"); // 그 뒤 운영자가 답변을 더 단다
+
+        assertEquals(1, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo));
+
+        assertEquals(1, service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getUnread());
     }
 
     @Test

@@ -15,10 +15,11 @@
              THEN TO_CHAR(r.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') END AS edited_at
     </sql>
 
-    <!-- 운영자 화면: 문의 표는 모든 업체 것을 읽는다(기능명세서 1.6 예외). 직원 표에서는 보낸 사람 이름만 가져온다 -->
+    <!-- 운영자 화면: 문의 표는 모든 업체 것을 읽는다(기능명세서 1.6 예외). 직원 표에서는 보낸 사람 이름만 가져온다.
+         requester_employee_id는 답변 알림을 받을 사람을 찾는 데만 쓰고 화면에는 보내지 않는다 -->
     <sql id="opsInquirySelect">
         SELECT <include refid="inquiryColumns" />,
-               i.company_id, c.company_name AS company, c.company_code, e.employee_name AS name
+               i.company_id, i.requester_employee_id, c.company_name AS company, c.company_code, e.employee_name AS name
         FROM support_inquiry i
         JOIN company c ON c.company_id = i.company_id
         JOIN employee e ON e.company_id = i.company_id AND e.employee_id = i.requester_employee_id
