@@ -18,4 +18,64 @@
          WHERE company_id = #{companyId}
          ORDER BY branch_name, branch_id
     </select>
+    
+    <!-- 같은 업체에 사용 중인 지점을 신규 등록한다. -->
+    <insert id="insertBranch">
+    	insert into branch (company_id, branch_name, address, detail_address)
+    	values (#{companyId}, #{branchName}, #{address}, #{detailAddress,jdbcType=VARCHAR})
+    </insert>
+    
+    <!-- 같은 업체의 지정된 지점명과 주소를 수정한다. -->
+    <update id="updateBranch">
+        UPDATE branch
+           SET branch_name = #{branchName},
+               address = #{address},
+               detail_address = #{detailAddress,jdbcType=VARCHAR},
+               updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+         WHERE company_id = #{companyId}
+           AND branch_id = #{branchId}
+    </update>
+    
+    <!-- 중지와 지급 티켓 생성을 직렬화하기 위해 같은 업체의 지점 행을 잠근다. -->
+    <select id="lockBranch" resultType="java.lang.Long">
+        SELECT branch_id
+          FROM branch
+         WHERE company_id = #{companyId}
+           AND branch_id = #{branchId}
+           FOR UPDATE
+    </select>
+
+    <!-- 잠금을 얻은 지점의 현재 사용 상태를 조회한다. -->
+    <select id="selectBranchUseYn" resultType="string">
+        SELECT use_yn
+          FROM branch
+         WHERE company_id = #{companyId}
+           AND branch_id = #{branchId}
+    </select>
+
+    <!-- 같은 업체·수령 지점의 미지급 장비 티켓을 센다. -->
+    <select id="countPendingEquipmentTickets" resultType="int">
+        <bind name="equipment" value="@com.ieum.gw.code.TicketType@TK_EQUIPMENT.name()"/>
+        <bind name="received" value="@com.ieum.gw.code.TicketStatus@RECEIVED.name()"/>
+        <bind name="assigned" value="@com.ieum.gw.code.TicketStatus@ASSIGNED.name()"/>
+        <bind name="inProgress" value="@com.ieum.gw.code.TicketStatus@IN_PROGRESS.name()"/>
+        SELECT COUNT(*)
+          FROM branch b
+          JOIN it_ticket t ON t.company_id = b.company_id
+                          AND t.branch_id = b.branch_id
+         WHERE b.company_id = #{companyId}
+           AND b.branch_id = #{branchId}
+           AND t.ticket_type = #{equipment}
+           AND t.status_code IN (#{received}, #{assigned}, #{inProgress})
+    </select>
+
+    <!-- 같은 업체의 사용 중 지점을 사용 중지로 바꾼다. -->
+    <update id="disableBranch">
+        UPDATE branch
+           SET use_yn = 'N',
+               updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+         WHERE company_id = #{companyId}
+           AND branch_id = #{branchId}
+           AND use_yn = 'Y'
+    </update>
 </mapper>
