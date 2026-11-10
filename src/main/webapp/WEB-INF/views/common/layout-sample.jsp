@@ -6,7 +6,8 @@
   layout.tag 사용 예시도 겸한다: 팀원은 이 모양(scripts 조각 + 본문)대로 자기 모듈 JSP를 만든다.
   숫자·목록은 home.js 가 이미 있는 각 모듈 API로 채운다. 못 불러온 칸은 "-" 그대로 둔다(다른 칸은 계속 보인다).
     결재 대기·진행 중인 내 기안: GET /approval/api/box   내 티켓: GET /ticket/api/tickets
-    남은 연차: GET /attendance/api/leaves   이번 주 일정: GET /schedule/api/schedules?month=   공지: GET /board/api/notices
+    남은 연차: GET /attendance/api/leaves   내 장비: GET /asset/api/assets/assigned
+    이번 주 일정: GET /schedule/api/schedules?month=   공지: GET /board/api/notices
 --%>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
 <ui:layout title="홈" menu="home">
@@ -41,7 +42,7 @@
         <span class="go">보기 ›</span>
       </a>
 
-      <%-- 3. 오늘 챙길 숫자 4개. 누르면 그 화면으로 간다. is-alert: 처리할 것이 있으면 파란 숫자.
+      <%-- 3. 오늘 챙길 숫자 5개. 누르면 그 화면으로 간다. is-alert: 처리할 것이 있으면 파란 숫자.
            아랫줄(sub)은 챙길 일이 있을 때만 home.js 가 채운다(예: "휴가 신청서 외 1건", "신청 중 1일") --%>
       <div class="home-cards">
         <a class="home-card" id="cardWait" href="${ctx}/approval/list">
@@ -55,6 +56,9 @@
         </a>
         <a class="home-card" id="cardLeave" href="${ctx}/attendance/leave">
           <small>남은 연차</small><strong id="homeLeave">-</strong><span class="sub" id="homeLeaveSub"></span>
+        </a>
+        <a class="home-card" id="cardAsset" href="${ctx}/asset/mine">
+          <small>내 장비</small><strong id="homeAsset">-</strong><span class="sub" id="homeAssetSub"></span>
         </a>
       </div>
 
