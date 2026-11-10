@@ -10,7 +10,12 @@
 const BILL_STATUS = { TRIAL: '체험 중', PAID: '이용 중', EXPIRED: '읽기 전용' };
 const BILL_PLAN = { MONTHLY: '월간', ANNUAL: '연간' };
 const MODE_TEXT = { FIRST: '첫 결제', EXTEND: '연장' };
-const BILL_RESULT = { OK: { label: '결제 완료', cls: 'paid' }, FAILED: { label: '결제 실패', cls: 'failed' } };
+// PENDING: 승인됐지만 이용 기간에 아직 반영되지 않은 결제(운영자 화면의 '반영 대기'와 같다)
+const BILL_RESULT = {
+  OK: { label: '결제 완료', cls: 'paid' },
+  PENDING: { label: '반영 대기', cls: 'pending' },
+  FAILED: { label: '결제 실패', cls: 'failed' },
+};
 const billDday = n => (n === 0 ? 'D-day' : `D-${n}`);
 
 let billState = null; // GET /subscription/api/billing 의 응답
@@ -57,13 +62,30 @@ function renderBilling() {
     });
 }
 
-// 보여 줄 이용 정보가 없을 때(신청 정보 없음, 권한 없음): 안내만 남기고 결제 칸을 감춘다
+// 보여 줄 이용 정보가 없을 때(신청 정보 없음, 권한 없음): 안내만 남기고 결제 카드를 감춘다. 제목만 남은 빈 카드가 보이지 않게
 function drawNoBilling(text) {
   ['billStatus', 'billPlan', 'billEnd', 'billUsersNow'].forEach(id => { document.getElementById(id).textContent = '-'; });
   fillDetail('billInfo', [['안내', text]]);
-  document.getElementById('billPay').hidden = true;
+  document.getElementById('billPayCard').hidden = true;
   document.getElementById('billHistoryBox').hidden = true;
 }
+
+// 승인됐지만 이용 기간에 반영되지 않은 결제의 안내. 결제를 이어 가면 서버가 토스를 부르기 전에 그 결제부터 반영하고 멈춘다
+// (PaymentService.createOrder, 다시 결제되지 않는다). 이미 유료인 업체의 첫 결제 주문은 반영할 수 없어 운영팀 몫이다
+function pendingPaymentNote(s) {
+  const pending = s.payments.filter(p => p.result === 'PENDING');
+  if (!pending.length) return '';
+  const head = `승인된 결제 ${pending.length}건이 아직 이용 기간에 반영되지 않았습니다.`;
+  const selfFix = s.canPay && !pending.some(p => p.kind === 'FIRST' && s.paid);
+  return selfFix
+    ? `${head} 결제 칸에서 '토스 결제창 열기'를 누르면 결제창을 열기 전에 이 결제부터 반영하고, 다시 결제하지 않습니다. 그래도 남아 있으면 IT 서비스 > 이음 장애 문의로 알려 주세요`
+    : `${head} 같은 결제를 다시 하지 말고 IT 서비스 > 이음 장애 문의로 알려 주세요`;
+}
+
+// 결제할 수 없을 때 결제 카드에 남길 안내. 유료가 끝난 업체는 다시 결제할 수 없다(이용 약관 제6조)
+const noPayHint = s => (s.paid && s.status === 'EXPIRED'
+  ? '유료 이용 기간이 끝난 업체는 다시 결제할 수 없습니다(이용 약관 제6조). 지금까지의 자료는 읽기 전용으로 볼 수 있습니다'
+  : '지금은 이 화면에서 결제할 수 없습니다. 이음 운영팀에 문의해 주세요');
 
 function drawBilling() {
   const s = billState;
@@ -82,6 +104,7 @@ function drawBilling() {
   const seatsLabel = s.paid ? '구매 인원' : '신청 인원';
   card('billUsersLabel', seatsLabel);
   card('billUsersNow', `${s.users}명`);
+  const pendingNote = pendingPaymentNote(s);
   // 구독 현황(SUB-01): 결제일·구독 시작일·만료일·구매 인원·이용 상태
   fillDetail('billInfo', [
     ['업체명', s.company],
@@ -95,8 +118,11 @@ function drawBilling() {
       ['요금제', BILL_PLAN[s.plan] || '월간'],
       ['구독 시작일', ymd(s.serviceFrom)],
       ['만료일', ymd(s.end)],
-      ['결제 방식', '자동 결제 없음 · 만료 전에 직접 연장'],
+      // 끝난 유료는 연장할 수 없으니 '직접 연장'을 말하지 않는다
+      ['결제 방식', s.status === 'EXPIRED' ? '자동 결제 없음' : '자동 결제 없음 · 만료 전에 직접 연장'],
     ] : []),
+    // 결제 이력의 '반영 대기'만으로는 무엇을 해야 할지 모른다
+    ...(pendingNote ? [['반영 대기', pendingNote]] : []),
     ['계정 한도', s.paid ? `사용 중 ${s.accountsInUse}명 / 구매 ${s.users}명` : `관리자 포함 ${s.trialSeats}명 (결제하면 해제)`],
   ]);
   renderPayHistory();
@@ -105,8 +131,15 @@ function drawBilling() {
   const done = billDone ? s.payments.find(p => p.id === billDone) : null;
   // 결제할 수 없으면 결제 칸은 보이지 않는다. 방금 결제해 유료가 됐거나 승인을 확인하는 중이면 그 결과를 보여 준다
   const showPay = s.canPay || done || billConfirming;
+  const payCard = document.getElementById('billPayCard');
+  payCard.hidden = false;
+  payCard.style.alignSelf = showPay ? '' : 'start'; // 안내만 남으면 왼쪽 카드 높이까지 늘이지 않는다(빈 칸이 커 보이지 않게)
   document.getElementById('billPay').hidden = !showPay;
-  if (!showPay) return;
+  if (!showPay) {
+    document.getElementById('billPayTitle').textContent = '결제';
+    document.getElementById('billHint').textContent = noPayHint(s);
+    return;
+  }
   if (billConfirming) {
     billStep = 2;
     document.getElementById('billPayTitle').textContent = '결제 승인 확인';

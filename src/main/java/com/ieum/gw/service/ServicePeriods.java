@@ -61,8 +61,11 @@ final class ServicePeriods {
     }
 
     /**
-     * 지금 기간(시작 ≤ now < 만료)을 고른다. 겹치면 나중에 시작한 것이다(체험 중 결제하면 유료 기간이 체험 기간 위에 생긴다, PAY-02).
-     * 지금 기간이 없으면 이미 끝난 기간 중 가장 늦게 끝난 것, 그것도 없으면 null.
+     * 지금 기간(시작 ≤ now < 만료)을 고른다. 겹치면 유료가 체험보다 먼저이고(체험 중 결제하면 유료 기간이 체험 기간 위에 생긴다, PAY-02),
+     * 같은 종류끼리는 나중에 시작한 것이다.
+     * 지금 기간이 없으면 이미 끝난 기간 중 유료를 먼저, 그다음 가장 늦게 끝난 것, 그것도 없으면 null.
+     * 유료를 먼저 보는 것은 SQL로 넣은 시연 자료처럼 유료 기간이 체험보다 먼저 시작하거나 먼저 끝나도 유료 업체가 체험으로 보이지 않게 하려는 것이다.
+     * 끝난 유료보다 지금 체험이 먼저인 것은 그대로다(시연 자료 SQL이 지금 기간이 없는 업체의 체험을 늘려 다시 쓰게 한다).
      * 연장은 새 기간 행을 만드므로, 지금 기간에 바로 이어지는 유료 기간이 있으면 그 끝까지를 endsAt으로 돌려준다(SUB-03).
      * 그래서 만료 여부·마지막 날·남은 일수는 이 값으로 계산하면 연장분까지 맞다.
      */
@@ -71,16 +74,24 @@ final class ServicePeriods {
         ServicePeriodDTO last = null;
         for (ServicePeriodDTO p : periods) {
             if (!p.getStartsAt().isAfter(now) && now.isBefore(p.getEndsAt())) {
-                if (current == null || p.getStartsAt().isAfter(current.getStartsAt())) {
+                if (current == null || ranksAbove(p, current, p.getStartsAt().isAfter(current.getStartsAt()))) {
                     current = p;
                 }
             } else if (!p.getEndsAt().isAfter(now)) {
-                if (last == null || p.getEndsAt().isAfter(last.getEndsAt())) {
+                if (last == null || ranksAbove(p, last, p.getEndsAt().isAfter(last.getEndsAt()))) {
                     last = p;
                 }
             }
         }
         return current != null ? throughRenewals(current, periods) : last;
+    }
+
+    // p가 지금 고른 기간보다 앞서나: 유료가 체험보다 먼저이고, 종류가 같으면 later(나중에 시작했나·늦게 끝났나)로 가른다
+    private static boolean ranksAbove(ServicePeriodDTO p, ServicePeriodDTO chosen, boolean later) {
+        if (p.isTrial() != chosen.isTrial()) {
+            return !p.isTrial();
+        }
+        return later;
     }
 
     // 지금 기간에 바로 이어지는 유료 기간의 끝까지 늘린 사본. 이어지는 기간이 없으면 지금 기간 그대로다
@@ -153,7 +164,7 @@ final class ServicePeriods {
         summary.setPaid(!period.isTrial());
         summary.setPlan(period.getPlan());
         summary.setSeats(period.getPurchasedSeats());
-        summary.setFirstDay(period.getStartsAt().toLocalDate());
+        summary.setFirstDay(firstDayOf(period));
         summary.setLastDay(lastDay(period.getEndsAt()));
         summary.setDaysLeft(daysLeft(period, now));
         for (ServicePeriodDTO p : periods) {
@@ -162,6 +173,17 @@ final class ServicePeriods {
             }
         }
         return summary;
+    }
+
+    /**
+     * 화면에 보일 이용 기간 첫날. 유료는 최초 기준일이라 연장분으로 넘어가도 처음 시작한 날이 그대로다(업체 이용 결제 화면의 구독 시작일과 같다).
+     * 기준일이 없는 행(SQL로 넣은 자료)과 체험은 그 기간의 시작일이다.
+     */
+    static LocalDate firstDayOf(ServicePeriodDTO period) {
+        if (!period.isTrial() && period.getBillingAnchorDate() != null) {
+            return period.getBillingAnchorDate();
+        }
+        return period.getStartsAt().toLocalDate();
     }
 
     static int seatLimitOf(ServicePeriodDTO period) {
