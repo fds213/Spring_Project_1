@@ -427,8 +427,9 @@ eaEl('eaDraftSave')?.addEventListener('click', () => {
 // ---------- 첨부 ----------
 // 고르는 즉시 서버에 올려(POST /approval/api/files) 번호를 받아 두고, 제출할 때 번호(fileIds)만 보낸다
 const EA_FILE_MAX = 5; // 서버 ApprovalService.FILE_MAX와 같게
-const EA_FILE_SIZE_MAX = 10 * 1024 * 1024; // 파일당 10MB, 한 번에 30MB (서버도 다시 검사한다)
+const EA_FILE_SIZE_MAX = 10 * 1024 * 1024; // 파일당 10MB(서버도 다시 검사한다)
 const EA_FILE_EXT = /\.(jpe?g|png|gif|pdf|docx|xlsx|pptx|hwpx?)$/i; // 서버와 같은 허용 목록
+const EA_REQUEST_MAX = 29 * 1024 * 1024; // 서버 요청 한도 30MB보다 조금 적게 (요청에 구분 문자열이 붙는다)
 eaState.files = [];
 
 // 올린 파일 목록을 그린다 (빼기 버튼 포함)
@@ -455,12 +456,11 @@ function eaInitFiles() {
       if (file.size > EA_FILE_SIZE_MAX) { errors.push(`${file.name}: 파일당 10MB까지 올릴 수 있습니다`); continue; }
       ok.push(file);
     }
-    if (ok.reduce((sum, f) => sum + f.size, 0) > EA_FILE_SIZE_MAX * 3) {
-      eaEl('eaFileError').textContent = '한 번에 30MB까지 올릴 수 있습니다. 나눠서 골라 주세요';
-      return;
-    }
-    if (errors.length) eaEl('eaFileError').textContent = errors.join(' / ');
-    if (!ok.length) return;
+
+    const total = ok.reduce((sum, f) => sum + f.size, 0);
+    if (total > EA_REQUEST_MAX) errors.push('한 번에 29MB까지 올릴 수 있습니다. 나눠서 골라 주세요');
+    if (errors.length) eaEl('eaFileError').textContent = [...new Set(errors)].join(' / '); // 같은 문구는 한 번만
+    if (!ok.length || total > EA_REQUEST_MAX) return;
 
     const form = new FormData();
     ok.forEach(file => form.append('files', file));
