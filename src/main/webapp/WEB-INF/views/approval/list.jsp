@@ -19,7 +19,7 @@
     <section class="view on" id="view-approval-box">
       <%-- 결재함: 내 순번에 온 문서, 내가 올린 문서를 상태별로 본다. 휴가와 장비 문서를 한 목록에서 다룬다 (approval/approval.js) --%>
       <div class="page-head"><h1>결재함</h1><a href="${ctx}/approval/write" class="btn btn-primary" data-write>기안 작성</a></div>
-      <div class="cards" id="eaTabs"><button type="button" class="card card-filter" data-tab="WAIT" aria-pressed="true"><small>내 순번 대기</small><strong id="eaCntWAIT">0건</strong></button><button type="button" class="card card-filter" data-tab="PROGRESS" aria-pressed="false"><small>진행</small><strong id="eaCntPROGRESS">0건</strong></button><button type="button" class="card card-filter" data-tab="DONE" aria-pressed="false"><small>완료</small><strong id="eaCntDONE">0건</strong></button><button type="button" class="card card-filter" data-tab="REJECTED" aria-pressed="false"><small>반려</small><strong id="eaCntREJECTED">0건</strong></button></div>
+      <div class="cards" id="eaTabs"><button type="button" class="card card-filter" data-tab="WAIT" aria-pressed="true"><small>내 순번 대기</small><strong id="eaCntWAIT">0건</strong></button><button type="button" class="card card-filter" data-tab="PROGRESS" aria-pressed="false"><small>진행</small><strong id="eaCntPROGRESS">0건</strong></button><button type="button" class="card card-filter" data-tab="DONE" aria-pressed="false"><small>완료</small><strong id="eaCntDONE">0건</strong></button><button type="button" class="card card-filter" data-tab="REJECTED" aria-pressed="false"><small>반려</small><strong id="eaCntREJECTED">0건</strong></button><button type="button" class="card card-filter" data-tab="DRAFT" aria-pressed="false"><small>임시저장</small><strong id="eaCntDRAFT">0건</strong></button></div>
       <section class="info-card table-gap">
         <div class="table-wrap"><table class="table"><thead id="eaHead"></thead><tbody id="eaList"></tbody></table></div>
       </section>
@@ -32,6 +32,16 @@
       <div class="modal-actions">
         <button type="button" class="btn" value="cancel">취소</button>
         <button type="button" class="btn btn-primary" value="ok">승인</button>
+      </div>
+    </dialog>
+
+    <%-- 임시저장 삭제 확인: 지우면 되살릴 수 없어 한 번 묻는다 --%>
+    <dialog class="modal" id="eaDraftDeleteDialog">
+      <h2>임시저장 문서를 지울까요?</h2>
+      <p>지우면 되살릴 수 없습니다.</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" value="cancel">취소</button>
+        <button type="button" class="btn btn-primary" value="ok">삭제</button>
       </div>
     </dialog>
   </jsp:body>

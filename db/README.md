@@ -2,14 +2,14 @@
 
 Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저장소의 `db/` 아래에 같은 구조로 배치한다. SQL과 실행 안내는 Git 저장소의 `db/` 디렉터리에서 함께 관리한다.
 
-현재 생성 기준: **프로젝트 테이블 82개 / 시퀀스 66개 / 공통 코드 232개**. 별도 보존한 TEST_EMP는 프로젝트 테이블 수에 포함하지 않는다.
+현재 생성 기준: **프로젝트 테이블 82개 / 시퀀스 66개 / 공통 코드 233개**. 별도 보존한 TEST_EMP는 프로젝트 테이블 수에 포함하지 않는다.
 
 ## 파일 용도
 
 | 파일 | 용도 |
 |---|---|
 | [ddl/IEUM_DDL.sql](ddl/IEUM_DDL.sql) | **신규 빈 스키마**에 테이블·시퀀스·제약·인덱스 생성 |
-| [data/IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) | 신규 DB에 기본 공통 코드 232개 입력 |
+| [data/IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) | 신규 DB에 기본 공통 코드 233개 입력 |
 | [data/init_auth_data.sql](data/init_auth_data.sql) | 신규 DB에 시연 업체·직원·계정 입력. 시연 보완 파일도 자동 실행 |
 | [data/IEUM_DEMO_SEED.sql](data/IEUM_DEMO_SEED.sql) | 월간·연간 요금제, 시연 업체 기간·지점·자산·직원 지점 보완. init 또는 데이터 패치에서 호출 |
 | [patches/11-02_01_SCHEMA_PATCH.sql](patches/11-02_01_SCHEMA_PATCH.sql) | 기존 DB의 11/02 구조 변경. 기존 자료 보존, 같은 정의는 검증 후 유지 |
@@ -24,6 +24,8 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [patches/11-06_02_LEAVE_GRANT_CHECK.sql](patches/11-06_02_LEAVE_GRANT_CHECK.sql) | 연차 추가 부여 컬럼·제약·인덱스·코드 읽기 전용 점검 |
 | [patches/11-06_03_ATTENDANCE_NOTIFICATION_PATCH.sql](patches/11-06_03_ATTENDANCE_NOTIFICATION_PATCH.sql) | 기존 DB에 근태 정정 알림 컬럼·FK·인덱스·CHECK·코드 추가. 승인 후 1회 실행 |
 | [patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql](patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql) | 근태 정정 알림 구조·코드 읽기 전용 점검 |
+| [patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql](patches/11-09_01_SUPPORT_NOTIFICATION_PATCH.sql) | 기존 DB에 이음 장애 문의 답변 알림 컬럼·FK·인덱스·CHECK·코드 추가. 승인 후 1회 실행 |
+| [patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql](patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql) | 이음 장애 문의 답변 알림 구조·코드 읽기 전용 점검 |
 
 ## 현재 팀 DB 상태
 
@@ -84,7 +86,8 @@ DB 변경이 포함된 커밋을 PR #164 브랜치에도 반영한 뒤 CI를 다
 4. `patches/11-02_03_CHECK.sql` 및 `patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql`
 5. `patches/11-06_02_LEAVE_GRANT_CHECK.sql`
 6. `patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql`
-7. 오류와 결과를 확인한 뒤 같은 연결에서 직접 `COMMIT;`
+7. `patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql`
+8. 오류와 결과를 확인한 뒤 같은 연결에서 직접 `COMMIT;`
 
 신규 DDL에는 근태정정이 포함되어 있으므로
 `11-02_04_ATTENDANCE_CORRECTION_PATCH.sql`은 실행하지 않는다.
@@ -113,6 +116,28 @@ DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행�
 
 DB 변경을 develop과 팀 DB에 반영한 뒤 #174를 병합한다.
 이후 근태 담당이 알림 호출과 화면 이동을 연결한다.
+
+## 이음 장애 문의 답변 알림 (11/09, 팀 DB 미적용)
+
+운영자가 이음 장애 문의에 답변하면 문의한 직원에게 알림을 저장하기 위한 변경이다.
+읽음 표시는 이 알림의 READ_AT을 쓰므로 칸을 따로 늘리지 않는다.
+
+- NOTIFICATION.SUPPORT_INQUIRY_ID 추가.
+- FK_69_08로 같은 업체의 장애 문의를 참조한다.
+- IX_69_07로 업체·장애 문의별 조회를 지원한다.
+- CK_69_01은 알림 종류에 맞는 대상 ID 하나만 허용한다.
+- NT_SUPPORT_REPLY 추가.
+- 신규 공통 코드 기준은 233개다.
+
+기존 DB는 별도 실행 승인 후 11-09_01 패치 → 11-09_02 점검과 정의 확인 →
+같은 연결에서 직접 COMMIT한다.
+DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행하지 않는다.
+
+신규 빈 DB는 수정된 전체 DDL·공통 코드 적재 파일을 사용한다.
+11-09_01 패치는 실행하지 않고 11-09_02 점검만 추가한다.
+
+DB 변경을 develop과 팀 DB에 반영한 뒤 알림 코드 PR을 병합한다.
+패치보다 알림 코드가 먼저 들어가면 알림 저장이 답변과 같은 트랜잭션이라 운영자 답변이 실패한다.
 
 ## 아직 11/02 변경이 적용되지 않은 기존 DB
 

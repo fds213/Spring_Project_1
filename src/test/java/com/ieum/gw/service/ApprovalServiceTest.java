@@ -2,6 +2,7 @@ package com.ieum.gw.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -17,8 +18,11 @@ import java.util.Set;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieum.gw.dao.ApprovalDAO;
 import com.ieum.gw.dto.ApprovalBoxDTO;
 import com.ieum.gw.dto.ApprovalBoxHistoryDTO;
@@ -33,6 +37,7 @@ import com.ieum.gw.dto.ApprovalStepDTO;
 import com.ieum.gw.dto.ApprovalSubmitDTO;
 import com.ieum.gw.dto.ApprovedEquipmentDTO;
 import com.ieum.gw.dto.ApproverDTO;
+import com.ieum.gw.dto.AttachmentDTO;
 import com.ieum.gw.dto.AuthEmpDTO;
 import com.ieum.gw.dto.BranchDTO;
 import com.ieum.gw.dto.EmpSummaryDTO;
@@ -125,6 +130,13 @@ class ApprovalServiceTest {
 
         ApprovalDocumentDTO document;
         ApprovalDocumentDTO originalDocument;
+        ApprovalDocumentDTO draftRow;          // 잠글 때 나오는 임시저장 문서
+        ApprovalDocumentDTO insertedDraft;
+        ApprovalDocumentDTO updatedDraft;
+        ApprovalDocumentDTO submittedDraft;
+        List<Object> deletedDraft;
+        int draftWriteResult = 1;
+        List<ApprovalBoxDTO> draftDocuments = List.of();
         int redraftCount;
         final List<ApprovalStepDTO> steps = new ArrayList<>();
         ApprovalHistoryDTO history;
@@ -163,8 +175,53 @@ class ApprovalServiceTest {
 
         @Override
         public ApprovalDocumentDTO lockDocument(Long companyId, long documentId) {
+            if (draftRow != null && companyId.equals(draftRow.getCompanyId())
+                    && Long.valueOf(documentId).equals(draftRow.getApprovalDocumentId())) {
+                return draftRow;
+            }
             return originalDocument != null && companyId.equals(originalDocument.getCompanyId())
                     && Long.valueOf(documentId).equals(originalDocument.getApprovalDocumentId()) ? originalDocument : null;
+        }
+
+        @Override
+        public int insertFile(Long companyId, Long approvalDocumentId, Long attachmentId) {
+            return 1;
+        }
+        
+        int boxFileCount; // countBoxFile이 돌려줄 값 (결재함에 보이면 1, 아니면 0)
+
+        @Override
+        public int countBoxFile(Long companyId, Long employeeId, Long documentId, Long attachmentId) {
+            return boxFileCount;
+        }
+
+        @Override
+        public void insertDraft(ApprovalDocumentDTO document) {
+            document.setApprovalDocumentId(NEW_DOCUMENT_ID); // selectKey가 하는 일
+            insertedDraft = document;
+        }
+
+        @Override
+        public int updateDraft(ApprovalDocumentDTO document) {
+            updatedDraft = document;
+            return draftWriteResult;
+        }
+
+        @Override
+        public int submitDraft(ApprovalDocumentDTO document) {
+            submittedDraft = document;
+            return draftWriteResult;
+        }
+
+        @Override
+        public int deleteDraft(Long companyId, Long employeeId, long documentId) {
+            deletedDraft = List.of(companyId, employeeId, documentId);
+            return draftWriteResult;
+        }
+
+        @Override
+        public List<ApprovalBoxDTO> selectDraftDocuments(Long companyId, Long employeeId) {
+            return draftDocuments;
         }
 
         @Override
@@ -992,7 +1049,7 @@ class ApprovalServiceTest {
     }
 
     @Test
-    @DisplayName("결재함: 탭 5개 키를 항상 만들고 DRAFT는 비어 있다")
+    @DisplayName("결재함: 탭 5개 키를 항상 만들고 문서가 없으면 모두 비어 있다")
     void boxAlwaysHasFiveTabs() {
         Map<String, List<ApprovalBoxDTO>> box = service.box(user());
 
@@ -1185,5 +1242,356 @@ class ApprovalServiceTest {
         assertEquals(List.of("saveDocument"), attendance.submitCalls);
         assertNull(attendance.lockedCompanyId);
         assertNull(attendance.lockedEmployeeId);
+    }
+
+    // ---------- 임시저장 ----------
+
+    /** 정해 둔 첨부만 있고, 받은 번호를 적어 두는 가짜 첨부 */
+    static class FakeAttachment extends AttachmentService {
+        final Map<Long, AttachmentDTO> files = new java.util.HashMap<>();
+        final List<Long> attached = new ArrayList<>();
+
+        FakeAttachment() {
+            super(null, null);
+        }
+
+        @Override
+        public AttachmentDTO get(Long attachmentId, Long companyId) {
+            AttachmentDTO file = files.get(attachmentId);
+            if (file == null || !companyId.equals(file.getCompanyId())) {
+                throw new IllegalArgumentException("파일을 찾을 수 없습니다");
+            }
+            return file;
+        }
+
+        @Override
+        public void markAttached(Long attachmentId, Long companyId) {
+            attached.add(attachmentId);
+        }
+    }
+
+    private final FakeAttachment attachments = new FakeAttachment();
+    private final ApprovalService draftService = new ApprovalService(employee, attendance, dao, branch, notification,
+            new ScheduleService(null, null), new TicketService(null), attachments);
+
+    private static final Long DRAFT_ID = 77L;
+    private static final Long MY_ACCOUNT_ID = 200L;
+
+    /** 잠글 때 나오는 임시저장 문서를 정해 둔다 */
+    private ApprovalDocumentDTO draftRow(Long authorId, String status) {
+        ApprovalDocumentDTO row = new ApprovalDocumentDTO();
+        row.setApprovalDocumentId(DRAFT_ID);
+        row.setCompanyId(COMPANY_ID);
+        row.setAuthorEmployeeId(authorId);
+        row.setStatusCode(status);
+        row.setDocumentType("DOC_LEAVE");
+        dao.draftRow = row;
+        return row;
+    }
+
+    private void addFile(Long id, Long uploaderAccountId) {
+        AttachmentDTO file = new AttachmentDTO();
+        file.setAttachmentId(id);
+        file.setCompanyId(COMPANY_ID);
+        file.setUploaderAccountId(uploaderAccountId);
+        file.setOriginalName("증빙" + id + ".pdf");
+        file.setByteSize(2048L);
+        file.setMimeType("application/pdf");
+        attachments.files.put(id, file);
+    }
+
+    private static ApprovalBoxDTO savedDraft(String content) {
+        ApprovalBoxDTO d = new ApprovalBoxDTO();
+        d.setApprovalDocumentId(DRAFT_ID);
+        d.setDocumentType("DOC_LEAVE");
+        d.setStatusCode("DRAFT");
+        d.setContent(content);
+        return d;
+    }
+
+    private void assertStatus(HttpStatus status, Executable call) {
+        assertEquals(status, assertThrows(ResponseStatusException.class, call).getStatus());
+    }
+
+    @Test
+    @DisplayName("임시저장: 필수 칸이 비어 있어도 문서 한 줄만 저장하고 결재선·상세·이력·알림은 만들지 않는다")
+    void draftSavesOnlyDocumentRow() {
+        ApprovalSubmitDTO dto = form("DOC_LEAVE", "", "");
+        dto.setFields(new ApprovalFieldsDTO());
+
+        Long id = draftService.saveDraft(user(), dto);
+
+        assertEquals(FakeDao.NEW_DOCUMENT_ID, id);
+        assertEquals("DRAFT", dao.insertedDraft.getStatusCode());
+        assertEquals(COMPANY_ID, dao.insertedDraft.getCompanyId());
+        assertEquals(MY_ID, dao.insertedDraft.getAuthorEmployeeId());
+        assertEquals("휴가 신청서", dao.insertedDraft.getTitle());
+        assertTrue(dao.savedNothing());
+        assertTrue(notification.requests.isEmpty());
+        assertTrue(attendance.submitCalls.isEmpty()); // 연차 잠금·계산을 하지 않는다
+    }
+
+    @Test
+    @DisplayName("임시저장: 입력값을 저장했다가 결재함 임시저장 탭에서 그대로 돌려받는다")
+    void draftRoundTripsThroughBox() {
+        addFile(9L, MY_ACCOUNT_ID);
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setOriginalDocumentId(42L);
+        dto.setFileIds(List.of(9L));
+        draftService.saveDraft(user(), dto);
+        ApprovalBoxDTO stored = savedDraft(dao.insertedDraft.getContent());
+        dao.draftDocuments = List.of(stored);
+
+        Map<String, List<ApprovalBoxDTO>> box = draftService.box(user());
+
+        assertEquals(List.of(stored), box.get("DRAFT"));
+        assertEquals("LV_FULL", stored.getFields().getLeaveType());
+        assertEquals("2026-11-10", stored.getFields().getFromDate());
+        assertEquals("개인 사정", stored.getFields().getReason());
+        assertEquals(List.of("1001", ""), stored.getLine());
+        assertEquals(42L, stored.getOriginalDocumentId());
+        assertEquals("증빙9.pdf", stored.getFiles().get(0).getName());
+        assertEquals("휴가 신청서 - 2026-11-10 ~ 2026-11-11", dao.insertedDraft.getTitle());
+    }
+
+    @Test
+    @DisplayName("임시저장: 입력값 JSON은 화면 응답에 나가지 않는다")
+    void draftContentIsNotSerialized() throws Exception {
+        ApprovalBoxDTO draft = savedDraft("{\"비밀\":\"값\"}");
+
+        String json = new ObjectMapper().writeValueAsString(draft);
+
+        assertFalse(json.contains("비밀"));
+    }
+
+    @Test
+    @DisplayName("임시저장: 저장 뒤 지워진 첨부는 빼고, 읽지 못하는 내용은 빈 칸으로 돌려준다")
+    void draftToleratesMissingFilesAndBadContent() {
+        addFile(9L, MY_ACCOUNT_ID);
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setFileIds(List.of(9L, 10L));
+        addFile(10L, MY_ACCOUNT_ID);
+        draftService.saveDraft(user(), dto);
+        attachments.files.remove(10L);
+        ApprovalBoxDTO stored = savedDraft(dao.insertedDraft.getContent());
+        ApprovalBoxDTO broken = savedDraft("JSON이 아님");
+        dao.draftDocuments = List.of(stored, broken);
+
+        draftService.box(user());
+
+        assertEquals(1, stored.getFiles().size());
+        assertTrue(broken.getLine().isEmpty());
+        assertTrue(broken.getFiles().isEmpty());
+        assertNull(broken.getFields().getReason());
+    }
+
+    @Test
+    @DisplayName("임시저장: 번호가 있으면 잠근 뒤 같은 문서를 고치고 새 문서를 만들지 않는다")
+    void draftUpdatesSameDocument() {
+        draftRow(MY_ID, "DRAFT");
+        ApprovalSubmitDTO dto = validEquipment();
+        dto.setDraftId(DRAFT_ID);
+
+        Long id = draftService.saveDraft(user(), dto);
+
+        assertEquals(DRAFT_ID, id);
+        assertNull(dao.insertedDraft);
+        assertEquals(DRAFT_ID, dao.updatedDraft.getApprovalDocumentId());
+        assertEquals("DOC_EQUIPMENT", dao.updatedDraft.getDocumentType());
+        assertEquals("장비 지급 신청서 - 노트북", dao.updatedDraft.getTitle());
+    }
+
+    @Test
+    @DisplayName("임시저장: 남의 문서·다른 업체 문서 번호는 404, 이미 제출한 문서는 409로 거절한다")
+    void draftRejectsForeignOrSubmitted() {
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setDraftId(DRAFT_ID);
+
+        draftRow(999L, "DRAFT");
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.saveDraft(user(), dto));
+
+        draftRow(MY_ID, "DRAFT").setCompanyId(2L);
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.saveDraft(user(), dto));
+
+        draftRow(MY_ID, "IN_PROGRESS");
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.saveDraft(user(), dto));
+        assertNull(dao.updatedDraft);
+    }
+
+    @Test
+    @DisplayName("임시저장: 잠근 뒤 고친 행이 없으면 409로 거절한다")
+    void draftUpdateConflict() {
+        draftRow(MY_ID, "DRAFT");
+        dao.draftWriteResult = 0;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setDraftId(DRAFT_ID);
+
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.saveDraft(user(), dto));
+    }
+
+    @Test
+    @DisplayName("임시저장: 없는 양식, 남이 올린 첨부, 6개 첨부, 너무 긴 내용은 저장하지 않는다")
+    void draftRejectsBadInput() {
+        ApprovalSubmitDTO badForm = form("DOC_UNKNOWN", "");
+        badForm.setFields(new ApprovalFieldsDTO());
+        assertThrows(IllegalArgumentException.class, () -> draftService.saveDraft(user(), badForm));
+
+        addFile(9L, 999L);
+        ApprovalSubmitDTO othersFile = validLeave();
+        othersFile.setFileIds(List.of(9L));
+        assertStatus(HttpStatus.FORBIDDEN, () -> draftService.saveDraft(user(), othersFile));
+
+        ApprovalSubmitDTO tooMany = validLeave();
+        tooMany.setFileIds(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+        assertStatus(HttpStatus.BAD_REQUEST, () -> draftService.saveDraft(user(), tooMany));
+
+        ApprovalSubmitDTO tooLong = leave("LV_FULL", "", "", "가".repeat(9000));
+        assertThrows(IllegalArgumentException.class, () -> draftService.saveDraft(user(), tooLong));
+
+        assertNull(dao.insertedDraft);
+    }
+
+    @Test
+    @DisplayName("임시저장 제출: 같은 번호를 DRAFT에서 진행으로 바꾸고 결재선·상세·이력·알림을 이때 만든다")
+    void submitDraftTurnsSameDocumentInProgress() {
+        draftRow(MY_ID, "DRAFT");
+        addFile(9L, MY_ACCOUNT_ID);
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setDraftId(DRAFT_ID);
+        dto.setFileIds(List.of(9L));
+
+        Long id = draftService.submit(user(), dto);
+
+        assertEquals(DRAFT_ID, id);
+        assertNull(dao.document); // 새 문서를 만들지 않는다
+        assertEquals("IN_PROGRESS", dao.submittedDraft.getStatusCode());
+        assertEquals("개인 사정", dao.submittedDraft.getContent()); // JSON이 실제 내용으로 바뀐다
+        assertEquals(DRAFT_ID, dao.steps.get(0).getApprovalDocumentId());
+        assertEquals(DRAFT_ID, dao.leave.getApprovalDocumentId());
+        assertEquals("DRAFT", dao.history.getBeforeStatus());
+        assertEquals("IN_PROGRESS", dao.history.getAfterStatus());
+        assertEquals(1, notification.requests.size());
+        assertEquals(List.of(9L), attachments.attached);
+    }
+
+    @Test
+    @DisplayName("임시저장 제출: 재기안 임시저장은 제출할 때 원본 조건을 다시 보고 원본 번호를 저장한다")
+    void submitDraftRechecksRedraftOriginal() {
+        draftRow(MY_ID, "DRAFT");
+        ApprovalDocumentDTO original = new ApprovalDocumentDTO();
+        original.setApprovalDocumentId(42L);
+        original.setCompanyId(COMPANY_ID);
+        original.setAuthorEmployeeId(MY_ID);
+        original.setStatusCode("REJECTED");
+        original.setDocumentType("DOC_LEAVE");
+        dao.originalDocument = original;
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setDraftId(DRAFT_ID);
+        dto.setOriginalDocumentId(42L);
+
+        draftService.submit(user(), dto);
+        assertEquals(42L, dao.submittedDraft.getOriginalDocumentId());
+
+        dao.redraftCount = 1;
+        dao.submittedDraft = null;
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.submit(user(), dto));
+        assertNull(dao.submittedDraft);
+    }
+
+    @Test
+    @DisplayName("임시저장 제출: 남의 문서 404, 이미 제출한 문서 409, 그사이 상태가 바뀌면 409로 거절한다")
+    void submitDraftRejectsForeignOrSubmitted() {
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setDraftId(DRAFT_ID);
+
+        draftRow(999L, "DRAFT");
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.submit(user(), dto));
+
+        draftRow(MY_ID, "IN_PROGRESS");
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.submit(user(), dto));
+        assertTrue(dao.savedNothing());
+
+        draftRow(MY_ID, "DRAFT");
+        dao.draftWriteResult = 0;
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.submit(user(), dto));
+        assertTrue(dao.steps.isEmpty());
+        assertTrue(notification.requests.isEmpty());
+    }
+
+    @Test
+    @DisplayName("임시저장 제출: 필수 칸이 비었거나 연차가 모자라면 평소 제출처럼 거절하고 문서는 DRAFT로 둔다")
+    void submitDraftRunsNormalChecks() {
+        draftRow(MY_ID, "DRAFT");
+        ApprovalSubmitDTO blank = leave("LV_FULL", "2026-11-10", "2026-11-11", " ");
+        blank.setDraftId(DRAFT_ID);
+        assertThrows(IllegalArgumentException.class, () -> draftService.submit(user(), blank));
+
+        attendance.remaining = BigDecimal.ONE;
+        ApprovalSubmitDTO noLeave = validLeave();
+        noLeave.setDraftId(DRAFT_ID);
+        assertThrows(IllegalArgumentException.class, () -> draftService.submit(user(), noLeave));
+
+        assertNull(dao.submittedDraft);
+    }
+
+    @Test
+    @DisplayName("임시저장 삭제: 내 임시저장 문서만 지우고 남의 문서는 404, 제출한 문서는 409")
+    void deleteDraftOnlyMine() {
+        draftRow(999L, "DRAFT");
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.deleteDraft(user(), DRAFT_ID));
+
+        draftRow(MY_ID, "APPROVED");
+        assertStatus(HttpStatus.CONFLICT, () -> draftService.deleteDraft(user(), DRAFT_ID));
+        assertNull(dao.deletedDraft);
+
+        draftRow(MY_ID, "DRAFT");
+        draftService.deleteDraft(user(), DRAFT_ID);
+        assertEquals(List.of(COMPANY_ID, MY_ID, DRAFT_ID), dao.deletedDraft);
+    }
+    
+
+    // ---------- 결재 첨부 (상신·내려받기) ----------
+
+    @Test
+    @DisplayName("결재 첨부: 상신할 때 내가 올린 파일을 문서에 붙이고, 같은 번호는 한 번만 붙인다")
+    void submitLinksMyFiles() {
+        addFile(9L, MY_ACCOUNT_ID);
+        ApprovalSubmitDTO dto = validLeave();
+        dto.setFileIds(List.of(9L, 9L));
+
+        draftService.submit(user(), dto);
+
+        assertEquals(List.of(9L), attachments.attached);
+    }
+
+    @Test
+    @DisplayName("결재 첨부: 남이 올린 파일, 우리 업체에 없는 파일, 6개 첨부는 상신하지 않는다")
+    void submitRejectsBadFiles() {
+        addFile(9L, 999L); // 다른 사람이 올린 파일
+        ApprovalSubmitDTO othersFile = validLeave();
+        othersFile.setFileIds(List.of(9L));
+        assertStatus(HttpStatus.FORBIDDEN, () -> draftService.submit(user(), othersFile));
+
+        ApprovalSubmitDTO unknownFile = validLeave();
+        unknownFile.setFileIds(List.of(404L)); // 다른 업체 파일이거나 없는 번호
+        assertThrows(IllegalArgumentException.class, () -> draftService.submit(user(), unknownFile));
+
+        ApprovalSubmitDTO tooMany = validLeave();
+        tooMany.setFileIds(List.of(1L, 2L, 3L, 4L, 5L, 6L));
+        assertStatus(HttpStatus.BAD_REQUEST, () -> draftService.submit(user(), tooMany));
+
+        assertTrue(attachments.attached.isEmpty());
+    }
+
+    @Test
+    @DisplayName("결재 첨부: 결재함에 보이지 않는 문서의 첨부는 404로 내려주지 않는다")
+    void downloadHiddenFileIsNotFound() {
+        addFile(9L, MY_ACCOUNT_ID);
+
+        dao.boxFileCount = 0;
+        assertStatus(HttpStatus.NOT_FOUND, () -> draftService.getFile(user(), 5L, 9L));
+
+        dao.boxFileCount = 1;
+        assertEquals("증빙9.pdf", draftService.getFile(user(), 5L, 9L).getOriginalName());
     }
 }

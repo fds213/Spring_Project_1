@@ -38,6 +38,68 @@
                 #{title}, #{content}, #{statusCode}, CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP))
     </insert>
 
+    <!-- ===== 임시저장: 문서 한 줄에 입력값 JSON만 담는다. 결재선·상세·이력은 제출할 때 만든다 ===== -->
+
+    <insert id="insertDraft" parameterType="com.ieum.gw.dto.ApprovalDocumentDTO">
+        <selectKey keyProperty="approvalDocumentId" resultType="long" order="BEFORE">
+            SELECT sq_approval_document.NEXTVAL FROM dual
+        </selectKey>
+        INSERT INTO approval_document (approval_document_id, company_id, author_employee_id, document_type,
+                                       title, content, status_code)
+        VALUES (#{approvalDocumentId}, #{companyId}, #{authorEmployeeId}, #{documentType},
+                #{title}, #{content,jdbcType=CLOB}, #{statusCode})
+    </insert>
+
+    <update id="updateDraft" parameterType="com.ieum.gw.dto.ApprovalDocumentDTO">
+        <bind name="docDraft" value="@com.ieum.gw.code.ApprovalDocumentStatus@DRAFT.name()"/>
+        UPDATE approval_document
+        SET document_type = #{documentType},
+            title = #{title},
+            content = #{content,jdbcType=CLOB},
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{approvalDocumentId}
+          AND author_employee_id = #{authorEmployeeId}
+          AND status_code = #{docDraft}
+    </update>
+
+    <!-- 제출: 임시저장 문서를 결재 중으로 바꾼다. 내용 칸의 JSON도 실제 내용으로 바뀐다 -->
+    <update id="submitDraft" parameterType="com.ieum.gw.dto.ApprovalDocumentDTO">
+        <bind name="docDraft" value="@com.ieum.gw.code.ApprovalDocumentStatus@DRAFT.name()"/>
+        UPDATE approval_document
+        SET original_document_id = #{originalDocumentId,jdbcType=NUMERIC},
+            document_type = #{documentType},
+            title = #{title},
+            content = #{content,jdbcType=CLOB},
+            status_code = #{statusCode},
+            submitted_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
+            updated_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{approvalDocumentId}
+          AND author_employee_id = #{authorEmployeeId}
+          AND status_code = #{docDraft}
+    </update>
+
+    <delete id="deleteDraft">
+        <bind name="docDraft" value="@com.ieum.gw.code.ApprovalDocumentStatus@DRAFT.name()"/>
+        DELETE FROM approval_document
+        WHERE company_id = #{companyId}
+          AND approval_document_id = #{documentId}
+          AND author_employee_id = #{employeeId}
+          AND status_code = #{docDraft}
+    </delete>
+
+    <select id="selectDraftDocuments" resultType="com.ieum.gw.dto.ApprovalBoxDTO">
+        <bind name="docDraft" value="@com.ieum.gw.code.ApprovalDocumentStatus@DRAFT.name()"/>
+        SELECT approval_document_id, author_employee_id, document_type, title, status_code, content,
+               TO_CHAR(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS saved_at
+        FROM approval_document
+        WHERE company_id = #{companyId}
+          AND author_employee_id = #{employeeId}
+          AND status_code = #{docDraft}
+        ORDER BY updated_at DESC, approval_document_id DESC
+    </select>
+
     <!-- 결재선 한 단계. 번호는 DB 기본값(sq_approval_step), 상태는 기본값 WAITING -->
     <insert id="insertStep" parameterType="com.ieum.gw.dto.ApprovalStepDTO">
         INSERT INTO approval_step (company_id, approval_document_id, step_no, approver_employee_id)
@@ -319,13 +381,15 @@
         ORDER BY f.approval_document_id, f.created_at, a.attachment_id
     </select>
 
-    <!-- 내려받기 권한: 결재함에 보이는 문서에 붙은 파일이면 1 -->
+    <!-- 내려받기 권한: 결재함에 보이는 문서에 붙은, 지워지지 않은 파일이면 1 (selectBoxFiles와 같은 조건) -->
     <select id="countBoxFile" resultType="int">
         SELECT COUNT(*)
         FROM approval_file f
                  JOIN approval_document ad ON ad.company_id = f.company_id AND ad.approval_document_id = f.approval_document_id
+                 JOIN attachment a ON a.company_id = f.company_id AND a.attachment_id = f.attachment_id
         WHERE <include refid="boxRelated"/>
           AND f.approval_document_id = #{documentId}
           AND f.attachment_id = #{attachmentId}
+          AND a.status_code != 'FILE_REMOVED'
     </select>
 </mapper>
