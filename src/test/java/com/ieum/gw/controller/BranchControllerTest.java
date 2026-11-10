@@ -16,6 +16,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.servlet.view.InternalResourceViewResolver;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ieum.gw.dao.BranchDAO;
 import com.ieum.gw.dto.AuthEmpDTO;
@@ -160,6 +161,22 @@ class BranchControllerTest {
         assertTrue(body.get("success").asBoolean());
         assertEquals(13L, body.get("data").get(0).get("branchId").asLong());
         assertEquals("본사", body.get("data").get(0).get("branchName").asText());
+    }
+
+    @Test
+    @DisplayName("지점 관리 화면 주소는 관리 화면 JSP를 고르고 지점을 조회하지 않는다")
+    void opensAdminBranchScreen() throws Exception {
+        InternalResourceViewResolver views = new InternalResourceViewResolver();
+        views.setPrefix("/WEB-INF/views/");
+        views.setSuffix(".jsp");
+        MockMvc page = MockMvcBuilders.standaloneSetup(new BranchController(service))
+                .setViewResolvers(views).build();
+
+        var response = page.perform(get("/location/admin/branch")).andReturn().getResponse();
+
+        assertEquals(200, response.getStatus());
+        assertEquals("/WEB-INF/views/location/admin/branch.jsp", response.getForwardedUrl());
+        assertNull(adminCompanyId);
     }
 
     @Test
