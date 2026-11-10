@@ -301,7 +301,7 @@ class ApprovalServiceTest {
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
     private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null), new TicketService(null));
+            new ScheduleService(null, null), new TicketService(null, branch));
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();
@@ -1143,7 +1143,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null));
+                new ScheduleService(null, null), new TicketService(null, branch));
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));
@@ -1162,7 +1162,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null));
+                new ScheduleService(null, null), new TicketService(null, branch));
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));

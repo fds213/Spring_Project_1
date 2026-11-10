@@ -76,12 +76,13 @@ class ApprovalOracleIT {
         ReflectionTestUtils.setField(employees, "dao", new EmployeeDAO(session.getMapper(EmployeeMapper.class)));
         ReflectionTestUtils.setField(employees, "passwordEncoder", new BCryptPasswordEncoder());
         ReflectionTestUtils.setField(employees, "attendanceService", attendance);
+        BranchService branches = transactional(new BranchService(new BranchDAO(session.getMapper(BranchMapper.class))));
         approval = transactional(new ApprovalService(employees, attendance,
                 new ApprovalDAO(session.getMapper(ApprovalMapper.class)),
-                new BranchService(new BranchDAO(session.getMapper(BranchMapper.class))),
+                branches,
                 new NotificationService(new NotificationDAO(session.getMapper(NotificationMapper.class))),
                 transactional(new ScheduleService(new ScheduleDAO(session.getMapper(ScheduleMapper.class)), attendance)),
-                transactional(new TicketService(new TicketDAO(session.getMapper(TicketMapper.class))))));
+                transactional(new TicketService(new TicketDAO(session.getMapper(TicketMapper.class)), branches))));
         author = user("20260002");
         first = user("20260001");
         second = user("20260004");

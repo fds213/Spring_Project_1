@@ -127,7 +127,7 @@ class ApprovalDecisionServiceTest {
     private RuntimeException scheduleError;
     private RuntimeException ticketError;
     private final List<List<Object>> ticketRequests = new ArrayList<>();
-    private final TicketService tickets = new TicketService(null) {
+    private final TicketService tickets = new TicketService(null, null) {
         @Override public Long createEquipmentTicket(Long companyId, Long requesterEmployeeId, Long documentId,
                                                     Long branchId, String assetType, String purpose) {
             calls.add("createTicket");

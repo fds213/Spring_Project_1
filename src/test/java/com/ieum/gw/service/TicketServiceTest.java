@@ -8,6 +8,7 @@ import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.IllegalTransactionStateException;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.AnnotationTransactionAttributeSource;
@@ -15,6 +16,8 @@ import org.springframework.transaction.interceptor.TransactionInterceptor;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
 import org.springframework.transaction.support.DefaultTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
+import com.ieum.gw.dao.BranchDAO;
 import com.ieum.gw.dao.TicketDAO;
 import com.ieum.gw.dto.EquipmentTicketDTO;
 
@@ -50,6 +53,23 @@ class TicketServiceTest {
         }
     }
 
+    private String branchUseYn = "Y";
+    private final BranchService branches = new BranchService(new BranchDAO(null) {
+        @Override
+        public Long lockBranch(Long companyId, Long branchId) {
+            assertEquals(7L, companyId);
+            assertEquals(13L, branchId);
+            return branchId;
+        }
+
+        @Override
+        public String selectBranchUseYn(Long companyId, Long branchId) {
+            assertEquals(7L, companyId);
+            assertEquals(13L, branchId);
+            return branchUseYn;
+        }
+    });
+
     private Long create(TicketService service) {
         return service.createEquipmentTicket(7L, 9L, 11L, 13L, "AT_LAPTOP", "개발 업무");
     }
@@ -66,7 +86,7 @@ class TicketServiceTest {
         dao.existing.setBranchId(13L);
         dao.existing.setContent("개발 업무");
 
-        Long ticketId = create(new TicketService(dao));
+        Long ticketId = create(new TicketService(dao, branches));
 
         assertEquals(101L, ticketId);
         assertEquals(1, dao.calls);
@@ -84,7 +104,7 @@ class TicketServiceTest {
         dao.existing.setBranchId(13L);
         dao.existing.setContent("개발 업무");
 
-        Long ticketId = create(new TicketService(dao));
+        Long ticketId = create(new TicketService(dao, branches));
 
         assertEquals(202L, ticketId);
         assertEquals(1, dao.calls);
@@ -95,19 +115,19 @@ class TicketServiceTest {
     void rejectsMismatchedDuplicate() {
         FakeDAO dao = new FakeDAO();
         dao.result = 0;
-        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
         dao.existing = new EquipmentTicketDTO();
         dao.existing.setItTicketId(202L);
         dao.existing.setRequesterEmployeeId(99L);
         dao.existing.setBranchId(13L);
         dao.existing.setContent("개발 업무");
-        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
         dao.existing.setRequesterEmployeeId(9L);
         dao.existing.setBranchId(99L);
-        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
         dao.existing.setBranchId(13L);
         dao.existing.setContent("다른 목적");
-        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+        assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
     }
 
     @Test
@@ -116,7 +136,7 @@ class TicketServiceTest {
         for (int inserted : new int[] {1, 0}) {
             FakeDAO dao = new FakeDAO();
             dao.result = inserted;
-            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
         }
     }
 
@@ -128,7 +148,7 @@ class TicketServiceTest {
                 FakeDAO dao = new FakeDAO();
                 dao.result = inserted;
                 dao.existing = matchingTicket(id);
-                assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+                assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
             }
         }
     }
@@ -140,7 +160,7 @@ class TicketServiceTest {
             FakeDAO dao = new FakeDAO();
             dao.result = inserted;
             dao.existing = matchingTicket(101L);
-            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao)));
+            assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches)));
         }
     }
 
@@ -156,7 +176,7 @@ class TicketServiceTest {
     @Test
     @DisplayName("잘못된 ID·장비 종류·사용 목적은 저장 전에 거절한다")
     void validatesInput() {
-        TicketService service = new TicketService(null);
+        TicketService service = new TicketService(null, branches);
         for (Long id : new Long[] {null, 0L, -1L}) {
             assertThrows(IllegalArgumentException.class, () -> service.createEquipmentTicket(id, 9L, 11L, 13L, "AT_LAPTOP", "목적"));
             assertThrows(IllegalArgumentException.class, () -> service.createEquipmentTicket(7L, id, 11L, 13L, "AT_LAPTOP", "목적"));
@@ -176,7 +196,7 @@ class TicketServiceTest {
     void propagatesDatabaseError() {
         FakeDAO dao = new FakeDAO();
         dao.error = new IllegalStateException("저장 실패");
-        assertSame(dao.error, assertThrows(IllegalStateException.class, () -> create(new TicketService(dao))));
+        assertSame(dao.error, assertThrows(IllegalStateException.class, () -> create(new TicketService(dao, branches))));
     }
 
     @Test
@@ -214,7 +234,7 @@ class TicketServiceTest {
     }
 
     private TicketService proxy(FakeDAO dao, FakeTransactions transactions) {
-        ProxyFactory factory = new ProxyFactory(new TicketService(dao));
+        ProxyFactory factory = new ProxyFactory(new TicketService(dao, branches));
         factory.addAdvice(new TransactionInterceptor(transactions, new AnnotationTransactionAttributeSource()));
         return (TicketService) factory.getProxy();
     }
@@ -239,6 +259,37 @@ class TicketServiceTest {
         assertEquals(1, transactions.begins);
         assertEquals(1, transactions.commits);
         assertEquals(0, transactions.rollbacks);
+    }
+
+    @Test
+    @DisplayName("중지된 지점의 신규 지급 티켓은 저장하지 않고 결재 트랜잭션을 롤백한다")
+    void rejectsNewTicketAtDisabledBranch() {
+        branchUseYn = "N";
+        FakeDAO dao = new FakeDAO();
+        FakeTransactions transactions = new FakeTransactions();
+        TicketService service = proxy(dao, transactions);
+
+        var error = assertThrows(ResponseStatusException.class,
+                () -> new TransactionTemplate(transactions).execute(status -> create(service)));
+
+        assertEquals(HttpStatus.CONFLICT, error.getStatus());
+        assertEquals(0, dao.calls);
+        assertEquals(0, transactions.commits);
+        assertEquals(1, transactions.rollbacks);
+    }
+
+    @Test
+    @DisplayName("수령 지점이 중지돼도 기존 지급 티켓은 정보가 일치할 때만 같은 ID를 반환한다")
+    void retriesExistingTicketAtDisabledBranch() {
+        branchUseYn = "N";
+        FakeDAO dao = new FakeDAO();
+        dao.existing = matchingTicket(202L);
+        TicketService service = new TicketService(dao, branches);
+
+        assertEquals(202L, create(service));
+        dao.existing.setBranchId(99L);
+        assertThrows(IllegalStateException.class, () -> create(service));
+        assertEquals(0, dao.calls);
     }
 
     @Test
