@@ -83,6 +83,62 @@
         ORDER BY created_at, ticket_history_id
     </select>
     
+    <!-- 같은 업체의 제목 검색 결과에 기존 상태 탭 조건을 적용한다. -->
+    <sql id="adminTicketSearch">
+        <bind name="received" value="@com.ieum.gw.code.TicketStatus@RECEIVED.name()"/>
+        <bind name="inProgress" value="@com.ieum.gw.code.TicketStatus@IN_PROGRESS.name()"/>
+        <bind name="resolved" value="@com.ieum.gw.code.TicketStatus@RESOLVED.name()"/>
+        <bind name="closed" value="@com.ieum.gw.code.TicketStatus@CLOSED.name()"/>
+        <bind name="canceled" value="@com.ieum.gw.code.TicketStatus@CANCELED.name()"/>
+        <bind name="rejected" value="@com.ieum.gw.code.TicketStatus@REJECTED.name()"/>
+
+        WITH admin_tickets AS (
+            SELECT it_ticket_id AS id, requester_employee_id AS requester_id,
+                   assignee_employee_id AS assignee_id, branch_id,
+                   ticket_type AS type, status_code AS status, title, created_at AS at,
+                   CASE WHEN status_code = #{received} AND assignee_employee_id IS NULL
+                        THEN 1 ELSE 0 END AS is_unassigned,
+                   CASE WHEN assignee_employee_id = #{employeeId}
+                             AND status_code NOT IN (#{closed}, #{canceled}, #{rejected})
+                        THEN 1 ELSE 0 END AS is_mine,
+                   CASE WHEN status_code = #{inProgress} THEN 1 ELSE 0 END AS is_in_progress,
+                   CASE WHEN status_code = #{resolved} THEN 1 ELSE 0 END AS is_resolved
+            FROM it_ticket
+            WHERE company_id = #{companyId}
+            <if test="keyword != null and keyword != ''">
+                AND INSTR(LOWER(title), LOWER(#{keyword})) > 0
+            </if>
+        )
+    </sql>
+
+    <!-- 제목 검색 결과에서 각 상태 탭에 해당하는 티켓 건수를 센다. -->
+    <select id="countAdminTicketTabs" resultType="com.ieum.gw.dto.TicketAdminCountsDTO">
+        <include refid="adminTicketSearch"/>
+        SELECT COUNT(CASE WHEN is_unassigned = 1 THEN 1 END) AS unassigned_count,
+               COUNT(CASE WHEN is_mine = 1 THEN 1 END) AS mine_count,
+               COUNT(CASE WHEN is_in_progress = 1 THEN 1 END) AS in_progress_count,
+               COUNT(CASE WHEN is_resolved = 1 THEN 1 END) AS resolved_count,
+               COUNT(*) AS all_count
+        FROM admin_tickets
+    </select>
+
+    <!-- 검색 결과에서 선택한 상태 탭의 티켓을 한 페이지 조회한다. -->
+    <select id="selectAdminTicketPage" resultType="com.ieum.gw.dto.TicketWorkDTO">
+        <include refid="adminTicketSearch"/>
+        SELECT id, requester_id, assignee_id, branch_id, type, status, title, at
+        FROM admin_tickets
+        <where>
+            <choose>
+                <when test="filter == 'UNASSIGNED'">is_unassigned = 1</when>
+                <when test="filter == 'MINE'">is_mine = 1</when>
+                <when test="filter == 'IN_PROGRESS'">is_in_progress = 1</when>
+                <when test="filter == 'RESOLVED'">is_resolved = 1</when>
+            </choose>
+        </where>
+        ORDER BY at DESC, id DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
     <!-- 티켓과 첨부파일의 연결을 저장한다. -->
     <insert id="insertTicketFile">
         INSERT INTO ticket_file (company_id, it_ticket_id, attachment_id)

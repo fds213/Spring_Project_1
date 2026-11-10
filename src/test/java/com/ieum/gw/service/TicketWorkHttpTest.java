@@ -32,6 +32,51 @@ class TicketWorkHttpTest {
         LoginUser u=TicketWorkServiceTest.user(1L,employee,role);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(u,"",u.getAuthorities()));
     }
+
+    @Test
+    @DisplayName("관리자 목록은 기존 응답을 유지하고 검색 요청에는 페이지 정보를 추가한다")
+    void adminListSupportsLegacyAndSearchRequests() throws Exception {
+        login("ROLE_IT", 3L);
+        String url = "/ticket/admin/api/tickets";
+        ObjectMapper json = new ObjectMapper();
+
+        var legacy = mvc.perform(get(url).param("filter", "ALL")).andReturn().getResponse();
+        assertEquals(200, legacy.getStatus());
+        JsonNode legacyData = json.readTree(legacy.getContentAsByteArray()).path("data");
+        assertEquals(2, legacyData.size());
+        assertEquals(1, legacyData.path("items").size());
+        assertEquals(1, legacyData.path("counts").path("ALL").asInt());
+        assertNull(fixture.rows.countArguments);
+
+        fixture.rows.adminCounts.setAllCount(21L);
+        var paged = mvc.perform(get(url).param("filter", "ALL").param("page", "2")
+                .param("keyword", "장애").param("companyId", "999").param("employeeId", "999"))
+                .andReturn().getResponse();
+        assertEquals(200, paged.getStatus());
+        JsonNode data = json.readTree(paged.getContentAsByteArray()).path("data");
+        assertEquals(2, data.path("page").asInt());
+        assertEquals(2, data.path("pages").asInt());
+        assertEquals(21, data.path("total").asInt());
+        assertEquals(21, data.path("counts").path("ALL").asInt());
+        assertEquals(legacyData.path("items"), data.path("items"));
+        assertEquals(java.util.List.of(1L, 3L, "장애", "ALL", 20L, 20), fixture.rows.pageArguments);
+    }
+
+    @Test
+    @DisplayName("관리자 검색은 일반 직원과 잘못된 탭·페이지 요청을 DB 조회 전에 거절한다")
+    void adminSearchRejectsUnauthorizedAndInvalidRequests() throws Exception {
+        String url = "/ticket/admin/api/tickets";
+        login("ROLE_EMP", 2L);
+        assertEquals(403, mvc.perform(get(url).param("page", "1")).andReturn().getResponse().getStatus());
+
+        login("ROLE_ADMIN", 3L);
+        assertEquals(400, mvc.perform(get(url).param("page", "abc")).andReturn().getResponse().getStatus());
+        assertEquals(400, mvc.perform(get(url).param("filter", "UNKNOWN").param("page", "1"))
+                .andReturn().getResponse().getStatus());
+        assertNull(fixture.rows.countArguments);
+        assertNull(fixture.rows.pageArguments);
+    }
+
     @Test @DisplayName("접수 HTTP 응답에는 숫자 id가 있고 위조 업체·작성자 대신 인증 정보를 저장한다")
     void create() throws Exception {
         login("ROLE_EMP",2L);

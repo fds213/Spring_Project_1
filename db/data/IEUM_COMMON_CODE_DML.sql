@@ -1,4 +1,4 @@
--- 2026-11-06: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 232개 INSERT.
+-- 2026-11-06: 전달문에서 사용 대상으로 지정한 코드 12개를 Y로 반영. 신규 적재용 233개 INSERT.
 -- 기존 DB에는 patches/11-02_02_DATA_PATCH.sql을 사용한다. 일부 적재된 DB에 이 파일 전체를 재실행하지 않는다.
 -- 대상: Oracle / COMMON_CODE
 -- 출처: https://docs.google.com/spreadsheets/d/1qBiMeyeUHtTa1W2TPY9VwphQEKBTNFclOThhCXRFbo0/edit
@@ -387,6 +387,8 @@ BEGIN
     VALUES ('NT_ATT_CORRECTION_REQUEST', 'NOTIFICATION_TYPE', '근태 정정 요청', '처리할 근태 정정 요청이 왔음을 부서장·업체 관리자에게 알리는 알림', 'Y', 6);
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
     VALUES ('NT_ATT_CORRECTION_DONE', 'NOTIFICATION_TYPE', '근태 정정 처리', '근태 정정 요청의 승인·반려 결과를 직원에게 알리는 알림', 'Y', 7);
+    INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)
+    VALUES ('NT_SUPPORT_REPLY', 'NOTIFICATION_TYPE', '이음 문의 답변', '운영자가 이음 장애 문의에 답변했음을 문의한 직원에게 알리는 알림', 'Y', 8);
     -- FILE_STATUS : 첨부 파일 상태
     -- 원본 시트 115행
     INSERT INTO COMMON_CODE (CODE, PARENT_CODE, CODE_NAME, DESCRIPTION, USE_YN, SORT_ORDER)

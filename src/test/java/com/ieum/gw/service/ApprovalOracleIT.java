@@ -82,7 +82,9 @@ class ApprovalOracleIT {
                 branches,
                 new NotificationService(new NotificationDAO(session.getMapper(NotificationMapper.class))),
                 transactional(new ScheduleService(new ScheduleDAO(session.getMapper(ScheduleMapper.class)), attendance)),
-                transactional(new TicketService(new TicketDAO(session.getMapper(TicketMapper.class)), branches))));
+
+                transactional(new TicketService(new TicketDAO(session.getMapper(TicketMapper.class)))), null));
+
         author = user("20260002");
         first = user("20260001");
         second = user("20260004");

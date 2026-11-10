@@ -165,7 +165,7 @@ class ApprovalDecisionServiceTest {
         }
     };
     private final ApprovalService service = new ApprovalService(employee,
-            attendance, dao, new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets);
+            attendance, dao, new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets, null);
 
     ApprovalDecisionServiceTest() {
         dao.document = new ApprovalDocumentDTO();
@@ -760,7 +760,7 @@ class ApprovalDecisionServiceTest {
             }
         };
         ApprovalService batch = new ApprovalService(employee, attendance, multiple,
-                new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets);
+                new ApprovalServiceTest.FakeBranch(), notification, schedule, tickets, null);
         assertEquals(2, batch.rejectWaitingForRetired(1L, 100L));
         assertEquals(List.of(10L, 20L, 30L, 40L), locked);
         assertEquals(List.of(10L, 20L), histories.stream()

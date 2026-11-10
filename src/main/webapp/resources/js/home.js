@@ -20,6 +20,7 @@ function openHome() {
   homeApproval();
   homeTicket();
   homeLeave();
+  homeAsset();
   homeWeek();
   homeNotices();
 }
@@ -80,6 +81,19 @@ function homeLeave() {
     }
     homeEl('homeLeave').replaceChildren(homeDays(sum.left), span('일', 'unit'));
     homeEl('homeLeaveSub').textContent = Number(sum.pendingDays) > 0 ? `신청 중 ${homeDays(Number(sum.pendingDays))}일` : '';
+  });
+}
+
+// 내 장비: 나에게 지급되어 아직 회수하지 않은 장비 수(내 장비 화면의 '사용 중'과 같은 목록이라 단위도 '개').
+// 목록은 최근에 받은 순서라 아랫줄에 가장 최근 장비를 보인다
+function homeAsset() {
+  api.get('/asset/api/assets/assigned').done(items => {
+    const list = items || [];
+    homeCount('homeAsset', list.length, '개', false);
+    const first = list[0];
+    homeEl('homeAssetSub').textContent = first
+      ? `${first.assetName || first.assetNo || '장비'}${list.length > 1 ? ` 외 ${list.length - 1}개` : ''}`
+      : '';
   });
 }
 

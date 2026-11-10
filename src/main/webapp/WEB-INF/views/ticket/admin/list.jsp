@@ -14,6 +14,9 @@
     <script>openTicketAdmin();</script>
   </jsp:attribute>
   <jsp:body>
+    <%-- 장애 사진 보기 (#197), 검색·쪽 번호 (#202) --%>
+    <link rel="stylesheet" href="${ctx}/resources/css/ticket/photo.css">
+    <link rel="stylesheet" href="${ctx}/resources/css/ticket/admin.css">
     <section class="view on" id="view-ticket-admin">
       <div class="page-head"><h1>티켓 처리</h1></div>
       <p class="muted join-scope">IT 담당자는 미배정 티켓을 맡아 처리하고, 관리자는 담당자를 정하거나 바꿉니다. 처리 완료 티켓은 요청자가 확인하면 종료됩니다.</p>
@@ -27,12 +30,20 @@
         <button type="button" class="card card-filter" data-filter="ALL" aria-pressed="false"><small>전체</small><strong id="taCntALL">-</strong></button>
       </div>
 
+      <%-- 제목 검색: 칠 때마다(0.25초 멈추면) 서버에 다시 묻는다. 카드 건수도 검색어 기준으로 바뀐다 --%>
+      <form class="search-row" id="taSearchForm" role="search">
+        <input type="search" class="search-input" id="taSearch" maxlength="200" placeholder="제목으로 검색" aria-label="티켓 제목 검색" autocomplete="off">
+        <span class="inq-hint" id="taSearchInfo" role="status"></span>
+      </form>
+
       <section class="info-card table-gap">
         <div class="table-wrap"><table class="table">
           <thead><tr><th>번호</th><th>구분</th><th>제목</th><th>요청자</th><th>접수 지점</th><th>담당자</th><th>상태</th><th>접수일</th></tr></thead>
           <tbody id="taList"></tbody>
         </table></div>
       </section>
+      <%-- 쪽 번호: 한 쪽에 20건(서버가 정한다). 한 쪽뿐이면 숨긴다 --%>
+      <nav class="pager" id="taPager" aria-label="페이지" hidden></nav>
     </section>
   </jsp:body>
 </ui:layout>

@@ -36,6 +36,46 @@ class TicketWorkMapperTest {
     }
 
     @Test
+    @DisplayName("관리자 검색의 건수와 목록 SQL은 업체·제목 조건을 공유하고 선택한 탭만 페이징한다")
+    void adminSearchBinding() throws Exception {
+        Configuration config = new Configuration();
+        String resource = "mapper/TicketWorkMapper.xml";
+        try (var input = getClass().getResourceAsStream("/" + resource)) {
+            new XMLMapperBuilder(input, config, resource, config.getSqlFragments()).parse();
+        }
+
+        String namespace = TicketWorkMapper.class.getName() + ".";
+        Map<String, Object> parameters = new HashMap<>(Map.of(
+                "companyId", 1L, "employeeId", 3L, "keyword", "노트북_%", "offset", 20L, "size", 20));
+        var count = config.getMappedStatement(namespace + "countAdminTicketTabs").getBoundSql(parameters);
+        String countSql = count.getSql().replaceAll("\\s+", " ").strip();
+        assertTrue(countSql.startsWith("WITH admin_tickets AS ("));
+        assertTrue(countSql.contains("WHERE company_id = ? AND INSTR(LOWER(title), LOWER(?)) > 0"));
+        assertFalse(countSql.contains("노트북_%"));
+        assertEquals("RECEIVED", count.getAdditionalParameter("received"));
+        assertEquals("CLOSED", count.getAdditionalParameter("closed"));
+        String sharedQuery = countSql.substring(0, countSql.indexOf("SELECT COUNT("));
+
+        var statement = config.getMappedStatement(namespace + "selectAdminTicketPage");
+        Map<String, String> tabConditions = Map.of(
+                "UNASSIGNED", "WHERE is_unassigned = 1 ",
+                "MINE", "WHERE is_mine = 1 ",
+                "IN_PROGRESS", "WHERE is_in_progress = 1 ",
+                "RESOLVED", "WHERE is_resolved = 1 ",
+                "ALL", "");
+        for (var tab : tabConditions.entrySet()) {
+            parameters.put("filter", tab.getKey());
+            String pageSql = statement.getBoundSql(parameters).getSql().replaceAll("\\s+", " ").strip();
+            assertTrue(pageSql.startsWith(sharedQuery));
+            assertTrue(pageSql.endsWith("FROM admin_tickets " + tab.getValue()
+                    + "ORDER BY at DESC, id DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY"));
+        }
+
+        parameters.put("keyword", "");
+        assertFalse(statement.getBoundSql(parameters).getSql().contains("INSTR"));
+    }
+
+    @Test
     @DisplayName("티켓 사진 SQL은 업체·티켓·첨부 ID를 바인딩하고 조회 행을 Long으로 매핑한다")
     void photoBinding() throws Exception {
         Configuration config = new Configuration();

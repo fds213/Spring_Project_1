@@ -15,4 +15,5 @@ public class ApprovalSubmitDTO {
     private Long originalDocumentId;
     private List<String> line;
     private ApprovalFieldsDTO fields;
+    private List<Long> fileIds; //첨부번호
 }

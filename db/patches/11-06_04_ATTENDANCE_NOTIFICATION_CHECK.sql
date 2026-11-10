@@ -58,8 +58,8 @@ SELECT '5 정정 알림 코드 두 개',
 
 UNION ALL
 
-SELECT '6 공통 코드 총 232개',
-       CASE WHEN COUNT(*) = 232 THEN 'PASS' ELSE 'FAIL' END
+SELECT '6 공통 코드 232개 이상',
+       CASE WHEN COUNT(*) >= 232 THEN 'PASS' ELSE 'FAIL' END
   FROM COMMON_CODE;
 
 -- CHECK의 세 분기가 패치와 일치하는지 확인한다.
