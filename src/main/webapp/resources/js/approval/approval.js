@@ -427,7 +427,7 @@ eaEl('eaDraftSave')?.addEventListener('click', () => {
 // ---------- 첨부 ----------
 // 고르는 즉시 서버에 올려(POST /approval/api/files) 번호를 받아 두고, 제출할 때 번호(fileIds)만 보낸다
 const EA_FILE_MAX = 5; // 서버 ApprovalService.FILE_MAX와 같게
-const EA_FILE_SIZE_MAX = 10 * 1024 * 1024; // 파일당 10MB, 한 번에 30MB (서버도 다시 검사한다)
+const EA_FILE_SIZE_MAX = 10 * 1024 * 1024; // 파일당 10MB(서버도 다시 검사한다)
 const EA_FILE_EXT = /\.(jpe?g|png|gif|pdf|docx|xlsx|pptx|hwpx?)$/i; // 서버와 같은 허용 목록
 const EA_REQUEST_MAX = 29 * 1024 * 1024; // 서버 요청 한도 30MB보다 조금 적게 (요청에 구분 문자열이 붙는다)
 eaState.files = [];
