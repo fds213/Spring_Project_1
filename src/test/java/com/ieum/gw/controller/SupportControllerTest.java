@@ -71,13 +71,14 @@ class SupportControllerTest {
             this.userAccountId = userAccountId;
             SupportInquiryDTO mine = inquiry();
             mine.setUnread(1);
+            mine.setUnreadUpTo(77L);
             return List.of(mine);
         }
 
         @Override
-        public int markRepliesRead(Long companyId, Long userAccountId, Long no) {
+        public int markRepliesRead(Long companyId, Long userAccountId, Long no, Long upTo) {
             check();
-            this.readTarget = companyId + ":" + userAccountId + ":" + no;
+            this.readTarget = companyId + ":" + userAccountId + ":" + no + ":" + upTo;
             return 1;
         }
 
@@ -182,6 +183,7 @@ class SupportControllerTest {
         assertEquals(9L, service.userAccountId);
         assertEquals(100L, data.get(0).get("no").asLong());
         assertEquals(1, data.get(0).get("unread").asInt());
+        assertEquals(77L, data.get(0).get("unreadUpTo").asLong());
         assertEquals("확인했습니다", data.get(0).get("replies").get(0).get("body").asText());
         assertFalse(data.get(0).has("companyId"));
         assertFalse(data.get(0).has("requesterEmployeeId"));
@@ -191,11 +193,11 @@ class SupportControllerTest {
     @Test
     @DisplayName("문의 읽음은 요청 값이 아니라 로그인 업체·계정과 주소의 접수번호로 처리한다")
     void readRepliesUsesLoginUser() throws Exception {
-        JsonNode body = body(postJson("/support/api/inquiries/100/read", "{\"companyId\":999,\"userAccountId\":999}"));
+        JsonNode body = body(postJson("/support/api/inquiries/100/read", "{\"upTo\":77,\"companyId\":999,\"userAccountId\":999}"));
 
         assertTrue(body.get("success").asBoolean());
         assertEquals(1, body.get("data").get("read").asInt());
-        assertEquals("3:9:100", service.readTarget);
+        assertEquals("3:9:100:77", service.readTarget);
     }
 
     @Test
@@ -206,6 +208,7 @@ class SupportControllerTest {
         assertEquals("강아지상사", first.get("company").asText());
         assertEquals("SUP_RECEIVED", first.get("state").asText());
         assertFalse(first.has("unread"));
+        assertFalse(first.has("unreadUpTo"));
         assertFalse(first.has("requesterEmployeeId"));
     }
 

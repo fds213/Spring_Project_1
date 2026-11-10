@@ -72,9 +72,9 @@
           AND read_at IS NULL
     </update>
 
-    <!-- 본인의 안 읽은 이음 문의 답변 알림 수, 문의별 ('내가 보낸 문의'의 새 답변 표시) -->
+    <!-- 본인의 안 읽은 이음 문의 답변 알림 수와 그중 가장 큰 알림 번호, 문의별 ('내가 보낸 문의'의 새 답변 표시) -->
     <select id="countUnreadSupportReplies" resultType="com.ieum.gw.dto.NotificationUnreadCountDTO">
-        SELECT support_inquiry_id AS target_id, COUNT(*) AS unread
+        SELECT support_inquiry_id AS target_id, COUNT(*) AS unread, MAX(notification_id) AS last_id
         FROM notification
         WHERE company_id = #{companyId}
           AND receiver_account_id = #{userAccountId}
@@ -83,7 +83,8 @@
         GROUP BY support_inquiry_id
     </select>
 
-    <!-- 한 문의의 본인 답변 알림을 모두 읽음으로 표시 (문의를 펼쳤을 때). 이미 읽은 알림은 그대로 둔다 -->
+    <!-- 한 문의의 본인 답변 알림을 upToId 번호까지 읽음으로 표시 (문의를 펼쳤을 때). 이미 읽은 알림은 그대로 둔다.
+         upToId는 화면이 목록을 받을 때의 가장 큰 알림 번호다: 목록을 받은 뒤 새로 온 답변의 알림은 번호가 더 커서 안 읽은 채로 남는다 -->
     <update id="markSupportRepliesRead">
         UPDATE notification
         SET read_at = CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP),
@@ -92,6 +93,7 @@
           AND receiver_account_id = #{userAccountId}
           AND notification_type = 'NT_SUPPORT_REPLY'
           AND support_inquiry_id = #{supportInquiryId}
+          AND notification_id &lt;= #{upToId}
           AND read_at IS NULL
     </update>
 

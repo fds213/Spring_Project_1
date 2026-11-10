@@ -61,18 +61,22 @@ function toggleSupport(kind, q, isOpen) {
   renderSupportList(kind);
 }
 
-// 이 문의의 답변 알림을 읽음으로 바꾸고 헤더 종 배지를 다시 센다.
+// 이 문의의 답변 알림을 읽음으로 바꾸고 헤더 종 배지를 다시 센다. 목록을 받을 때 보인 알림(unreadUpTo 번호)까지만 바꾸므로,
+// 목록을 받은 뒤 온 답변은 화면에 없으니 안 읽은 채로 남는다(다시 불러오면 '새 답변'으로 보인다).
 // 읽음 저장도 쓰기라 이용 기간이 끝난 업체(body.is-readonly)에서는 저장하지 않는다(알림 목록과 같다)
 function markSupportRead(q) {
-  if (!q.unread || document.body.classList.contains('is-readonly')) return;
-  api.post(`${SUPPORT_PATH}/${encodeURIComponent(q.no)}/read`)
+  if (!q.unread || q.reading || document.body.classList.contains('is-readonly')) return;
+  const n = q.unread; // 응답 전에 접었다 펼쳐도 요청은 한 번, 표시할 수는 요청할 때 값으로
+  q.reading = true;
+  api.post(`${SUPPORT_PATH}/${encodeURIComponent(q.no)}/read`, { upTo: q.unreadUpTo })
     .done(() => {
-      supportFresh[q.no] = q.unread; // 저장된 뒤에만 표시한다. 실패하면 행의 '새 답변 N'이 그대로 남는다
+      supportFresh[q.no] = n; // 저장된 뒤에만 표시한다. 실패하면 행의 '새 답변 N'이 그대로 남는다
       q.unread = 0;
       renderSupportList('mine');
       if (window.IEUM && IEUM.refreshBadges) IEUM.refreshBadges();
     })
-    .fail(xhr => showToast(apiMessage(xhr, '읽음으로 바꾸지 못했습니다')));
+    .fail(xhr => showToast(apiMessage(xhr, '읽음으로 바꾸지 못했습니다')))
+    .always(() => { q.reading = false; });
 }
 
 // 문의를 보낸다. 서버도 같은 검사를 다시 한다

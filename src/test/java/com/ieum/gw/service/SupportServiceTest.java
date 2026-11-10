@@ -16,6 +16,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 
 import com.ieum.gw.code.SupportInquiryStatus;
 import com.ieum.gw.dao.SupportDAO;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 import com.ieum.gw.dto.SupportInquiryDTO;
 import com.ieum.gw.dto.SupportInquiryFormDTO;
 import com.ieum.gw.dto.SupportInquirySaveDTO;
@@ -34,7 +35,7 @@ class SupportServiceTest {
     static class FakeNotification extends NotificationService {
         final List<String> replies = new ArrayList<>();
         final List<String> asked = new ArrayList<>();
-        final Map<Long, Integer> unread = new HashMap<>();
+        final Map<Long, NotificationUnreadCountDTO> unread = new HashMap<>();
         RuntimeException error;
         int marked = 2;
 
@@ -52,14 +53,14 @@ class SupportServiceTest {
         }
 
         @Override
-        public Map<Long, Integer> countUnreadSupportReplies(Long companyId, Long userAccountId) {
+        public Map<Long, NotificationUnreadCountDTO> countUnreadSupportReplies(Long companyId, Long userAccountId) {
             asked.add("count:" + companyId + ":" + userAccountId);
             return unread;
         }
 
         @Override
-        public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId) {
-            asked.add("read:" + companyId + ":" + userAccountId + ":" + supportInquiryId);
+        public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId, Long upToId) {
+            asked.add("read:" + companyId + ":" + userAccountId + ":" + supportInquiryId + ":" + upToId);
             return marked;
         }
     }
@@ -165,6 +166,14 @@ class SupportServiceTest {
         return inquiry;
     }
 
+    private static NotificationUnreadCountDTO unreadRow(Long inquiryNo, int unread, Long lastId) {
+        NotificationUnreadCountDTO row = new NotificationUnreadCountDTO();
+        row.setTargetId(inquiryNo);
+        row.setUnread(unread);
+        row.setLastId(lastId);
+        return row;
+    }
+
     private static SupportReplyDTO replyOf(Long inquiryNo, Long id) {
         SupportReplyDTO reply = new SupportReplyDTO();
         reply.setId(id);
@@ -242,14 +251,16 @@ class SupportServiceTest {
     void listMineMarksUnread() {
         dao.inquiries.add(inquiry(100L, 3L));
         dao.inquiries.add(inquiry(101L, 3L));
-        notification.unread.put(100L, 2);
-        notification.unread.put(999L, 1); // 목록에 없는 문의 번호는 무시된다
+        notification.unread.put(100L, unreadRow(100L, 2, 77L));
+        notification.unread.put(999L, unreadRow(999L, 1, 78L)); // 목록에 없는 문의 번호는 무시된다
 
         List<SupportInquiryDTO> mine = service.listMine(3L, 44L, 9L);
 
         assertEquals(List.of("count:3:9"), notification.asked);
         assertEquals(2, mine.get(0).getUnread());
+        assertEquals(77L, mine.get(0).getUnreadUpTo());
         assertEquals(0, mine.get(1).getUnread());
+        assertNull(mine.get(1).getUnreadUpTo());
     }
 
     @Test
@@ -262,11 +273,19 @@ class SupportServiceTest {
     }
 
     @Test
-    @DisplayName("문의를 펼쳐 읽음으로 바꿀 때는 로그인 업체·계정과 주소의 접수번호를 알림 서비스에 넘긴다")
+    @DisplayName("문의를 펼쳐 읽음으로 바꿀 때는 로그인 업체·계정, 주소의 접수번호, 목록에서 받은 마지막 알림 번호를 넘긴다")
     void markRepliesReadUsesLogin() {
-        assertEquals(2, service.markRepliesRead(3L, 9L, 100L));
+        assertEquals(2, service.markRepliesRead(3L, 9L, 100L, 77L));
 
-        assertEquals(List.of("read:3:9:100"), notification.asked);
+        assertEquals(List.of("read:3:9:100:77"), notification.asked);
+    }
+
+    @Test
+    @DisplayName("마지막 알림 번호 없이 읽음을 보내면 거절하고 아무것도 바꾸지 않는다")
+    void markRepliesReadNeedsUpTo() {
+        assertThrows(SupportFormException.class, () -> service.markRepliesRead(3L, 9L, 100L, null));
+
+        assertTrue(notification.asked.isEmpty());
     }
 
     @Test

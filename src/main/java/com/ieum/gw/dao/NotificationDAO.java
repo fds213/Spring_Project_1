@@ -52,9 +52,9 @@ public class NotificationDAO {
         return mapper.countUnreadSupportReplies(companyId, userAccountId);
     }
 
-    /** 한 문의의 본인 답변 알림을 모두 읽음으로 표시. 바뀐 행 수 */
-    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId) {
-        return mapper.markSupportRepliesRead(companyId, userAccountId, supportInquiryId);
+    /** 한 문의의 본인 답변 알림을 upToId 번호까지 읽음으로 표시. 바뀐 행 수 */
+    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId, Long upToId) {
+        return mapper.markSupportRepliesRead(companyId, userAccountId, supportInquiryId, upToId);
     }
 
     /** 이 번호가 본인 알림인지 */

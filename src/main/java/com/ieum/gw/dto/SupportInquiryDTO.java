@@ -27,6 +27,9 @@ public class SupportInquiryDTO {
     @JsonInclude(JsonInclude.Include.NON_NULL)
     private Integer unread;     // 안 읽은 답변 알림 수. '내가 보낸 문의'에만 채운다
 
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private Long unreadUpTo;    // 그 안 읽은 알림 중 가장 큰 알림 번호. 펼칠 때 여기까지만 읽음으로 바꾼다. 안 읽은 것이 없으면 null
+
     @JsonIgnore
     private Long companyId;     // 답변을 문의와 같은 업체로 저장할 때 쓴다
 

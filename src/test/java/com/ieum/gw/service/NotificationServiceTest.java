@@ -134,25 +134,26 @@ class NotificationServiceTest {
         /** 이음 문의 답변 알림 중 안 읽은 것을 문의별로 센다(SQL의 GROUP BY 흉내) */
         @Override
         public List<NotificationUnreadCountDTO> countUnreadSupportReplies(Long companyId, Long accountId) {
-            Map<Long, Integer> counts = new HashMap<>();
+            Map<Long, NotificationUnreadCountDTO> counts = new HashMap<>();
             for (long id = 0; id < rows.size(); id++) {
                 NotificationSaveDTO row = rows.get((int) id);
                 if (owned(companyId, accountId, id) && !readIds.contains(id) && "NT_SUPPORT_REPLY".equals(row.getNotificationType())) {
-                    counts.merge(row.getSupportInquiryId(), 1, Integer::sum);
+                    NotificationUnreadCountDTO dto = counts.computeIfAbsent(row.getSupportInquiryId(), k -> {
+                        NotificationUnreadCountDTO d = new NotificationUnreadCountDTO();
+                        d.setTargetId(k);
+                        return d;
+                    });
+                    dto.setUnread(dto.getUnread() + 1);
+                    dto.setLastId(id); // 순번이 알림 번호다
                 }
             }
-            return counts.entrySet().stream().map(e -> {
-                NotificationUnreadCountDTO dto = new NotificationUnreadCountDTO();
-                dto.setTargetId(e.getKey());
-                dto.setUnread(e.getValue());
-                return dto;
-            }).collect(Collectors.toList());
+            return new ArrayList<>(counts.values());
         }
 
         @Override
-        public int markSupportRepliesRead(Long companyId, Long accountId, Long supportInquiryId) {
+        public int markSupportRepliesRead(Long companyId, Long accountId, Long supportInquiryId, Long upToId) {
             int changed = 0;
-            for (long id = 0; id < rows.size(); id++) {
+            for (long id = 0; id <= upToId && id < rows.size(); id++) {
                 NotificationSaveDTO row = rows.get((int) id);
                 if (owned(companyId, accountId, id) && !readIds.contains(id)
                         && "NT_SUPPORT_REPLY".equals(row.getNotificationType())
@@ -358,9 +359,12 @@ class NotificationServiceTest {
         service.notifySupportReply(COMPANY, EMP_LEE, INQUIRY, 4L, "a");
         service.notifyApprovalRequest(COMPANY, EMP_KIM, DOC, "c");
 
-        Map<Long, Integer> counts = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM);
+        Map<Long, NotificationUnreadCountDTO> counts = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM);
 
-        assertEquals(Map.of(INQUIRY, 2, INQUIRY + 1, 1), counts);
+        assertEquals(2, counts.size());
+        assertEquals(2, counts.get(INQUIRY).getUnread());
+        assertEquals(1L, counts.get(INQUIRY).getLastId()); // 0·1번이 김의 INQUIRY 알림
+        assertEquals(1, counts.get(INQUIRY + 1).getUnread());
         assertTrue(service.countUnreadSupportReplies(OTHER_COMPANY, ACCOUNT_KIM).isEmpty());
     }
 
@@ -372,12 +376,26 @@ class NotificationServiceTest {
         service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY + 1, 3L, "b");
         service.notifySupportReply(COMPANY, EMP_LEE, INQUIRY, 4L, "a");
 
-        assertEquals(2, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY));
-        assertEquals(0, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY)); // 두 번 눌러도 된다
+        Long upTo = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getLastId();
+        assertEquals(2, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo));
+        assertEquals(0, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo)); // 두 번 눌러도 된다
 
-        assertEquals(Map.of(INQUIRY + 1, 1), service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM));
+        assertEquals(Map.of(INQUIRY + 1, 1), service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getUnread())));
         assertEquals(1, service.countUnread(COMPANY, ACCOUNT_KIM));
         assertEquals(1, service.countUnread(COMPANY, ACCOUNT_LEE));
+    }
+
+    @Test
+    @DisplayName("목록을 받은 뒤 온 답변의 알림은 그때 받은 번호까지만 읽음으로 바꿔서 안 읽은 채로 남는다")
+    void markSupportRepliesReadKeepsLaterReply() {
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 1L, "a");
+        Long upTo = service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getLastId(); // 화면이 받은 목록
+        service.notifySupportReply(COMPANY, EMP_KIM, INQUIRY, 2L, "a"); // 그 뒤 운영자가 답변을 더 단다
+
+        assertEquals(1, service.markSupportRepliesRead(COMPANY, ACCOUNT_KIM, INQUIRY, upTo));
+
+        assertEquals(1, service.countUnreadSupportReplies(COMPANY, ACCOUNT_KIM).get(INQUIRY).getUnread());
     }
 
     @Test

@@ -125,14 +125,19 @@ class SupportNotificationOracleIT {
         assertEquals(other, latest.getSupportInquiryId());
         assertNull(latest.getApprovalDocumentId());
 
-        assertEquals(0, support.markRepliesRead(companyId, adminAccount, no)); // 같은 업체의 다른 계정은 못 바꾼다
+        Long upTo = mine(no).getUnreadUpTo(); // 화면이 받은 목록
+        assertEquals(0, support.markRepliesRead(companyId, adminAccount, no, upTo)); // 같은 업체의 다른 계정은 못 바꾼다
         assertEquals(2, mine(no).getUnread());
 
-        assertEquals(2, support.markRepliesRead(companyId, memberAccount, no));
-        assertEquals(0, support.markRepliesRead(companyId, memberAccount, no));
-        assertEquals(0, mine(no).getUnread());
+        support.reply(no, reply("하나 더 답변합니다"), operatorAccount); // 목록을 받은 뒤 온 답변
+        assertEquals(2, support.markRepliesRead(companyId, memberAccount, no, upTo));
+        assertEquals(0, support.markRepliesRead(companyId, memberAccount, no, upTo));
+        assertEquals(1, mine(no).getUnread()); // 화면에 없던 답변은 안 읽은 채로 남는다
         assertEquals(1, mine(other).getUnread());
-        assertEquals(before + 1, notification.countUnread(companyId, memberAccount));
+        assertEquals(before + 2, notification.countUnread(companyId, memberAccount));
+
+        assertEquals(1, support.markRepliesRead(companyId, memberAccount, no, mine(no).getUnreadUpTo()));
+        assertEquals(0, mine(no).getUnread());
     }
 
     @Test

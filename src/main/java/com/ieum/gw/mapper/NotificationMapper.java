@@ -34,7 +34,8 @@ public interface NotificationMapper {
 
     int markSupportRepliesRead(@Param("companyId") Long companyId,
                                @Param("userAccountId") Long userAccountId,
-                               @Param("supportInquiryId") Long supportInquiryId);
+                               @Param("supportInquiryId") Long supportInquiryId,
+                               @Param("upToId") Long upToId);
 
     int countOwned(@Param("companyId") Long companyId,
                    @Param("userAccountId") Long userAccountId,

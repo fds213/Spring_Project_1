@@ -102,21 +102,22 @@ public class NotificationService {
         save(dto, receiverEmployeeId);
     }
 
-    /** 본인의 안 읽은 이음 문의 답변 알림 수를 문의 번호별로. 안 읽은 것이 없는 문의는 빠진다 */
-    public Map<Long, Integer> countUnreadSupportReplies(Long companyId, Long userAccountId) {
-        Map<Long, Integer> counts = new HashMap<>();
+    /** 본인의 안 읽은 이음 문의 답변 알림 수와 가장 큰 알림 번호를 문의 번호별로. 안 읽은 것이 없는 문의는 빠진다 */
+    public Map<Long, NotificationUnreadCountDTO> countUnreadSupportReplies(Long companyId, Long userAccountId) {
+        Map<Long, NotificationUnreadCountDTO> counts = new HashMap<>();
         for (NotificationUnreadCountDTO row : notificationDAO.countUnreadSupportReplies(companyId, userAccountId)) {
-            counts.put(row.getTargetId(), row.getUnread());
+            counts.put(row.getTargetId(), row);
         }
         return counts;
     }
 
     /**
-     * 한 문의에 온 본인 답변 알림을 모두 읽음으로 표시한다('내가 보낸 문의'에서 그 문의를 펼쳤을 때).
+     * 한 문의에 온 본인 답변 알림을 upToId 번호까지 읽음으로 표시한다('내가 보낸 문의'에서 그 문의를 펼쳤을 때).
+     * upToId는 화면이 받은 목록의 가장 큰 알림 번호라, 목록을 받은 뒤 온 답변의 알림은 안 읽은 채로 남는다.
      * 남의 문의 번호나 이미 읽은 알림이면 아무것도 바꾸지 않는다(업체·받는 계정 조건). 바뀐 수를 돌려준다.
      */
-    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId) {
-        return notificationDAO.markSupportRepliesRead(companyId, userAccountId, supportInquiryId);
+    public int markSupportRepliesRead(Long companyId, Long userAccountId, Long supportInquiryId, Long upToId) {
+        return notificationDAO.markSupportRepliesRead(companyId, userAccountId, supportInquiryId, upToId);
     }
 
     /** 안 읽은 알림 수(헤더 배지 'notification'). */

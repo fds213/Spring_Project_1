@@ -12,6 +12,7 @@ import com.ieum.gw.code.SupportInquiryStatus;
 import com.ieum.gw.dao.SupportDAO;
 import com.ieum.gw.dto.SupportInquiryDTO;
 import com.ieum.gw.dto.SupportInquiryFormDTO;
+import com.ieum.gw.dto.NotificationUnreadCountDTO;
 import com.ieum.gw.dto.SupportInquirySaveDTO;
 import com.ieum.gw.dto.SupportReplyDTO;
 import com.ieum.gw.dto.SupportReplyFormDTO;
@@ -53,23 +54,31 @@ public class SupportService {
         return inquiry.getNo();
     }
 
-    /** 내가 보낸 문의와 그 답변, 최신 문의 순. 문의마다 안 읽은 답변 알림 수(unread)를 붙인다 */
+    /** 내가 보낸 문의와 그 답변, 최신 문의 순. 문의마다 안 읽은 답변 알림 수(unread)와 그 마지막 알림 번호(unreadUpTo)를 붙인다 */
     public List<SupportInquiryDTO> listMine(Long companyId, Long employeeId, Long userAccountId) {
         List<SupportInquiryDTO> inquiries = withReplies(supportDAO.listMyInquiries(companyId, employeeId),
                 supportDAO.listMyReplies(companyId, employeeId));
-        Map<Long, Integer> unread = notificationService.countUnreadSupportReplies(companyId, userAccountId);
+        Map<Long, NotificationUnreadCountDTO> unread = notificationService.countUnreadSupportReplies(companyId, userAccountId);
         for (SupportInquiryDTO inquiry : inquiries) {
-            inquiry.setUnread(unread.getOrDefault(inquiry.getNo(), 0));
+            NotificationUnreadCountDTO row = unread.get(inquiry.getNo());
+            inquiry.setUnread(row == null ? 0 : row.getUnread());
+            inquiry.setUnreadUpTo(row == null ? null : row.getLastId());
         }
         return inquiries;
     }
 
     /**
-     * 직원이 내가 보낸 문의를 펼쳤을 때 그 문의의 답변 알림을 읽음으로 바꾼다. 업체·계정은 로그인 정보로만 받는다.
+     * 직원이 내가 보낸 문의를 펼쳤을 때 그 문의의 답변 알림을 upTo(목록에서 받은 unreadUpTo) 번호까지 읽음으로 바꾼다.
+     * 목록을 받은 뒤 온 답변은 화면에 없으니 안 읽은 채로 남긴다. 업체·계정은 로그인 정보로만 받는다.
      * 남의 문의 번호면 바뀌는 것이 없다(알림의 받는 계정 조건). 바뀐 알림 수를 돌려준다.
+     *
+     * @throws SupportFormException upTo가 없을 때
      */
-    public int markRepliesRead(Long companyId, Long userAccountId, Long no) {
-        return notificationService.markSupportRepliesRead(companyId, userAccountId, no);
+    public int markRepliesRead(Long companyId, Long userAccountId, Long no, Long upTo) {
+        if (upTo == null) {
+            throw new SupportFormException("요청을 읽을 수 없습니다. 화면을 새로 고쳐 다시 시도해 주세요.");
+        }
+        return notificationService.markSupportRepliesRead(companyId, userAccountId, no, upTo);
     }
 
     /** 업체 관리자: 우리 회사 직원들이 보낸 문의와 그 답변, 최신 문의 순. 업체는 로그인 정보로만 받는다 */
