@@ -26,6 +26,24 @@ public interface ApprovalMapper {
 
     void insertDocument(ApprovalDocumentDTO document);
 
+    // 임시저장 문서 새로 만들기
+    void insertDraft(ApprovalDocumentDTO document);
+
+    // 임시저장 문서 고치기 (DRAFT일 때만)
+    int updateDraft(ApprovalDocumentDTO document);
+
+    // 임시저장 문서를 제출 상태로 바꾸기 (DRAFT일 때만)
+    int submitDraft(ApprovalDocumentDTO document);
+
+    // 임시저장 문서 지우기 (내 문서이고 DRAFT일 때만)
+    int deleteDraft(@Param("companyId") Long companyId,
+                    @Param("employeeId") Long employeeId,
+                    @Param("documentId") long documentId);
+
+    // 내 임시저장 문서 목록 (최근에 저장한 순)
+    List<ApprovalBoxDTO> selectDraftDocuments(@Param("companyId") Long companyId,
+                                              @Param("employeeId") Long employeeId);
+
     void insertStep(ApprovalStepDTO stepDto);
 
     void insertHistory(ApprovalHistoryDTO history);

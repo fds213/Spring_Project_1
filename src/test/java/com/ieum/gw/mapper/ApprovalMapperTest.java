@@ -20,6 +20,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import com.ieum.gw.dao.ApprovalDAO;
+import com.ieum.gw.dto.ApprovalDocumentDTO;
 
 class ApprovalMapperTest {
     @Test
@@ -177,6 +178,42 @@ class ApprovalMapperTest {
         assertTrue(query.contains("WHERE company_id = ? AND approval_document_id = ?"));
         assertEquals(com.ieum.gw.dto.ApprovalEquipmentDTO.class, statement.getResultMaps().get(0).getType());
     }
+    @Test
+    @DisplayName("임시저장 쓰기는 업체·문서·기안자·DRAFT 조건이 모두 걸려 남의 문서나 제출한 문서를 바꾸지 못한다")
+    void draftWritesGuardCompanyAuthorAndStatus() throws Exception {
+        Configuration config = configuration();
+        ApprovalDocumentDTO doc = new ApprovalDocumentDTO();
+        doc.setCompanyId(1L);
+        doc.setApprovalDocumentId(10L);
+        doc.setAuthorEmployeeId(100L);
+        doc.setDocumentType("DOC_LEAVE");
+        doc.setStatusCode("IN_PROGRESS");
+
+        for (String id : List.of("updateDraft", "submitDraft")) {
+            BoundSql sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper." + id).getBoundSql(doc);
+            List<Object> values = boundValues(config, sql, doc);
+            assertEquals(List.of(1L, 10L, 100L, "DRAFT"), values.subList(values.size() - 4, values.size()), id);
+            assertTrue(sql.getSql().replaceAll("\\s+", " ")
+                    .contains("WHERE company_id = ? AND approval_document_id = ? AND author_employee_id = ? AND status_code = ?"), id);
+        }
+
+        var method = ApprovalMapper.class.getMethod("deleteDraft", Long.class, Long.class, long.class);
+        Object params = new ParamNameResolver(config, method).getNamedParams(new Object[] {1L, 100L, 10L});
+        BoundSql sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.deleteDraft").getBoundSql(params);
+        assertEquals(List.of(1L, 10L, 100L, "DRAFT"), boundValues(config, sql, params));
+    }
+
+    @Test
+    @DisplayName("임시저장 목록은 내 업체·내가 쓴 DRAFT만 최근 저장 순으로 읽는다")
+    void draftListIsAuthorOnly() throws Exception {
+        Configuration config = configuration();
+        var method = ApprovalMapper.class.getMethod("selectDraftDocuments", Long.class, Long.class);
+        Object params = new ParamNameResolver(config, method).getNamedParams(new Object[] {1L, 100L});
+        BoundSql sql = config.getMappedStatement("com.ieum.gw.mapper.ApprovalMapper.selectDraftDocuments").getBoundSql(params);
+        assertEquals(List.of(1L, 100L, "DRAFT"), boundValues(config, sql, params));
+        assertTrue(sql.getSql().replaceAll("\\s+", " ").contains("ORDER BY updated_at DESC"));
+    }
+
     @Test
     @DisplayName("자동 반려 후보는 업체·현재 순번으로 조회하며 문서 종류 제한 없이 ID순으로 반환한다")
     void retirementCandidatesUseCurrentTurn() throws Exception {
