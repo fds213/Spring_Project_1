@@ -364,7 +364,7 @@ class ApprovalServiceTest {
     private final FakeBranch branch = new FakeBranch();
     private final FakeNotification notification = new FakeNotification();
     private final ApprovalService service = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null), new TicketService(null), null);
+        new ScheduleService(null, null), new TicketService(null, branch), null);
 
     private static BranchDTO branch(Long id, String name) {
         BranchDTO b = new BranchDTO();
@@ -1206,7 +1206,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null), null);
+                new ScheduleService(null, null), new TicketService(null, branch), null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));
@@ -1225,7 +1225,7 @@ class ApprovalServiceTest {
             }
         };
         ApprovalService subject = new ApprovalService(employee, changedAttendance, dao, branch, notification,
-                new ScheduleService(null, null), new TicketService(null), null);
+                new ScheduleService(null, null), new TicketService(null, branch), null);
 
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
                 () -> subject.submit(user(), validLeave()));
@@ -1272,7 +1272,7 @@ class ApprovalServiceTest {
 
     private final FakeAttachment attachments = new FakeAttachment();
     private final ApprovalService draftService = new ApprovalService(employee, attendance, dao, branch, notification,
-            new ScheduleService(null, null), new TicketService(null), attachments);
+            new ScheduleService(null, null), new TicketService(null, branch), attachments);
 
     private static final Long DRAFT_ID = 77L;
     private static final Long MY_ACCOUNT_ID = 200L;

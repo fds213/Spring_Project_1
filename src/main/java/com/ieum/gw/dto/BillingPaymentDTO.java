@@ -19,5 +19,5 @@ public class BillingPaymentDTO {
     private String at;      // 승인 시각
     private String from;    // 유료 기간 첫날. 반영 전이면 null
     private String to;      // 유료 기간 마지막 날(다음 날 0시에 만료)
-    private String result;  // OK 또는 FAILED
+    private String result;  // OK(반영됨), PENDING(승인됐지만 이용 기간에 아직 반영되지 않음), FAILED
 }

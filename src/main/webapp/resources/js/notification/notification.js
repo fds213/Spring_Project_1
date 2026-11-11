@@ -1,13 +1,14 @@
 // 알림 목록 (views/notification/list.jsp). 모든 직원 (요구분석서 3.4 업무 알림, 통합 계획서 4장 업무 알림).
-// 본인 알림만 본다(제목·내용·시각·읽음 여부). 누르면 읽음으로 바꾸고 결재·티켓·근태 화면으로 간다. 메뉴 배지(종 아이콘)는 common.js 가 /badges 로 다시 센다.
+// 본인 알림만 본다(제목·내용·시각·읽음 여부). 누르면 읽음으로 바꾸고 결재·티켓·근태·이음 장애 문의 화면으로 간다. 메뉴 배지(종 아이콘)는 common.js 가 /badges 로 다시 센다.
 // 읽음 저장도 쓰기라서 이용 기간이 끝난 업체(body.is-readonly)에서는 저장하지 않고 화면만 연다.
 // 서버: NotificationController (notification 모듈)
-//   GET  /notification/api/list?page=      → { page, pages, total, items: [{ notificationId, notificationType, title, message, approvalDocumentId, itTicketId, readAt, createdAt }] }
+//   GET  /notification/api/list?page=      → { page, pages, total, items: [{ notificationId, notificationType, title, message, approvalDocumentId, itTicketId, supportInquiryId, readAt, createdAt }] }
 //   POST /notification/api/{id}/read       → 없거나 남의 알림이면 404
 // util.js 의 h, span, whenFull, showToast 를 쓴다.
 (() => {
   // 알림 종류(NotificationType)별 아이콘 색과 누르면 갈 화면. 결재는 결재함, 티켓 배정은 티켓 처리의 '내 담당' 카드, 처리 완료는 요청자의 내 티켓.
-  // 근태 정정은 요청(처리자)·처리(요청자) 모두 근태 화면: 처리할 요청은 맨 위 '처리할 근태 정정', 결과는 달력의 그날 칸에 보인다
+  // 근태 정정은 요청(처리자)·처리(요청자) 모두 근태 화면: 처리할 요청은 맨 위 '처리할 근태 정정', 결과는 달력의 그날 칸에 보인다.
+  // 이음 문의 답변은 이음 장애 문의 화면에서 그 문의를 펼친다(link가 함수면 알림 한 건으로 주소를 만든다)
   const TYPE = {
     NT_APPROVAL_REQUEST: { cls: 'is-approval', link: '/approval/list' },
     NT_APPROVAL_DONE: { cls: 'is-approval', link: '/approval/list' },
@@ -16,11 +17,13 @@
     NT_TICKET_RESOLVED: { cls: 'is-ticket', link: '/ticket/mine' },
     NT_ATT_CORRECTION_REQUEST: { cls: 'is-attendance', link: '/attendance/my' },
     NT_ATT_CORRECTION_DONE: { cls: 'is-attendance', link: '/attendance/my' },
+    NT_SUPPORT_REPLY: { cls: 'is-support', link: n => '/support/inquiry' + (n.supportInquiryId ? `?no=${encodeURIComponent(n.supportInquiryId)}` : '') },
   };
   const ICON = {
     'is-approval': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="m9 15 2 2 4-4"/>',
     'is-ticket': '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-.6-.6-2.6z"/>',
     'is-attendance': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    'is-support': '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     'is-other': '<path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6"/>',
   };
   const ctx = document.body.dataset.ctx || '';
@@ -65,7 +68,7 @@
         h('strong', 'noti-title', n.message || '')),
       ...(unread ? [h('span', 'noti-dot', h('span', 'visually-hidden', '안 읽음'))] : []));
     btn.type = 'button';
-    btn.addEventListener('click', () => open(n, type.link));
+    btn.addEventListener('click', () => open(n, typeof type.link === 'function' ? type.link(n) : type.link));
     return h('li', '', btn);
   }
 

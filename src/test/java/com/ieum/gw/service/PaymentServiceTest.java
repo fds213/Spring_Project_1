@@ -769,8 +769,11 @@ class PaymentServiceTest {
         BillingDTO unapplied = service.getBilling(admin());
         assertFalse(unapplied.isPaid());
         assertNotNull(unapplied.getLastPaidDate()); // 반영 전이어도 승인된 결제의 날짜는 있다
+        assertEquals("PENDING", unapplied.getPayments().get(0).getResult()); // 결제 완료가 아니라 반영 대기로 보인다
+        assertNull(unapplied.getPayments().get(0).getFrom());
 
         confirm(order);
+        assertEquals("OK", service.getBilling(admin()).getPayments().get(0).getResult());
 
         assertEquals(1, toss.confirmCalls);
         assertEquals(1, payments.approved.size());

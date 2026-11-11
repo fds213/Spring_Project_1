@@ -11,6 +11,8 @@ const GUEST_STATE = {
   IQ_ANSWERED: { label: '답변 완료', tone: 'done' },
   IQ_CLOSED: { label: '종료', tone: 'done' },
 };
+// 이름표에 없는 상태가 와도 목록 전체가 멈추지 않게 받은 값을 그대로 보인다(회원 접수의 memberState와 같다)
+const guestState = q => GUEST_STATE[q.state] || { label: q.state, tone: 'wait' };
 // 답변 한 건의 발송 상태는 공통 코드 MAIL_STATUS다. stale은 결과를 남기지 못한 채 멈춘 발송이다(메일이 나갔는지 알 수 없다)
 const REPLY_STATE = {
   MAIL_PENDING: { label: '발송 중', tone: 'wait' },
@@ -112,7 +114,8 @@ function wireSearch(kind, render) {
   document.getElementById(`${kind}Stale`).addEventListener('change', e => set({ stale: e.target.checked }));
 }
 
-const guestNeedsReply = q => q.state === 'IQ_RECEIVED';
+// 아직 답변 메일이 나가지 않은 상태. '확인 중'도 답변 전이라 '답변 없음' 거르기에 걸린다(서버의 답변 저장도 두 상태를 받는다)
+const guestNeedsReply = q => q.state === 'IQ_RECEIVED' || q.state === 'IQ_PROCESSING';
 
 // ---------- 답변 발송: 답변은 메일로 나간다 ----------
 const lastReply = q => q.replies[q.replies.length - 1];
@@ -203,19 +206,21 @@ function guestDetail(q) {
 function guestRowState(q) {
   if (sendingNo === q.no) return REPLY_STATE.MAIL_PENDING;
   const last = lastReply(q);
-  return last && last.status !== 'MAIL_SENT' ? replyState(last) : GUEST_STATE[q.state];
+  return last && last.status !== 'MAIL_SENT' ? replyState(last) : guestState(q);
 }
 
 function renderGuest() {
   const all = inqItems.guest; // 서버가 최신순으로 준다
   const n = s => all.filter(q => q.state === s).length;
   setCount('gCntAll', all.length);
-  setCount('gCntWait', n('IQ_RECEIVED'));
+  setCount('gCntWait', all.filter(guestNeedsReply).length); // '확인 중'도 답변 전이라 답변 대기로 센다
   setCount('gCntDone', n('IQ_ANSWERED'));
   markPressed('guestFilters', inq.guest.filter);
 
   const f = inq.guest.filter;
-  const shown = all.filter(q => (f === 'all' || q.state === f)
+  // 답변 대기 카드(IQ_RECEIVED)는 '확인 중'까지 보인다. 숫자·'답변 없음' 거르기와 같은 기준
+  const inFilter = q => f === 'all' || (f === 'IQ_RECEIVED' ? guestNeedsReply(q) : q.state === f);
+  const shown = all.filter(q => inFilter(q)
     && passesControls('guest', q, guestNeedsReply(q), q.name, q.company || '', q.email, q.title, q.body, q.no));
   showSearchInfo('guest', shown.length);
   const rows = shown.flatMap(q => {

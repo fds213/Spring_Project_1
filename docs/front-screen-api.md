@@ -11,7 +11,7 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | 항목 | 위치 | 설명 |
 |---|---|---|
 | 화면 JSP | `WEB-INF/views/<모듈>/*.jsp` | `<ui:layout>` 안의 본문. 화면 자리는 `<section class="view on" id="view-<메뉴 키>">` |
-| 게시판 JSP | `WEB-INF/views/board/{notice,dept}.jsp` | 목록·글 보기·글쓰기를 한 JSP에 두고, `board.js`가 주소(`/view/3`, `/write`, `/edit/3`)를 보고 하나를 보인다 |
+| 게시판 JSP | `WEB-INF/views/board/{notice,dept,anon,library}.jsp` | 목록·글 보기·글쓰기를 한 JSP에 두고, `board.js`가 주소(`/view/3`, `/write`, `/edit/3`)를 보고 하나를 보인다 |
 | 소개 사이트 | `WEB-INF/views/site/{intro,trial,inquiry}.jsp` | `<ui:site>` 틀. 주소 `/`, `/trial`, `/inquiry` (화면 모양만, 체험 신청·문의 접수 JS는 API가 정해지면 붙인다) |
 | 계정 만들기·비밀번호 찾기 | `WEB-INF/views/common/{join,join-password}.jsp` | 주소 `/join`, `/join/password` (화면 모양만. JS는 백엔드 API가 생긴 뒤에 그 주소에 맞춰 붙인다) |
 | 화면 JS | `resources/js/util.js` + `resources/js/<모듈>/*.js` | 페이지마다 `util.js`(같이 쓰는 도구)와 그 모듈 JS만 불러오고, 페이지가 열리면 화면을 여는 함수를 부른다 |
@@ -46,13 +46,15 @@ dev2에 넣은 화면과, 화면 JS가 서버를 부르는 방식을 정리했�
 | `/subscription/billing` | `subscription/billing` |
 | `/board/notice`, `/board/notice/view/{id}`, `/board/notice/write`, `/board/notice/edit/{id}` | `board/notice` (네 주소 모두 같은 JSP) |
 | `/board/dept`, `/board/dept/view/{id}`, `/board/dept/write`, `/board/dept/edit/{id}` | `board/dept` (네 주소 모두 같은 JSP) |
+| `/board/anon`, `/board/anon/view/{id}`, `/board/anon/write`, `/board/anon/edit/{id}` | `board/anon` (익명 게시판, 네 주소 모두 같은 JSP) |
+| `/board/library`, `/board/library/view/{id}`, `/board/library/write`, `/board/library/edit/{id}` | `board/library` (자료실, 네 주소 모두 같은 JSP) |
 | `/ops/company` | `ops/company` |
 | `/ops/application-status` | `ops/application` |
 | `/ops/inquiry-guest` | `ops/inquiry-guest` |
 | `/ops/inquiry-member` | `ops/inquiry-member` |
 | `/support/inquiry` | `support/inquiry` |
 
-이번 범위에서 빠져 화면을 두지 않은 것: 운영자 증설 승인·인원 증설(CAP-01·02), 운영 데이터, 익명 게시판(요구사항에 없음), 근무 > 승인(휴가는 전자결재 휴가 신청서로), 가입 승인의 자리 대기, 직원 이메일 인증 코드.
+이번 범위에서 빠져 화면을 두지 않은 것: 운영자 증설 승인·인원 증설(CAP-01·02), 운영 데이터, 근무 > 승인(휴가는 전자결재 휴가 신청서로), 가입 승인의 자리 대기, 직원 이메일 인증 코드.
 
 ## 2. 화면 JS가 서버를 부르는 방식
 

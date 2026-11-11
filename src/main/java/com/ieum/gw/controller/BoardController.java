@@ -30,15 +30,20 @@ import com.ieum.gw.dto.NoticeDTO;
 import com.ieum.gw.dto.NoticeFileDTO;
 import com.ieum.gw.dto.NoticeCommentSaveDTO;
 import com.ieum.gw.dto.NoticeSaveDTO;
+import com.ieum.gw.service.BoardAnonService;
 import com.ieum.gw.service.BoardDeptService;
+import com.ieum.gw.service.BoardLibraryService;
 import com.ieum.gw.service.NoticeService;
 import com.ieum.gw.dto.AttachmentDTO;
+import com.ieum.gw.dto.BoardAnonCommentDTO;
+import com.ieum.gw.dto.BoardAnonPostDTO;
 import com.ieum.gw.dto.BoardDeptPostDTO;
+import com.ieum.gw.dto.BoardLibraryPostDTO;
 import com.ieum.gw.dto.LoginUser;
 
 import lombok.RequiredArgsConstructor;
 
-// 게시판(공지사항·부서 게시판) Controller.
+// 게시판(공지사항·부서 게시판·익명 게시판·자료실) Controller.
 // 화면 주소 → JSP 연결은 docs/front-screen-api.md 1장, 데이터 주소는 2장(/board/api/...)을 따른다.
 @Controller
 @RequestMapping("/board")
@@ -47,6 +52,8 @@ public class BoardController {
 
     private final NoticeService noticeService;
     private final BoardDeptService boardDeptService;
+    private final BoardAnonService boardAnonService;
+    private final BoardLibraryService boardLibraryService;
 
     // ---------- 화면 ----------
 
@@ -60,6 +67,18 @@ public class BoardController {
     @GetMapping({"/dept", "/dept/view/{id}", "/dept/write", "/dept/edit/{id}"})
     public String dept() {
         return "board/dept";
+    }
+
+    // 익명 게시판: 네 주소 모두 같은 JSP(WEB-INF/views/board/anon.jsp)를 연다
+    @GetMapping({"/anon", "/anon/view/{id}", "/anon/write", "/anon/edit/{id}"})
+    public String anon() {
+        return "board/anon";
+    }
+
+    // 자료실: 네 주소 모두 같은 JSP(WEB-INF/views/board/library.jsp)를 연다
+    @GetMapping({"/library", "/library/view/{id}", "/library/write", "/library/edit/{id}"})
+    public String library() {
+        return "board/library";
     }
 
     // ---------- 데이터 (board.js가 부른다) ----------
@@ -230,6 +249,146 @@ public class BoardController {
                                                      @PathVariable Long id,
                                                      @PathVariable Long fileId) throws IOException {
         return fileResponse(boardDeptService.getFile(loginUser, id, fileId));
+    }
+
+    // ---------- 익명 게시판 데이터 (board.js가 부른다) ----------
+    // 응답에는 쓴 사람의 이름·사번·부서를 넣지 않는다. 본인 글·댓글인지(mine·canDelete)만 그 사람에게 알려 준다
+
+    // 글 목록: GET /board/api/anon/posts?q=검색어&page=1
+    @GetMapping("/api/anon/posts")
+    @ResponseBody
+    public Map<String, Object> anonPostList(@AuthenticationPrincipal LoginUser loginUser,
+                                            @RequestParam(defaultValue = "") String q,
+                                            @RequestParam(defaultValue = "1") int page) {
+        return boardAnonService.getPosts(loginUser, q, page);
+    }
+
+    // 글쓰기·수정 화면을 열 때: GET /board/api/anon/posts/form (수정이면 ?id=3, 본인 글만)
+    @GetMapping("/api/anon/posts/form")
+    @ResponseBody
+    public Map<String, Object> anonPostForm(@AuthenticationPrincipal LoginUser loginUser,
+                                            @RequestParam(required = false) Long id) {
+        return boardAnonService.getForm(loginUser, id);
+    }
+
+    // 글 보기: GET /board/api/anon/posts/3  (다른 업체 글이면 404)
+    @GetMapping("/api/anon/posts/{id}")
+    @ResponseBody
+    public BoardAnonPostDTO anonPostDetail(@AuthenticationPrincipal LoginUser loginUser,
+                                           @PathVariable Long id) {
+        return boardAnonService.getPost(loginUser, id);
+    }
+
+    // 글 저장: POST /board/api/anon/posts  (본문 JSON: { title, content }. 첨부는 받지 않는다)
+    @PostMapping("/api/anon/posts")
+    @ResponseBody
+    public Map<String, Object> anonPostCreate(@AuthenticationPrincipal LoginUser loginUser,
+                                              @RequestBody NoticeSaveDTO form) {
+        return boardAnonService.createPost(loginUser, form.getTitle(), form.getContent());
+    }
+
+    // 글 수정: POST /board/api/anon/posts/3  (본문은 저장과 같은 모양)
+    @PostMapping("/api/anon/posts/{id}")
+    @ResponseBody
+    public Map<String, Object> anonPostUpdate(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id,
+                                              @RequestBody NoticeSaveDTO form) {
+        return boardAnonService.updatePost(loginUser, id, form.getTitle(), form.getContent());
+    }
+
+    // 글 삭제: POST /board/api/anon/posts/3/delete
+    @PostMapping("/api/anon/posts/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> anonPostDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                              @PathVariable Long id) {
+        return boardAnonService.deletePost(loginUser, id);
+    }
+
+    // 댓글 등록: POST /board/api/anon/posts/3/comments  (본문 JSON: { text }). 성공하면 댓글 목록 전체
+    @PostMapping("/api/anon/posts/{id}/comments")
+    @ResponseBody
+    public List<BoardAnonCommentDTO> anonCommentAdd(@AuthenticationPrincipal LoginUser loginUser,
+                                                    @PathVariable Long id,
+                                                    @RequestBody NoticeCommentSaveDTO form) {
+        return boardAnonService.addComment(loginUser, id, form.getText());
+    }
+
+    // 댓글 삭제: POST /board/api/anon/posts/3/comments/7/delete. 성공하면 남은 댓글 목록 전체
+    @PostMapping("/api/anon/posts/{id}/comments/{commentId}/delete")
+    @ResponseBody
+    public List<BoardAnonCommentDTO> anonCommentDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                                       @PathVariable Long id,
+                                                       @PathVariable Long commentId) {
+        return boardAnonService.deleteComment(loginUser, id, commentId);
+    }
+
+    // ---------- 자료실 데이터 (board.js가 부른다) ----------
+
+    // 글 목록: GET /board/api/library/posts?q=검색어&page=1
+    @GetMapping("/api/library/posts")
+    @ResponseBody
+    public Map<String, Object> libraryPostList(@AuthenticationPrincipal LoginUser loginUser,
+                                               @RequestParam(defaultValue = "") String q,
+                                               @RequestParam(defaultValue = "1") int page) {
+        return boardLibraryService.getPosts(loginUser, q, page);
+    }
+
+    // 글쓰기·수정 화면을 열 때: GET /board/api/library/posts/form (수정이면 ?id=3, 본인 글만)
+    @GetMapping("/api/library/posts/form")
+    @ResponseBody
+    public Map<String, Object> libraryPostForm(@AuthenticationPrincipal LoginUser loginUser,
+                                               @RequestParam(required = false) Long id) {
+        return boardLibraryService.getForm(loginUser, id);
+    }
+
+    // 글 보기: GET /board/api/library/posts/3  (다른 업체 글이면 404)
+    @GetMapping("/api/library/posts/{id}")
+    @ResponseBody
+    public BoardLibraryPostDTO libraryPostDetail(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @PathVariable Long id) {
+        return boardLibraryService.getPost(loginUser, id);
+    }
+
+    // 글 저장: POST /board/api/library/posts  (본문 JSON: { title, content, files }. 파일은 1개 이상)
+    @PostMapping("/api/library/posts")
+    @ResponseBody
+    public Map<String, Object> libraryPostCreate(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @RequestBody NoticeSaveDTO form) {
+        return boardLibraryService.createPost(loginUser, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 글 수정: POST /board/api/library/posts/3  (본문은 저장과 같은 모양)
+    @PostMapping("/api/library/posts/{id}")
+    @ResponseBody
+    public Map<String, Object> libraryPostUpdate(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @PathVariable Long id,
+                                                 @RequestBody NoticeSaveDTO form) {
+        return boardLibraryService.updatePost(loginUser, id, form.getTitle(), form.getContent(), form.getFiles());
+    }
+
+    // 글 삭제: POST /board/api/library/posts/3/delete
+    @PostMapping("/api/library/posts/{id}/delete")
+    @ResponseBody
+    public Map<String, Object> libraryPostDelete(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @PathVariable Long id) {
+        return boardLibraryService.deletePost(loginUser, id);
+    }
+
+    // 자료실 파일 올리기: POST /board/api/library/files  (multipart, 이름 "files"로 여러 개. 우리 업체 직원 누구나)
+    // 성공하면 [{ id, name, size, type }] → 화면이 번호를 들고 있다가 글 저장 때 보낸다
+    @PostMapping("/api/library/files")
+    @ResponseBody
+    public List<NoticeFileDTO> libraryFileUpload(@AuthenticationPrincipal LoginUser loginUser,
+                                                 @RequestPart("files") List<MultipartFile> files) throws IOException {
+        return boardLibraryService.uploadFiles(loginUser, files);
+    }
+
+    // 자료 내려받기: GET /board/api/library/posts/3/files/12
+    @GetMapping("/api/library/posts/{id}/files/{fileId}")
+    public ResponseEntity<Resource> libraryFileDownload(@AuthenticationPrincipal LoginUser loginUser,
+                                                        @PathVariable Long id,
+                                                        @PathVariable Long fileId) throws IOException {
+        return fileResponse(boardLibraryService.getFile(loginUser, id, fileId));
     }
 
     // 파일 응답을 만든다. 이미지는 화면에 바로 보이게(inline), 나머지는 내려받게(attachment)

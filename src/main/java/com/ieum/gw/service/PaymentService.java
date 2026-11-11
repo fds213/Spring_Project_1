@@ -107,8 +107,9 @@ public class PaymentService {
                 billing.setTrialEnd(day(ServicePeriods.lastDay(p.getEndsAt())));
             }
         }
-        // 시작 시각이 아니라 기준일이다: 연장분으로 넘어가도 처음 시작한 날이 그대로 보인다. 만료 뒤에 승인된 연장은 그날로 바뀐다(applyOrder)
-        billing.setServiceFrom(paid ? day(period.getBillingAnchorDate()) : null);
+        // 시작 시각이 아니라 기준일이다: 연장분으로 넘어가도 처음 시작한 날이 그대로 보인다. 만료 뒤에 승인된 연장은 그날로 바뀐다(applyOrder).
+        // 운영자 화면의 이용 기간 첫날도 같은 계산을 쓴다(ServicePeriods.firstDayOf)
+        billing.setServiceFrom(paid ? day(ServicePeriods.firstDayOf(period)) : null);
         billing.setCanPay(mode != null);
         billing.setMode(mode);
         billing.setPlans(offers(mode, period));
@@ -503,7 +504,8 @@ public class PaymentService {
             payment.setFrom(day(row.getStartsAt().toLocalDate()));
             payment.setTo(day(ServicePeriods.lastDay(row.getEndsAt())));
         }
-        payment.setResult(row.isApproved() ? "OK" : "FAILED");
+        // 승인됐지만 이용 기간이 아직 없으면 반영 대기다(운영자 화면 OpsService.payments와 같은 기준)
+        payment.setResult(!row.isApproved() ? "FAILED" : row.getStartsAt() == null ? "PENDING" : "OK");
         return payment;
     }
 

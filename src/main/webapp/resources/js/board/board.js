@@ -119,6 +119,7 @@ function showSub(id) {
 function route(hash) {
   const [view, action, id] = decodeURIComponent(hash).split('/');
   if (view === 'board-dept') return routeBoard(action, id);
+  if (memberBoards[view]) return memberBoards[view].route(action, id); // 익명 게시판·자료실
   if (action === 'view') return openDetail(id);
   if (action === 'write' || action === 'edit') return openForm(action === 'edit' ? id : null);
   showSub('view-notice-list');
@@ -132,11 +133,12 @@ document.addEventListener('click', async e => {
   e.preventDefault();
   if (await confirmDialog('leaveDialog')) { setLeaving(true); location.href = a.href; }
 });
-// 공지·부서 게시판 작성 화면을 모두 확인한다
-const anyFormDirty = () => formDirty() || boardFormDirty();
+// 공지·부서 게시판·익명 게시판·자료실 작성 화면을 모두 확인한다
+const anyFormDirty = () => formDirty() || boardFormDirty() || Object.values(memberBoards).some(b => b && b.formDirty());
 function setLeaving(v) {
   formState.leaving = v;
   boardFormState.leaving = v;
+  Object.values(memberBoards).forEach(b => b && b.setLeaving(v));
 }
 
 // 페이지 번호 (공지·게시판 같이 씀): state.page를 바꾸고 reload로 그 페이지를 다시 받는다
@@ -227,6 +229,16 @@ const LIST_OF = {
     path: '/board/dept', label: '게시판 목록으로', title: () => byId('bListTitle')?.textContent.trim() || '부서 게시판',
     notFound: '게시글을 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 게시글입니다.',
     loadFail: '게시글을 불러오지 못했습니다', noEdit: '이 게시글은 수정할 수 없습니다', noWrite: '게시글을 쓸 수 없습니다', view: '게시글 보기',
+  },
+  'board-anon': {
+    path: '/board/anon', label: '게시판 목록으로', title: () => '익명 게시판',
+    notFound: '게시글을 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 게시글입니다.',
+    loadFail: '게시글을 불러오지 못했습니다', noEdit: '이 게시글은 수정할 수 없습니다', noWrite: '게시글을 쓸 수 없습니다', view: '게시글 보기',
+  },
+  'board-library': {
+    path: '/board/library', label: '자료 목록으로', title: () => '자료실',
+    notFound: '자료를 찾을 수 없습니다', notFoundDesc: '삭제되었거나 볼 수 있는 범위가 아닌 자료입니다.',
+    loadFail: '자료를 불러오지 못했습니다', noEdit: '이 자료는 수정할 수 없습니다', noWrite: '자료를 올릴 수 없습니다', view: '자료 보기',
   },
 };
 // 글 보기·작성 화면을 열지 못한 응답을 안내로 바꾼다. 404는 '없거나 볼 수 없는 글', 그 밖(서버 오류 등)은 '불러오지 못함'
@@ -731,7 +743,8 @@ const FILE_SIZE_MAX = 10 * 1024 * 1024;
 const FILE_EXT = /\.(jpe?g|png|gif|pdf|docx|xlsx|pptx|hwpx?)$/i;
 const fileSig = files => files.map(f => f.id).join(',');
 
-// 글쓰기 화면의 "파일 선택" 묶음. ids: { pick, input, info, list, error }
+// 글쓰기 화면의 "파일 선택" 묶음. ids: { pick, input, info, list, error, upload }
+// upload는 파일을 올릴 주소다. 비우면 공지·부서 게시판이 같이 쓰는 /board/api/files (자료실은 자기 주소를 준다)
 function makeFilePicker(ids) {
   if (!byId(ids.pick)) return null; // 이 페이지에 없는 게시판
   const fp = { files: [], uploading: false };
@@ -781,7 +794,7 @@ function makeFilePicker(ids) {
     fp.uploading = true;
     byId(ids.info).textContent = '올리는 중…';
     byId(ids.pick).disabled = true;
-    $.ajax({ url: pageHref('/board/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
+    $.ajax({ url: pageHref(ids.upload || '/board/api/files'), method: 'POST', data: form, processData: false, contentType: false, dataType: 'json' })
       .done(saved => {
         // 이미지 미리보기는 내 컴퓨터의 파일로 바로 보여 준다 (아직 글에 붙기 전이라 내려받기 주소가 없다)
         saved.forEach((f, i) => fp.files.push({ ...f, preview: isImage(f) ? URL.createObjectURL(ok[i]) : null }));
@@ -1133,6 +1146,235 @@ byId('bBtnCancel')?.addEventListener('click', async () => {
   boardFormState.leaving = true;
   location.href = boardFormState.id ? pageHref(`/board/dept/view/${boardFormState.id}`) : pageHref('/board/dept');
 });
+
+
+// ======================================================================
+// 익명 게시판 · 자료실 (목록 · 상세 · 작성/수정). 같은 업체 직원 누구나 보고 쓰고, 수정·삭제는 쓴 사람 본인만
+// 부서 게시판과 같은 모양이고, 두 게시판이 아래 makeMemberBoard 하나를 같이 쓴다. 다른 점은 cfg로 준다
+// - 익명 게시판(anonymous): 글·댓글에 쓴 사람 대신 '익명'을 보인다. 서버도 이름·사번을 보내지 않는다. 첨부 없음, 댓글 있음
+// - 자료실(files): 올린 사람(부서·이름)을 보인다. 파일을 1개 이상 붙여야 하고(fileRequired), 댓글 없음
+// 화면 요소 id는 JSP마다 앞글자(prefix)를 붙여 만든다: 익명 게시판 anon…, 자료실 lib… (예: anonRows, libRows)
+const ANON_NAME = '익명';
+
+function makeMemberBoard(key, cfg) {
+  const p = cfg.prefix;
+  const id = name => `${p}${name}`;
+  if (!byId(id('Rows'))) return null; // 이 페이지에 없는 게시판
+  const state = { page: 1, q: '' };
+  const listHref = pageHref(cfg.page);
+  let current = null; // 열려 있는 글 (상세 응답)
+
+  // ---------- 1. 목록 ----------
+  function loadList() {
+    const live = ticket();
+    api.get(cfg.api, { q: state.q, page: state.page })
+      .done(res => { if (live()) renderList(res); })
+      .fail(xhr => { if (live()) toast(apiMessage(xhr, cfg.text.listFail)); });
+  }
+
+  function renderList(res) {
+    state.page = res.page;
+    if (document.activeElement !== byId(id('SearchInput'))) byId(id('SearchInput')).value = state.q;
+    byId(id('ResultInfo')).textContent = state.q ? `"${state.q}" 검색 결과 ${res.total}건` : `전체 ${res.total}건`;
+
+    const tbody = byId(id('Rows'));
+    if (!res.items.length) {
+      tbody.replaceChildren(emptyRow(cfg.anonymous ? 3 : 4, state.q ? '검색 결과가 없습니다.' : cfg.text.empty));
+    } else {
+      tbody.replaceChildren(...res.items.map(x => {
+        const tr = el('tr');
+        tr.append(el('td', { 'data-label': '번호', class: 'num' }, String(x.no)), titleCell(pageHref(`${cfg.page}/view/${x.id}`), x));
+        if (!cfg.anonymous) tr.append(el('td', { 'data-label': '작성자' }, x.writerName)); // 익명 게시판은 작성자 칸이 없다
+        tr.append(el('td', { 'data-label': '작성일', class: 'num' }, fmtDate(x.createdAt)));
+        return tr;
+      }));
+    }
+    renderPager(id('Pager'), state, res.pages, loadList);
+  }
+
+  liveSearch(id('SearchInput'), id('SearchForm'), state, loadList);
+
+  // ---------- 2. 상세 (+ 익명 게시판은 댓글) ----------
+  function openDetail(postId) {
+    const live = ticket();
+    api.get(`${cfg.api}/${enc(postId)}`)
+      .done(x => { if (live()) { renderDetail(x); showSub(`view-${p}-detail`); } })
+      .fail(xhr => { if (live()) showOpenFailed(xhr, key); });
+  }
+
+  function renderDetail(x) {
+    current = x;
+    byId(id('DetailTitle')).textContent = x.title;
+    const who = el('span');
+    who.append(el('strong', {}, cfg.anonymous ? ANON_NAME : writerLabel(x)));
+    const parts = [who, el('span', {}, `${fmtTime(x.createdAt)} 작성`)];
+    if (x.updatedAt) parts.push(el('span', {}, `${fmtTime(x.updatedAt)} 수정`));
+    byId(id('DetailMeta')).replaceChildren(...parts);
+    byId(id('DetailBody')).innerHTML = sanitizeHtml(x.content); // 서식 글. 허용한 태그만 남기고 넣는다
+    if (cfg.files) renderFilesBox(x.files, { box: id('DetailFiles'), count: id('DetailFileCount'), images: id('DetailImages'), list: id('DetailFileList') });
+    byId(id('OwnerActions')).hidden = !x.mine; // 수정·삭제: 쓴 사람 본인에게만 (서버가 mine으로 알려 준다)
+    byId(id('BtnEdit')).setAttribute('href', pageHref(`${cfg.page}/edit/${x.id}`));
+    if (cfg.comments) {
+      byId(id('CommentText')).value = '';
+      setFieldError(id('CommentText'), id('CommentError'), '');
+      updateCount(id('CommentText'), id('CommentCountNow'), COMMENT_MAX);
+      renderComments(x);
+    }
+  }
+
+  // 댓글 목록: 익명 게시판은 모두 '익명'으로 보이고, 삭제 버튼은 본인 댓글에만 (서버가 canDelete로 알려 준다)
+  function renderComments(x) {
+    renderCommentList({ count: id('CommentCount'), empty: id('CommentEmpty'), list: id('Comments') }, x.comments, {
+      name: c => el('strong', {}, cfg.anonymous ? ANON_NAME : writerLabel(c)),
+      onDelete: cid => deleteCommentAt(`${cfg.api}/${x.id}/comments/${cid}`, listHref,
+        comments => { x.comments = comments; renderComments(x); }),
+    });
+  }
+  if (cfg.comments) {
+    bindCommentForm({ form: id('CommentForm'), text: id('CommentText'), counter: id('CommentCountNow'), error: id('CommentError'), save: id('CommentSave') },
+      () => current && `${cfg.api}/${current.id}/comments`, listHref,
+      comments => { if (current) { current.comments = comments; renderComments(current); } }, '댓글을 등록했습니다');
+  }
+
+  byId(id('BtnDelete')).addEventListener('click', async () => {
+    const x = current;
+    if (!x) return;
+    const d = byId('deleteDialog');
+    d.querySelector('h2').textContent = cfg.text.deleteTitle;
+    const extra = [cfg.comments && x.comments.length && `댓글 ${x.comments.length}개`, cfg.files && x.files.length && `첨부파일 ${x.files.length}개`].filter(Boolean);
+    d.querySelector('p').textContent = extra.length
+      ? `${extra.join('와 ')}도 함께 삭제되며 되돌릴 수 없습니다.` : '삭제한 글은 되돌릴 수 없습니다.';
+    if (!(await confirmDialog('deleteDialog'))) return;
+    const btn = byId(id('BtnDelete'));
+    btn.disabled = true;
+    api.post(`${cfg.api}/${x.id}/delete`)
+      .done(() => toastAndGo(cfg.text.deleted, listHref))
+      .fail(failTo(listHref))
+      .always(() => { btn.disabled = false; });
+  });
+
+  // ---------- 3. 작성 · 수정 ----------
+  // 내용은 공지와 같은 에디터. 자료실의 첨부파일도 공지와 같은 규칙(5개·파일당 10MB)이고 올리는 주소만 자료실 것이다
+  const editor = makeEditor(id('Content'));
+  const files = cfg.files
+    ? makeFilePicker({ pick: id('BtnPickFiles'), input: id('Files'), info: id('FilesInfo'), list: id('FileList'), error: id('FilesError'), upload: cfg.upload })
+    : null;
+  const fileSigNow = () => (files ? fileSig(files.files) : '');
+  const formState = { id: null, initial: { title: '', content: '', files: '' }, saving: false, leaving: false };
+  const formDirty = () => byId(`view-${p}-form`).classList.contains('on') && !formState.leaving && !formState.saving &&
+    (byId(id('Title')).value !== formState.initial.title || editor.html() !== formState.initial.content ||
+     fileSigNow() !== formState.initial.files);
+
+  function openForm(postId) {
+    const live = ticket();
+    api.get(`${cfg.api}/form`, postId ? { id: postId } : undefined)
+      .done(res => { if (live()) fillForm(res); })
+      .fail(xhr => { if (live()) formOpenFailed(xhr, postId, key); });
+  }
+
+  function fillForm(res) {
+    const x = res.post;
+    formState.id = x ? x.id : null;
+    formState.saving = false;
+    byId(id('FormTitle')).textContent = x ? cfg.text.editTitle : cfg.text.writeTitle;
+    byId(id('Title')).value = x ? x.title : '';
+    editor.set(x ? x.content : '');
+    if (files) files.set(x ? x.files : []);
+    formState.initial = { title: byId(id('Title')).value, content: editor.html(), files: fileSigNow() };
+    setSaving(id('BtnSave'), false, '저장');
+    setFieldError(id('Title'), id('TitleError'), '');
+    setFieldError(id('Content'), id('ContentError'), '');
+    updateCount(id('Title'), id('TitleCount'), TITLE_MAX);
+    updateCount(id('Content'), id('ContentCount'), CONTENT_MAX);
+    showSub(`view-${p}-form`);
+    byId(id('Title')).focus();
+  }
+
+  byId(id('Title')).addEventListener('input', () => { updateCount(id('Title'), id('TitleCount'), TITLE_MAX); setFieldError(id('Title'), id('TitleError'), ''); });
+  byId(id('Content')).addEventListener('input', () => { updateCount(id('Content'), id('ContentCount'), CONTENT_MAX); setFieldError(id('Content'), id('ContentError'), ''); });
+
+  byId(id('Form')).addEventListener('submit', e => {
+    e.preventDefault();
+    if (formState.saving) return; // 두 번 눌러도 한 번만 저장
+    if (files && files.uploading) { toast('파일을 올리는 중입니다. 잠시 뒤 저장해 주세요'); return; }
+    setFieldError(id('Title'), id('TitleError'), '');
+    setFieldError(id('Content'), id('ContentError'), '');
+    if (files) files.error('');
+    const title = byId(id('Title')).value.trim();
+    const content = editor.html();
+    const err = validate(title, textOf(content)); // 공지와 같은 규칙 (서식을 뺀 글자로 검사)
+    if (err) {
+      const [input, errId] = err.field === 'title' ? [id('Title'), id('TitleError')] : [id('Content'), id('ContentError')];
+      setFieldError(input, errId, err.message);
+      byId(input).focus();
+      return;
+    }
+    // 자료실은 파일이 있어야 한다 (서버도 같은 이유로 400을 돌려준다)
+    if (cfg.fileRequired && !files.files.length) {
+      files.error(cfg.text.noFile);
+      byId(id('BtnPickFiles')).focus();
+      return;
+    }
+    // 작성자·업체는 화면에서 보내지 않는다. 서버가 로그인한 사람으로 정한다
+    const body = { title, content };
+    if (files) body.files = filesToSend(files.files);
+    const editing = formState.id;
+    formState.saving = true;
+    setSaving(id('BtnSave'), true, '저장');
+    (editing ? api.post(`${cfg.api}/${editing}`, body) : api.post(cfg.api, body))
+      .done(r => {
+        if (!editing) { state.page = 1; state.q = ''; }
+        toastAndGo(editing ? cfg.text.updated : cfg.text.created, pageHref(`${cfg.page}/view/${r.id}`));
+      })
+      .fail(xhr => {
+        formState.saving = false;
+        setSaving(id('BtnSave'), false, '저장');
+        const msg = apiMessage(xhr);
+        // 파일 문제(너무 큼, 파일이 없음, 붙일 수 없는 파일, 5개 넘음)는 첨부 칸 아래에 둔다
+        if (files && (xhr.status === 413 || (xhr.status === 400 && msg.includes('파일')))) files.error(msg);
+        else if (xhr.status === 404) { formState.leaving = true; toastAndGo(msg, listHref); } // 저장하는 사이 지워진 글
+        else toast(msg);
+      });
+  });
+
+  byId(id('BtnCancel')).addEventListener('click', async () => {
+    if (formDirty() && !(await confirmDialog('leaveDialog'))) return;
+    formState.leaving = true;
+    location.href = formState.id ? pageHref(`${cfg.page}/view/${formState.id}`) : listHref;
+  });
+
+  // 주소를 보고 목록·글 보기·작성 중 하나를 연다 (route가 부른다)
+  function routeTo(action, postId) {
+    if (action === 'view') return openDetail(postId);
+    if (action === 'write' || action === 'edit') return openForm(action === 'edit' ? postId : null);
+    showSub(`view-${p}-list`);
+    loadList();
+  }
+
+  return { route: routeTo, formDirty, setLeaving: v => { formState.leaving = v; } };
+}
+
+// 이 페이지에 있는 게시판만 만들어진다 (없는 게시판은 null)
+const memberBoards = {
+  'board-anon': makeMemberBoard('board-anon', {
+    prefix: 'anon', api: '/board/api/anon/posts', page: '/board/anon',
+    anonymous: true, comments: true, files: false,
+    text: {
+      listFail: '게시글을 불러오지 못했습니다', empty: '아직 글이 없습니다. 첫 글을 써 보세요.',
+      writeTitle: '익명 글쓰기', editTitle: '글 수정', created: '글을 등록했습니다', updated: '글을 수정했습니다',
+      deleteTitle: '게시글을 삭제할까요?', deleted: '게시글을 삭제했습니다',
+    },
+  }),
+  'board-library': makeMemberBoard('board-library', {
+    prefix: 'lib', api: '/board/api/library/posts', page: '/board/library', upload: '/board/api/library/files',
+    anonymous: false, comments: false, files: true, fileRequired: true,
+    text: {
+      listFail: '자료 목록을 불러오지 못했습니다', empty: '아직 올라온 자료가 없습니다. 첫 자료를 올려 보세요.',
+      writeTitle: '자료 올리기', editTitle: '자료 수정', created: '자료를 올렸습니다', updated: '자료를 수정했습니다',
+      deleteTitle: '자료를 삭제할까요?', deleted: '자료를 삭제했습니다', noFile: '자료실 글에는 파일을 1개 이상 붙여 주세요',
+    },
+  }),
+};
 
 
 // ---------- 그룹웨어에 내놓는 것 ----------

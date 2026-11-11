@@ -1,8 +1,11 @@
 package com.ieum.gw.service;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
 import com.ieum.gw.dao.TicketDAO;
 import com.ieum.gw.dto.EquipmentTicketDTO;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +20,7 @@ import java.util.Objects;
 public class TicketService {
 
     private final TicketDAO dao;
+    private final BranchService branchService;
 
     /**
      * 장비 신청 최종 승인 때 IT 지급 티켓(TK_EQUIPMENT, RECEIVED) 1건을 만든다(계획서 흐름 B).
@@ -37,18 +41,26 @@ public class TicketService {
         requireId(requesterEmployeeId);
         requireId(approvalDocumentId);
         requireId(branchId);
+        
         if (assetType == null || !List.of("AT_LAPTOP", "AT_DESKTOP", "AT_MONITOR", "AT_OTHER").contains(assetType)) {
             throw new IllegalArgumentException("장비 종류가 올바르지 않습니다.");
         }
+        
         if (purpose == null || purpose.isBlank() || purpose.codePointCount(0, purpose.length()) > 1000) {
             throw new IllegalArgumentException("사용 목적은 1~1,000자로 입력해 주세요.");
         }
+        
         // 회사·요청자·지점은 결재 Service가 검증한 값이며, 업체별 복합 FK로도 검사한다.
         // 원본 장비 문서 고유 제약에 해당하는 중복만 SQL에서 건너뛴다.
-        int inserted = dao.insertEquipmentTicket(companyId, requesterEmployeeId, approvalDocumentId, branchId, purpose);
+        boolean branchActive = branchService.lockActiveBranchForEquipmentTicket(companyId, branchId);
+        int inserted = branchActive ? dao.insertEquipmentTicket(companyId, requesterEmployeeId, approvalDocumentId, branchId, purpose) : 0;
         
         if (inserted == 1 || inserted == 0) {
 			EquipmentTicketDTO ticket = dao.selectEquipmentTicket(companyId, approvalDocumentId);
+			
+			if (!branchActive && ticket == null) {
+				throw new ResponseStatusException(HttpStatus.CONFLICT, "수령 지점이 사용 중지되었거나 존재하지 않습니다.");
+			}
 			
 			if (ticket != null 
 					&& ticket.getItTicketId() != null

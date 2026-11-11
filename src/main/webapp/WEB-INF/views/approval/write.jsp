@@ -55,7 +55,8 @@
             <div class="ea-group" id="eaEquipFields" hidden>
               <p class="ea-group-title">장비 내용</p>
               <div class="ea-row"><label for="eaEquipKind">장비</label><select class="filter-select" id="eaEquipKind"></select></div>
-              <div class="ea-row"><label for="eaEquipQty">수량</label><input class="input ea-qty" id="eaEquipQty" type="number" min="1" max="10" value="1" inputmode="numeric"></div>
+              <div class="ea-row"><label for="eaEquipQty">수량</label><input class="input ea-qty" id="eaEquipQty" type="text" value="1" readonly aria-readonly="true" inputmode="numeric"></div>
+              <div class="ea-row ea-row-sub"><span></span><p class="ea-hint">장비는 한 번에 1대만 신청할 수 있습니다.</p></div>
               <div class="ea-row"><label for="eaEquipBranch">수령 지점</label><select class="filter-select" id="eaEquipBranch"></select></div>
               <div class="ea-row ea-row-sub" id="eaBranchHintRow" hidden><span></span><p class="ea-hint is-warn" id="eaBranchHint">등록된 지점이 없습니다. 업체 관리자가 지점 관리에서 지점을 먼저 등록해야 합니다.</p></div>
               <div class="ea-row ea-row-top">
