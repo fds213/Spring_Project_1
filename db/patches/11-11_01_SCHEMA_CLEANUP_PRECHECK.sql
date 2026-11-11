@@ -1,0 +1,169 @@
+-- 82개 구조에서 60개 구조로 정리하기 전 사전 점검. 조회만 수행한다.
+-- 삭제 대상에 데이터, 목록 밖 FK, 의존 객체 또는 시퀀스 기본값 참조가 있으면 멈춘다.
+SET DEFINE OFF
+SET SERVEROUTPUT ON
+WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
+
+DECLARE
+    c_drop_tables CONSTANT SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
+        'ACCOUNT_PERMISSION', 'ATTENDANCE_ASSESSMENT', 'DAILY_NOTICE_VIEW', 'DATA_PURGE_RUN',
+        'DEMO_ACCOUNT', 'DEMO_DEPARTMENT', 'DEPARTMENT_PERMISSION', 'ERROR_ARCHIVE',
+        'EVENT_DEPARTMENT', 'EVENT_EMPLOYEE', 'MAP_BUNDLE_ITEM', 'MAP_MARKER_GRANT',
+        'PAYMENT_REMINDER', 'ROLE_PERMISSION', 'SUPPORT_ACTION', 'SUPPORT_CONSENT',
+        'USAGE_SNAPSHOT', 'MAP_BUNDLE_GRANT', 'SUPPORT_SCOPE', 'MAP_SHARE_REQUEST',
+        'SUPPORT_GRANT', 'MAP_BUNDLE'
+    );
+    c_drop_sequences CONSTANT SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
+        'SQ_ACCOUNT_PERMISSION', 'SQ_ATTENDANCE_ASSESSMENT', 'SQ_DAILY_NOTICE_VIEW', 'SQ_DATA_PURGE_RUN',
+        'SQ_DEPARTMENT_PERMISSION', 'SQ_ERROR_ARCHIVE', 'SQ_MAP_BUNDLE', 'SQ_MAP_BUNDLE_GRANT',
+        'SQ_MAP_MARKER_GRANT', 'SQ_MAP_SHARE_REQUEST', 'SQ_PAYMENT_REMINDER', 'SQ_SUPPORT_ACTION',
+        'SQ_SUPPORT_CONSENT', 'SQ_SUPPORT_GRANT', 'SQ_SUPPORT_SCOPE', 'SQ_USAGE_SNAPSHOT'
+    );
+    c_keep_tables CONSTANT SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
+        'COMMON_CODE', 'COMPANY', 'DEPARTMENT', 'JOB_GRADE',
+        'BRANCH', 'EMPLOYEE', 'USER_ACCOUNT', 'ACCOUNT_REQUEST',
+        'EMAIL_VERIFICATION', 'EMAIL_RATE_LIMIT', 'EMPLOYEE_NO_COUNTER', 'SUBSCRIPTION_PLAN',
+        'SERVICE_PERIOD', 'CAPACITY_REQUEST', 'PAYMENT_ORDER', 'PAYMENT',
+        'SUBSCRIPTION_CHANGE', 'CAPACITY_LIMIT', 'APPROVAL_DOCUMENT', 'APPROVAL_STEP',
+        'APPROVAL_HISTORY', 'LEAVE_REQUEST', 'LEAVE_REQUEST_DAY', 'LEAVE_CYCLE',
+        'LEAVE_LEDGER', 'LEAVE_SLOT', 'EQUIPMENT_REQUEST', 'ATTENDANCE',
+        'ATTENDANCE_DEVICE', 'DEVICE_EMPLOYEE', 'ATTENDANCE_EVENT', 'HOLIDAY',
+        'OVERTIME_RECORD', 'ASSET', 'IT_TICKET', 'TICKET_COMMENT',
+        'TICKET_HISTORY', 'ASSET_ASSIGNMENT', 'ASSET_HISTORY', 'CALENDAR_EVENT',
+        'BOARD', 'POST', 'POST_COMMENT', 'CHAT_ROOM',
+        'CHAT_MEMBER', 'CHAT_MESSAGE', 'WORK_MAP', 'MAP_MARKER',
+        'ATTACHMENT', 'APPROVAL_FILE', 'POST_FILE', 'TICKET_FILE',
+        'NOTIFICATION', 'PUBLIC_INQUIRY', 'PUBLIC_REPLY', 'MAIL_OUTBOX',
+        'MAIL_ATTEMPT', 'SUPPORT_INQUIRY', 'SUPPORT_REPLY', 'ATTENDANCE_CORRECTION'
+    );
+    c_keep_sequences CONSTANT SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(
+        'SQ_COMPANY', 'SQ_DEPARTMENT', 'SQ_JOB_GRADE', 'SQ_BRANCH',
+        'SQ_EMPLOYEE', 'SQ_USER_ACCOUNT', 'SQ_ACCOUNT_REQUEST', 'SQ_EMAIL_VERIFICATION',
+        'SQ_EMAIL_RATE_LIMIT', 'SQ_SUBSCRIPTION_PLAN', 'SQ_SERVICE_PERIOD', 'SQ_CAPACITY_REQUEST',
+        'SQ_PAYMENT_ORDER', 'SQ_PAYMENT', 'SQ_SUBSCRIPTION_CHANGE', 'SQ_CAPACITY_LIMIT',
+        'SQ_APPROVAL_DOCUMENT', 'SQ_APPROVAL_STEP', 'SQ_APPROVAL_HISTORY', 'SQ_LEAVE_REQUEST_DAY',
+        'SQ_LEAVE_CYCLE', 'SQ_LEAVE_LEDGER', 'SQ_ATTENDANCE', 'SQ_ATTENDANCE_DEVICE',
+        'SQ_ATTENDANCE_EVENT', 'SQ_HOLIDAY', 'SQ_OVERTIME_RECORD', 'SQ_ASSET',
+        'SQ_IT_TICKET', 'SQ_TICKET_COMMENT', 'SQ_TICKET_HISTORY', 'SQ_ASSET_ASSIGNMENT',
+        'SQ_ASSET_HISTORY', 'SQ_CALENDAR_EVENT', 'SQ_BOARD', 'SQ_POST',
+        'SQ_POST_COMMENT', 'SQ_CHAT_ROOM', 'SQ_CHAT_MESSAGE', 'SQ_WORK_MAP',
+        'SQ_MAP_MARKER', 'SQ_ATTACHMENT', 'SQ_NOTIFICATION', 'SQ_PUBLIC_INQUIRY',
+        'SQ_PUBLIC_REPLY', 'SQ_MAIL_OUTBOX', 'SQ_MAIL_ATTEMPT', 'SQ_SUPPORT_INQUIRY',
+        'SQ_SUPPORT_REPLY', 'SQ_ATTENDANCE_CORRECTION'
+    );
+    v_count PLS_INTEGER;
+    v_has_row PLS_INTEGER;
+    v_blocked BOOLEAN := FALSE;
+    v_table_ddl CLOB;
+    v_seq_pattern VARCHAR2(512);
+
+    FUNCTION drop_position(p_table_name VARCHAR2) RETURN PLS_INTEGER IS
+    BEGIN
+        FOR i IN 1 .. c_drop_tables.COUNT LOOP
+            IF c_drop_tables(i) = p_table_name THEN RETURN i; END IF;
+        END LOOP;
+        RETURN 0;
+    END;
+BEGIN
+    IF SYS_CONTEXT('USERENV', 'SESSION_USER') <> 'IEUM'
+       OR SYS_CONTEXT('USERENV', 'CURRENT_SCHEMA') <> 'IEUM' THEN
+        RAISE_APPLICATION_ERROR(-20601, 'IEUM 계정과 IEUM 스키마에서 실행하세요.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_TABLES
+     WHERE TABLE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_keep_tables));
+    IF v_count <> c_keep_tables.COUNT THEN
+        RAISE_APPLICATION_ERROR(-20602, '유지 대상 테이블이 누락되었습니다. 기존 패치 적용 상태를 확인하세요.');
+    END IF;
+
+    SELECT COUNT(*) INTO v_count
+      FROM USER_SEQUENCES
+     WHERE SEQUENCE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_keep_sequences))
+       AND MAX_VALUE = 99999 AND CYCLE_FLAG = 'N';
+    IF v_count <> c_keep_sequences.COUNT THEN
+        RAISE_APPLICATION_ERROR(-20603, '유지 대상 시퀀스 목록 또는 MAXVALUE/NOCYCLE 설정을 확인하세요.');
+    END IF;
+
+    FOR obj IN (
+        SELECT TABLE_NAME FROM USER_TABLES
+         WHERE TABLE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_drop_tables))
+         ORDER BY TABLE_NAME
+    ) LOOP
+        EXECUTE IMMEDIATE 'SELECT COUNT(*) FROM ' || obj.TABLE_NAME || ' WHERE ROWNUM = 1'
+            INTO v_has_row;
+        IF v_has_row > 0 THEN
+            DBMS_OUTPUT.PUT_LINE('데이터 있음: ' || obj.TABLE_NAME);
+            v_blocked := TRUE;
+        END IF;
+    END LOOP;
+
+    FOR fk IN (
+        SELECT child.OWNER, child.TABLE_NAME, child.CONSTRAINT_NAME, parent.TABLE_NAME AS PARENT_TABLE
+          FROM ALL_CONSTRAINTS child
+          JOIN USER_CONSTRAINTS parent ON child.R_CONSTRAINT_NAME = parent.CONSTRAINT_NAME
+         WHERE child.CONSTRAINT_TYPE = 'R' AND child.R_OWNER = USER
+           AND parent.TABLE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_drop_tables))
+    ) LOOP
+        IF fk.OWNER <> USER OR drop_position(fk.TABLE_NAME) = 0 THEN
+            DBMS_OUTPUT.PUT_LINE('목록 밖 FK: ' || fk.OWNER || '.' || fk.TABLE_NAME || ' / ' || fk.CONSTRAINT_NAME);
+            v_blocked := TRUE;
+        ELSIF drop_position(fk.TABLE_NAME) > drop_position(fk.PARENT_TABLE) THEN
+            DBMS_OUTPUT.PUT_LINE('삭제 순서와 다른 FK: ' || fk.TABLE_NAME || ' / ' || fk.CONSTRAINT_NAME || ' → ' || fk.PARENT_TABLE);
+            v_blocked := TRUE;
+        END IF;
+    END LOOP;
+
+    FOR dep IN (
+        SELECT OWNER, NAME, TYPE, REFERENCED_NAME
+          FROM ALL_DEPENDENCIES
+         WHERE REFERENCED_OWNER = USER
+           AND ((REFERENCED_TYPE = 'TABLE' AND REFERENCED_NAME IN (
+                    SELECT COLUMN_VALUE FROM TABLE(c_drop_tables)
+                )) OR (REFERENCED_TYPE = 'SEQUENCE' AND REFERENCED_NAME IN (
+                    SELECT COLUMN_VALUE FROM TABLE(c_drop_sequences)
+                )))
+           AND (OWNER <> USER OR TYPE <> 'TABLE' OR NAME NOT IN (
+               SELECT COLUMN_VALUE FROM TABLE(c_drop_tables)
+           ))
+    ) LOOP
+        DBMS_OUTPUT.PUT_LINE('의존 객체: ' || dep.OWNER || '.' || dep.NAME || ' (' || dep.TYPE || ') → ' || dep.REFERENCED_NAME);
+        v_blocked := TRUE;
+    END LOOP;
+
+    FOR syn IN (
+        SELECT OWNER, SYNONYM_NAME, TABLE_NAME
+          FROM ALL_SYNONYMS
+         WHERE TABLE_OWNER = USER AND DB_LINK IS NULL
+           AND (TABLE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_drop_tables))
+                OR TABLE_NAME IN (SELECT COLUMN_VALUE FROM TABLE(c_drop_sequences)))
+    ) LOOP
+        DBMS_OUTPUT.PUT_LINE('동의어: ' || syn.OWNER || '.' || syn.SYNONYM_NAME || ' → ' || syn.TABLE_NAME);
+        v_blocked := TRUE;
+    END LOOP;
+
+    -- 컬럼 기본값의 시퀀스 참조도 확인한다. 식별자의 큰따옴표는 비교에서 제외한다.
+    v_seq_pattern := '(^|[^A-Z0-9_$#])(';
+    FOR i IN 1 .. c_drop_sequences.COUNT LOOP
+        IF i > 1 THEN v_seq_pattern := v_seq_pattern || '|'; END IF;
+        v_seq_pattern := v_seq_pattern || c_drop_sequences(i);
+    END LOOP;
+    v_seq_pattern := v_seq_pattern || ')[[:space:]]*\.[[:space:]]*(NEXTVAL|CURRVAL)($|[^A-Z0-9_$#])';
+    FOR obj IN (
+        SELECT TABLE_NAME FROM USER_TABLES
+         WHERE DROPPED = 'NO' AND NESTED = 'NO' AND SECONDARY = 'N'
+           AND TABLE_NAME NOT IN (SELECT COLUMN_VALUE FROM TABLE(c_drop_tables))
+    ) LOOP
+        v_table_ddl := DBMS_METADATA.GET_DDL('TABLE', obj.TABLE_NAME, USER);
+        IF REGEXP_LIKE(REPLACE(v_table_ddl, '"', ''), v_seq_pattern, 'i') THEN
+            DBMS_OUTPUT.PUT_LINE('삭제 대상 시퀀스를 참조하는 테이블: ' || obj.TABLE_NAME);
+            v_blocked := TRUE;
+        END IF;
+    END LOOP;
+
+    IF v_blocked THEN
+        RAISE_APPLICATION_ERROR(-20604, '삭제를 중단했습니다. 위 항목을 DB 담당자와 확인하세요.');
+    END IF;
+    DBMS_OUTPUT.PUT_LINE('PASS: 삭제 대상의 데이터 및 참조 사전 점검');
+END;
+/
