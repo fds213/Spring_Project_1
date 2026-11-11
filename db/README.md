@@ -2,7 +2,9 @@
 
 Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저장소의 `db/` 아래에 같은 구조로 배치한다. SQL과 실행 안내는 Git 저장소의 `db/` 디렉터리에서 함께 관리한다.
 
-현재 생성 기준: **프로젝트 테이블 82개 / 시퀀스 66개 / 공통 코드 235개**. 별도 보존한 TEST_EMP는 프로젝트 테이블 수에 포함하지 않는다.
+신규 설치·제출 ERD 기준은 **프로젝트 테이블 60개, 컬럼 615개, 외래키 231개, 시퀀스 50개, 공통 코드 235개**다. 정리 전에는 프로젝트 테이블 82개와 시퀀스 66개를 생성했다. 레거시 TEST_EMP는 두 집계에서 모두 제외한다.
+
+**팀 DB 재구성 (2026-11-11):** XEPDB1의 IEUM 스키마에 프로젝트 테이블·시퀀스가 없는 것을 확인하고 신규 DDL과 초기 데이터를 적용했다. 11-11_03 구조 점검을 통과했고, COMMIT 후 공통 코드 235개와 시연 계정 8개를 확인했다. 레거시 TEST_EMP는 보존했다. 이 재구성으로 설치 SQL에 들어 있는 초기 데이터가 생성됐다.
 
 ## 파일 용도
 
@@ -19,7 +21,7 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql](patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql) | 근태정정 구조·코드·시퀀스 7개 항목 읽기 전용 점검 |
 | [patches/11-03_01_ANNUAL_RENEW_PATCH.sql](patches/11-03_01_ANNUAL_RENEW_PATCH.sql) | 기존 DB에 연간 요금제 행 추가, 코드 `PLAN_YEARLY`·`PP_RENEW` 활성화. 구조 변경 없음. 다시 실행해도 결과가 같다 |
 | [patches/11-03_02_ANNUAL_RENEW_CHECK.sql](patches/11-03_02_ANNUAL_RENEW_CHECK.sql) | 연간 요금제·코드 3개 항목 읽기 전용 점검 |
-| [dev/IEUM_DDL_reset.sql](dev/IEUM_DDL_reset.sql) | **폐기 가능한 개발 DB 전용. 테이블 82개·시퀀스 66개와 데이터 삭제. 팀 DB 실행 금지** |
+| [dev/IEUM_DDL_reset.sql](dev/IEUM_DDL_reset.sql) | **폐기 가능한 개발 DB 전용. 테이블 60개·시퀀스 50개와 데이터 삭제. 팀 DB 실행 금지** |
 | [patches/11-06_01_LEAVE_GRANT_PATCH.sql](patches/11-06_01_LEAVE_GRANT_PATCH.sql) | 기존 DB의 연차 추가 부여 구조·코드 변경. 승인 후 1회 실행 |
 | [patches/11-06_02_LEAVE_GRANT_CHECK.sql](patches/11-06_02_LEAVE_GRANT_CHECK.sql) | 연차 추가 부여 컬럼·제약·인덱스·코드 읽기 전용 점검 |
 | [patches/11-06_03_ATTENDANCE_NOTIFICATION_PATCH.sql](patches/11-06_03_ATTENDANCE_NOTIFICATION_PATCH.sql) | 기존 DB에 근태 정정 알림 컬럼·FK·인덱스·CHECK·코드 추가. 승인 후 1회 실행 |
@@ -28,8 +30,38 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 | [patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql](patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql) | 이음 장애 문의 답변 알림 구조·코드 읽기 전용 점검 |
 | [patches/11-10_01_BOARD_EXTRA_PATCH.sql](patches/11-10_01_BOARD_EXTRA_PATCH.sql) | 기존 DB에 익명 게시판·자료실 게시판 종류 코드 추가, CK_52_01을 새 정의로 교체(임시 이름으로 먼저 추가). 승인 후 1회 실행 |
 | [patches/11-10_02_BOARD_EXTRA_CHECK.sql](patches/11-10_02_BOARD_EXTRA_CHECK.sql) | 익명 게시판·자료실 CHECK·코드 읽기 전용 점검 |
+| [11-11_01_SCHEMA_CLEANUP_PRECHECK.sql](patches/11-11_01_SCHEMA_CLEANUP_PRECHECK.sql) | 기존 DB의 삭제 대상 데이터와 의존성 조회 |
+| [11-11_02_SCHEMA_CLEANUP_PATCH.sql](patches/11-11_02_SCHEMA_CLEANUP_PATCH.sql) | 사전 점검을 다시 실행하고 빈 테이블 22개와 시퀀스 16개 정리 |
+| [11-11_03_SCHEMA_CLEANUP_CHECK.sql](patches/11-11_03_SCHEMA_CLEANUP_CHECK.sql) | 신규 설치 또는 정리 후 프로젝트 구조 점검 |
 
-## 현재 팀 DB 상태
+## 신규 빈 개발 DB 실행 순서
+
+로컬 Oracle 계정과 애플리케이션 접속 설정은 [로컬 Oracle 설치 안내](../docs/5.%20DB/README.md#로컬-oracle에-설치하기)를 참고한다.
+
+1. [IEUM_DDL.sql](ddl/IEUM_DDL.sql) — 테이블 60개와 시퀀스 50개 생성
+2. [IEUM_COMMON_CODE_DML.sql](data/IEUM_COMMON_CODE_DML.sql) — 공통 코드 235개 입력
+3. [init_auth_data.sql](data/init_auth_data.sql) — 시연 계정 입력. 같은 폴더의 [IEUM_DEMO_SEED.sql](data/IEUM_DEMO_SEED.sql)을 자동으로 실행
+4. [11-11_03_SCHEMA_CLEANUP_CHECK.sql](patches/11-11_03_SCHEMA_CLEANUP_CHECK.sql)과 초기 데이터 파일의 조회 결과 확인
+5. 같은 연결에서 직접 COMMIT
+
+새로 만든 60개 구조에는 11/02~11/10 기능 변경이 포함되어 있다. 당시 패치와 점검 파일은 기존 DB 이행에 사용한다.
+
+초기화가 필요한 60개 구조의 별도 개발 DB는 [IEUM_DDL_reset.sql](dev/IEUM_DDL_reset.sql)을 실행한 후 위 순서로 다시 생성한다. reset은 지정한 테이블·데이터와 시퀀스를 삭제하며 ROLLBACK으로 복구되지 않는다.
+
+## 기존 DB의 테이블 정리 (82개 → 60개)
+
+1. 기존 DB에 적용할 기능 패치와 점검을 먼저 끝내고 미확정 DML을 정리한다. 앱과 배치의 쓰기를 중지하고 백업을 확보한다.
+2. [11-11_01 사전 점검](patches/11-11_01_SCHEMA_CLEANUP_PRECHECK.sql)을 실행한다. 대상에 데이터나 목록 밖 FK·뷰·프로그램·동의어·시퀀스 참조가 나오면 중단한다. 타 스키마에서만 보이는 의존성은 DBA와 확인한다.
+3. [11-11_02 정리 패치](patches/11-11_02_SCHEMA_CLEANUP_PATCH.sql)를 실행한다. 대상 안의 자식 테이블부터 삭제하고 이미 없는 객체는 건너뛴다. 삭제 DDL은 자동 확정되므로 중간에 멈추면 로그와 남은 객체를 확인한다.
+4. [11-11_03 사후 점검](patches/11-11_03_SCHEMA_CLEANUP_CHECK.sql)에서 유지 테이블 60개, 컬럼 615개, 외래키 231개, 시퀀스 50개와 제외 대상 0개를 확인한다.
+
+삭제 대상 22개 테이블과 16개 시퀀스의 이름은 정리 패치에서 확인할 수 있다. 유지 테이블의 데이터, 시퀀스 번호 및 공통 코드는 기존 DB의 값을 사용한다.
+
+## 기존 기능 패치 적용 기록
+
+아래 11/02~11/10 기록의 테이블·시퀀스 수와 점검 조건은 각 패치가 적용되던 시점의 기준이다.
+
+### 팀 DB의 기존 기능 패치 상태
 
 2026-11-02, `ieum_project` 연결의 XEPDB1 / IEUM에 구조·데이터 패치 및 **COMMIT 완료**. 점검 1~16번 완료, 17번의 `TEST_EMP`는 삭제하지 않고 보존했다. **현재 팀 DB에 같은 패치를 다시 실행할 필요는 없다.** 애플리케이션 기능 검증은 별도다.
 
@@ -39,11 +71,11 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 - PLAN_MONTHLY: 1개월·1인 4,000원·사용 Y. 시연 업체의 직원 지점 NULL 없음.
 - ieum0001: 기존 지점 포함 지점 4개·자산 6개. ieum0002: 지점 3개·자산 5개.
 
-## 연간 요금제·만료 전 연장 (11/03, 팀 DB 미적용)
+### 연간 요금제·만료 전 연장 (11/03, 팀 DB 미적용)
 
 이미 11/02 패치가 적용된 기존 DB는 `patches/11-03_01_ANNUAL_RENEW_PATCH.sql` 실행 → `patches/11-03_02_ANNUAL_RENEW_CHECK.sql` PASS 확인 → 같은 연결에서 직접 `COMMIT;`한다. 신규 빈 DB는 `IEUM_COMMON_CODE_DML.sql`과 `IEUM_DEMO_SEED.sql`에 들어 있어 실행하지 않는다. 넣기 전에도 앱은 돈다: 이용 결제 화면에 월간만 나오고, 월간 연장은 된다.
 
-## 연차 추가 부여 (11/06, 팀 DB 적용 완료)
+### 연차 추가 부여 (11/06, 팀 DB 적용 완료)
 
 2026-11-06 팀 DB 패치 적용·COMMIT 완료.
 점검 8개 항목 PASS와 CHECK·인덱스 정의 일치를 확인했다.
@@ -58,7 +90,7 @@ Oracle XE 21c / XEPDB1 / IEUM 계정 기준. 이 폴더의 내용은 GitHub 저�
 - 11/06 파일 기준: 테이블 82개·컬럼 794개·시퀀스 66개·공통 코드 230개.
 - 신규 공통 코드 적재 파일의 USE_YN='Y'는 116개다.
 
-### 기존 DB
+#### 기존 DB
 
 공용 DB 실행은 별도 승인을 받은 뒤 진행한다.
 
@@ -71,33 +103,16 @@ DDL은 자동 확정되어 ROLLBACK으로 취소되지 않는다.
 오류 발생 시 중단하고, 일부 적용 상태를 확인하기 전에는 패치를 다시 실행하지 않는다.
 전체 DDL·공통 코드 적재 파일·reset은 기존 DB에 실행하지 않는다.
 
-### 신규 빈 DB
+#### 신규 빈 DB
 
-기존 신규 DB 생성 순서를 따른다.
+위 신규 빈 개발 DB 실행 순서를 따른다.
 수정된 전체 DDL과 공통 코드 적재 파일에 이번 변경이 포함되어 있으므로
 11-06_01 패치는 실행하지 않고, 11-06_02 점검만 추가로 실행한다.
 
 공용 DB 반영과 CI 검증은 별개다.
 DB 변경이 포함된 커밋을 PR #164 브랜치에도 반영한 뒤 CI를 다시 확인한다.
 
-## 신규 빈 개발 DB 실행 순서
-
-1. `ddl/IEUM_DDL.sql`
-2. `data/IEUM_COMMON_CODE_DML.sql`
-3. `data/init_auth_data.sql` — `IEUM_DEMO_SEED.sql`도 자동 실행
-4. `patches/11-02_03_CHECK.sql` 및 `patches/11-02_05_ATTENDANCE_CORRECTION_CHECK.sql`
-5. `patches/11-06_02_LEAVE_GRANT_CHECK.sql`
-6. `patches/11-06_04_ATTENDANCE_NOTIFICATION_CHECK.sql`
-7. `patches/11-09_02_SUPPORT_NOTIFICATION_CHECK.sql`
-8. `patches/11-10_02_BOARD_EXTRA_CHECK.sql`
-9. 오류와 결과를 확인한 뒤 같은 연결에서 직접 `COMMIT;`
-
-신규 DDL에는 근태정정이 포함되어 있으므로
-`11-02_04_ATTENDANCE_CORRECTION_PATCH.sql`은 실행하지 않는다.
-
-기존 자료를 모두 버려도 되는 **별도 개발 DB에서만**, 위 순서 전에 `dev/IEUM_DDL_reset.sql`을 실행할 수 있다. 초기화는 ROLLBACK으로 복구되지 않는다. 신규 생성 DDL은 기존 객체를 건너뛰지 않는다. 이 생성·삭제 경로는 이번 팀 DB 패치 실행 검증에 포함하지 않았다.
-
-## 근태 정정 알림 (11/06, 팀 DB 적용 완료)
+### 근태 정정 알림 (11/06, 팀 DB 적용 완료)
 
 2026-11-06 팀 DB 패치 적용·COMMIT 완료.
 점검 6개 항목 PASS와 CHECK·FK·인덱스 정의 일치를 확인했다.
@@ -120,7 +135,7 @@ DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행�
 DB 변경을 develop과 팀 DB에 반영한 뒤 #174를 병합한다.
 이후 근태 담당이 알림 호출과 화면 이동을 연결한다.
 
-## 이음 장애 문의 답변 알림 (11/09, 팀 DB 적용 완료)
+### 이음 장애 문의 답변 알림 (11/09, 팀 DB 적용 완료)
 
 2026-11-10 팀 DB 패치 적용·COMMIT 완료.
 11-09_02 점검 6개 항목 PASS를 확인했다.
@@ -143,7 +158,7 @@ DB 변경을 develop과 팀 DB에 반영한 뒤 #174를 병합한다.
 DB 변경을 develop(#209)과 팀 DB에 반영한 뒤 알림 코드를 붙였다.
 패치를 돌리지 않은 DB에서는 알림 저장이 답변과 같은 트랜잭션이라 운영자 답변이 실패한다.
 
-## 익명 게시판·자료실 (11/10, 팀 DB 적용 완료)
+### 익명 게시판·자료실 (11/10, 팀 DB 적용 완료)
 
 2026-11-10 팀 DB 패치 적용·COMMIT 완료.
 11-10_02 점검 6개 항목 PASS를 확인했다.
@@ -163,7 +178,7 @@ DB 변경을 develop(#209)과 팀 DB에 반영한 뒤 알림 코드를 붙였다
 같은 연결에서 직접 COMMIT한다.
 DDL은 자동 확정되므로 오류 발생 시 상태 확인 없이 재실행하지 않는다.
 
-### 11-10_01 패치가 중간에 멈췄을 때
+#### 11-10_01 패치가 중간에 멈췄을 때
 
 CHECK 교체는 1단계 새 정의를 CK_52_01_TMP로 추가·검증, 2단계 옛 CK_52_01 삭제,
 3단계 CK_52_01_TMP를 CK_52_01로 이름 바꾸기 순서다. 어느 단계에서 멈춰도
@@ -199,7 +214,7 @@ SELECT CODE FROM COMMON_CODE WHERE CODE IN ('BOARD_ANON', 'BOARD_LIBRARY');
 DB 변경을 develop(#217)과 팀 DB에 반영한 뒤 익명 게시판·자료실 코드를 붙였다.
 패치를 돌리지 않은 DB에서는 두 게시판의 줄을 만들 수 없어(FK_52_02·CK_52_01) 첫 글쓰기가 실패한다.
 
-## 아직 11/02 변경이 적용되지 않은 기존 DB
+### 아직 11/02 변경이 적용되지 않은 기존 DB
 
 DB 백업을 확보하고 앱의 쓰기 작업을 멈춘 뒤 다음 순서로 실행한다. 전체 DDL이나 init 파일로 갱신하지 않는다.
 
@@ -215,7 +230,7 @@ DB 백업을 확보하고 앱의 쓰기 작업을 멈춘 뒤 다음 순서로 �
 
 17번은 옛 객체 정리 항목으로, 사용 여부를 확인한 뒤 별도로 결정한다. 자동 삭제하지 않는다. 16번은 기존 프로젝트 시퀀스 65개를 검사한다. 새 근태정정 시퀀스를 포함한 66개는 05 점검 파일에서 확인한다.
 
-## 근태정정 추가 변경
+### 근태정정 추가 변경
 
 팀장 최종 요청 기준: 알림 변경, AR_NO_OUT 추가, 기존 근태 판정 코드 USE_YN 변경은 제외한다. ATTENDANCE와 ATTENDANCE_EVENT의 컬럼·제약은 유지한다.
 
@@ -240,7 +255,7 @@ DB 백업을 확보하고 앱의 쓰기 작업을 멈춘 뒤 다음 순서로 �
 
 이미 11/02 기본 패치가 적용된 기존 DB는 **04 근태정정 패치만** 실행 → 05 점검 PASS 확인 → 같은 연결에서 직접 COMMIT한다. 원본 공통 코드 DML이나 전체 DDL을 재실행하지 않는다. 04는 이미 새 객체가 있으면 중단하므로 일부 실패 시 상태 확인 없이 다시 실행하지 않는다.
 
-### 향후 서버 구현 기준
+#### 향후 서버 구현 기준
 
 기능은 11/6 필수 통합 이후 구현한다. 아래는 확정된 구현 기준이며 **이번 SQL만으로 서버 기능이 구현되지는 않는다.**
 
