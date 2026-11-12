@@ -57,7 +57,7 @@
     <div class="card yellow"><b>근태 단말기</b>지문 시뮬레이터 화면<br>/api/** 로 출퇴근 기록 (단말기 키)</div>
     <div class="card purple"><b>토스페이먼츠 결제창</b>결제 SDK (브라우저)<br>테스트 결제, 실제 대금 없음</div>
     <div class="card pink"><b>WebSocket</b>ws://host/{ctx}/chat/room/{roomId}<br>ws://host/{ctx}/chat/updates</div>
-    <div class="card gray"><b>개발 도구</b>Git · GitHub · STS3<br>GitHub Actions(build · db-check · app-check)</div>
+    <div class="card gray"><b>개발 도구</b>Git · GitHub · STS3<br>GitHub Actions(build · db-check · app-check · url-report)</div>
     <div class="card green"><b>JUnit 5.14 + Spring Test</b>테스트 클래스 81개<br>결재·티켓 상태, 동시 승인, 업체 분리</div>
   </div>
 </div>
@@ -89,7 +89,7 @@
       <div class="stack">
         <div class="in"><b>/api/** 체인 (근태 단말기)</b>세션 없음 · CSRF 없음 · 로그인 없이 통과<br>단말기 키는 AttendanceService가 확인</div>
         <div class="in"><b>일반 체인: form-login /login</b>업체 코드 + 사번 + 비밀번호<br>LoginAuthenticationProvider: 잠금 → 비밀번호 → 계정 상태<br>LoginFailureHandler: 5번 실패 → 10분 잠금</div>
-        <div class="in"><b>intercept-url</b>/ · /trial · /inquiry · /join · /login 공개<br>/ops/** OPS · /*/admin/** ADMIN · 나머지 로그인</div>
+        <div class="in"><b>intercept-url</b>/ · /trial · /inquiry · /join · /login · /attendance/simulator 공개<br>/ops/** OPS · 티켓·자산 관리 IT·ADMIN<br>근태 관리·사원 목록 HR·ADMIN · 그 밖의 /*/admin/** ADMIN<br>나머지는 로그인</div>
         <div class="in"><b>Ajax 응답</b>AjaxAwareEntryPoint (401 JSON)<br>AjaxAwareAccessDeniedHandler (403 JSON, CSRF 만료 구분)</div>
       </div>
     </div>
@@ -108,7 +108,7 @@
           <div class="in"><b>@ResponseBody (JSON API)</b>/&lt;모듈&gt;/api/** · 데이터를 바꾸는 요청은 모두 POST<br>@AuthenticationPrincipal LoginUser (업체·사원은 로그인 정보에서만)</div>
         </div>
         <div class="row">
-          <div class="in"><b>StandardServletMultipartResolver</b>첨부·사진 업로드 (공지·결재·티켓)</div>
+          <div class="in"><b>StandardServletMultipartResolver</b>첨부·사진 업로드 (공지·자료실·결재·티켓·채팅 이미지)</div>
           <div class="in"><b>정적 파일</b>/resources/** · /manifest.json · /service-worker.js</div>
         </div>
       </div>
