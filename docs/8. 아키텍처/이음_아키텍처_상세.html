@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>이음 시스템 아키텍처</title>
+<!-- 원본. 고친 뒤 브라우저로 열어 화면 전체를 PNG로 저장해 이음_아키텍처.png로 덮어쓴다. -->
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;font-family:"Noto Sans CJK KR","Malgun Gothic","맑은 고딕","Apple SD Gothic Neo",sans-serif;color:#1f2937}
+  .page{width:1800px;padding:34px 40px 40px}
+  h1{text-align:center;font-size:36px;margin:0 0 6px;letter-spacing:-.5px}
+  .sub{text-align:center;color:#6b7280;font-size:16px;margin:0 0 26px}
+  .layer{border:2px solid #cbd5e1;border-radius:14px;padding:16px 20px 20px;background:#fff}
+  .layer>h2{font-size:21px;margin:0 0 14px}
+  .row{display:flex;gap:16px}
+  .row>*{flex:1}
+  .card{border:1.5px solid;border-radius:10px;padding:10px 12px;text-align:center;font-size:13.5px;line-height:1.5}
+  .card b{display:block;font-size:16px;margin-bottom:2px}
+  .grp{border:1.5px solid;border-radius:12px;padding:12px 14px 14px}
+  .grp>h3{text-align:center;font-size:18px;margin:0 0 2px}
+  .grp>.d{text-align:center;font-size:13.5px;color:#4b5563;margin:0 0 10px}
+  .in{background:#fff;border:1.5px solid;border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.5;text-align:center}
+  .in b{display:block;font-size:14.5px}
+  .stack{display:flex;flex-direction:column;gap:8px}
+  .arrows{display:flex;justify-content:space-around;height:52px;align-items:center;font-size:14px}
+  .arr{display:flex;align-items:center;gap:8px;font-weight:600}
+  .arr i{display:inline-block;width:3px;height:40px;position:relative}
+  .arr i:after{content:"";position:absolute;left:-6px;bottom:-4px;border:7.5px solid transparent;border-top:10px solid currentColor}
+  .blue{border-color:#60a5fa;background:#eff6ff;color:#1e3a8a}
+  .yellow{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+  .purple{border-color:#a78bfa;background:#f5f3ff;color:#4c1d95}
+  .pink{border-color:#f472b6;background:#fdf2f8;color:#9d174d}
+  .gray{border-color:#9ca3af;background:#f3f4f6;color:#374151}
+  .green{border-color:#4ade80;background:#f0fdf4;color:#14532d}
+  .orange{border-color:#fb923c;background:#fff7ed;color:#9a3412}
+  .red{border-color:#f87171;background:#fef2f2;color:#991b1b}
+  .teal{border-color:#2dd4bf;background:#f0fdfa;color:#134e4a}
+  .amber{border-color:#fbbf24;background:#fefce8;color:#713f12}
+  .grp.red .in{border-color:#fca5a5} .grp.blue .in{border-color:#93c5fd} .grp.pink .in{border-color:#f9a8d4}
+  .grp.green .in{border-color:#86efac} .grp.amber .in{border-color:#fcd34d} .grp.teal .in{border-color:#5eead4}
+  .grp.gray .in{border-color:#d1d5db}
+  .note{font-size:12.5px;color:#6b7280;margin-top:6px}
+  .gap{height:16px}
+  .wide{flex:2}
+</style>
+</head>
+<body><div class="page">
+
+<h1>이음(IEUM) 시스템 아키텍처 (Spring Legacy MVC + WebSocket + Oracle)</h1>
+<p class="sub">여러 업체가 함께 쓰는 그룹웨어 · IT 지원(티켓·자산) · 무료 체험·구독 운영 플랫폼</p>
+
+<!-- ① Client -->
+<div class="layer">
+  <h2>① Client Layer</h2>
+  <div class="row">
+    <div class="card blue"><b>웹 브라우저 · PWA</b>JSP · JSTL · jQuery Ajax<br>manifest.json · service-worker.js(정적 파일만 캐시)</div>
+    <div class="card yellow"><b>근태 단말기</b>지문 시뮬레이터 화면<br>/api/** 로 출퇴근 기록 (단말기 키)</div>
+    <div class="card purple"><b>토스페이먼츠 결제창</b>결제 SDK (브라우저)<br>테스트 결제, 실제 대금 없음</div>
+    <div class="card pink"><b>WebSocket</b>ws://host/{ctx}/chat/room/{roomId}<br>ws://host/{ctx}/chat/updates</div>
+    <div class="card gray"><b>개발 도구</b>Git · GitHub · STS3<br>GitHub Actions(build · db-check · app-check · url-report)</div>
+    <div class="card green"><b>JUnit 5.14 + Spring Test</b>테스트 클래스 81개<br>결재·티켓 상태, 동시 승인, 업체 분리</div>
+  </div>
+</div>
+
+<div class="arrows">
+  <span class="arr" style="color:#2563eb"><i style="background:#2563eb"></i>HTTP 화면 · Ajax(JSON)</span>
+  <span class="arr" style="color:#b45309"><i style="background:#b45309"></i>HTTP /api/**</span>
+  <span class="arr" style="color:#7c3aed"><i style="background:#7c3aed"></i>결제 승인 후 돌아오기</span>
+  <span class="arr" style="color:#db2777"><i style="background:#db2777"></i>WebSocket Handshake</span>
+</div>
+
+<!-- ② WAS -->
+<div class="layer">
+  <h2>② WAS / Application — Apache Tomcat 9 · Java 11 · Spring Framework 5.3.39 (XML 설정, WAR)</h2>
+
+  <div class="grp orange" style="margin-bottom:16px">
+    <h3 style="text-align:left">Servlet Container · Filters (web.xml)</h3>
+    <div style="font-size:14px;line-height:1.7">
+      CharacterEncodingFilter (UTF-8, force) → springSecurityFilterChain (DelegatingFilterProxy, /*)<br>
+      → ContextLoaderListener (root-context.xml + security-context.xml) → DispatcherServlet "appServlet" (servlet-context.xml, "/") · 업로드 파일당 10MB · 요청당 30MB
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Security -->
+    <div class="grp red">
+      <h3>Spring Security 5.8.16</h3>
+      <p class="d">필터 체인 두 개 · BCryptPasswordEncoder · CSRF 사용(일반 체인)</p>
+      <div class="stack">
+        <div class="in"><b>/api/** 체인 (근태 단말기)</b>세션 없음 · CSRF 없음 · 로그인 없이 통과<br>단말기 키는 AttendanceService가 확인</div>
+        <div class="in"><b>일반 체인: form-login /login</b>업체 코드 + 사번 + 비밀번호<br>LoginAuthenticationProvider: 잠금 → 비밀번호 → 계정 상태<br>LoginFailureHandler: 5번 실패 → 10분 잠금</div>
+        <div class="in"><b>intercept-url</b>/ · /trial · /inquiry · /join · /login · /attendance/simulator 공개<br>/ops/** OPS · 티켓·자산 관리 IT·ADMIN<br>근태 관리·사원 목록 HR·ADMIN · 그 밖의 /*/admin/** ADMIN<br>나머지는 로그인</div>
+        <div class="in"><b>Ajax 응답</b>AjaxAwareEntryPoint (401 JSON)<br>AjaxAwareAccessDeniedHandler (403 JSON, CSRF 만료 구분)</div>
+      </div>
+    </div>
+
+    <!-- MVC -->
+    <div class="grp blue wide">
+      <h3>Spring MVC — DispatcherServlet</h3>
+      <p class="d">@Controller 28개 · InternalResourceViewResolver (/WEB-INF/views/*.jsp) · Jackson 2.17 (JSON)</p>
+      <div class="stack">
+        <div class="row">
+          <div class="in"><b>Interceptor ① AccountStatusInterceptor</b>요청마다 세션의 역할 ↔ DB 역할 비교<br>비활성화·역할 변경이면 세션 끊기 (화면 → /login, Ajax → 401)</div>
+          <div class="in"><b>Interceptor ② ReadOnlyInterceptor</b>만료 업체는 GET 아닌 요청(쓰기) 거절<br>예외: 본인 비밀번호 변경 · 관리자 결제·직원 비활성화</div>
+        </div>
+        <div class="row">
+          <div class="in"><b>@Controller (JSP 화면)</b>GET /&lt;모듈&gt;/&lt;기능&gt; → views/&lt;모듈&gt;/*.jsp<br>관리 화면 /&lt;모듈&gt;/admin/** · 운영자 /ops/**</div>
+          <div class="in"><b>@ResponseBody (JSON API)</b>/&lt;모듈&gt;/api/** · 데이터를 바꾸는 요청은 모두 POST<br>@AuthenticationPrincipal LoginUser (업체·사원은 로그인 정보에서만)</div>
+        </div>
+        <div class="row">
+          <div class="in"><b>StandardServletMultipartResolver</b>첨부·사진 업로드 (공지·자료실·결재·티켓·채팅 이미지)</div>
+          <div class="in"><b>정적 파일</b>/resources/** · /manifest.json · /service-worker.js</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WebSocket -->
+    <div class="grp pink">
+      <h3>WebSocket (javax.websocket)</h3>
+      <p class="d">@ServerEndpoint + SpringConfigurator (Service 주입)</p>
+      <div class="stack">
+        <div class="in"><b>/chat/room/{roomId}</b>ChatServerEndpoint<br>방 참여자에게 메시지 전송</div>
+        <div class="in"><b>/chat/updates</b>ChatUpdateEndpoint<br>안 읽은 채팅 수(배지) 갱신 알림</div>
+        <div class="in"><b>로그인 확인</b>handshake가 Security 일반 체인을 거침<br>session.getUserPrincipal()로 사용자 확인<br>만료 업체는 메시지마다 거절(ChatService)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="gap"></div>
+
+  <div class="row">
+    <!-- Service -->
+    <div class="grp green wide">
+      <h3>Service Layer (@Service · @Transactional) — 43개</h3>
+      <p class="d">업무 규칙 · 데이터별 권한 · 동시 처리(SELECT … FOR UPDATE · 조건부 UPDATE · version) · 메일/외부 호출은 커밋 뒤</p>
+      <div class="row" style="margin-bottom:8px">
+        <div class="in"><b>사원 · 공통</b>EmployeeService · EmployeeAdminService<br>JoinService · PasswordResetService<br>AttachmentService · BadgeService</div>
+        <div class="in"><b>결재 · 근태</b>ApprovalService · AttendanceService<br>AttendanceCorrectionService<br>LeaveService · HolidayService</div>
+        <div class="in"><b>티켓 · 자산 · 지점</b>TicketService · TicketWorkService<br>AssetService · AssetAllocationService<br>BranchService · WorkMapService</div>
+      </div>
+      <div class="row">
+        <div class="in"><b>게시판 · 일정 · 채팅 · 알림</b>NoticeService · BoardDept/Anon/LibraryService<br>ScheduleService · ChatService<br>NotificationService</div>
+        <div class="in"><b>운영 플랫폼</b>SiteService · TrialVerifyService<br>SubscriptionService · PaymentService<br>OpsService · SupportService · InquiryService</div>
+        <div class="in"><b>외부 연결</b>MailService (JavaMailSender)<br>TossPaymentsClient (결제 승인 확인)<br>FileStorage → LocalFileStorage</div>
+      </div>
+    </div>
+
+    <!-- Persistence -->
+    <div class="grp amber">
+      <h3>Persistence Layer — MyBatis 3.5.19</h3>
+      <p class="d">Service → DAO → Mapper 순서로만 호출</p>
+      <div class="stack">
+        <div class="in"><b>DAO (@Repository) 31개</b>Mapper를 감싸고 Service가 부름</div>
+        <div class="in"><b>@Mapper 인터페이스 31개 + XML 31개</b>classpath:mapper/**/*.xml · #{} 파라미터만<br>업체 자료 SQL에는 company_id 조건</div>
+        <div class="in"><b>SqlSessionFactoryBean · DataSourceTransactionManager</b>tx:annotation-driven · mybatis-config.xml</div>
+        <div class="in"><b>HikariCP 7.1 + log4jdbc + ojdbc11</b>접속 정보는 db.properties (git 제외)</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="arrows">
+  <span class="arr" style="color:#b45309"><i style="background:#b45309"></i>JDBC</span>
+  <span class="arr" style="color:#0f766e"><i style="background:#0f766e"></i>파일 저장·열기</span>
+  <span class="arr" style="color:#7c3aed"><i style="background:#7c3aed"></i>HTTPS · SMTP (커밋 뒤)</span>
+</div>
+
+<!-- ③ Data / External -->
+<div class="layer">
+  <h2>③ Data &amp; External</h2>
+  <div class="row">
+    <div class="card amber"><b>Oracle XE 21c (공용 DB 서버 1대)</b>모든 업체가 같은 표를 쓰고 company_id로 구분<br>PK는 테이블마다 SEQUENCE · 이력은 DELETE 대신 상태 값</div>
+    <div class="card teal"><b>파일 저장소 (WAR 밖 서버 폴더)</b>{루트}/{company_id}/{모듈}/{UUID}.확장자<br>DB에는 파일 정보(ATTACHMENT)만 · 루트 경로는 file.properties</div>
+    <div class="card purple"><b>토스페이먼츠 (테스트)</b>브라우저 결제창 → 서버가 승인 API로 확인<br>같은 주문 번호는 한 번만 반영</div>
+    <div class="card blue"><b>카카오 지도 JavaScript API</b>브라우저가 불러옴 · 키는 kakao.properties<br>지점·근무지 지도</div>
+    <div class="card red"><b>Gmail SMTP</b>체험 인증 · 비밀번호 찾기 · 문의 접수·답변 메일<br>발송 기록 먼저 저장 → 커밋 뒤 발송</div>
+  </div>
+  <p class="note">비밀값(db · file · mail · toss · kakao .properties)은 git에 올리지 않고 *.example만 올린다.</p>
+</div>
+
+</div></body>
+</html>
