@@ -2,7 +2,7 @@
 
 [신규 설치 DDL](../../db/ddl/IEUM_DDL.sql)의 **테이블 60개, 컬럼 615개, 외래키 231개**를 10개 업무 영역으로 나눴다. 정리 전 82개 테이블과의 차이 및 기존 DB 반영 절차는 [DB 안내](../../db/README.md)에서 확인할 수 있다.
 
-전체 구조는 [IEUM_ERD.png](IEUM_ERD.png), 확대해서 볼 때는 [IEUM_ERD.svg](IEUM_ERD.svg)를 사용한다.
+전체 구조는 [이음_ERD.png](%EC%9D%B4%EC%9D%8C_ERD.png), 확대해서 볼 때는 [이음_ERD.svg](%EC%9D%B4%EC%9D%8C_ERD.svg)를 사용한다.
 
 | 번호 | 업무 영역 | 테이블 배치 | 테이블 정보 |
 | --- | --- | --- | --- |
