@@ -10,11 +10,11 @@
 
 ## 소스 코드 zip 만드는 법
 
-마감 때 `develop` → `main`을 병합하고 태그를 붙인 뒤(예: `v1.0`), 저장소 폴더에서 아래를 실행한다.
+마감 때 `develop` → `main`을 병합하고 태그를 붙인 뒤(제출본은 `v1.1`), 저장소 폴더에서 아래를 실행한다.
 
 ```bash
 git fetch --tags
-git archive --format=zip --prefix=IEUM/ -o ../이음_소스코드.zip v1.0
+git archive --format=zip --prefix=IEUM/ -o ../이음_소스코드.zip v1.1
 ```
 
 - `git archive`: 그 태그 시점에 저장소에 올라간 파일만 묶는다. `.gitignore`에 있는 키 파일(`db.properties`·`toss.properties`·`kakao.properties`·`mail.properties` 등)과 `target/`은 들어가지 않는다.

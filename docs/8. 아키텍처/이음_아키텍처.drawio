@@ -4,7 +4,7 @@
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="c3" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Malgun Gothic;" value="&lt;b style=&#39;font-size:26px&#39;&gt;이음(IEUM) 시스템 아키텍처&lt;/b&gt;&lt;br&gt;&lt;span style=&#39;color:#6b7280&#39;&gt;Spring Legacy MVC (XML 설정) · WebSocket · MyBatis · Oracle&lt;/span&gt;" vertex="1">
+        <mxCell id="c3" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;fontFamily=Malgun Gothic;" value="&lt;b style=&#39;font-size:26px&#39;&gt;시스템 아키텍처&lt;/b&gt;&lt;br&gt;&lt;span style=&#39;color:#6b7280&#39;&gt;Spring Legacy MVC (XML 설정) · WebSocket · MyBatis · Oracle&lt;/span&gt;" vertex="1">
           <mxGeometry height="60" width="800" x="420" y="10" as="geometry" />
         </mxCell>
         <mxCell id="c4" parent="1" style="rounded=1;arcSize=10;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#1e3a8a;strokeWidth=2;verticalAlign=top;align=left;spacingLeft=16;spacingTop=8;fontSize=19;fontStyle=1;fontColor=#1d4ed8;fontFamily=Malgun Gothic;" value="Client" vertex="1">
