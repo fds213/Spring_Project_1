@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8">
-<title>이음 순서도</title>
+<title>순서도</title>
 <style>
   html,body{margin:0;background:#fff;}
   body{font-family:"Apple SD Gothic Neo","Malgun Gothic","맑은 고딕",sans-serif;color:#111827;
@@ -24,7 +24,7 @@
   .edgeLabel{background:#f3e8ff !important;font-size:13px;}
   .edgeLabel p{background:#f3e8ff !important;}
 </style></head><body>
-<h1>이음(IEUM) 순서도</h1>
+<h1>순서도</h1>
 <p class="sub">업체용 그룹웨어 + 데모·구독 운영 플랫폼.</p>
 <div class="legend">
   <span><i class="sw start"></i>시작·끝</span><span><i class="sw proc"></i>처리(서버)</span>
@@ -55,7 +55,7 @@ classDef dec fill:#dcfce7,stroke:#4ade80,color:#111827;
 classDef db fill:#fef3c7,stroke:#f59e0b,color:#111827;
 </pre></div>
 <h2>② 로그인과 공통 검사</h2>
-<p class="note">업체 코드 + 사번으로 로그인한다. 5번 틀리면 10분 잠긴다. 업체 이용 기간은 요청마다 DB에서 확인하고, 끝난 업체는 읽기 전용이 된다. 이음 운영자는 로그인하면 홈 대신 운영 &gt; 업체 화면으로 간다.</p>
+<p class="note">업체 코드 + 사번으로 로그인한다. 5번 틀리면 10분 잠긴다. 업체 이용 기간은 요청마다 DB에서 확인하고, 끝난 업체는 읽기 전용이 된다. 이음 운영자는 로그인하면 홈 대신 이음 운영 &gt; 업체 관리 화면으로 간다.</p>
 <div class="flow"><pre class="mermaid">flowchart LR
 s(["시작&lt;br/&gt;로그인"]):::start --&gt; i1[/"업체 코드·사번·비밀번호 입력"/]:::io
 i1 --&gt; d1{"잠긴 계정인가?&lt;br/&gt;5번 실패 뒤 10분"}:::dec
@@ -97,7 +97,7 @@ classDef db fill:#fef3c7,stroke:#f59e0b,color:#111827;
 <p class="note">공개 회원가입은 없다. 직원은 계정 만들기에서 비밀번호까지 넣고, 승인되면 사번을 받아 바로 로그인한다. 업체 관리자는 업체 전체, 부서장은 자기 부서 요청만 처리한다.</p>
 <div class="flow"><pre class="mermaid">flowchart LR
 s1(["시작&lt;br/&gt;업체 관리자·부서장"]):::start --&gt; i0[/"가입 열기: 부서와 여는 시간 지정"/]:::io
-i0 --&gt; db0[("부서 DEPARTMENT&lt;br/&gt;가입을 여는 시각 기록")]:::db
+i0 --&gt; db0[("부서 DEPARTMENT&lt;br/&gt;가입을 받는 마감 시각 기록")]:::db
 s2(["시작&lt;br/&gt;계정 만들기 /join"]):::start --&gt; i1[/"업체 코드 입력 후 [확인]"/]:::io
 i1 --&gt; d1{"이용 중인 업체이고&lt;br/&gt;열린 부서가 있는가?"}:::dec
 db0 -.- d1
@@ -129,9 +129,13 @@ d0 -- 부서·직급 --&gt; i1[/"부서 관리·직급 관리:&lt;br/&gt;추가�
 i1 --&gt; db1[("부서 DEPARTMENT·직급 JOB_GRADE")]:::db
 db1 --&gt; o0[/"조직도·계정 만들기의 부서 목록에 반영"/]:::io
 d0 -- 사원 --&gt; i2[/"사원 관리: 비활성화·다시 사용&lt;br/&gt;업체 관리자는 역할(직원·IT 담당·인사 담당)과&lt;br/&gt;부서장도 지정"/]:::io
-i2 --&gt; d1{"업체 관리자 계정이나&lt;br/&gt;본인 계정을 바꾸려는가?"}:::dec
-d1 -- 예 --&gt; o1[/"바꿀 수 없음 안내"/]:::io
-d1 -- 아니오 --&gt; db2[("직원 EMPLOYEE·계정 USER_ACCOUNT")]:::db
+i2 --&gt; d1{"부서장 지정인가?"}:::dec
+d1 -- 예 --&gt; dh{"사용 중인 계정인가?"}:::dec
+dh -- 아니오 --&gt; oh[/"사용 중인 계정만&lt;br/&gt;부서장으로 지정할 수 있음 안내"/]:::io
+dh -- 예 --&gt; dbh[("부서 DEPARTMENT의 부서장 칸")]:::db
+d1 -- 아니오 --&gt; dr{"역할 변경·비활성화인데&lt;br/&gt;업체 관리자·본인 계정이거나&lt;br/&gt;다시 사용인데 본인 계정인가?"}:::dec
+dr -- 예 --&gt; o1[/"바꿀 수 없음 안내"/]:::io
+dr -- 아니오 --&gt; db2[("직원 EMPLOYEE·계정 USER_ACCOUNT")]:::db
 db2 --&gt; o2[/"역할을 바꾸거나 비활성화하면 그 직원은&lt;br/&gt;다음 요청에서 로그아웃.&lt;br/&gt;역할은 다시 로그인하면 새 메뉴로 반영,&lt;br/&gt;비활성 계정은 로그인할 수 없음"/]:::io
 d0 -- 지점 --&gt; i3[/"지점 등록·수정·사용 중지"/]:::io
 i3 --&gt; d2{"사용 중지인데 그 지점에&lt;br/&gt;지급이 안 끝난 장비 티켓이 있는가?"}:::dec
@@ -225,7 +229,7 @@ classDef dec fill:#dcfce7,stroke:#4ade80,color:#111827;
 classDef db fill:#fef3c7,stroke:#f59e0b,color:#111827;
 </pre></div>
 <h2>⑧ IT 티켓: 장애 접수와 처리 (접수 → 배정 → 처리 → 완료 → 확인)</h2>
-<p class="note">상태가 바뀔 때마다 이력(TICKET_HISTORY)을 같은 트랜잭션으로 저장하고, 배정과 처리 완료 때는 알림도 함께 저장한다. 두 사람이 동시에 바꾸면 늦은 쪽에 새로 불러오라고 안내한다. 해결되지 않았을 때의 재요청은 이번 범위가 아니다.</p>
+<p class="note">상태가 바뀔 때마다 이력(TICKET_HISTORY)을 같은 트랜잭션으로 저장하고, 배정과 처리 완료 때는 알림도 함께 저장한다. 두 사람이 동시에 바꾸면 늦은 쪽에 새로 불러오라고 안내한다. 해결되지 않았을 때의 재요청은 구현하지 않았다(기능명세서 1.7).</p>
 <div class="flow"><pre class="mermaid">flowchart LR
 s(["시작&lt;br/&gt;IT 서비스 &amp;gt; 장애·문의 접수"]):::start --&gt; i1[/"구분(장애·문의), 관련 자산 선택 또는 없음,&lt;br/&gt;접수 지점, 제목·내용, 사진(장애만 1장)"/]:::io
 i1 --&gt; db1[("티켓: 접수 IT_TICKET&lt;br/&gt;사진 TICKET_FILE")]:::db
@@ -258,7 +262,7 @@ d1 -- 예 --&gt; i2[/"사용자 번호 고르기&lt;br/&gt;출근·퇴근 고르
 i2 --&gt; d2{"이용 기간이&lt;br/&gt;끝난 업체인가?"}:::dec
 d2 -- 예 --&gt; o2[/"출퇴근을 받지 않음"/]:::io
 d2 -- 아니오 --&gt; p1["단말기 사용자 번호로&lt;br/&gt;직원 찾기"]:::proc
-dbd[("단말기·직원 연결&lt;br/&gt;ATTENDANCE_DEVICE")]:::db -.- p1
+dbd[("단말기·직원 연결&lt;br/&gt;DEVICE_EMPLOYEE")]:::db -.- p1
 p1 --&gt; d3{"등록된&lt;br/&gt;재직 직원인가?"}:::dec
 d3 -- 아니오 --&gt; o3[/"'등록되지 않은 번호'·&lt;br/&gt;재직 중이 아님"/]:::io
 d3 -- 예 --&gt; d4{"출근인가&lt;br/&gt;퇴근인가?"}:::dec
@@ -295,7 +299,7 @@ d4 -- 아니오 --&gt; p1["정정 요청 저장"]:::proc
 p1 --&gt; db1[("근태 정정&lt;br/&gt;ATTENDANCE_CORRECTION")]:::db
 p1 --&gt; d5{"재직 중인 부서장이 있고&lt;br/&gt;요청자가 아닌가?"}:::dec
 d5 -- 예 --&gt; p2["부서장에게&lt;br/&gt;정정 요청 알림"]:::proc
-d5 -- 아니오 --&gt; p3["업체 관리자 전원에게&lt;br/&gt;정정 요청 알림"]:::proc
+d5 -- 아니오 --&gt; p3["요청자를 뺀 업체 관리자에게&lt;br/&gt;정정 요청 알림"]:::proc
 p2 --&gt; i4[/"처리자: 처리할 근태 정정에서&lt;br/&gt;승인 또는 반려(사유)"/]:::io
 p3 --&gt; i4
 i4 --&gt; d6{"승인인가?"}:::dec
@@ -391,7 +395,7 @@ classDef dec fill:#dcfce7,stroke:#4ade80,color:#111827;
 classDef db fill:#fef3c7,stroke:#f59e0b,color:#111827;
 </pre></div>
 <h2>⑬ 문의와 이음 운영자 (도입 문의, 이음 장애 문의)</h2>
-<p class="note">이음 운영자는 운영 업체 ieum0000 소속 계정이고 운영 메뉴에서 신청 현황·업체 목록·문의를 본다. 지원 허가(업체 자료 열람)는 이번 범위가 아니다.</p>
+<p class="note">이음 운영자는 운영 업체 ieum0000 소속 계정이고 운영 메뉴에서 신청 현황·업체 목록·문의를 본다. 지원 허가(업체 자료 열람)는 구현하지 않았다(요구분석서 3장 &#x27;이번 제외&#x27;).</p>
 <div class="flow"><pre class="mermaid">flowchart LR
 s(["시작&lt;br/&gt;상품 홈페이지 &amp;gt; 문의"]):::start --&gt; i1[/"회사명·이름·이메일·제목·내용 입력,&lt;br/&gt;개인정보 수집 동의"/]:::io
 i1 --&gt; db1[("도입 문의 PUBLIC_INQUIRY")]:::db
