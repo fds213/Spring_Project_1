@@ -46,7 +46,7 @@
 </head>
 <body><div class="page">
 
-<h1>이음(IEUM) 시스템 아키텍처 (Spring Legacy MVC + WebSocket + Oracle)</h1>
+<h1>시스템 아키텍처 (Spring Legacy MVC + WebSocket + Oracle)</h1>
 <p class="sub">여러 업체가 함께 쓰는 그룹웨어 · IT 지원(티켓·자산) · 무료 체험·구독 운영 플랫폼</p>
 
 <!-- ① Client -->
@@ -58,14 +58,14 @@
     <div class="card purple"><b>토스페이먼츠 결제창</b>결제 SDK (브라우저)<br>테스트 결제, 실제 대금 없음</div>
     <div class="card pink"><b>WebSocket</b>ws://host/{ctx}/chat/room/{roomId}<br>ws://host/{ctx}/chat/updates</div>
     <div class="card gray"><b>개발 도구</b>Git · GitHub · STS3<br>GitHub Actions(build · db-check · app-check · url-report)</div>
-    <div class="card green"><b>JUnit 5.14 + Spring Test</b>테스트 클래스 81개<br>결재·티켓 상태, 동시 승인, 업체 분리</div>
+    <div class="card green"><b>JUnit 5.14 + Spring Test</b>테스트 클래스 77개 · 테스트 842개<br>(그 밖에 Oracle 통합 점검 4개 · 16개)<br>결재·티켓 상태, 동시 승인, 업체 분리</div>
   </div>
 </div>
 
 <div class="arrows">
   <span class="arr" style="color:#2563eb"><i style="background:#2563eb"></i>HTTP 화면 · Ajax(JSON)</span>
   <span class="arr" style="color:#b45309"><i style="background:#b45309"></i>HTTP /api/**</span>
-  <span class="arr" style="color:#7c3aed"><i style="background:#7c3aed"></i>결제 승인 후 돌아오기</span>
+  <span class="arr" style="color:#7c3aed"><i style="background:#7c3aed"></i>결제창 인증 후 돌아오기</span>
   <span class="arr" style="color:#db2777"><i style="background:#db2777"></i>WebSocket Handshake</span>
 </div>
 
@@ -77,7 +77,8 @@
     <h3 style="text-align:left">Servlet Container · Filters (web.xml)</h3>
     <div style="font-size:14px;line-height:1.7">
       CharacterEncodingFilter (UTF-8, force) → springSecurityFilterChain (DelegatingFilterProxy, /*)<br>
-      → ContextLoaderListener (root-context.xml + security-context.xml) → DispatcherServlet "appServlet" (servlet-context.xml, "/") · 업로드 파일당 10MB · 요청당 30MB
+      → DispatcherServlet "appServlet" (servlet-context.xml, "/") · 업로드 파일당 10MB · 요청당 30MB<br>
+      ※ ContextLoaderListener (root-context.xml + security-context.xml)는 요청 단계가 아니라 시작할 때 루트 설정을 읽는다
     </div>
   </div>
 
@@ -105,10 +106,10 @@
         </div>
         <div class="row">
           <div class="in"><b>@Controller (JSP 화면)</b>GET /&lt;모듈&gt;/&lt;기능&gt; → views/&lt;모듈&gt;/*.jsp<br>관리 화면 /&lt;모듈&gt;/admin/** · 운영자 /ops/**</div>
-          <div class="in"><b>@ResponseBody (JSON API)</b>/&lt;모듈&gt;/api/** · 데이터를 바꾸는 요청은 모두 POST<br>@AuthenticationPrincipal LoginUser (업체·사원은 로그인 정보에서만)</div>
+          <div class="in"><b>@ResponseBody (JSON API)</b>주로 /&lt;모듈&gt;/api/** (배지 /badges · 채팅 /chat/**는 예외)<br>데이터를 바꾸는 요청은 모두 POST<br>@AuthenticationPrincipal LoginUser (업체·사원은 로그인 정보에서만)</div>
         </div>
         <div class="row">
-          <div class="in"><b>StandardServletMultipartResolver</b>첨부·사진 업로드 (공지·자료실·결재·티켓·채팅 이미지)</div>
+          <div class="in"><b>StandardServletMultipartResolver</b>첨부·사진 업로드<br>(공지·부서 게시판·자료실·결재·티켓·채팅 이미지)</div>
           <div class="in"><b>정적 파일</b>/resources/** · /manifest.json · /service-worker.js</div>
         </div>
       </div>
@@ -131,7 +132,7 @@
   <div class="row">
     <!-- Service -->
     <div class="grp green wide">
-      <h3>Service Layer (@Service · @Transactional) — 43개</h3>
+      <h3>Service Layer (@Service · @Transactional) — 업무 Service 43개 + 파일 저장 LocalFileStorage</h3>
       <p class="d">업무 규칙 · 데이터별 권한 · 동시 처리(SELECT … FOR UPDATE · 조건부 UPDATE · version) · 메일/외부 호출은 커밋 뒤</p>
       <div class="row" style="margin-bottom:8px">
         <div class="in"><b>사원 · 공통</b>EmployeeService · EmployeeAdminService<br>JoinService · PasswordResetService<br>AttachmentService · BadgeService</div>
@@ -151,7 +152,7 @@
       <p class="d">Service → DAO → Mapper 순서로만 호출</p>
       <div class="stack">
         <div class="in"><b>DAO (@Repository) 31개</b>Mapper를 감싸고 Service가 부름</div>
-        <div class="in"><b>@Mapper 인터페이스 31개 + XML 31개</b>classpath:mapper/**/*.xml · #{} 파라미터만<br>업체 자료 SQL에는 company_id 조건</div>
+        <div class="in"><b>@Mapper 인터페이스 31개 + XML 31개</b>classpath:mapper/**/*.xml · 값은 #{}로만 바인딩<br>(부서·직급 관리의 표·칼럼 이름만 고정 enum 값으로 ${})<br>업체 자료 SQL에는 company_id 조건</div>
         <div class="in"><b>SqlSessionFactoryBean · DataSourceTransactionManager</b>tx:annotation-driven · mybatis-config.xml</div>
         <div class="in"><b>HikariCP 7.1 + log4jdbc + ojdbc11</b>접속 정보는 db.properties (git 제외)</div>
       </div>
@@ -169,10 +170,10 @@
 <div class="layer">
   <h2>③ Data &amp; External</h2>
   <div class="row">
-    <div class="card amber"><b>Oracle XE 21c (공용 DB 서버 1대)</b>모든 업체가 같은 표를 쓰고 company_id로 구분<br>PK는 테이블마다 SEQUENCE · 이력은 DELETE 대신 상태 값</div>
+    <div class="card amber"><b>Oracle XE 21c (공용 DB 서버 1대)</b>모든 업체가 같은 표를 쓰고 company_id로 구분<br>PK는 대부분 테이블별 SEQUENCE<br>(공통 코드는 코드 값, 나머지 9개는 부모 키·복합 키)<br>이력은 DELETE 대신 상태 값</div>
     <div class="card teal"><b>파일 저장소 (WAR 밖 서버 폴더)</b>{루트}/{company_id}/{모듈}/{UUID}.확장자<br>DB에는 파일 정보(ATTACHMENT)만 · 루트 경로는 file.properties</div>
     <div class="card purple"><b>토스페이먼츠 (테스트)</b>브라우저 결제창 → 서버가 승인 API로 확인<br>같은 주문 번호는 한 번만 반영</div>
-    <div class="card blue"><b>카카오 지도 JavaScript API</b>브라우저가 불러옴 · 키는 kakao.properties<br>지점·근무지 지도</div>
+    <div class="card blue"><b>카카오 지도 JavaScript API</b>브라우저가 불러옴 · 키는 kakao.properties<br>공통 지도·개인 지도 (주소 검색·마커)</div>
     <div class="card red"><b>Gmail SMTP</b>체험 인증 · 비밀번호 찾기 · 문의 접수·답변 메일<br>발송 기록 먼저 저장 → 커밋 뒤 발송</div>
   </div>
   <p class="note">비밀값(db · file · mail · toss · kakao .properties)은 git에 올리지 않고 *.example만 올린다.</p>

@@ -1,12 +1,11 @@
--- 2026-11-02: 신규 빈 DB용 전체 초기 자료. 기존 팀 DB에는 재실행하지 않는다.
--- 기존 팀 DB에는 patches/11-02_01_SCHEMA_PATCH.sql → patches/11-02_02_DATA_PATCH.sql 순서를 사용한다.
+-- 신규 빈 DB용 초기 자료(시연 업체·직원·계정). 자료가 있는 DB에는 다시 실행하지 않는다.
 SET DEFINE OFF
 SET SERVEROUTPUT ON
 WHENEVER SQLERROR EXIT SQL.SQLCODE ROLLBACK
 
 -- =====================================================================
 -- 로그인·사원 초기 데이터 (시연·테스트용)
--- 실행: 신규 빈 개발 DB의 ieum 계정. 기존 팀 DB에는 전체 재실행 금지. PK는 컬럼 기본값(SQ_*.NEXTVAL)으로 자동 생성
+-- 실행: 신규 빈 DB의 ieum 계정. PK는 컬럼 기본값(SQ_*.NEXTVAL)으로 자동 생성
 -- 순서: COMPANY → DEPARTMENT·JOB_GRADE → EMPLOYEE → USER_ACCOUNT → 부서장 → 사번 카운터
 -- 비밀번호: 모두 1234 (BCrypt)
 -- 사번 규칙: 발급 연도 4자리 + 업체별 일련번호 4자리, 업체마다 0001부터 (요구분석서 ACC-03)
@@ -32,7 +31,7 @@ SELECT company_id, 'IT지원팀', 3 FROM company WHERE company_code = 'ieum0001'
 INSERT INTO department (company_id, department_name, sort_order)
 SELECT company_id, '영업팀', 1 FROM company WHERE company_code = 'ieum0002';
 
--- 3. 직급 (업체마다 같은 6단계, 요구분석서 3.9 직급별 경력)
+-- 3. 직급 (업체마다 같은 6단계)
 INSERT INTO job_grade (company_id, grade_name, sort_order)
 SELECT c.company_id, g.grade_name, g.sort_order
 FROM company c CROSS JOIN (SELECT '사원' AS grade_name, 1 AS sort_order FROM dual UNION ALL SELECT '주임' AS grade_name, 2 AS sort_order FROM dual UNION ALL SELECT '대리' AS grade_name, 3 AS sort_order FROM dual UNION ALL SELECT '과장' AS grade_name, 4 AS sort_order FROM dual UNION ALL SELECT '차장' AS grade_name, 5 AS sort_order FROM dual UNION ALL SELECT '부장' AS grade_name, 6 AS sort_order FROM dual) g

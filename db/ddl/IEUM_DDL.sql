@@ -1,7 +1,6 @@
 -- 신규 빈 스키마 생성용. 프로젝트 테이블 60개, 시퀀스 50개를 생성한다.
--- 기존 DB는 db/README.md의 패치 절차를 따른다.
 -- 실행 순서: 이 파일 → data/IEUM_COMMON_CODE_DML.sql → data/init_auth_data.sql(내부에서 IEUM_DEMO_SEED.sql 포함).
--- 시퀀스 시작값/증가값은 유지하고 최댓값만 999999999999에서 99999로 축소했다. NOCYCLE 유지.
+-- 시퀀스 최댓값은 99999, NOCYCLE이다.
 -- DDL은 자동 COMMIT된다. 오류 시 이미 성공한 DDL은 되돌아가지 않는다.
 SET DEFINE OFF
 SET SERVEROUTPUT ON

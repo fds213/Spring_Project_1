@@ -1,7 +1,7 @@
--- 11/02 전달문 8~12번: 시험 업체 전용 보완 자료. 재실행 시 같은 업무 키로 중복 생성하지 않는다.
+-- 시연 업체(ieum0001·ieum0002) 보완 자료: 요금제·체험 기간·지점·자산·직원 근무 지점. 재실행 시 같은 업무 키로 중복 생성하지 않는다.
 -- IEUM_DDL.sql 및 업체·직원·계정 초기 자료 이후 실행한다.
--- 기존 팀 DB에서는 init_auth_data.sql 전체 대신 이 파일을 포함한 patches/11-02_02_DATA_PATCH.sql을 실행한다.
--- ieum0001/ieum0002에만 지점·자산·근무 지점·시험 기간을 넣는다. 실제 주소가 아닌 전달문의 시연 예시다.
+-- ieum0001/ieum0002에만 지점·자산·근무 지점·시험 기간을 넣는다. 지점 주소와 장비는 시연용 예시다.
+-- 시연 업체의 체험 기간은 2027-12-01 00:00(한국 시각)에 끝난다. 그 뒤에 설치하면 아래 날짜 세 곳을 설치일 뒤로 바꿔 실행한다.
 -- 본사/판교지점/부산지점, 업체별 재고 장비 5개를 준비하고 추가 지점에 재고가 없으면 1개를 보충한다.
 -- 기존 직원 지점·지급된 자산·유료 기간은 덮어쓰지 않는다. 자동 COMMIT하지 않는다.
 SET DEFINE OFF
@@ -42,20 +42,20 @@ BEGIN
 
     -- 기간이 하나도 없는 시험 업체만 최초 체험 기간을 만든다.
     INSERT INTO SERVICE_PERIOD (COMPANY_ID,PERIOD_TYPE,STARTS_AT,ENDS_AT,PURCHASED_SEATS,BILLING_ANCHOR_DATE)
-    SELECT c.COMPANY_ID,'PD_TRIAL',TIMESTAMP '2026-10-27 00:00:00',TIMESTAMP '2026-12-01 00:00:00',10,DATE '2026-10-27'
+    SELECT c.COMPANY_ID,'PD_TRIAL',TIMESTAMP '2026-10-27 00:00:00',TIMESTAMP '2027-12-01 00:00:00',10,DATE '2026-10-27'
     FROM COMPANY c
     WHERE c.COMPANY_CODE IN ('ieum0001','ieum0002')
       AND NOT EXISTS (SELECT 1 FROM SERVICE_PERIOD p WHERE p.COMPANY_ID=c.COMPANY_ID);
 
-    -- 현재 유효한 기간이 없을 때만 가장 최근 체험 기간을 12/1까지 연장한다.
+    -- 현재 유효한 기간이 없을 때만 가장 최근 체험 기간을 2027-12-01까지 연장한다.
     -- 유료 기간, 과거 체험 이력, 이미 더 긴 기간은 유지한다.
     UPDATE SERVICE_PERIOD p
-       SET p.ENDS_AT=TIMESTAMP '2026-12-01 00:00:00',
+       SET p.ENDS_AT=TIMESTAMP '2027-12-01 00:00:00',
            p.UPDATED_AT=CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
      WHERE p.PERIOD_TYPE='PD_TRIAL'
        AND p.COMPANY_ID IN (SELECT COMPANY_ID FROM COMPANY WHERE COMPANY_CODE IN ('ieum0001','ieum0002'))
        AND p.STARTS_AT <= CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
-       AND p.ENDS_AT < TIMESTAMP '2026-12-01 00:00:00'
+       AND p.ENDS_AT < TIMESTAMP '2027-12-01 00:00:00'
        AND p.SERVICE_PERIOD_ID=(SELECT MAX(p2.SERVICE_PERIOD_ID) FROM SERVICE_PERIOD p2 WHERE p2.COMPANY_ID=p.COMPANY_ID AND p2.PERIOD_TYPE='PD_TRIAL')
        AND NOT EXISTS (SELECT 1 FROM SERVICE_PERIOD active_period WHERE active_period.COMPANY_ID=p.COMPANY_ID
             AND active_period.STARTS_AT <= CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
@@ -77,7 +77,7 @@ BEGIN
     WHERE c.COMPANY_CODE IN ('ieum0001','ieum0002')
       AND b.BRANCH_NAME IN ('본사','판교지점','부산지점') AND b.USE_YN <> 'Y';
     IF v_count > 0 THEN
-        RAISE_APPLICATION_ERROR(-20103, '시연용 이름과 같은 비활성 지점이 있다. 지점명/활성화 여부를 담당자와 확인한다.');
+        RAISE_APPLICATION_ERROR(-20103, '시연용 이름과 같은 비활성 지점이 있다. 지점명과 사용 여부를 확인한다.');
     END IF;
 
     INSERT INTO ASSET (COMPANY_ID,ASSET_NO,ASSET_NAME,ASSET_TYPE,BRANCH_ID)
@@ -113,7 +113,7 @@ BEGIN
       AND p.STARTS_AT<=CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP)
       AND p.ENDS_AT>CAST(SYSTIMESTAMP AT TIME ZONE 'Asia/Seoul' AS TIMESTAMP);
     IF v_count <> 2 THEN
-        RAISE_APPLICATION_ERROR(-20104, '유효한 시험 이용 기간이 없는 업체가 있다. 유료 기간/미래 기간/12월 이후 시연 날짜를 수동 확인한다.');
+        RAISE_APPLICATION_ERROR(-20104, '유효한 시험 이용 기간이 없는 업체가 있다. 유료 기간/미래 기간/2027-12-01 이후 시연 날짜를 수동 확인한다.');
     END IF;
     SELECT COUNT(*) INTO v_count FROM BRANCH b JOIN COMPANY c ON c.COMPANY_ID=b.COMPANY_ID
     WHERE c.COMPANY_CODE IN ('ieum0001','ieum0002')
